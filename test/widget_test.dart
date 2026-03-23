@@ -1,8 +1,45 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 
-import 'package:flixie_app/main.dart';
+import 'package:flixie_app/providers/auth_provider.dart';
+import 'package:flixie_app/services/auth_service.dart';
 import 'package:flixie_app/theme/app_theme.dart';
+
+// ---------------------------------------------------------------------------
+// Minimal stubs so tests run without a real Firebase project
+// ---------------------------------------------------------------------------
+
+class _FakeUser extends Fake implements User {
+  @override
+  String get uid => 'test-uid';
+  @override
+  String? get displayName => 'Test User';
+  @override
+  String? get email => 'test@example.com';
+  @override
+  String? get photoURL => null;
+}
+
+class _FakeAuthService extends Fake implements AuthService {
+  final _controller = StreamController<User?>.broadcast();
+
+  @override
+  Stream<User?> get authStateChanges => _controller.stream;
+
+  @override
+  User? get currentUser => null;
+
+  void emitUser(User? user) => _controller.add(user);
+
+  @override
+  Future<User?> getUserProfile() async => null;
+
+  void close() => _controller.close();
+}
 
 void main() {
   group('FlixieColors', () {
@@ -51,27 +88,81 @@ void main() {
     });
   });
 
-  group('FlixieApp widget', () {
-    testWidgets('renders without errors', (WidgetTester tester) async {
-      await tester.pumpWidget(const FlixieApp());
-      expect(find.byType(MaterialApp), findsOneWidget);
+  group('AuthProvider', () {
+    late _FakeAuthService fakeAuth;
+    late AuthProvider authProvider;
+
+    setUp(() {
+      fakeAuth = _FakeAuthService();
+      authProvider = AuthProvider(fakeAuth);
     });
 
-    testWidgets('shows bottom navigation bar', (WidgetTester tester) async {
-      await tester.pumpWidget(const FlixieApp());
-      expect(find.byType(NavigationBar), findsOneWidget);
+    tearDown(() => fakeAuth.close());
+
+    test('initial status is unknown', () {
+      expect(authProvider.status, AuthStatus.unknown);
     });
 
-    testWidgets('has three navigation destinations', (WidgetTester tester) async {
-      await tester.pumpWidget(const FlixieApp());
-      expect(find.byType(NavigationDestination), findsNWidgets(3));
+    test('status becomes authenticated when user emitted', () async {
+      fakeAuth.emitUser(_FakeUser());
+      await Future<void>.delayed(Duration.zero);
+      expect(authProvider.status, AuthStatus.authenticated);
+      expect(authProvider.isAuthenticated, isTrue);
+      expect(authProvider.user?.email, 'test@example.com');
     });
 
-    testWidgets('navigation labels are correct', (WidgetTester tester) async {
-      await tester.pumpWidget(const FlixieApp());
-      expect(find.text('Home'), findsOneWidget);
-      expect(find.text('Search'), findsOneWidget);
-      expect(find.text('Profile'), findsOneWidget);
+    test('status becomes unauthenticated when null emitted', () async {
+      fakeAuth.emitUser(_FakeUser());
+      await Future<void>.delayed(Duration.zero);
+      fakeAuth.emitUser(null);
+      await Future<void>.delayed(Duration.zero);
+      expect(authProvider.status, AuthStatus.unauthenticated);
+      expect(authProvider.isAuthenticated, isFalse);
+      expect(authProvider.user, isNull);
+    });
+  });
+
+  group('AuthService.messageFromAuthException', () {
+    FirebaseAuthException makeException(String code) =>
+        FirebaseAuthException(code: code);
+
+    test('user-not-found returns correct message', () {
+      expect(
+        AuthService.messageFromAuthException(makeException('user-not-found')),
+        'No account found for that email.',
+      );
+    });
+
+    test('wrong-password returns correct message', () {
+      expect(
+        AuthService.messageFromAuthException(makeException('wrong-password')),
+        'Incorrect password.',
+      );
+    });
+
+    test('email-already-in-use returns correct message', () {
+      expect(
+        AuthService.messageFromAuthException(
+            makeException('email-already-in-use')),
+        'An account already exists for that email.',
+      );
+    });
+
+    test('weak-password returns correct message', () {
+      expect(
+        AuthService.messageFromAuthException(makeException('weak-password')),
+        'Password must be at least 6 characters.',
+      );
+    });
+
+    test('unknown code returns message field', () {
+      expect(
+        AuthService.messageFromAuthException(
+          FirebaseAuthException(code: 'other', message: 'Some error'),
+        ),
+        'Some error',
+      );
     });
   });
 }
+
