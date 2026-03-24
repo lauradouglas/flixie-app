@@ -28,33 +28,33 @@ class DefaultFirebaseOptions {
 
   // TODO: Replace with your Firebase web app credentials.
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'YOUR_WEB_API_KEY',
-    appId: 'YOUR_WEB_APP_ID',
-    messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
-    projectId: 'YOUR_PROJECT_ID',
-    authDomain: 'YOUR_PROJECT_ID.firebaseapp.com',
-    storageBucket: 'YOUR_PROJECT_ID.appspot.com',
+    apiKey: 'AIzaSyDnfcp89CBYnn0e-iMpx-bcVLLSeRDl-PQ',
+    appId: '1:1093787683868:web:cbfb38400d174042e963d9',
+    messagingSenderId: '1093787683868',
+    projectId: 'flixie-9a8eb',
+    authDomain: 'flixie-9a8eb.firebaseapp.com',
+    storageBucket: 'flixie-9a8eb.appspot.com',
   );
 
   // TODO: Replace with your Firebase Android app credentials.
   // These values come from your google-services.json file.
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'YOUR_ANDROID_API_KEY',
-    appId: 'YOUR_ANDROID_APP_ID',
-    messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
-    projectId: 'YOUR_PROJECT_ID',
-    storageBucket: 'YOUR_PROJECT_ID.appspot.com',
+    apiKey: 'AIzaSyCoDU1xEPxVJ-hCr41gc1QIGTKjjQeRTgo',
+    appId: '1:1093787683868:android:ba7f4704c76d4e65e963d9',
+    messagingSenderId: '1093787683868',
+    projectId: 'flixie-9a8eb',
+    storageBucket: 'flixie-9a8eb.appspot.com',
   );
 
   // TODO: Replace with your Firebase iOS app credentials.
   // These values come from your GoogleService-Info.plist file.
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'YOUR_IOS_API_KEY',
-    appId: 'YOUR_IOS_APP_ID',
-    messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
-    projectId: 'YOUR_PROJECT_ID',
-    storageBucket: 'YOUR_PROJECT_ID.appspot.com',
-    iosClientId: 'YOUR_IOS_CLIENT_ID',
-    iosBundleId: 'YOUR_IOS_BUNDLE_ID',
+    apiKey: 'AIzaSyDEgK7FOpbLfLCdXsDGtETv9ciPgCcdFQQ',
+    appId: '1:1093787683868:ios:a13967c2215d82f3e963d9',
+    messagingSenderId: '1093787683868',
+    projectId: 'flixie-9a8eb',
+    storageBucket: 'flixie-9a8eb.appspot.com',
+    iosClientId: '1093787683868-0vo57s3c7hud798645h5cjc11i5jt43v.apps.googleusercontent.com',
+    iosBundleId: 'com.flixie.flixieApp',
   );
 }
