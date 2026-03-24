@@ -1,0 +1,55 @@
+import '../models/group.dart';
+import 'api_client.dart';
+
+class GroupService {
+  static Future<Group> createGroup(Map<String, dynamic> body) async {
+    final data = await ApiClient.post('/groups', body: body);
+    return Group.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<Group> getGroup(String groupId) async {
+    final data = await ApiClient.get('/groups/$groupId');
+    return Group.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<List<Group>> getUserGroups(String userId) async {
+    final data = await ApiClient.get('/groups/user/$userId');
+    return (data as List<dynamic>)
+        .map((e) => Group.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  static Future<Group> updateGroup(
+      String groupId, Map<String, dynamic> body) async {
+    final data = await ApiClient.put('/groups/$groupId', body: body);
+    return Group.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<void> deleteGroup(String groupId) async {
+    await ApiClient.delete('/groups/$groupId');
+  }
+
+  static Future<void> addMember(String groupId, String userId) async {
+    await ApiClient.post(
+      '/groups/$groupId/members',
+      body: {'userId': userId},
+    );
+  }
+
+  static Future<void> removeMember(String groupId, String userId) async {
+    await ApiClient.delete(
+      '/groups/$groupId/members',
+      body: {'userId': userId},
+    );
+  }
+
+  static Future<void> sendGroupMessage(
+      String groupId, Map<String, dynamic> body) async {
+    await ApiClient.post('/groups/$groupId/messages', body: body);
+  }
+
+  static Future<List<dynamic>> getGroupMessages(String groupId) async {
+    final data = await ApiClient.get('/groups/$groupId/messages');
+    return data as List<dynamic>;
+  }
+}
