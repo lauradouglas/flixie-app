@@ -1,13 +1,26 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
+import 'firebase_options.dart';
+import 'providers/auth_provider.dart';
+import 'services/auth_service.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/auth/login_screen.dart';
+import 'screens/auth/signup_screen.dart';
+import 'screens/auth/forgot_password_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   // Lock to portrait + landscape orientations, allow both
   SystemChrome.setPreferredOrientations([
@@ -27,7 +40,65 @@ void main() {
     ),
   );
 
-  runApp(const FlixieApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => AuthProvider(AuthService()),
+      child: const FlixieApp(),
+    ),
+  );
+}
+
+/// Builds the GoRouter, refreshing whenever [AuthProvider] changes.
+GoRouter _buildRouter(AuthProvider authProvider) {
+  return GoRouter(
+    refreshListenable: authProvider,
+    redirect: (context, state) {
+      final isAuthenticated = authProvider.isAuthenticated;
+      final isAuthRoute = state.matchedLocation.startsWith('/auth');
+
+      // Still determining auth state – stay put
+      if (authProvider.status == AuthStatus.unknown) return null;
+
+      if (!isAuthenticated && !isAuthRoute) return '/auth/login';
+      if (isAuthenticated && isAuthRoute) return '/';
+      return null;
+    },
+    routes: [
+      // Main shell (authenticated)
+      ShellRoute(
+        builder: (context, state, child) =>
+            MainNavigationShell(child: child),
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (context, state) => const HomeScreen(),
+          ),
+          GoRoute(
+            path: '/search',
+            builder: (context, state) => const SearchScreen(),
+          ),
+          GoRoute(
+            path: '/profile',
+            builder: (context, state) => const ProfileScreen(),
+          ),
+        ],
+      ),
+
+      // Auth routes (unauthenticated)
+      GoRoute(
+        path: '/auth/login',
+        builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/auth/signup',
+        builder: (context, state) => const SignupScreen(),
+      ),
+      GoRoute(
+        path: '/auth/forgot-password',
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+    ],
+  );
 }
 
 class FlixieApp extends StatelessWidget {
@@ -35,45 +106,42 @@ class FlixieApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    final authProvider = context.watch<AuthProvider>();
+    final router = _buildRouter(authProvider);
+
+    return MaterialApp.router(
       title: 'Flixie',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      home: const MainNavigationShell(),
+      routerConfig: router,
     );
   }
 }
 
-class MainNavigationShell extends StatefulWidget {
-  const MainNavigationShell({super.key});
+/// Bottom-navigation shell shown when the user is authenticated.
+class MainNavigationShell extends StatelessWidget {
+  const MainNavigationShell({super.key, required this.child});
 
-  @override
-  State<MainNavigationShell> createState() => _MainNavigationShellState();
-}
+  final Widget child;
 
-class _MainNavigationShellState extends State<MainNavigationShell> {
-  int _selectedIndex = 0;
-
-  static const List<Widget> _screens = [
-    HomeScreen(),
-    SearchScreen(),
-    ProfileScreen(),
-  ];
-
-  void _onTabTapped(int index) {
-    setState(() => _selectedIndex = index);
+  static int _indexFromLocation(String location) {
+    if (location.startsWith('/search')) return 1;
+    if (location.startsWith('/profile')) return 2;
+    return 0;
   }
+
+  static const List<String> _routes = ['/', '/search', '/profile'];
 
   @override
   Widget build(BuildContext context) {
+    final location = GoRouterState.of(context).matchedLocation;
+    final selectedIndex = _indexFromLocation(location);
+
     return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _screens,
-      ),
+      body: child,
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: _onTabTapped,
+        selectedIndex: selectedIndex,
+        onDestinationSelected: (index) => context.go(_routes[index]),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),

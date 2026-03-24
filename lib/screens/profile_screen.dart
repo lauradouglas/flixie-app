@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -8,6 +10,14 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final auth = context.watch<AuthProvider>();
+    final user = auth.user;
+
+    final displayName = user?.displayName?.trim().isNotEmpty == true
+        ? user!.displayName!
+        : 'Guest User';
+    final email = user?.email ?? '';
+    final photoUrl = user?.photoURL;
 
     return Scaffold(
       appBar: AppBar(
@@ -28,15 +38,20 @@ class ProfileScreen extends StatelessWidget {
             CircleAvatar(
               radius: 48,
               backgroundColor: FlixieColors.primary.withValues(alpha: 0.3),
-              child: const Icon(
-                Icons.person,
-                size: 48,
-                color: FlixieColors.primary,
-              ),
+              backgroundImage:
+                  photoUrl != null ? NetworkImage(photoUrl) : null,
+              child: photoUrl == null
+                  ? const Icon(
+                      Icons.person,
+                      size: 48,
+                      color: FlixieColors.primary,
+                    )
+                  : null,
             ),
             const SizedBox(height: 12),
-            Text('Guest User', style: textTheme.headlineMedium),
-            Text('@flixie_user', style: textTheme.bodySmall),
+            Text(displayName, style: textTheme.headlineMedium),
+            if (email.isNotEmpty)
+              Text(email, style: textTheme.bodySmall),
 
             const SizedBox(height: 24),
 
@@ -71,14 +86,20 @@ class ProfileScreen extends StatelessWidget {
 
             // Sign out button
             OutlinedButton.icon(
-              icon: const Icon(Icons.logout),
+              icon: auth.isLoading
+                  ? const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.logout),
               label: const Text('Sign Out'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: FlixieColors.danger,
                 side: const BorderSide(color: FlixieColors.danger),
                 minimumSize: const Size.fromHeight(48),
               ),
-              onPressed: () {},
+              onPressed: auth.isLoading ? null : () => auth.signOut(),
             ),
 
             const SizedBox(height: 16),
