@@ -2,10 +2,13 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../models/movie.dart';
+import '../models/review.dart';
+import '../services/movie_service.dart';
 import '../theme/app_theme.dart';
 
 // ---------------------------------------------------------------------------
-// Data stubs – in a real app these come from MovieService / the API.
+// Local stub types – cast and similar movies are not yet served by the API.
 // ---------------------------------------------------------------------------
 
 class _CastMember {
@@ -18,22 +21,6 @@ class _CastMember {
   final String name;
   final String character;
   final String? profilePath;
-}
-
-class _UserReview {
-  const _UserReview({
-    required this.author,
-    required this.date,
-    required this.rating,
-    required this.body,
-    this.avatarInitials = 'JD',
-  });
-
-  final String author;
-  final String date;
-  final int rating;
-  final String body;
-  final String avatarInitials;
 }
 
 class _SimilarMovie {
@@ -60,27 +47,13 @@ class MovieDetailScreen extends StatefulWidget {
 }
 
 class _MovieDetailScreenState extends State<MovieDetailScreen> {
+  Movie? _movie;
+  List<Review> _reviews = [];
+  bool _isLoading = true;
+  String? _error;
   bool _inWatchlist = false;
 
-  // --- placeholder data -------------------------------------------------------
-  static const String _movieTitle = 'NEON ASCENSION';
-  static const String _year = '2024';
-  static const String _rating = 'PG-13';
-  static const String _runtime = '2h 15m';
-  static const double _cineScore = 8.9;
-  static const int _criticsScore = 94;
-  static const String _audienceScore = 'A+';
-  static const String _synopsis =
-      'In a decaying hyper-metropolis where memories are traded like currency, '
-      'a low-level data courier discovers a fragment of code that could restart '
-      'the sun. Pursued by celestial enforcers and underground syndicates, they '
-      'must ascend to the legendary Spire before the final eclipse '
-      'permanentizes the dark.';
-  static const List<String> _genres = ['SCI-FI', 'ACTION', '4K ULTRA HD'];
-  static const String _director = 'Denis Villeneuve';
-  static const String _writers = 'Elena Vance, Jonathan Reed';
-  static const String _studio = 'Warner Bros. / Legendary';
-
+  // Stub data for sections not yet available from the API.
   static const List<_CastMember> _cast = [
     _CastMember(name: 'Liam Vance', character: 'Kaelen Flux'),
     _CastMember(name: 'Sarah Chen', character: 'Nova Seven'),
@@ -88,33 +61,144 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     _CastMember(name: 'Priya Nair', character: 'Echo'),
   ];
 
-  static const List<_UserReview> _reviews = [
-    _UserReview(
-      author: 'John Doe',
-      date: 'Feb 12, 2024',
-      rating: 9,
-      body:
-          'Visually stunning and emotionally resonant. The world-building is '
-          "top-notch. It's rare to see a sci-fi film today that takes this "
-          'many risks.',
-      avatarInitials: 'JD',
-    ),
-  ];
-
   static const List<_SimilarMovie> _similar = [
     _SimilarMovie(title: 'Digital Mirage'),
     _SimilarMovie(title: 'The Void Project'),
     _SimilarMovie(title: 'Orbit Zero'),
   ];
-  // ---------------------------------------------------------------------------
+
+  // ---- Data loading ---------------------------------------------------------
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final id = int.tryParse(widget.movieId);
+    if (id == null || id <= 0) {
+      if (mounted) {
+        setState(() {
+          _error = 'Invalid movie ID.';
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+    try {
+      final results = await Future.wait([
+        MovieService.getMovieById(id),
+        MovieService.getMovieReviews(id),
+      ]);
+      if (mounted) {
+        setState(() {
+          _movie = results[0] as Movie;
+          _reviews = results[1] as List<Review>;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  // ---- Helpers --------------------------------------------------------------
+
+  /// Extracts a 4-digit year from a date string like "2024-03-15".
+  String _extractYear(String? dateStr) {
+    if (dateStr == null || dateStr.length < 4) return '';
+    return dateStr.substring(0, 4);
+  }
+
+  /// Formats runtime in minutes to "Xh Ym".
+  String _formatRuntime(int? minutes) {
+    if (minutes == null || minutes <= 0) return '';
+    final h = minutes ~/ 60;
+    final m = minutes % 60;
+    if (h == 0) return '${m}m';
+    if (m == 0) return '${h}h';
+    return '${h}h ${m}m';
+  }
+
+  /// Derives two-letter initials from a userId string.
+  String _initials(String userId) {
+    if (userId.isEmpty) return '?';
+    return userId.substring(0, userId.length >= 2 ? 2 : userId.length).toUpperCase();
+  }
+
+  // ---- Build ----------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF0D1B2A),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_error != null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF0D1B2A),
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF0D1B2A),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: FlixieColors.light),
+            onPressed: () => context.pop(),
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  color: FlixieColors.danger,
+                  size: 56,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Failed to load movie',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _error!,
+                  style: Theme.of(context).textTheme.bodySmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _isLoading = true;
+                      _error = null;
+                    });
+                    _load();
+                  },
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final movie = _movie!;
     return Scaffold(
       backgroundColor: const Color(0xFF0D1B2A),
       body: CustomScrollView(
         slivers: [
-          _buildSliverAppBar(context),
+          _buildSliverAppBar(context, movie),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -122,19 +206,18 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 16),
-                  _buildGenreChips(),
+                  if (movie.tagline != null && movie.tagline!.isNotEmpty)
+                    _buildTaglineChip(movie.tagline!),
                   const SizedBox(height: 12),
-                  _buildTitleBlock(context),
+                  _buildTitleBlock(context, movie),
                   const SizedBox(height: 16),
-                  _buildScores(context),
+                  _buildScores(context, movie),
                   const Divider(height: 32, color: Color(0xFF1E2D40)),
-                  _buildSynopsis(context),
+                  _buildSynopsis(context, movie),
                   const SizedBox(height: 24),
                   _buildWatchNowButton(),
                   const SizedBox(height: 12),
                   _buildAddToListButton(),
-                  const SizedBox(height: 20),
-                  _buildCreditsCard(context),
                   const SizedBox(height: 28),
                   _buildTopCastSection(context),
                   const SizedBox(height: 28),
@@ -153,7 +236,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   // ---- Sliver app bar with hero image --------------------------------------
 
-  Widget _buildSliverAppBar(BuildContext context) {
+  Widget _buildSliverAppBar(BuildContext context, Movie movie) {
     return SliverAppBar(
       expandedHeight: 240,
       pinned: true,
@@ -163,7 +246,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         onPressed: () => context.pop(),
       ),
       title: const Text(
-        'CINEHUB',
+        'FLIXIE',
         style: TextStyle(
           color: FlixieColors.primary,
           fontWeight: FontWeight.bold,
@@ -183,29 +266,31 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         ),
       ],
       flexibleSpace: FlexibleSpaceBar(
-        background: _HeroBackdrop(posterPath: null),
+        background: _HeroBackdrop(
+          imagePath: movie.backdropPath ?? movie.posterPath,
+        ),
       ),
     );
   }
 
-  // ---- Genre chips ---------------------------------------------------------
+  // ---- Tagline chip --------------------------------------------------------
 
-  Widget _buildGenreChips() {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 6,
-      children: _genres.map((g) => _GenreChip(label: g)).toList(),
-    );
+  Widget _buildTaglineChip(String tagline) {
+    return _GenreChip(label: tagline.toUpperCase());
   }
 
   // ---- Title + meta --------------------------------------------------------
 
-  Widget _buildTitleBlock(BuildContext context) {
+  Widget _buildTitleBlock(BuildContext context, Movie movie) {
+    final year = _extractYear(movie.releaseDate);
+    final runtime = _formatRuntime(movie.runtime);
+    final meta = [year, runtime].where((s) => s.isNotEmpty).join('  •  ');
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          _movieTitle,
+          movie.title.toUpperCase(),
           style: const TextStyle(
             color: FlixieColors.white,
             fontSize: 30,
@@ -213,46 +298,62 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             letterSpacing: 0.5,
           ),
         ),
-        const SizedBox(height: 6),
-        Text(
-          '$_year  •  $_rating  •  $_runtime',
-          style: const TextStyle(
-            color: FlixieColors.medium,
-            fontSize: 13,
+        if (meta.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            meta,
+            style: const TextStyle(
+              color: FlixieColors.medium,
+              fontSize: 13,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
 
   // ---- Score row -----------------------------------------------------------
 
-  Widget _buildScores(BuildContext context) {
+  Widget _buildScores(BuildContext context, Movie movie) {
+    final score = movie.voteAverage;
+    final voteCount = movie.voteCount;
+
     return Row(
       children: [
-        _ScoreTile(
-          leading: const Icon(Icons.star, color: FlixieColors.warning, size: 18),
-          value: _cineScore.toString(),
-          label: 'CINESCORE',
-        ),
-        const SizedBox(width: 28),
-        _ScoreTile(
-          value: '$_criticsScore%',
-          valueColor: FlixieColors.success,
-          label: 'CRITICS',
-        ),
-        const SizedBox(width: 28),
-        _ScoreTile(
-          value: _audienceScore,
-          label: 'AUDIENCE',
-        ),
+        if (score != null)
+          _ScoreTile(
+            leading:
+                const Icon(Icons.star, color: FlixieColors.warning, size: 18),
+            value: score.toStringAsFixed(1),
+            label: 'CINESCORE',
+          ),
+        if (score != null && voteCount != null) const SizedBox(width: 28),
+        if (voteCount != null)
+          _ScoreTile(
+            value: _formatVoteCount(voteCount),
+            valueColor: FlixieColors.success,
+            label: 'VOTES',
+          ),
       ],
     );
   }
 
+  String _formatVoteCount(int count) {
+    if (count >= 1000000) {
+      return '${(count / 1000000).toStringAsFixed(1)}M';
+    }
+    if (count >= 1000) {
+      return '${(count / 1000).toStringAsFixed(1)}K';
+    }
+    return count.toString();
+  }
+
   // ---- Synopsis ------------------------------------------------------------
 
-  Widget _buildSynopsis(BuildContext context) {
+  Widget _buildSynopsis(BuildContext context, Movie movie) {
+    final text = movie.overview;
+    if (text == null || text.isEmpty) return const SizedBox.shrink();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -265,7 +366,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         ),
         const SizedBox(height: 10),
         Text(
-          _synopsis,
+          text,
           style: const TextStyle(
             color: FlixieColors.light,
             fontSize: 14,
@@ -318,29 +419,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
         onPressed: () => setState(() => _inWatchlist = !_inWatchlist),
-      ),
-    );
-  }
-
-  // ---- Credits card --------------------------------------------------------
-
-  Widget _buildCreditsCard(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1B2E42),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _CreditsRow(label: 'DIRECTOR', value: _director),
-          const SizedBox(height: 12),
-          _CreditsRow(label: 'WRITERS', value: _writers),
-          const SizedBox(height: 12),
-          _CreditsRow(label: 'STUDIO', value: _studio),
-        ],
       ),
     );
   }
@@ -431,7 +509,19 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        ..._reviews.map((r) => _ReviewCard(review: r)),
+        if (_reviews.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'No reviews yet. Be the first to write one!',
+              style: TextStyle(color: FlixieColors.medium, fontSize: 13),
+            ),
+          )
+        else
+          ..._reviews.map((r) => _ReviewCard(
+                review: r,
+                avatarInitials: _initials(r.userId),
+              )),
       ],
     );
   }
@@ -469,18 +559,18 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 // ---------------------------------------------------------------------------
 
 class _HeroBackdrop extends StatelessWidget {
-  const _HeroBackdrop({this.posterPath});
+  const _HeroBackdrop({this.imagePath});
 
-  final String? posterPath;
+  final String? imagePath;
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       fit: StackFit.expand,
       children: [
-        posterPath != null
+        imagePath != null
             ? CachedNetworkImage(
-                imageUrl: posterPath!,
+                imageUrl: imagePath!,
                 fit: BoxFit.cover,
                 errorWidget: (_, __, ___) => _placeholder(),
               )
@@ -605,40 +695,6 @@ class _ScoreTile extends StatelessWidget {
   }
 }
 
-class _CreditsRow extends StatelessWidget {
-  const _CreditsRow({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: FlixieColors.medium,
-            fontSize: 11,
-            letterSpacing: 1,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: const TextStyle(
-            color: FlixieColors.light,
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _CastCard extends StatelessWidget {
   const _CastCard({required this.member});
 
@@ -704,9 +760,10 @@ class _CastCard extends StatelessWidget {
 }
 
 class _ReviewCard extends StatelessWidget {
-  const _ReviewCard({required this.review});
+  const _ReviewCard({required this.review, required this.avatarInitials});
 
-  final _UserReview review;
+  final Review review;
+  final String avatarInitials;
 
   @override
   Widget build(BuildContext context) {
@@ -727,7 +784,7 @@ class _ReviewCard extends StatelessWidget {
                 radius: 20,
                 backgroundColor: FlixieColors.primary.withValues(alpha: 0.3),
                 child: Text(
-                  review.avatarInitials,
+                  avatarInitials,
                   style: const TextStyle(
                     color: FlixieColors.primary,
                     fontWeight: FontWeight.bold,
@@ -741,26 +798,28 @@ class _ReviewCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      review.author,
+                      review.title,
                       style: const TextStyle(
                         color: FlixieColors.white,
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
                       ),
                     ),
-                    Text(
-                      review.date,
-                      style: const TextStyle(
-                        color: FlixieColors.medium,
-                        fontSize: 12,
+                    if (review.createdAt != null)
+                      Text(
+                        review.createdAt!,
+                        style: const TextStyle(
+                          color: FlixieColors.medium,
+                          fontSize: 12,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
               Row(
                 children: [
-                  const Icon(Icons.star, color: FlixieColors.warning, size: 14),
+                  const Icon(Icons.star,
+                      color: FlixieColors.warning, size: 14),
                   const SizedBox(width: 3),
                   Text(
                     '${review.rating}/10',
@@ -846,3 +905,4 @@ class _SimilarCard extends StatelessWidget {
     );
   }
 }
+
