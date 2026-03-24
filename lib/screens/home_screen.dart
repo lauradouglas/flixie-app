@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../theme/app_theme.dart';
 
@@ -38,7 +39,7 @@ class HomeScreen extends StatelessWidget {
                 itemCount: 5,
                 separatorBuilder: (_, __) => const SizedBox(width: 12),
                 itemBuilder: (context, index) =>
-                    _FeaturedCard(index: index),
+                    _FeaturedCard(index: index, onTap: () => context.push('/movies/${index + 1}')),
               ),
             ),
 
@@ -56,7 +57,7 @@ class HomeScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: 6,
               separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, index) => _ListCard(index: index),
+              itemBuilder: (context, index) => _ListCard(index: index, onTap: () => context.push('/movies/${index + 10}')),
             ),
           ],
         ),
@@ -66,9 +67,10 @@ class HomeScreen extends StatelessWidget {
 }
 
 class _FeaturedCard extends StatelessWidget {
-  const _FeaturedCard({required this.index});
+  const _FeaturedCard({required this.index, this.onTap});
 
   final int index;
+  final VoidCallback? onTap;
 
   static const List<Color> _gradients = [
     FlixieColors.primary,
@@ -85,36 +87,39 @@ class _FeaturedCard extends StatelessWidget {
       width: 160,
       child: Card(
         clipBehavior: Clip.antiAlias,
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                color.withValues(alpha: 0.8),
-                color.withValues(alpha: 0.3),
-              ],
+        child: InkWell(
+          onTap: onTap,
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  color.withValues(alpha: 0.8),
+                  color.withValues(alpha: 0.3),
+                ],
+              ),
             ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                const Icon(Icons.movie_outlined, size: 36),
-                const SizedBox(height: 8),
-                Text(
-                  'Title ${index + 1}',
-                  style: Theme.of(context).textTheme.titleMedium,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  'Genre • Year',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  const Icon(Icons.movie_outlined, size: 36),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Title ${index + 1}',
+                    style: Theme.of(context).textTheme.titleMedium,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    'Genre • Year',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -124,9 +129,10 @@ class _FeaturedCard extends StatelessWidget {
 }
 
 class _ListCard extends StatelessWidget {
-  const _ListCard({required this.index});
+  const _ListCard({required this.index, this.onTap});
 
   final int index;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -147,7 +153,7 @@ class _ListCard extends StatelessWidget {
           Icons.chevron_right,
           color: FlixieColors.medium,
         ),
-        onTap: () {},
+        onTap: onTap,
       ),
     );
   }

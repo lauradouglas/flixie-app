@@ -9,7 +9,9 @@ import 'providers/auth_provider.dart';
 import 'services/auth_service.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
+import 'screens/movie_detail_screen.dart';
 import 'screens/search_screen.dart';
+import 'screens/watchlist_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/signup_screen.dart';
@@ -78,8 +80,18 @@ GoRouter _buildRouter(AuthProvider authProvider) {
             builder: (context, state) => const SearchScreen(),
           ),
           GoRoute(
+            path: '/watchlist',
+            builder: (context, state) => const WatchlistScreen(),
+          ),
+          GoRoute(
             path: '/profile',
             builder: (context, state) => const ProfileScreen(),
+          ),
+          GoRoute(
+            path: '/movies/:id',
+            builder: (context, state) => MovieDetailScreen(
+              movieId: state.pathParameters['id'] ?? '0',
+            ),
           ),
         ],
       ),
@@ -126,11 +138,12 @@ class MainNavigationShell extends StatelessWidget {
 
   static int _indexFromLocation(String location) {
     if (location.startsWith('/search')) return 1;
-    if (location.startsWith('/profile')) return 2;
+    if (location.startsWith('/watchlist')) return 2;
+    if (location.startsWith('/profile')) return 3;
     return 0;
   }
 
-  static const List<String> _routes = ['/', '/search', '/profile'];
+  static const List<String> _routes = ['/', '/search', '/watchlist', '/profile'];
 
   @override
   Widget build(BuildContext context) {
@@ -144,14 +157,19 @@ class MainNavigationShell extends StatelessWidget {
         onDestinationSelected: (index) => context.go(_routes[index]),
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
+            icon: Icon(Icons.explore_outlined),
+            selectedIcon: Icon(Icons.explore),
+            label: 'Discover',
           ),
           NavigationDestination(
             icon: Icon(Icons.search_outlined),
             selectedIcon: Icon(Icons.search),
             label: 'Search',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.bookmark_border_outlined),
+            selectedIcon: Icon(Icons.bookmark),
+            label: 'Watchlist',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),
