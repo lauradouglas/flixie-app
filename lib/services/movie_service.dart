@@ -2,6 +2,7 @@ import '../models/movie.dart';
 import '../models/movie_credits.dart';
 import '../models/review.dart';
 import '../models/similar_movie.dart';
+import '../models/movie_short.dart';
 import '../models/watch_provider.dart';
 import '../utils/app_logger.dart';
 import 'api_client.dart';
@@ -131,7 +132,17 @@ class MovieService {
         .map((e) => Review.fromJson(e as Map<String, dynamic>))
         .toList();
   }
-
+  static Future<List<MovieShort>> getNowPlayingMovies({String region = 'US'}) async {
+    apiLogger.d('Fetching now playing movies for region $region');
+    final data = await ApiClient.get('/movies/now_playing', queryParams: {'region': region});
+    apiLogger.d('now_playing raw response type: ${data.runtimeType}');
+    apiLogger.d('now_playing response: $data');
+    final movies = (data as List<dynamic>)
+        .map((e) => MovieShort.fromJson(e as Map<String, dynamic>))
+        .toList();
+    apiLogger.d('now_playing parsed ${movies.length} movies');
+    return movies;
+  }
   // ---- Cache management methods ----
 
   /// Clear all cached movies
