@@ -22,24 +22,43 @@ A Flutter frontend for the Flixie backend, targeting **Android** and **iOS**.
    real values from your Firebase project (or run `flutterfire configure` to generate
    this file automatically).
 
+### API Base URL
+
+The app reads the backend URL from the `API_BASE_URL` build-time variable (via
+`--dart-define`). When the variable is not supplied it defaults to
+`http://localhost:3000`, which works for the Android emulator and iOS simulator.
+
+| Target | `--dart-define=API_BASE_URL=` value |
+|---|---|
+| iOS simulator | *(omit — default `http://localhost:3000` works)* |
+| Android emulator | `http://10.0.2.2:3000` (localhost loopback alias) |
+| Physical device | `http://<your-machine-LAN-IP>:3000` |
+| Production | `https://api.example.com` |
+
 ### Setup
 
 ```bash
 # Install dependencies
 flutter pub get
 
-# Run on a connected device or emulator
+# Run on iOS simulator (default http://localhost:3000 works)
 flutter run
+
+# Run on Android emulator (localhost doesn't route to host machine)
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000
+
+# Run on a physical device pointing at your local machine
+flutter run --dart-define=API_BASE_URL=http://192.168.1.100:3000
 ```
 
 ### Building
 
 ```bash
 # Android APK
-flutter build apk --release
+flutter build apk --release --dart-define=API_BASE_URL=https://api.example.com
 
 # iOS (requires macOS + Xcode)
-flutter build ios --release
+flutter build ios --release --dart-define=API_BASE_URL=https://api.example.com
 ```
 
 ### Testing
