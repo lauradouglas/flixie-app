@@ -35,13 +35,29 @@ class Movie {
       overview: json['overview'] as String?,
       posterPath: json['posterPath'] as String?,
       backdropPath: json['backdropPath'] as String?,
-      popularity: (json['popularity'] as num?)?.toDouble(),
-      voteAverage: (json['voteAverage'] as num?)?.toDouble(),
-      voteCount: json['voteCount'] as int?,
-      runtime: json['runtime'] as int?,
+      popularity: _parseDouble(json['popularity']),
+      voteAverage: _parseDouble(json['voteAverage']),
+      voteCount: _parseInt(json['voteCount']),
+      runtime: _parseInt(json['runtime']),
       tagline: json['tagline'] as String?,
       status: json['status'] as String?,
     );
+  }
+
+  static double? _parseDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
+  static int? _parseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
   }
 
   Map<String, dynamic> toJson() {

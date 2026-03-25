@@ -27,13 +27,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     final auth = context.read<AuthProvider>();
+    
     final success = await auth.signIn(
       _emailController.text,
       _passwordController.text,
     );
-    if (!success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
+    
+    if (!success) {
+      messenger.showSnackBar(
         SnackBar(
           content: Text(auth.errorMessage ?? 'Sign in failed.'),
           backgroundColor: FlixieColors.danger,

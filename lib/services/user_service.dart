@@ -1,3 +1,5 @@
+import 'package:flixie_app/models/review.dart';
+
 import '../models/user.dart';
 import 'api_client.dart';
 
@@ -18,8 +20,16 @@ class UserService {
   }
 
   static Future<User> getUserByExternalId(String externalId) async {
-    final data = await ApiClient.get('/users/external-id/$externalId');
-    return User.fromJson(data as Map<String, dynamic>);
+    print('🌐 [UserService] GET /users/external-id/$externalId');
+    try {
+      final data = await ApiClient.get('/users/external-id/$externalId');
+      print(
+          '✅ [UserService] User data received: ${(data as Map<String, dynamic>)['username']}');
+      return User.fromJson(data);
+    } catch (e) {
+      print('❌ [UserService] Error fetching user by externalId: $e');
+      rethrow;
+    }
   }
 
   static Future<bool> usernameExists(String username) async {
@@ -60,5 +70,13 @@ class UserService {
       body: {'iconColorId': iconColorId},
     );
     return User.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<List<Review>> getMovieReviews(int movieId) async {
+    final data = await ApiClient.get('/users/movie/$movieId/reviews');
+    // final data = await ApiClient.get('/users/movie/11/reviews');
+    return (data as List<dynamic>)
+        .map((e) => Review.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 }

@@ -13,6 +13,22 @@ class User {
   final bool darkMode;
   final String? createdAt;
   final String? updatedAt;
+  final String? initials;
+  
+  // Nested objects
+  final Map<String, dynamic>? country;
+  final Map<String, dynamic>? language;
+  final Map<String, dynamic>? iconColor;
+  
+  // Lists
+  final List<dynamic>? watchedMovies;
+  final List<dynamic>? watchedShows;
+  final List<dynamic>? movieWatchlist;
+  final List<dynamic>? showWatchlist;
+  final List<dynamic>? favoriteMovies;
+  final List<dynamic>? favoriteShows;
+  final List<dynamic>? favoritePeople;
+  final List<dynamic>? favoriteGenres;
 
   const User({
     required this.id,
@@ -29,6 +45,18 @@ class User {
     required this.darkMode,
     this.createdAt,
     this.updatedAt,
+    this.initials,
+    this.country,
+    this.language,
+    this.iconColor,
+    this.watchedMovies,
+    this.watchedShows,
+    this.movieWatchlist,
+    this.showWatchlist,
+    this.favoriteMovies,
+    this.favoriteShows,
+    this.favoritePeople,
+    this.favoriteGenres,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -47,6 +75,18 @@ class User {
       darkMode: json['darkMode'] as bool,
       createdAt: json['createdAt'] as String?,
       updatedAt: json['updatedAt'] as String?,
+      initials: json['initials'] as String?,
+      country: json['country'] as Map<String, dynamic>?,
+      language: json['language'] as Map<String, dynamic>?,
+      iconColor: json['iconColor'] as Map<String, dynamic>?,
+      watchedMovies: json['watchedMovies'] as List<dynamic>?,
+      watchedShows: json['watchedShows'] as List<dynamic>?,
+      movieWatchlist: json['movieWatchlist'] as List<dynamic>?,
+      showWatchlist: json['showWatchlist'] as List<dynamic>?,
+      favoriteMovies: json['favoriteMovies'] as List<dynamic>?,
+      favoriteShows: json['favoriteShows'] as List<dynamic>?,
+      favoritePeople: json['favoritePeople'] as List<dynamic>?,
+      favoriteGenres: json['favoriteGenres'] as List<dynamic>?,
     );
   }
 
@@ -66,6 +106,18 @@ class User {
       'darkMode': darkMode,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
+      'initials': initials,
+      'country': country,
+      'language': language,
+      'iconColor': iconColor,
+      'watchedMovies': watchedMovies,
+      'watchedShows': watchedShows,
+      'movieWatchlist': movieWatchlist,
+      'showWatchlist': showWatchlist,
+      'favoriteMovies': favoriteMovies,
+      'favoriteShows': favoriteShows,
+      'favoritePeople': favoritePeople,
+      'favoriteGenres': favoriteGenres,
     };
   }
 }

@@ -1,5 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'api_client.dart';
+
 /// Wraps Firebase Authentication to provide login, sign-up, logout,
 /// forgot-password, and user-profile operations.
 class AuthService {
@@ -17,11 +19,20 @@ class AuthService {
   /// Signs in with [email] and [password].
   ///
   /// Throws a [FirebaseAuthException] on failure.
-  Future<UserCredential> signIn(String email, String password) {
-    return _auth.signInWithEmailAndPassword(
+  Future<UserCredential> signIn(String email, String password) async {
+    final credential = await _auth.signInWithEmailAndPassword(
       email: email.trim(),
       password: password,
     );
+    
+    // Get the ID token and set it in ApiClient
+    final idToken = await credential.user?.getIdToken();
+    if (idToken != null) {
+      print('🔑 [AuthService] Got Firebase ID token, setting in ApiClient');
+      ApiClient.setToken(idToken);
+    }
+    
+    return credential;
   }
 
   /// Creates a new account with [email] and [password], then sets [displayName].
@@ -37,11 +48,23 @@ class AuthService {
       password: password,
     );
     await credential.user?.updateDisplayName(displayName.trim());
+    
+    // Get the ID token and set it in ApiClient
+    final idToken = await credential.user?.getIdToken();
+    if (idToken != null) {
+      print('🔑 [AuthService] Got Firebase ID token after signup, setting in ApiClient');
+      ApiClient.setToken(idToken);
+    }
+    
     return credential;
   }
 
   /// Signs out the current user.
-  Future<void> signOut() => _auth.signOut();
+  Future<void> signOut() async {
+    print('🚪 [AuthService] Signing out, clearing API token');
+    ApiClient.setToken(null);
+    await _auth.signOut();
+  }
 
   /// Sends a password-reset email to [email].
   ///
@@ -60,6 +83,8 @@ class AuthService {
   /// Returns a human-readable message for common [FirebaseAuthException] codes.
   static String messageFromAuthException(FirebaseAuthException e) {
     switch (e.code) {
+      case 'invalid-credential':
+        return 'Invalid email or password.';
       case 'user-not-found':
         return 'No account found for that email.';
       case 'wrong-password':
