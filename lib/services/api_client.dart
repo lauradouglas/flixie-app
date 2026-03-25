@@ -72,7 +72,7 @@ class ApiClient {
     final response = await http.get(uri, headers: _headers());
     
     print('📥 [ApiClient] Response ${response.statusCode}');
-    print('   Body: ${response.body.length > 200 ? response.body.substring(0, 200) + "..." : response.body}');
+    print('   Body: ${response.body.length > 200 ? "${response.body.substring(0, 200)}..." : response.body}');
     
     return _parseResponse(response);
   }

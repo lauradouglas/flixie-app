@@ -153,6 +153,35 @@ class AuthProvider extends ChangeNotifier {
   /// Reloads and returns the current user profile from Firebase.
   Future<firebase_auth.User?> getUserProfile() => _authService.getUserProfile();
   
+  /// Updates the database user without making an API call.
+  /// Use this when you already have updated user data from an API response.
+  void updateDbUser(models.User user) {
+    print('🔄 [AuthProvider] Updating database user: ${user.username}');
+    _dbUser = user;
+    notifyListeners();
+  }
+
+  /// Updates a specific list field on the user
+  void updateUserList({
+    List<dynamic>? watchedMovies,
+    List<dynamic>? movieWatchlist,
+    List<dynamic>? favoriteMovies,
+  }) {
+    if (_dbUser == null) return;
+    
+    print('🔄 [AuthProvider] Updating user lists:');
+    if (watchedMovies != null) print('   Watched: ${watchedMovies.length} items');
+    if (movieWatchlist != null) print('   Watchlist: ${movieWatchlist.length} items');
+    if (favoriteMovies != null) print('   Favorites: ${favoriteMovies.length} items');
+    
+    _dbUser = _dbUser!.copyWith(
+      watchedMovies: watchedMovies ?? _dbUser!.watchedMovies,
+      movieWatchlist: movieWatchlist ?? _dbUser!.movieWatchlist,
+      favoriteMovies: favoriteMovies ?? _dbUser!.favoriteMovies,
+    );
+    notifyListeners();
+  }
+  
   /// Refreshes the database user from the backend.
   Future<void> refreshDbUser() async {
     print('🔄 [AuthProvider] Manually refreshing database user');

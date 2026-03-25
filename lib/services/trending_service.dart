@@ -15,9 +15,7 @@ class TrendingService {
     }
 
     // Fetch from API
-    print('🌐 [TrendingService] Fetching trending movies ($timeWindow) from API');
-    final data = await ApiClient.get('/trending/movie/week',
-        queryParams: {'timeWindow': timeWindow});
+    final data = await ApiClient.get('/trending/movie/week');
     final trendingMovies = (data as List<dynamic>)
         .map((e) => TrendingMovie.fromJson(e as Map<String, dynamic>))
         .toList();

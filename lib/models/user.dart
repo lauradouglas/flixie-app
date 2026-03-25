@@ -90,6 +90,96 @@ class User {
     );
   }
 
+  // Helper methods to check movie status
+  bool isMovieInWatchlist(int movieId) {
+    if (movieWatchlist == null) return false;
+    return movieWatchlist!.any((item) {
+      if (item is Map<String, dynamic>) {
+        return item['movieId'] == movieId || item['id'] == movieId;
+      }
+      return item == movieId;
+    });
+  }
+
+  bool isMovieWatched(int movieId) {
+    if (watchedMovies == null) return false;
+    return watchedMovies!.any((item) {
+      if (item is Map<String, dynamic>) {
+        return item['movieId'] == movieId || item['id'] == movieId;
+      }
+      return item == movieId;
+    });
+  }
+
+  bool isMovieFavorite(int movieId) {
+    if (favoriteMovies == null) return false;
+    return favoriteMovies!.any((item) {
+      if (item is Map<String, dynamic>) {
+        return item['movieId'] == movieId || item['id'] == movieId;
+      }
+      return item == movieId;
+    });
+  }
+
+  // Create a copy of User with updated fields
+  User copyWith({
+    String? id,
+    String? externalId,
+    String? firstName,
+    String? lastName,
+    String? username,
+    String? email,
+    String? bio,
+    int? iconColorId,
+    int? countryId,
+    int? languageId,
+    bool? completedSetup,
+    bool? darkMode,
+    String? createdAt,
+    String? updatedAt,
+    String? initials,
+    Map<String, dynamic>? country,
+    Map<String, dynamic>? language,
+    Map<String, dynamic>? iconColor,
+    List<dynamic>? watchedMovies,
+    List<dynamic>? watchedShows,
+    List<dynamic>? movieWatchlist,
+    List<dynamic>? showWatchlist,
+    List<dynamic>? favoriteMovies,
+    List<dynamic>? favoriteShows,
+    List<dynamic>? favoritePeople,
+    List<dynamic>? favoriteGenres,
+  }) {
+    return User(
+      id: id ?? this.id,
+      externalId: externalId ?? this.externalId,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
+      username: username ?? this.username,
+      email: email ?? this.email,
+      bio: bio ?? this.bio,
+      iconColorId: iconColorId ?? this.iconColorId,
+      countryId: countryId ?? this.countryId,
+      languageId: languageId ?? this.languageId,
+      completedSetup: completedSetup ?? this.completedSetup,
+      darkMode: darkMode ?? this.darkMode,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      initials: initials ?? this.initials,
+      country: country ?? this.country,
+      language: language ?? this.language,
+      iconColor: iconColor ?? this.iconColor,
+      watchedMovies: watchedMovies ?? this.watchedMovies,
+      watchedShows: watchedShows ?? this.watchedShows,
+      movieWatchlist: movieWatchlist ?? this.movieWatchlist,
+      showWatchlist: showWatchlist ?? this.showWatchlist,
+      favoriteMovies: favoriteMovies ?? this.favoriteMovies,
+      favoriteShows: favoriteShows ?? this.favoriteShows,
+      favoritePeople: favoritePeople ?? this.favoritePeople,
+      favoriteGenres: favoriteGenres ?? this.favoriteGenres,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,

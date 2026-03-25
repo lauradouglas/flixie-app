@@ -1,4 +1,4 @@
-# Flixie App
+# Flixie
 
 A Flutter frontend for the Flixie backend, targeting **Android** and **iOS**.
 

@@ -1,6 +1,9 @@
 import 'package:flixie_app/models/review.dart';
 
 import '../models/user.dart';
+import '../models/favorite_movie.dart';
+import '../models/watchlist_movie.dart';
+import '../models/watched_movie.dart';
 import 'api_client.dart';
 
 class UserService {
@@ -78,5 +81,82 @@ class UserService {
     return (data as List<dynamic>)
         .map((e) => Review.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  // ---- Movie List Management -----------------------------------------------
+
+  static Future<WatchlistMovie> addToWatchlist(String userId, int movieId) async {
+    print('📤 [UserService] POST /users/$userId/movie/watchlist/$movieId');
+    final data = await ApiClient.post(
+      '/users/$userId/movie/watchlist/$movieId',
+      body: {},
+    );
+    print('📥 [UserService] Response type: ${data.runtimeType}');
+    
+    if (data == null) {
+      throw Exception('API returned null response');
+    }
+    return WatchlistMovie.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<WatchlistMovie> removeFromWatchlist(String userId, int movieId) async {
+    print('📤 [UserService] DELETE /users/$userId/movie/watchlist/$movieId');
+    final data = await ApiClient.delete('/users/$userId/movie/watchlist/$movieId');
+    print('📥 [UserService] Response type: ${data.runtimeType}');
+    
+    if (data == null) {
+      throw Exception('API returned null response');
+    }
+    return WatchlistMovie.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<WatchedMovie> addToWatched(String userId, int movieId) async {
+    print('📤 [UserService] POST /users/$userId/movie/watched/$movieId');
+    final data = await ApiClient.post(
+      '/users/$userId/movie/watched/$movieId',
+      body: {},
+    );
+    print('📥 [UserService] Response type: ${data.runtimeType}');
+    
+    if (data == null) {
+      throw Exception('API returned null response');
+    }
+    return WatchedMovie.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<WatchedMovie> removeFromWatched(String userId, int movieId) async {
+    print('📤 [UserService] DELETE /users/$userId/movie/watched/$movieId');
+    final data = await ApiClient.delete('/users/$userId/movie/watched/$movieId');
+    print('📥 [UserService] Response type: ${data.runtimeType}');
+    
+    if (data == null) {
+      throw Exception('API returned null response');
+    }
+    return WatchedMovie.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<FavoriteMovie> addToFavorites(String userId, int movieId) async {
+    print('📤 [UserService] POST /users/$userId/movie/favorite/$movieId');
+    final data = await ApiClient.post(
+      '/users/$userId/movie/favorite/$movieId',
+      body: {},
+    );
+    print('📥 [UserService] Response type: ${data.runtimeType}');
+    
+    if (data == null) {
+      throw Exception('API returned null response');
+    }
+    return FavoriteMovie.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<FavoriteMovie> removeFromFavorites(String userId, int movieId) async {
+    print('📤 [UserService] DELETE /users/$userId/movie/favorite/$movieId');
+    final data = await ApiClient.delete('/users/$userId/movie/favorite/$movieId');
+    print('📥 [UserService] Response type: ${data.runtimeType}');
+    
+    if (data == null) {
+      throw Exception('API returned null response');
+    }
+    return FavoriteMovie.fromJson(data as Map<String, dynamic>);
   }
 }

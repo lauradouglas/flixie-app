@@ -108,9 +108,18 @@ class MovieService {
   static Future<List<WatchProvider>> getMovieWatchProviders(int movieId, String region) async {
     print('🌐 [MovieService] Fetching watch providers for movie $movieId in region $region from API');
     final data = await ApiClient.get('/movies/$movieId/$region/watch/providers');
-    return (data as List<dynamic>)
+    final allProviders = (data as List<dynamic>)
         .map((e) => WatchProvider.fromJson(e as Map<String, dynamic>))
         .toList();
+    
+    // Filter to only show providers with displayPriority <= 50
+    final filteredProviders = allProviders
+        .where((provider) => provider.displayPriority <= 50)
+        .toList();
+    
+    print('📊 [MovieService] Filtered ${filteredProviders.length} providers from ${allProviders.length} total (displayPriority <= 50)');
+    
+    return filteredProviders;
   }
 
   // ---- Cache management methods ----

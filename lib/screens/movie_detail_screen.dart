@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -10,6 +11,7 @@ import '../models/similar_movie.dart';
 import '../models/watch_provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/movie_service.dart';
+import '../services/user_service.dart';
 import '../theme/app_theme.dart';
 
 // ---------------------------------------------------------------------------
@@ -25,6 +27,8 @@ class MovieDetailScreen extends StatefulWidget {
   State<MovieDetailScreen> createState() => _MovieDetailScreenState();
 }
 
+enum ListUpdateType { watchlist, watched, favorite }
+
 class _MovieDetailScreenState extends State<MovieDetailScreen> {
   Movie? _movie;
   final List<Review> _reviews = [];
@@ -34,6 +38,12 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   bool _isLoading = true;
   String? _error;
   bool _inWatchlist = false;
+  bool _isWatched = false;
+  bool _isFavorite = false;
+  ListUpdateType? _currentlyUpdating;
+  int _watchlistBounceKey = 0;
+  int _watchedBounceKey = 0;
+  int _favoriteBounceKey = 0;
 
   // ---- Data loading ---------------------------------------------------------
 
@@ -60,10 +70,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final userId = authProvider.dbUser?.id;
     
     try {
-      // final results = await Future.wait([
-      //   MovieService.getMovieById(id),
-      //   UserService.getMovieReviews(id),
-      // ]);
       final results = await Future.wait([
         MovieService.getMovieById(id, userId: userId),
         MovieService.getMovieRecommendations(id),
@@ -77,6 +83,15 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           final credits = results[2] as MovieCredits;
           _cast = credits.castMembers;
           _watchProviders = results[3] as List<WatchProvider>;
+          
+          // Check movie status in user's lists
+          final user = authProvider.dbUser;
+          if (user != null) {
+            _inWatchlist = user.isMovieInWatchlist(id);
+            _isWatched = user.isMovieWatched(id);
+            _isFavorite = user.isMovieFavorite(id);
+          }
+          
           _isLoading = false;
         });
       }
@@ -86,6 +101,107 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           _error = e.toString();
           _isLoading = false;
         });
+      }
+    }
+  }
+
+  // ---- List Management ------------------------------------------------------
+
+  Future<void> _toggleWatchlist() async {
+    final authProvider = context.read<AuthProvider>();
+    final user = authProvider.dbUser;
+    final movieId = int.tryParse(widget.movieId);
+    
+    if (user == null || movieId == null) return;
+    
+    setState(() => _currentlyUpdating = ListUpdateType.watchlist);
+    
+    try {
+      await (_inWatchlist
+          ? UserService.removeFromWatchlist(user.id, movieId)
+          : UserService.addToWatchlist(user.id, movieId));
+      
+      // Successfully updated on server, toggle UI state
+      if (mounted) {
+        HapticFeedback.lightImpact();
+        setState(() {
+          _inWatchlist = !_inWatchlist;
+          _currentlyUpdating = null;
+          _watchlistBounceKey++;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _currentlyUpdating = null);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update watchlist: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _toggleWatched() async {
+    final authProvider = context.read<AuthProvider>();
+    final user = authProvider.dbUser;
+    final movieId = int.tryParse(widget.movieId);
+    
+    if (user == null || movieId == null) return;
+    
+    setState(() => _currentlyUpdating = ListUpdateType.watched);
+    
+    try {
+      await (_isWatched
+          ? UserService.removeFromWatched(user.id, movieId)
+          : UserService.addToWatched(user.id, movieId));
+      
+      // Successfully updated on server, toggle UI state
+      if (mounted) {
+        HapticFeedback.lightImpact();
+        setState(() {
+          _isWatched = !_isWatched;
+          _currentlyUpdating = null;
+          _watchedBounceKey++;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _currentlyUpdating = null);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update watched list: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _toggleFavorite() async {
+    final authProvider = context.read<AuthProvider>();
+    final user = authProvider.dbUser;
+    final movieId = int.tryParse(widget.movieId);
+    
+    if (user == null || movieId == null) return;
+    
+    setState(() => _currentlyUpdating = ListUpdateType.favorite);
+    
+    try {
+      await (_isFavorite
+          ? UserService.removeFromFavorites(user.id, movieId)
+          : UserService.addToFavorites(user.id, movieId));
+      
+      // Successfully updated on server, toggle UI state
+      if (mounted) {
+        HapticFeedback.lightImpact();
+        setState(() {
+          _isFavorite = !_isFavorite;
+          _currentlyUpdating = null;
+          _favoriteBounceKey++;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _currentlyUpdating = null);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update favorites: $e')),
+        );
       }
     }
   }
@@ -200,8 +316,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   _buildSynopsis(context, movie),
                   const SizedBox(height: 24),
                   _buildWatchNowButton(),
-                  const SizedBox(height: 12),
-                  _buildAddToListButton(),
+                  const SizedBox(height: 16),
+                  _buildActionButtons(),
                   const SizedBox(height: 28),
                   _buildWhereToWatchSection(context),
                   const SizedBox(height: 28),
@@ -467,24 +583,118 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     );
   }
 
-  Widget _buildAddToListButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: FlixieColors.primary,
-          side: const BorderSide(color: FlixieColors.primary, width: 1.5),
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+  Widget _buildActionButtons() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildActionButton(
+            icon: _isWatched ? Icons.check_circle : Icons.check_circle_outline,
+            label: 'Watched',
+            isActive: _isWatched,
+            color: Colors.green,
+            isLoading: _currentlyUpdating == ListUpdateType.watched,
+            bounceKey: _watchedBounceKey,
+            onPressed: _currentlyUpdating != null ? null : _toggleWatched,
           ),
         ),
-        icon: Icon(_inWatchlist ? Icons.check : Icons.add),
-        label: Text(
-          _inWatchlist ? 'Remove from List' : 'Add to List',
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildActionButton(
+            icon: _inWatchlist ? Icons.bookmark : Icons.bookmark_outline,
+            label: 'Watchlist',
+            isActive: _inWatchlist,
+            color: Colors.amber,
+            isLoading: _currentlyUpdating == ListUpdateType.watchlist,
+            bounceKey: _watchlistBounceKey,
+            onPressed: _currentlyUpdating != null ? null : _toggleWatchlist,
+          ),
         ),
-        onPressed: () => setState(() => _inWatchlist = !_inWatchlist),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildActionButton(
+            icon: _isFavorite ? Icons.favorite : Icons.favorite_outline,
+            label: 'Favorite',
+            isActive: _isFavorite,
+            color: Colors.red,
+            isLoading: _currentlyUpdating == ListUpdateType.favorite,
+            bounceKey: _favoriteBounceKey,
+            onPressed: _currentlyUpdating != null ? null : _toggleFavorite,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required bool isActive,
+    required Color color,
+    required bool isLoading,
+    required int bounceKey,
+    required VoidCallback? onPressed,
+  }) {
+    final buttonColor = isActive ? color : Colors.grey;
+    return OutlinedButton(
+      style: OutlinedButton.styleFrom(
+        side: BorderSide(
+          color: isActive ? color : Colors.grey.withOpacity(0.5),
+          width: 1.5,
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+      onPressed: onPressed,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height: 24,
+            width: 24,
+            child: isLoading
+                ? CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    valueColor: AlwaysStoppedAnimation<Color>(buttonColor),
+                  )
+                : TweenAnimationBuilder<double>(
+                    key: ValueKey<String>('$icon-$bounceKey'),
+                    duration: const Duration(milliseconds: 500),
+                    tween: Tween<double>(begin: 1.4, end: 1.0),
+                    curve: Curves.elasticOut,
+                    builder: (context, value, child) {
+                      return Transform.scale(
+                        scale: value,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          transitionBuilder: (child, animation) {
+                            return ScaleTransition(
+                              scale: animation,
+                              child: child,
+                            );
+                          },
+                          child: Icon(
+                            icon,
+                            key: ValueKey<IconData>(icon),
+                            size: 24,
+                            color: buttonColor,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: buttonColor,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -506,7 +716,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 80,
+          height: 100,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: _watchProviders.length,
@@ -945,7 +1155,7 @@ class _SimilarCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => context.go('/movies/${movie.id}'),
+      onTap: () => context.push('/movies/${movie.id}'),
       child: SizedBox(
         width: 120,
         child: Column(
