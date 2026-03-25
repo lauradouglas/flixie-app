@@ -126,7 +126,7 @@ class MovieService {
 
   static Future<List<Review>> getMovieReviews(int movieId) async {
     apiLogger.d('Fetching reviews for movie $movieId from API');
-    final data = await ApiClient.get('/movie/$movieId/reviews');
+    final data = await ApiClient.get('/users/MOVIE/$movieId/reviews');
     return (data as List<dynamic>)
         .map((e) => Review.fromJson(e as Map<String, dynamic>))
         .toList();

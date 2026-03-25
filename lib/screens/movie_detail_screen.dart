@@ -330,14 +330,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     return '${h}h ${m}m';
   }
 
-  /// Derives two-letter initials from a userId string.
-  String _initials(String userId) {
-    if (userId.isEmpty) return '?';
-    return userId
-        .substring(0, userId.length >= 2 ? 2 : userId.length)
-        .toUpperCase();
-  }
-
   // ---- Build ----------------------------------------------------------------
 
   @override
@@ -1125,10 +1117,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             ),
           )
         else
-          ..._reviews.map((r) => _ReviewCard(
-                review: r,
-                avatarInitials: _initials(r.userId),
-              )),
+          ..._reviews.map((r) => _ReviewCard(review: r)),
       ],
     );
   }
@@ -1363,10 +1352,42 @@ class _CastCard extends StatelessWidget {
 }
 
 class _ReviewCard extends StatelessWidget {
-  const _ReviewCard({required this.review, required this.avatarInitials});
+  const _ReviewCard({required this.review});
 
   final Review review;
-  final String avatarInitials;
+
+  String _getInitials() {
+    final username = review.user?.username ?? review.userId;
+    return username.isNotEmpty ? username[0].toUpperCase() : '?';
+  }
+
+  String _getDisplayName() {
+    return review.user?.username ?? 'Anonymous';
+  }
+
+  String _formatDate(String dateStr) {
+    try {
+      final date = DateTime.parse(dateStr);
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final reviewDay = DateTime(date.year, date.month, date.day);
+      final diff = today.difference(reviewDay).inDays;
+
+      if (diff == 0) return 'Today';
+      if (diff == 1) return 'Yesterday';
+
+      const months = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      ];
+      final day = date.day.toString().padLeft(2, '0');
+      final month = months[date.month - 1];
+      final year = date.year.toString().substring(2);
+      return '$day $month $year';
+    } catch (e) {
+      return dateStr;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1387,7 +1408,7 @@ class _ReviewCard extends StatelessWidget {
                 radius: 20,
                 backgroundColor: FlixieColors.primary.withValues(alpha: 0.3),
                 child: Text(
-                  avatarInitials,
+                  _getInitials(),
                   style: const TextStyle(
                     color: FlixieColors.primary,
                     fontWeight: FontWeight.bold,
@@ -1400,35 +1421,48 @@ class _ReviewCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      review.title,
-                      style: const TextStyle(
-                        color: FlixieColors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                    if (review.createdAt != null)
+                    if (review.title.isNotEmpty)
                       Text(
-                        review.createdAt!,
+                        review.title,
                         style: const TextStyle(
-                          color: FlixieColors.medium,
-                          fontSize: 12,
+                          color: FlixieColors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
                         ),
                       ),
+                    Text(
+                      _getDisplayName(),
+                      style: const TextStyle(
+                        color: FlixieColors.light,
+                        fontSize: 13,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
                   ],
                 ),
               ),
-              Row(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  const Icon(Icons.star, color: FlixieColors.warning, size: 14),
-                  const SizedBox(width: 3),
+                  Row(
+                    children: [
+                      const Icon(Icons.star, color: FlixieColors.warning, size: 14),
+                      const SizedBox(width: 3),
+                      Text(
+                        '${review.rating}/10',
+                        style: const TextStyle(
+                          color: FlixieColors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
                   Text(
-                    '${review.rating}/10',
+                    _formatDate(review.createdAt),
                     style: const TextStyle(
-                      color: FlixieColors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
+                      color: FlixieColors.medium,
+                      fontSize: 12,
                     ),
                   ),
                 ],
