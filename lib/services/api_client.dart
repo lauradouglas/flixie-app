@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../utils/app_logger.dart';
 
 class ApiException implements Exception {
   final int statusCode;
@@ -12,12 +13,19 @@ class ApiException implements Exception {
 }
 
 class ApiClient {
-  static const String baseUrl = 'http://localhost:3000';
+  // Use Mac's local IP for testing on physical device
+  // Change back to 'http://localhost:3000' when using simulator
+  static const String baseUrl = 'http://192.168.1.203:3000';
 
   static String? _token;
 
   static void setToken(String? token) {
     _token = token;
+    if (token != null) {
+      apiLogger.d('Token set');
+    } else {
+      apiLogger.d('Token cleared');
+    }
   }
 
   static String? getToken() => _token;
@@ -49,6 +57,7 @@ class ApiClient {
       } catch (_) {
         message = response.body;
       }
+      apiLogger.e('Error ${response.statusCode}: $message');
       throw ApiException(statusCode: response.statusCode, message: message);
     }
     if (response.body.isEmpty) return null;
@@ -57,10 +66,14 @@ class ApiClient {
 
   static Future<dynamic> get(String path,
       {Map<String, String>? queryParams}) async {
-    final response = await http.get(
-      _buildUri(path, queryParams: queryParams),
-      headers: _headers(),
-    );
+    final uri = _buildUri(path, queryParams: queryParams);
+    apiLogger.d('GET $uri');
+    apiLogger.d('Headers: ${_headers()}');
+    
+    final response = await http.get(uri, headers: _headers());
+    
+    apiLogger.d('Response ${response.statusCode}');
+    
     return _parseResponse(response);
   }
 

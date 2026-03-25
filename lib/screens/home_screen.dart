@@ -1,10 +1,45 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../models/trending_movie.dart';
+import '../services/trending_service.dart';
 import '../theme/app_theme.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  List<TrendingMovie> _featuredMovies = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFeaturedMovies();
+  }
+
+  Future<void> _loadFeaturedMovies() async {
+    try {
+      final movies = await TrendingService.getTrendingMovies();
+      if (mounted) {
+        setState(() {
+          _featuredMovies = movies;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,14 +68,18 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 12),
             SizedBox(
               height: 220,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: 5,
-                separatorBuilder: (_, __) => const SizedBox(width: 12),
-                itemBuilder: (context, index) =>
-                    _FeaturedCard(index: index, onTap: () => context.push('/movies/${index + 1}')),
-              ),
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: _featuredMovies.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemBuilder: (context, index) => _FeaturedCard(
+                        movie: _featuredMovies[index],
+                        onTap: () => context.push('/movies/${_featuredMovies[index].id}'),
+                      ),
+                    ),
             ),
 
             const SizedBox(height: 24),
@@ -67,60 +106,81 @@ class HomeScreen extends StatelessWidget {
 }
 
 class _FeaturedCard extends StatelessWidget {
-  const _FeaturedCard({required this.index, this.onTap});
+  const _FeaturedCard({required this.movie, this.onTap});
 
-  final int index;
+  final TrendingMovie movie;
   final VoidCallback? onTap;
-
-  static const List<Color> _gradients = [
-    FlixieColors.primary,
-    FlixieColors.secondary,
-    FlixieColors.tertiary,
-    FlixieColors.success,
-    FlixieColors.warning,
-  ];
 
   @override
   Widget build(BuildContext context) {
-    final color = _gradients[index % _gradients.length];
     return SizedBox(
       width: 160,
       child: Card(
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  color.withValues(alpha: 0.8),
-                  color.withValues(alpha: 0.3),
-                ],
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  const Icon(Icons.movie_outlined, size: 36),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Title ${index + 1}',
-                    style: Theme.of(context).textTheme.titleMedium,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Poster image
+              if (movie.poster != null)
+                CachedNetworkImage(
+                  imageUrl: 'https://image.tmdb.org/t/p/w342${movie.poster}',
+                  fit: BoxFit.cover,
+                  errorWidget: (_, __, ___) => Container(
+                    color: FlixieColors.primary.withValues(alpha: 0.3),
+                    child: const Icon(Icons.movie_outlined, size: 36),
                   ),
-                  Text(
-                    'Genre • Year',
-                    style: Theme.of(context).textTheme.bodySmall,
+                )
+              else
+                Container(
+                  color: FlixieColors.primary.withValues(alpha: 0.3),
+                  child: const Icon(Icons.movie_outlined, size: 36),
+                ),
+              // Gradient overlay
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.8),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
+              // Text content
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(
+                      movie.name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (movie.releaseDate != null && movie.releaseDate!.length >= 4) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        movie.releaseDate!.substring(0, 4),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),

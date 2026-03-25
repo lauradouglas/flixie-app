@@ -1,4 +1,10 @@
+import 'package:flixie_app/models/review.dart';
+
 import '../models/user.dart';
+import '../models/favorite_movie.dart';
+import '../models/watchlist_movie.dart';
+import '../models/watched_movie.dart';
+import '../utils/app_logger.dart';
 import 'api_client.dart';
 
 class UserService {
@@ -18,8 +24,15 @@ class UserService {
   }
 
   static Future<User> getUserByExternalId(String externalId) async {
-    final data = await ApiClient.get('/users/external-id/$externalId');
-    return User.fromJson(data as Map<String, dynamic>);
+    apiLogger.d('GET /users/external-id/$externalId');
+    try {
+      final data = await ApiClient.get('/users/external-id/$externalId');
+      apiLogger.i('User data received: ${(data as Map<String, dynamic>)['username']}');
+      return User.fromJson(data);
+    } catch (e) {
+      apiLogger.e('Error fetching user by externalId: $e');
+      rethrow;
+    }
   }
 
   static Future<bool> usernameExists(String username) async {
@@ -60,5 +73,89 @@ class UserService {
       body: {'iconColorId': iconColorId},
     );
     return User.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<List<Review>> getMovieReviews(int movieId) async {
+    final data = await ApiClient.get('/users/movie/$movieId/reviews');
+    // final data = await ApiClient.get('/users/movie/11/reviews');
+    return (data as List<dynamic>)
+        .map((e) => Review.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  // ---- Movie List Management -----------------------------------------------
+
+  static Future<WatchlistMovie> addToWatchlist(
+      String userId, int movieId) async {
+    apiLogger.d('POST /users/$userId/movie/watchlist/$movieId');
+    final data = await ApiClient.post(
+      '/users/$userId/movie/watchlist/$movieId',
+      body: {},
+    );
+
+    if (data == null) {
+      throw Exception('API returned null response');
+    }
+    return WatchlistMovie.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<WatchlistMovie> removeFromWatchlist(
+      String userId, int movieId) async {
+    apiLogger.d('DELETE /users/$userId/movie/watchlist/$movieId');
+    final data =
+        await ApiClient.delete('/users/$userId/movie/watchlist/$movieId');
+
+    if (data == null) {
+      throw Exception('API returned null response');
+    }
+    return WatchlistMovie.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<WatchedMovie> addToWatched(String userId, int movieId) async {
+    apiLogger.d('POST /users/$userId/movie/watched/$movieId');
+    final data = await ApiClient.post(
+      '/users/$userId/movie/watched/$movieId',
+      body: {},
+    );
+
+    if (data == null) {
+      throw Exception('API returned null response');
+    }
+    return WatchedMovie.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<WatchedMovie> removeFromWatched(
+      String userId, int movieId) async {
+    apiLogger.d('DELETE /users/$userId/movie/watched/$movieId');
+    final data =
+        await ApiClient.delete('/users/$userId/movie/watched/$movieId');
+
+    if (data == null) {
+      throw Exception('API returned null response');
+    }
+    return WatchedMovie.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<FavoriteMovie> addToFavorites(
+      String userId, int movieId) async {
+    apiLogger.d('POST /users/$userId/movie/favorite/$movieId');
+    final data = await ApiClient.post(
+      '/users/$userId/movie/favorite/$movieId',
+      body: {},
+    );
+
+    if (data == null) {
+      throw Exception('API returned null response');
+    }
+    return FavoriteMovie.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<void> removeFromFavorites(String userId, int movieId) async {
+    apiLogger.d('DELETE /users/$userId/movie/favorite/$movieId');
+    final data =
+        await ApiClient.delete('/users/$userId/movie/favorite/$movieId');
+    apiLogger.d('Response type: ${data.runtimeType}');
+    // API returns the updated favorites list, not a single object
+    // We don't need to parse it since we update locally in the UI
   }
 }

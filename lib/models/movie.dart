@@ -1,3 +1,6 @@
+import 'genre.dart';
+import 'movie_video.dart';
+
 class Movie {
   final int id;
   final String title;
@@ -11,6 +14,8 @@ class Movie {
   final int? runtime;
   final String? tagline;
   final String? status;
+  final List<Genre>? genres;
+  final List<MovieVideo>? videos;
 
   const Movie({
     required this.id,
@@ -25,6 +30,8 @@ class Movie {
     this.runtime,
     this.tagline,
     this.status,
+    this.genres,
+    this.videos,
   });
 
   factory Movie.fromJson(Map<String, dynamic> json) {
@@ -35,13 +42,39 @@ class Movie {
       overview: json['overview'] as String?,
       posterPath: json['posterPath'] as String?,
       backdropPath: json['backdropPath'] as String?,
-      popularity: (json['popularity'] as num?)?.toDouble(),
-      voteAverage: (json['voteAverage'] as num?)?.toDouble(),
-      voteCount: json['voteCount'] as int?,
-      runtime: json['runtime'] as int?,
+      popularity: _parseDouble(json['popularity']),
+      voteAverage: _parseDouble(json['voteAverage']),
+      voteCount: _parseInt(json['voteCount']),
+      runtime: _parseInt(json['runtime']),
       tagline: json['tagline'] as String?,
       status: json['status'] as String?,
+      genres: json['genres'] != null
+          ? (json['genres'] as List<dynamic>)
+              .map((e) => Genre.fromJson(e as Map<String, dynamic>))
+              .toList()
+          : null,
+      videos: json['videos'] != null
+          ? (json['videos'] as List<dynamic>)
+              .map((e) => MovieVideo.fromJson(e as Map<String, dynamic>))
+              .toList()
+          : null,
     );
+  }
+
+  static double? _parseDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
+  static int? _parseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
   }
 
   Map<String, dynamic> toJson() {
@@ -58,6 +91,8 @@ class Movie {
       'runtime': runtime,
       'tagline': tagline,
       'status': status,
+      'genres': genres?.map((e) => e.toJson()).toList(),
+      'videos': videos?.map((e) => e.toJson()).toList(),
     };
   }
 }
