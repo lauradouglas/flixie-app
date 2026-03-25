@@ -143,7 +143,7 @@ class AppTheme {
       ),
 
       // Cards
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: FlixieColors.tabBarBackgroundFocused,
         elevation: 4,
         shape: RoundedRectangleBorder(

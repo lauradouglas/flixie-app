@@ -11,13 +11,14 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final auth = context.watch<AuthProvider>();
-    final user = auth.user;
+    final firebaseUser = auth.firebaseUser;
+    final dbUser = auth.dbUser;
 
-    final displayName = user?.displayName?.trim().isNotEmpty == true
-        ? user!.displayName!
-        : 'Guest User';
-    final email = user?.email ?? '';
-    final photoUrl = user?.photoURL;
+    // Prefer database user info, fallback to Firebase
+    final displayName = dbUser?.username ?? firebaseUser?.displayName ?? 'Guest User';
+    final email = dbUser?.email ?? firebaseUser?.email ?? '';
+    final bio = dbUser?.bio;
+    final photoUrl = firebaseUser?.photoURL;
 
     return Scaffold(
       appBar: AppBar(
@@ -59,13 +60,56 @@ class ProfileScreen extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _StatItem(value: '0', label: 'Watched'),
-                _StatItem(value: '0', label: 'Watchlist'),
-                _StatItem(value: '0', label: 'Reviews'),
+                _StatItem(
+                  value: '${(dbUser?.watchedMovies?.length ?? 0) + (dbUser?.watchedShows?.length ?? 0)}',
+                  label: 'Watched',
+                ),
+                _StatItem(
+                  value: '${(dbUser?.movieWatchlist?.length ?? 0) + (dbUser?.showWatchlist?.length ?? 0)}',
+                  label: 'Watchlist',
+                ),
+                _StatItem(
+                  value: '${(dbUser?.favoriteMovies?.length ?? 0) + (dbUser?.favoriteShows?.length ?? 0)}',
+                  label: 'Favorites',
+                ),
               ],
             ),
 
             const SizedBox(height: 24),
+
+            // Bio section
+            if (bio != null && bio.isNotEmpty) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: FlixieColors.tabBarBackgroundFocused,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: FlixieColors.medium.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Bio',
+                      style: textTheme.titleMedium?.copyWith(
+                        color: FlixieColors.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      bio,
+                      style: textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+
             const Divider(),
             const SizedBox(height: 8),
 

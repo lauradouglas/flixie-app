@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "1093787683868",
+    "project_id": "flixie-9a8eb",
+    "storage_bucket": "flixie-9a8eb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1093787683868:android:ba7f4704c76d4e65e963d9",
+        "android_client_info": {
+          "package_name": "com.flixie.flixie_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1093787683868-6d5o5dduc9jeoas22jtfmfu2rjklmq1i.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCoDU1xEPxVJ-hCr41gc1QIGTKjjQeRTgo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1093787683868-6d5o5dduc9jeoas22jtfmfu2rjklmq1i.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
