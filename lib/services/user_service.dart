@@ -158,4 +158,29 @@ class UserService {
     // API returns the updated favorites list, not a single object
     // We don't need to parse it since we update locally in the UI
   }
+
+  // ---- Reviews -------------------------------------------------------------
+
+  static Future<Review> addMovieReview(Review review) async {
+    apiLogger.d('POST /users/add/MOVIE/review');
+    final data = await ApiClient.post(
+      '/users/add/MOVIE/review',
+      body: {
+        'review': {
+          'id': review.movieId,
+          'userId': review.userId,
+          'mediaId': review.movieId,
+          'title': review.title,
+          'body': review.body,
+          'rating': review.rating,
+          'recommended': review.recommended,
+          'language': review.language,
+          'containsSpoilers': review.containsSpoilers,
+          'upvotes': 0,
+          'downvotes': 0,
+        }
+      },
+    );
+    return Review.fromJson(data as Map<String, dynamic>);
+  }
 }
