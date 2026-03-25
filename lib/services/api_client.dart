@@ -22,7 +22,7 @@ class ApiClient {
   static void setToken(String? token) {
     _token = token;
     if (token != null) {
-      apiLogger.d('Token set: ${token.substring(0, 20)}...');
+      apiLogger.d('Token set');
     } else {
       apiLogger.d('Token cleared');
     }

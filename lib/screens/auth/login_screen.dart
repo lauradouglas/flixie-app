@@ -28,7 +28,6 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     
-    final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final auth = context.read<AuthProvider>();
     
