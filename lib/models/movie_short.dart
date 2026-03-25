@@ -1,4 +1,4 @@
-class TrendingMovie {
+class MovieShort {
   final int id;
   final String name;
   final String? originalLanguage;
@@ -8,7 +8,7 @@ class TrendingMovie {
   final Trailer? trailer;
   final String? mediaType;
 
-  const TrendingMovie({
+  const MovieShort({
     required this.id,
     required this.name,
     this.originalLanguage,
@@ -19,10 +19,10 @@ class TrendingMovie {
     this.mediaType,
   });
 
-  factory TrendingMovie.fromJson(Map<String, dynamic> json) {
-    return TrendingMovie(
+  factory MovieShort.fromJson(Map<String, dynamic> json) {
+    return MovieShort(
       id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
-      name: json['name'] as String,
+      name: (json['name'] ?? json['title']) as String,
       originalLanguage: json['originalLanguage'] as String?,
       poster: json['poster'] as String?,
       releaseDate: json['releaseDate'] as String?,

@@ -5,11 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../models/movie.dart';
 import '../models/movie_credits.dart';
-import '../models/movie_video.dart';
 import '../models/review.dart';
 import '../models/similar_movie.dart';
 import '../models/watch_provider.dart';
@@ -18,6 +16,14 @@ import '../services/movie_service.dart';
 import '../services/user_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_logger.dart';
+import 'movie_detail/cast_card.dart';
+import 'movie_detail/genre_chip.dart';
+import 'movie_detail/hero_backdrop.dart';
+import 'movie_detail/review_card.dart';
+import 'movie_detail/score_tile.dart';
+import 'movie_detail/similar_card.dart';
+import 'movie_detail/video_card.dart';
+import 'movie_detail/watch_provider_card.dart';
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -464,7 +470,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         ),
       ],
       flexibleSpace: FlexibleSpaceBar(
-        background: _HeroBackdrop(
+        background: MovieHeroBackdrop(
           imagePath: movie.backdropPath != null
               ? 'https://image.tmdb.org/t/p/w780${movie.posterPath}'
               : (movie.posterPath != null
@@ -478,7 +484,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   // ---- Tagline chip --------------------------------------------------------
 
   Widget _buildTaglineChip(String tagline) {
-    return _GenreChip(label: tagline.toUpperCase());
+    return GenreChip(label: tagline.toUpperCase());
   }
 
   // ---- Title + meta --------------------------------------------------------
@@ -560,7 +566,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       spacing: 8,
       runSpacing: 8,
       children: movie.genres!
-          .map((genre) => _GenreChip(
+          .map((genre) => GenreChip(
                 label: genre.name.toUpperCase(),
                 color: colors[random.nextInt(colors.length)],
               ))
@@ -593,14 +599,14 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     return Row(
       children: [
         if (score != null)
-          _ScoreTile(
+          ScoreTile(
             value: _formatFlixScore(score),
             label: 'FLIXSCORE',
             onInfoTap: () => _showFlixScoreInfo(context),
           ),
         if (score != null && voteCount != null) const SizedBox(width: 28),
         if (voteCount != null)
-          _ScoreTile(
+          ScoreTile(
             value: _formatVoteCount(voteCount),
             valueColor: FlixieColors.success,
             label: 'RATING(S)',
@@ -854,7 +860,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             scrollDirection: Axis.horizontal,
             itemCount: videos.length,
             separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, i) => _VideoCard(video: videos[i]),
+            itemBuilder: (context, i) => VideoCard(video: videos[i]),
           ),
         ),
       ],
@@ -883,7 +889,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             scrollDirection: Axis.horizontal,
             itemCount: _watchProviders.length,
             separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, i) => _WatchProviderCard(provider: _watchProviders[i]),
+            itemBuilder: (context, i) => WatchProviderCard(provider: _watchProviders[i]),
           ),
         ),
       ],
@@ -1066,7 +1072,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             scrollDirection: Axis.horizontal,
             itemCount: _cast.length > 6 ? 6 : _cast.length,
             separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, i) => _CastCard(member: _cast[i]),
+            itemBuilder: (context, i) => CastCard(member: _cast[i]),
           ),
         ),
       ],
@@ -1117,7 +1123,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             ),
           )
         else
-          ..._reviews.map((r) => _ReviewCard(review: r)),
+          ..._reviews.map((r) => ReviewCard(review: r)),
       ],
     );
   }
@@ -1142,7 +1148,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             scrollDirection: Axis.horizontal,
             itemCount: _similar.length,
             separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, i) => _SimilarCard(movie: _similar[i]),
+            itemBuilder: (context, i) => SimilarMovieCard(movie: _similar[i]),
           ),
         ),
       ],
@@ -1150,571 +1156,4 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Sub-widgets
-// ---------------------------------------------------------------------------
-
-class _HeroBackdrop extends StatelessWidget {
-  const _HeroBackdrop({this.imagePath});
-
-  final String? imagePath;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        imagePath != null
-            ? CachedNetworkImage(
-                imageUrl: imagePath!,
-                fit: BoxFit.cover,
-                errorWidget: (_, __, ___) => _placeholder(),
-              )
-            : _placeholder(),
-        // Dark gradient overlay
-        Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color(0x44000000),
-                Color(0xBB000000),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _placeholder() {
-    return Container(
-      color: const Color(0xFF1B2E42),
-      child: const Center(
-        child: Icon(
-          Icons.movie_creation_outlined,
-          color: FlixieColors.medium,
-          size: 64,
-        ),
-      ),
-    );
-  }
-}
-
-class _GenreChip extends StatelessWidget {
-  const _GenreChip({required this.label, this.color});
-
-  final String label;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    final chipColor = color ?? FlixieColors.primary;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: chipColor.withValues(alpha: 0.15),
-        border: Border.all(color: chipColor.withValues(alpha: 0.5)),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: chipColor,
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
-  }
-}
-
-class _ScoreTile extends StatelessWidget {
-  const _ScoreTile({
-    required this.value,
-    required this.label,
-    this.valueColor = FlixieColors.white,
-    this.onInfoTap,
-  });
-
-  final String value;
-  final String label;
-  final Color valueColor;
-  final VoidCallback? onInfoTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            color: valueColor,
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Row(
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                color: FlixieColors.medium,
-                fontSize: 10,
-                letterSpacing: 0.8,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            if (onInfoTap != null) ...[
-              const SizedBox(width: 4),
-              GestureDetector(
-                onTap: onInfoTap,
-                child: const Icon(
-                  Icons.info_outline,
-                  size: 14,
-                  color: FlixieColors.medium,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _CastCard extends StatelessWidget {
-  const _CastCard({required this.member});
-
-  final MovieCastMember member;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 100,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Profile image
-          Container(
-            height: 120,
-            width: 100,
-            decoration: BoxDecoration(
-              color: const Color(0xFF1B2E42),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: member.profileImage != null
-                ? CachedNetworkImage(
-                    imageUrl: 'https://image.tmdb.org/t/p/w185${member.profileImage}',
-                    fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) => _avatarFallback(),
-                  )
-                : _avatarFallback(),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            member.name,
-            style: const TextStyle(
-              color: FlixieColors.light,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          Text(
-            member.character,
-            style: const TextStyle(
-              color: FlixieColors.medium,
-              fontSize: 11,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _avatarFallback() {
-    return Container(
-      color: const Color(0xFF253A50),
-      child: const Center(
-        child: Icon(Icons.person, color: FlixieColors.medium, size: 40),
-      ),
-    );
-  }
-}
-
-class _ReviewCard extends StatelessWidget {
-  const _ReviewCard({required this.review});
-
-  final Review review;
-
-  String _getInitials() {
-    final username = review.user?.username ?? review.userId;
-    return username.isNotEmpty ? username[0].toUpperCase() : '?';
-  }
-
-  String _getDisplayName() {
-    return review.user?.username ?? 'Anonymous';
-  }
-
-  String _formatDate(String dateStr) {
-    try {
-      final date = DateTime.parse(dateStr);
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      final reviewDay = DateTime(date.year, date.month, date.day);
-      final diff = today.difference(reviewDay).inDays;
-
-      if (diff == 0) return 'Today';
-      if (diff == 1) return 'Yesterday';
-
-      const months = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-      ];
-      final day = date.day.toString().padLeft(2, '0');
-      final month = months[date.month - 1];
-      final year = date.year.toString().substring(2);
-      return '$day $month $year';
-    } catch (e) {
-      return dateStr;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1B2E42),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              // Avatar
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: FlixieColors.primary.withValues(alpha: 0.3),
-                child: Text(
-                  _getInitials(),
-                  style: const TextStyle(
-                    color: FlixieColors.primary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (review.title.isNotEmpty)
-                      Text(
-                        review.title,
-                        style: const TextStyle(
-                          color: FlixieColors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
-                    Text(
-                      _getDisplayName(),
-                      style: const TextStyle(
-                        color: FlixieColors.light,
-                        fontSize: 13,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.star, color: FlixieColors.warning, size: 14),
-                      const SizedBox(width: 3),
-                      Text(
-                        '${review.rating}/10',
-                        style: const TextStyle(
-                          color: FlixieColors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Text(
-                    _formatDate(review.createdAt),
-                    style: const TextStyle(
-                      color: FlixieColors.medium,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            review.body,
-            style: const TextStyle(
-              color: FlixieColors.light,
-              fontSize: 13,
-              height: 1.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SimilarCard extends StatelessWidget {
-  const _SimilarCard({required this.movie});
-
-  final SimilarMovie movie;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => context.push('/movies/${movie.id}'),
-      child: SizedBox(
-        width: 120,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              height: 160,
-              width: 120,
-              decoration: BoxDecoration(
-                color: const Color(0xFF1B2E42),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: movie.posterPath != null
-                  ? CachedNetworkImage(
-                      imageUrl:
-                          'https://image.tmdb.org/t/p/w342${movie.posterPath!}',
-                      fit: BoxFit.cover,
-                      errorWidget: (_, __, ___) => _posterFallback(),
-                    )
-                  : _posterFallback(),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              movie.title,
-              style: const TextStyle(
-                color: FlixieColors.light,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _posterFallback() {
-    return Container(
-      color: const Color(0xFF253A50),
-      child: const Center(
-        child: Icon(
-          Icons.movie_creation_outlined,
-          color: FlixieColors.medium,
-          size: 36,
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Video Card
-// ---------------------------------------------------------------------------
-
-class _VideoCard extends StatelessWidget {
-  const _VideoCard({required this.video});
-
-  final MovieVideo video;
-
-  Future<void> _launchVideo(BuildContext context) async {
-    final url = video.youtubeUrl;
-    final uri = Uri.parse(url);
-    
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Could not open video'),
-              backgroundColor: Color(0xFFEF4444),
-            ),
-          );
-        }
-        logger.w('Could not launch YouTube URL: $url');
-      }
-    } catch (e) {
-      logger.e('Error launching video', error: e);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Error opening video'),
-            backgroundColor: Color(0xFFEF4444),
-          ),
-        );
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => _launchVideo(context),
-      child: SizedBox(
-        width: 300,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
-              children: [
-                Container(
-                  height: 170,
-                  width: 300,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1B2E42),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: CachedNetworkImage(
-                    imageUrl: video.thumbnailUrl,
-                    fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) => _thumbnailFallback(),
-                  ),
-                ),
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Center(
-                      child: Icon(
-                        Icons.play_circle_filled,
-                        color: Colors.white,
-                        size: 56,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              video.name,
-              style: const TextStyle(
-                color: FlixieColors.light,
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _thumbnailFallback() {
-    return Container(
-      color: const Color(0xFF253A50),
-      child: const Center(
-        child: Icon(
-          Icons.play_circle_outline,
-          color: FlixieColors.medium,
-          size: 48,
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Watch Provider Card
-// ---------------------------------------------------------------------------
-
-class _WatchProviderCard extends StatelessWidget {
-  const _WatchProviderCard({required this.provider});
-
-  final WatchProvider provider;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 80,
-      child: Column(
-        children: [
-          Container(
-            height: 60,
-            width: 60,
-            decoration: BoxDecoration(
-              color: const Color(0xFF1B2E42),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: CachedNetworkImage(
-              imageUrl: 'https://image.tmdb.org/t/p/w92${provider.logoPath}',
-              fit: BoxFit.cover,
-              errorWidget: (_, __, ___) => _logoFallback(),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            provider.providerName,
-            style: const TextStyle(
-              color: FlixieColors.light,
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _logoFallback() {
-    return Container(
-      color: const Color(0xFF253A50),
-      child: const Center(
-        child: Icon(
-          Icons.play_circle_outline,
-          color: FlixieColors.medium,
-          size: 28,
-        ),
-      ),
-    );
-  }
-}
+// (sub-widgets moved to lib/screens/movie_detail/)

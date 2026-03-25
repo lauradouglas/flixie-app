@@ -1,8 +1,12 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-import '../models/trending_movie.dart';
+import '../models/movie_short.dart';
+import '../providers/auth_provider.dart';
+import '../services/movie_service.dart';
 import '../services/trending_service.dart';
 import '../theme/app_theme.dart';
 
@@ -14,7 +18,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  List<TrendingMovie> _featuredMovies = [];
+  List<MovieShort> _featuredMovies = [];
+  List<MovieShort> _nowPlayingMovies = [];
   bool _isLoading = true;
 
   @override
@@ -24,11 +29,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadFeaturedMovies() async {
+    // Derive region from the user's country profile (e.g. {"isoCode": "GB"}),
+    // falling back to 'US'.
+    final user = context.read<AuthProvider>().dbUser;
+    final region = (user?.country?['isoCode'] as String?)?.toUpperCase() ?? 'US';
+    debugPrint('[HomeScreen] user country: ${user?.country}, resolved region: $region');
+
     try {
-      final movies = await TrendingService.getTrendingMovies();
+      final results = await Future.wait([
+        TrendingService.getTrendingMovies(),
+        MovieService.getNowPlayingMovies(region: region),
+      ]);
       if (mounted) {
         setState(() {
-          _featuredMovies = movies;
+          _featuredMovies = results[0] as List<MovieShort>;
+          _nowPlayingMovies = results[1] as List<MovieShort>;
           _isLoading = false;
         });
       }
@@ -87,17 +102,24 @@ class _HomeScreenState extends State<HomeScreen> {
             // Popular section
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text('Popular', style: textTheme.headlineSmall),
+              child: Text('In Theatres Now', style: textTheme.headlineSmall),
             ),
             const SizedBox(height: 12),
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: 6,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, index) => _ListCard(index: index, onTap: () => context.push('/movies/${index + 10}')),
-            ),
+            if (!_isLoading)
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: _nowPlayingMovies.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemBuilder: (context, index) {
+                  final movie = _nowPlayingMovies[index];
+                  return _ListCard(
+                    movie: movie,
+                    onTap: () => context.push('/movies/${movie.id}'),
+                  );
+                },
+              ),
           ],
         ),
       ),
@@ -108,7 +130,7 @@ class _HomeScreenState extends State<HomeScreen> {
 class _FeaturedCard extends StatelessWidget {
   const _FeaturedCard({required this.movie, this.onTap});
 
-  final TrendingMovie movie;
+  final MovieShort movie;
   final VoidCallback? onTap;
 
   @override
@@ -189,31 +211,81 @@ class _FeaturedCard extends StatelessWidget {
 }
 
 class _ListCard extends StatelessWidget {
-  const _ListCard({required this.index, this.onTap});
+  const _ListCard({required this.movie, this.onTap});
 
-  final int index;
+  final MovieShort movie;
   final VoidCallback? onTap;
+
+  Future<void> _searchInCinemas() async {
+    final query = Uri.encodeComponent('${movie.name} in cinemas near me');
+    final url = Uri.parse('https://www.google.com/search?q=$query');
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Card(
-      child: ListTile(
-        leading: Container(
-          width: 50,
-          height: 50,
-          decoration: BoxDecoration(
-            color: FlixieColors.primary.withValues(alpha: 0.3),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Icon(Icons.movie, color: FlixieColors.primary),
-        ),
-        title: Text('Movie Title ${index + 1}'),
-        subtitle: Text('Genre • ${2020 + index}'),
-        trailing: const Icon(
-          Icons.chevron_right,
-          color: FlixieColors.medium,
-        ),
+      child: InkWell(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              // Poster
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: Container(
+                  width: 60,
+                  height: 90,
+                  color: FlixieColors.primary.withValues(alpha: 0.3),
+                  child: movie.poster != null
+                      ? CachedNetworkImage(
+                          imageUrl: 'https://image.tmdb.org/t/p/w92${movie.poster}',
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) =>
+                              const Icon(Icons.movie, color: FlixieColors.primary),
+                        )
+                      : const Icon(Icons.movie, color: FlixieColors.primary),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Title + year
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      movie.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    if (movie.releaseDate != null && movie.releaseDate!.length >= 4) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Released: ${movie.releaseDate!}',
+                        style: textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              // Cinema search button
+              IconButton(
+                icon: const Icon(Icons.map_outlined),
+                tooltip: 'Find in cinemas',
+                color: FlixieColors.primary,
+                onPressed: _searchInCinemas,
+              ),
+              const Icon(Icons.chevron_right, color: FlixieColors.medium),
+            ],
+          ),
+        ),
       ),
     );
   }

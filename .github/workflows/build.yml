@@ -36,6 +36,12 @@ jobs:
           }
           EOF
 
+      - name: Write GoogleService-Info.plist
+        run: echo "${{ secrets.GOOGLE_SERVICE_INFO_PLIST_BASE64 }}" | base64 --decode > ios/Runner/GoogleService-Info.plist
+
+      - name: Write google-services.json
+        run: echo "${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}" | base64 --decode > android/app/google-services.json
+
       - run: flutter pub get
 
       - name: Build iOS
