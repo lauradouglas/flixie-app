@@ -64,3 +64,10 @@ coverage/
 
 # Generated files
 lib/generated_plugin_registrant.dart
+
+# Firebase / secrets — never commit real credentials
+.firebase.json
+lib/firebase_options.dart
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+
