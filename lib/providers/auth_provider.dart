@@ -5,6 +5,7 @@ import '../models/user.dart' as models;
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../services/user_service.dart';
+import '../utils/app_logger.dart';
 
 /// Auth states that the UI can observe.
 enum AuthStatus { unknown, authenticated, unauthenticated }
@@ -19,6 +20,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   final AuthService _authService;
+  final _authStatusNotifier = _AuthStatusNotifier();
 
   AuthStatus _status = AuthStatus.unknown;
   firebase_auth.User? _firebaseUser;
@@ -32,50 +34,59 @@ class AuthProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isAuthenticated => _status == AuthStatus.authenticated;
+  
+  /// A Listenable that only notifies when auth status changes, not when user data changes.
+  /// Use this for router refresh to avoid unnecessary navigation rebuilds.
+  Listenable get authStatusListenable => _authStatusNotifier;
 
   void _onAuthStateChanged(firebase_auth.User? user) async {
-    print('🔄 [AuthProvider] Auth state changed');
-    print('   Firebase user: ${user?.email ?? "null"} (uid: ${user?.uid ?? "null"})');
+    logger.i('Auth state changed');
+    logger.d('Firebase user: ${user?.email ?? "null"} (uid: ${user?.uid ?? "null"})');
     
     _firebaseUser = user;
+    final oldStatus = _status;
     
     if (user != null) {
       // FIRST: Get Firebase ID token and set it in ApiClient
       try {
         final idToken = await user.getIdToken();
         if (idToken != null) {
-          print('🔑 [AuthProvider] Got Firebase ID token, setting in ApiClient');
+          logger.d('Got Firebase ID token, setting in ApiClient');
           ApiClient.setToken(idToken);
         } else {
-          print('⚠️ [AuthProvider] ID token is null');
+          logger.w('ID token is null');
         }
       } catch (e) {
-        print('⚠️ [AuthProvider] Failed to get ID token: $e');
+        logger.w('Failed to get ID token: $e');
       }
       
       // THEN: Fetch the database user using Firebase UID as externalId
-      print('📥 [AuthProvider] Fetching database user with externalId: ${user.uid}');
+      logger.d('Fetching database user with externalId: ${user.uid}');
       try {
         _dbUser = await UserService.getUserByExternalId(user.uid);
-        print('✅ [AuthProvider] Database user fetched successfully');
-        print('   DB User: ${_dbUser?.username} (id: ${_dbUser?.id})');
-        print('   Email: ${_dbUser?.email}');
-        print('   Name: ${_dbUser?.firstName} ${_dbUser?.lastName}');
+        logger.i('Database user fetched: ${_dbUser?.username} (id: ${_dbUser?.id})');
+        logger.d('Email: ${_dbUser?.email}');
+        logger.d('Name: ${_dbUser?.firstName} ${_dbUser?.lastName}');
         _status = AuthStatus.authenticated;
       } catch (e, stackTrace) {
-        print('❌ [AuthProvider] Error fetching database user: $e');
-        print('   Stack trace: $stackTrace');
+        logger.e('Error fetching database user: $e', error: e, stackTrace: stackTrace);
         _dbUser = null;
         _status = AuthStatus.unauthenticated;
       }
     } else {
-      print('👋 [AuthProvider] User signed out, clearing database user');
+      logger.i('User signed out, clearing database user');
       ApiClient.setToken(null);
       _dbUser = null;
       _status = AuthStatus.unauthenticated;
     }
     
-    print('📊 [AuthProvider] Final status: $_status');
+    logger.d('Final status: $_status');
+    
+    // Notify auth status listener only if status actually changed
+    if (oldStatus != _status) {
+      _authStatusNotifier.notify();
+    }
+    
     notifyListeners();
   }
 
@@ -156,7 +167,7 @@ class AuthProvider extends ChangeNotifier {
   /// Updates the database user without making an API call.
   /// Use this when you already have updated user data from an API response.
   void updateDbUser(models.User user) {
-    print('🔄 [AuthProvider] Updating database user: ${user.username}');
+    logger.d('Updating database user: ${user.username}');
     _dbUser = user;
     notifyListeners();
   }
@@ -169,10 +180,10 @@ class AuthProvider extends ChangeNotifier {
   }) {
     if (_dbUser == null) return;
     
-    print('🔄 [AuthProvider] Updating user lists:');
-    if (watchedMovies != null) print('   Watched: ${watchedMovies.length} items');
-    if (movieWatchlist != null) print('   Watchlist: ${movieWatchlist.length} items');
-    if (favoriteMovies != null) print('   Favorites: ${favoriteMovies.length} items');
+    logger.d('Updating user lists:');
+    if (watchedMovies != null) logger.d('Watched: ${watchedMovies.length} items');
+    if (movieWatchlist != null) logger.d('Watchlist: ${movieWatchlist.length} items');
+    if (favoriteMovies != null) logger.d('Favorites: ${favoriteMovies.length} items');
     
     _dbUser = _dbUser!.copyWith(
       watchedMovies: watchedMovies ?? _dbUser!.watchedMovies,
@@ -184,19 +195,26 @@ class AuthProvider extends ChangeNotifier {
   
   /// Refreshes the database user from the backend.
   Future<void> refreshDbUser() async {
-    print('🔄 [AuthProvider] Manually refreshing database user');
+    logger.d('Manually refreshing database user');
     if (_firebaseUser == null) {
-      print('⚠️ [AuthProvider] Cannot refresh - no Firebase user');
+      logger.w('Cannot refresh - no Firebase user');
       return;
     }
     try {
-      print('📥 [AuthProvider] Fetching user with externalId: ${_firebaseUser!.uid}');
+      logger.d('Fetching user with externalId: ${_firebaseUser!.uid}');
       _dbUser = await UserService.getUserByExternalId(_firebaseUser!.uid);
-      print('✅ [AuthProvider] Database user refreshed: ${_dbUser?.username}');
+      logger.i('Database user refreshed: ${_dbUser?.username}');
       notifyListeners();
     } catch (e, stackTrace) {
-      print('❌ [AuthProvider] Error refreshing database user: $e');
-      print('   Stack trace: $stackTrace');
+      logger.e('Error refreshing database user: $e', error: e, stackTrace: stackTrace);
     }
+  }
+}
+
+/// A minimal ChangeNotifier that only notifies when auth status changes.
+/// This is used by GoRouter to avoid rebuilding routes when user data changes.
+class _AuthStatusNotifier extends ChangeNotifier {
+  void notify() {
+    notifyListeners();
   }
 }

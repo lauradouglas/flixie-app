@@ -1,3 +1,5 @@
+import '../utils/app_logger.dart';
+
 class User {
   final String id;
   final String externalId;
@@ -93,32 +95,52 @@ class User {
   // Helper methods to check movie status
   bool isMovieInWatchlist(int movieId) {
     if (movieWatchlist == null) return false;
-    return movieWatchlist!.any((item) {
-      if (item is Map<String, dynamic>) {
-        return item['movieId'] == movieId || item['id'] == movieId;
-      }
-      return item == movieId;
-    });
+    try {
+      return movieWatchlist!.any((item) {
+        if (item is Map<String, dynamic>) {
+          return item['movieId'] == movieId || item['id'] == movieId;
+        }
+        if (item is int) return item == movieId;
+        return false;
+      });
+    } catch (e) {
+      logger.w('Error checking watchlist: $e');
+      return false;
+    }
   }
 
   bool isMovieWatched(int movieId) {
     if (watchedMovies == null) return false;
-    return watchedMovies!.any((item) {
-      if (item is Map<String, dynamic>) {
-        return item['movieId'] == movieId || item['id'] == movieId;
-      }
-      return item == movieId;
-    });
+    try {
+      return watchedMovies!.any((item) {
+        if (item is Map<String, dynamic>) {
+          return item['movieId'] == movieId || item['id'] == movieId;
+        }
+        if (item is int) return item == movieId;
+        return false;
+      });
+    } catch (e) {
+      logger.w('Error checking watched: $e');
+      return false;
+    }
   }
 
   bool isMovieFavorite(int movieId) {
     if (favoriteMovies == null) return false;
-    return favoriteMovies!.any((item) {
-      if (item is Map<String, dynamic>) {
-        return item['movieId'] == movieId || item['id'] == movieId;
-      }
-      return item == movieId;
-    });
+    try {
+      return favoriteMovies!.any((item) {
+        if (item is Map<String, dynamic>) {
+          return item['movieId'] == movieId || item['id'] == movieId;
+        }
+        if (item is int) return item == movieId;
+        return false;
+      });
+    } catch (e) {
+      logger.w('Error checking favorite: $e');
+      logger.d('favoriteMovies type: ${favoriteMovies.runtimeType}');
+      logger.d('favoriteMovies value: $favoriteMovies');
+      return false;
+    }
   }
 
   // Create a copy of User with updated fields

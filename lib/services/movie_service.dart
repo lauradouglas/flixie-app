@@ -1,7 +1,9 @@
 import '../models/movie.dart';
 import '../models/movie_credits.dart';
+import '../models/review.dart';
 import '../models/similar_movie.dart';
 import '../models/watch_provider.dart';
+import '../utils/app_logger.dart';
 import 'api_client.dart';
 import 'movie_cache_service.dart';
 
@@ -16,7 +18,7 @@ class MovieService {
     }
 
     // Fetch from API
-    print('🌐 [MovieService] Fetching movie $id from API');
+    apiLogger.d('Fetching movie $id from API');
     final queryParams = userId != null ? {'userId': userId} : null;
     final data = await ApiClient.get('/movies/id/$id', queryParams: queryParams);
     final movie = Movie.fromJson(data as Map<String, dynamic>);
@@ -75,7 +77,7 @@ class MovieService {
     }
 
     // Fetch from API
-    print('🌐 [MovieService] Fetching recommendations for movie $movieId from API');
+    apiLogger.d('Fetching recommendations for movie $movieId from API');
     final data = await ApiClient.get('/movies/$movieId/recommendations');
     final recommendations = (data as List<dynamic>)
         .map((e) => SimilarMovie.fromJson(e as Map<String, dynamic>))
@@ -95,7 +97,7 @@ class MovieService {
     }
 
     // Fetch from API
-    print('🌐 [MovieService] Fetching credits for movie $movieId from API');
+    apiLogger.d('Fetching credits for movie $movieId from API');
     final data = await ApiClient.get('/movies/$movieId/credits');
     final credits = MovieCredits.fromJson(data as Map<String, dynamic>);
     
@@ -106,7 +108,7 @@ class MovieService {
   }
 
   static Future<List<WatchProvider>> getMovieWatchProviders(int movieId, String region) async {
-    print('🌐 [MovieService] Fetching watch providers for movie $movieId in region $region from API');
+    apiLogger.d('Fetching watch providers for movie $movieId in region $region from API');
     final data = await ApiClient.get('/movies/$movieId/$region/watch/providers');
     final allProviders = (data as List<dynamic>)
         .map((e) => WatchProvider.fromJson(e as Map<String, dynamic>))
@@ -117,9 +119,17 @@ class MovieService {
         .where((provider) => provider.displayPriority <= 50)
         .toList();
     
-    print('📊 [MovieService] Filtered ${filteredProviders.length} providers from ${allProviders.length} total (displayPriority <= 50)');
+    apiLogger.d('Filtered ${filteredProviders.length} providers from ${allProviders.length} total (displayPriority <= 50)');
     
     return filteredProviders;
+  }
+
+  static Future<List<Review>> getMovieReviews(int movieId) async {
+    apiLogger.d('Fetching reviews for movie $movieId from API');
+    final data = await ApiClient.get('/movie/$movieId/reviews');
+    return (data as List<dynamic>)
+        .map((e) => Review.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   // ---- Cache management methods ----

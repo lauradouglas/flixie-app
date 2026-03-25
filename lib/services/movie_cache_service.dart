@@ -2,6 +2,7 @@ import '../models/movie.dart';
 import '../models/movie_credits.dart';
 import '../models/similar_movie.dart';
 import '../models/trending_movie.dart';
+import '../utils/app_logger.dart';
 
 /// Simple in-memory cache for movies, credits, recommendations, and trending movies viewed during the current day.
 /// Cache is cleared when the day changes or when the app restarts.
@@ -21,7 +22,6 @@ class MovieCacheService {
   Movie? getMovie(int movieId) {
     final cached = _movieCache[movieId];
     if (cached == null) {
-      print('❌ [MovieCache] Cache miss for movie $movieId');
       return null;
     }
 
@@ -32,12 +32,11 @@ class MovieCacheService {
     if (now.year == cacheDate.year &&
         now.month == cacheDate.month &&
         now.day == cacheDate.day) {
-      print('✅ [MovieCache] Cache hit for movie $movieId (cached at ${cacheDate.hour}:${cacheDate.minute.toString().padLeft(2, '0')})');
       return cached.movie;
     }
 
     // Cache is stale, remove it
-    print('🗑️ [MovieCache] Removing stale cache entry for movie $movieId (cached on ${cacheDate.month}/${cacheDate.day})');
+    logger.d('Removing stale cache entry for movie $movieId (cached on ${cacheDate.month}/${cacheDate.day})');
     _movieCache.remove(movieId);
     return null;
   }
@@ -49,7 +48,7 @@ class MovieCacheService {
       movie: movie,
       timestamp: now,
     );
-    print('💾 [MovieCache] Cached movie ${movie.id} (${movie.title}) at ${now.hour}:${now.minute.toString().padLeft(2, '0')}');
+    logger.d('Cached movie ${movie.id} (${movie.title})');
   }
 
   // ---- Credits Caching ----
@@ -58,16 +57,14 @@ class MovieCacheService {
   MovieCredits? getCredits(int movieId) {
     final cached = _creditsCache[movieId];
     if (cached == null) {
-      print('❌ [MovieCache] Cache miss for credits $movieId');
       return null;
     }
 
     if (_isToday(cached.timestamp)) {
-      print('✅ [MovieCache] Cache hit for credits $movieId');
       return cached.credits;
     }
 
-    print('🗑️ [MovieCache] Removing stale credits cache for movie $movieId');
+    logger.d('Removing stale credits cache for movie $movieId');
     _creditsCache.remove(movieId);
     return null;
   }
@@ -79,7 +76,7 @@ class MovieCacheService {
       credits: credits,
       timestamp: now,
     );
-    print('💾 [MovieCache] Cached credits for movie $movieId');
+    logger.d('Cached credits for movie $movieId');
   }
 
   // ---- Recommendations Caching ----
@@ -88,16 +85,14 @@ class MovieCacheService {
   List<SimilarMovie>? getRecommendations(int movieId) {
     final cached = _recommendationsCache[movieId];
     if (cached == null) {
-      print('❌ [MovieCache] Cache miss for recommendations $movieId');
       return null;
     }
 
     if (_isToday(cached.timestamp)) {
-      print('✅ [MovieCache] Cache hit for recommendations $movieId');
       return cached.recommendations;
     }
 
-    print('🗑️ [MovieCache] Removing stale recommendations cache for movie $movieId');
+    logger.d('Removing stale recommendations cache for movie $movieId');
     _recommendationsCache.remove(movieId);
     return null;
   }
@@ -109,7 +104,7 @@ class MovieCacheService {
       recommendations: recommendations,
       timestamp: now,
     );
-    print('💾 [MovieCache] Cached ${recommendations.length} recommendations for movie $movieId');
+    logger.d('Cached ${recommendations.length} recommendations for movie $movieId');
   }
 
   // ---- Trending Movies Caching ----
@@ -118,16 +113,14 @@ class MovieCacheService {
   List<TrendingMovie>? getTrendingMovies(String timeWindow) {
     final cached = _trendingMoviesCache[timeWindow];
     if (cached == null) {
-      print('❌ [MovieCache] Cache miss for trending movies ($timeWindow)');
       return null;
     }
 
     if (_isToday(cached.timestamp)) {
-      print('✅ [MovieCache] Cache hit for trending movies ($timeWindow)');
       return cached.movies;
     }
 
-    print('🗑️ [MovieCache] Removing stale trending movies cache ($timeWindow)');
+    logger.d('Removing stale trending movies cache ($timeWindow)');
     _trendingMoviesCache.remove(timeWindow);
     return null;
   }
@@ -139,7 +132,7 @@ class MovieCacheService {
       movies: movies,
       timestamp: now,
     );
-    print('💾 [MovieCache] Cached ${movies.length} trending movies ($timeWindow)');
+    logger.d('Cached ${movies.length} trending movies ($timeWindow)');
   }
 
   // ---- Cache Management ----
@@ -156,7 +149,7 @@ class MovieCacheService {
     _recommendationsCache.clear();
     _trendingMoviesCache.clear();
     
-    print('🗑️ [MovieCache] Cleared all cache ($movieCount movies, $creditsCount credits, $recommendationsCount recommendations, $trendingCount trending)');
+    logger.d('Cleared all cache ($movieCount movies, $creditsCount credits, $recommendationsCount recommendations, $trendingCount trending)');
   }
 
   /// Clear only stale cache entries (older than today)
@@ -178,9 +171,7 @@ class MovieCacheService {
     final totalRemoved = removedMovies + removedCredits + removedRecommendations + removedTrending;
     
     if (totalRemoved > 0) {
-      print('🗑️ [MovieCache] Removed $totalRemoved stale entries ($removedMovies movies, $removedCredits credits, $removedRecommendations recommendations, $removedTrending trending)');
-    } else {
-      print('✨ [MovieCache] No stale cache entries to remove');
+      logger.d('Removed $totalRemoved stale entries ($removedMovies movies, $removedCredits credits, $removedRecommendations recommendations, $removedTrending trending)');
     }
   }
 
@@ -194,7 +185,7 @@ class MovieCacheService {
       'total': _movieCache.length + _creditsCache.length + _recommendationsCache.length + _trendingMoviesCache.length,
     };
     
-    print('📊 [MovieCache] Cache stats: ${stats['movies']} movies, ${stats['credits']} credits, ${stats['recommendations']} recommendations, ${stats['trending']} trending');
+    logger.d('Cache stats: ${stats['movies']} movies, ${stats['credits']} credits, ${stats['recommendations']} recommendations, ${stats['trending']} trending');
     return stats;
   }
 

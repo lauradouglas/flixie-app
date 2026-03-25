@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../utils/app_logger.dart';
 
 class ApiException implements Exception {
   final int statusCode;
@@ -21,9 +22,9 @@ class ApiClient {
   static void setToken(String? token) {
     _token = token;
     if (token != null) {
-      print('🔐 [ApiClient] Token set: ${token.substring(0, 20)}...');
+      apiLogger.d('Token set: ${token.substring(0, 20)}...');
     } else {
-      print('🔐 [ApiClient] Token cleared');
+      apiLogger.d('Token cleared');
     }
   }
 
@@ -56,7 +57,7 @@ class ApiClient {
       } catch (_) {
         message = response.body;
       }
-      print('❌ [ApiClient] Error ${response.statusCode}: $message');
+      apiLogger.e('Error ${response.statusCode}: $message');
       throw ApiException(statusCode: response.statusCode, message: message);
     }
     if (response.body.isEmpty) return null;
@@ -66,13 +67,13 @@ class ApiClient {
   static Future<dynamic> get(String path,
       {Map<String, String>? queryParams}) async {
     final uri = _buildUri(path, queryParams: queryParams);
-    print('📤 [ApiClient] GET $uri');
-    print('   Headers: ${_headers()}');
+    apiLogger.d('GET $uri');
+    apiLogger.d('Headers: ${_headers()}');
     
     final response = await http.get(uri, headers: _headers());
     
-    print('📥 [ApiClient] Response ${response.statusCode}');
-    print('   Body: ${response.body.length > 200 ? "${response.body.substring(0, 200)}..." : response.body}');
+    apiLogger.d('Response ${response.statusCode}');
+    apiLogger.d('Body: ${response.body.length > 200 ? "${response.body.substring(0, 200)}..." : response.body}');
     
     return _parseResponse(response);
   }

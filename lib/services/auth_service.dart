@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../utils/app_logger.dart';
 import 'api_client.dart';
 
 /// Wraps Firebase Authentication to provide login, sign-up, logout,
@@ -28,7 +29,7 @@ class AuthService {
     // Get the ID token and set it in ApiClient
     final idToken = await credential.user?.getIdToken();
     if (idToken != null) {
-      print('🔑 [AuthService] Got Firebase ID token, setting in ApiClient');
+      apiLogger.d('Got Firebase ID token, setting in ApiClient');
       ApiClient.setToken(idToken);
     }
     
@@ -52,7 +53,7 @@ class AuthService {
     // Get the ID token and set it in ApiClient
     final idToken = await credential.user?.getIdToken();
     if (idToken != null) {
-      print('🔑 [AuthService] Got Firebase ID token after signup, setting in ApiClient');
+      apiLogger.d('Got Firebase ID token after signup, setting in ApiClient');
       ApiClient.setToken(idToken);
     }
     
@@ -61,7 +62,7 @@ class AuthService {
 
   /// Signs out the current user.
   Future<void> signOut() async {
-    print('🚪 [AuthService] Signing out, clearing API token');
+    apiLogger.d('Signing out, clearing API token');
     ApiClient.setToken(null);
     await _auth.signOut();
   }

@@ -1,11 +1,15 @@
+import 'dart:math';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/movie.dart';
 import '../models/movie_credits.dart';
+import '../models/movie_video.dart';
 import '../models/review.dart';
 import '../models/similar_movie.dart';
 import '../models/watch_provider.dart';
@@ -13,6 +17,7 @@ import '../providers/auth_provider.dart';
 import '../services/movie_service.dart';
 import '../services/user_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/app_logger.dart';
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -31,10 +36,11 @@ enum ListUpdateType { watchlist, watched, favorite }
 
 class _MovieDetailScreenState extends State<MovieDetailScreen> {
   Movie? _movie;
-  final List<Review> _reviews = [];
+  List<Review> _reviews = [];
   List<SimilarMovie> _similar = [];
   List<MovieCastMember> _cast = [];
   List<WatchProvider> _watchProviders = [];
+  String? _director;
   bool _isLoading = true;
   String? _error;
   bool _inWatchlist = false;
@@ -75,6 +81,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         MovieService.getMovieRecommendations(id),
         MovieService.getMovieCredits(id),
         MovieService.getMovieWatchProviders(id, 'US'), // TODO: Get region from user profile
+        MovieService.getMovieReviews(id),
       ]);
       if (mounted) {
         setState(() {
@@ -82,7 +89,12 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           _similar = results[1] as List<SimilarMovie>;
           final credits = results[2] as MovieCredits;
           _cast = credits.castMembers;
+          _director = credits.crewMembers
+              .where((crew) => crew.job == 'Director')
+              .map((crew) => crew.name)
+              .firstOrNull;
           _watchProviders = results[3] as List<WatchProvider>;
+          _reviews = results[4] as List<Review>;
           
           // Check movie status in user's lists
           final user = authProvider.dbUser;
@@ -121,7 +133,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           ? UserService.removeFromWatchlist(user.id, movieId)
           : UserService.addToWatchlist(user.id, movieId));
       
-      // Successfully updated on server, toggle UI state
+      // Successfully updated on server, toggle UI state and update user list
       if (mounted) {
         HapticFeedback.lightImpact();
         setState(() {
@@ -129,8 +141,38 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           _currentlyUpdating = null;
           _watchlistBounceKey++;
         });
+        
+        final currentWatchlist = user.movieWatchlist ?? [];
+        final updatedWatchlist = <int>[];
+        
+        try {
+          for (var item in currentWatchlist) {
+            if (item is int) {
+              updatedWatchlist.add(item);
+            } else if (item is Map<String, dynamic>) {
+              final id = item['movieId'] ?? item['id'];
+              if (id is int) {
+                updatedWatchlist.add(id);
+              }
+            }
+          }
+        } catch (e) {
+          logger.w('Error processing watchlist: $e');
+          logger.d('currentWatchlist type: ${currentWatchlist.runtimeType}');
+          logger.d('currentWatchlist: $currentWatchlist');
+        }
+        
+        if (_inWatchlist) {
+          if (!updatedWatchlist.contains(movieId)) {
+            updatedWatchlist.add(movieId);
+          }
+        } else {
+          updatedWatchlist.remove(movieId);
+        }
+        authProvider.updateUserList(movieWatchlist: updatedWatchlist);
       }
     } catch (e) {
+      logger.e('Error toggling watchlist: $e');
       if (mounted) {
         setState(() => _currentlyUpdating = null);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -154,7 +196,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           ? UserService.removeFromWatched(user.id, movieId)
           : UserService.addToWatched(user.id, movieId));
       
-      // Successfully updated on server, toggle UI state
+      // Successfully updated on server, toggle UI state and update user list
       if (mounted) {
         HapticFeedback.lightImpact();
         setState(() {
@@ -162,8 +204,38 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           _currentlyUpdating = null;
           _watchedBounceKey++;
         });
+        
+        final currentWatched = user.watchedMovies ?? [];
+        final updatedWatched = <int>[];
+        
+        try {
+          for (var item in currentWatched) {
+            if (item is int) {
+              updatedWatched.add(item);
+            } else if (item is Map<String, dynamic>) {
+              final id = item['movieId'] ?? item['id'];
+              if (id is int) {
+                updatedWatched.add(id);
+              }
+            }
+          }
+        } catch (e) {
+          logger.w('Error processing watched list: $e');
+          logger.d('currentWatched type: ${currentWatched.runtimeType}');
+          logger.d('currentWatched: $currentWatched');
+        }
+        
+        if (_isWatched) {
+          if (!updatedWatched.contains(movieId)) {
+            updatedWatched.add(movieId);
+          }
+        } else {
+          updatedWatched.remove(movieId);
+        }
+        authProvider.updateUserList(watchedMovies: updatedWatched);
       }
     } catch (e) {
+      logger.e('Error toggling watched: $e');
       if (mounted) {
         setState(() => _currentlyUpdating = null);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -181,13 +253,12 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     if (user == null || movieId == null) return;
     
     setState(() => _currentlyUpdating = ListUpdateType.favorite);
-    
     try {
       await (_isFavorite
           ? UserService.removeFromFavorites(user.id, movieId)
           : UserService.addToFavorites(user.id, movieId));
       
-      // Successfully updated on server, toggle UI state
+      // Successfully updated on server, toggle UI state and update user list
       if (mounted) {
         HapticFeedback.lightImpact();
         setState(() {
@@ -195,8 +266,43 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           _currentlyUpdating = null;
           _favoriteBounceKey++;
         });
+        
+        final currentFavorites = user.favoriteMovies ?? [];
+        final updatedFavorites = <int>[];
+        
+        for (var item in currentFavorites) {
+          try {
+            int? movieIdToAdd;
+            
+            if (item is int) {
+              movieIdToAdd = item;
+            } else if (item is Map) {
+              final map = item;
+              movieIdToAdd = map['movieId'] as int?;
+              movieIdToAdd ??= map['id'] as int?;
+            }
+            
+            if (movieIdToAdd != null) {
+              updatedFavorites.add(movieIdToAdd);
+            }
+          } catch (e) {
+            logger.w('Skipping problematic item in favorites: $e');
+            logger.d('Item type: ${item.runtimeType}');
+            logger.d('Item value: $item');
+          }
+        }
+        
+        if (_isFavorite) {
+          if (!updatedFavorites.contains(movieId)) {
+            updatedFavorites.add(movieId);
+          }
+        } else {
+          updatedFavorites.remove(movieId);
+        }
+        authProvider.updateUserList(favoriteMovies: updatedFavorites);
       }
     } catch (e) {
+      logger.e('Error toggling favorite: $e');
       if (mounted) {
         setState(() => _currentlyUpdating = null);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -310,14 +416,16 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                     _buildTaglineChip(movie.tagline!),
                   const SizedBox(height: 12),
                   _buildTitleBlock(context, movie),
+                  const SizedBox(height: 12),
+                  _buildGenrePills(movie),
                   const SizedBox(height: 16),
                   _buildScores(context, movie),
                   const Divider(height: 32, color: Color(0xFF1E2D40)),
                   _buildSynopsis(context, movie),
-                  const SizedBox(height: 24),
-                  _buildWatchNowButton(),
                   const SizedBox(height: 16),
                   _buildActionButtons(),
+                  const SizedBox(height: 28),
+                  _buildTrailersSection(context, movie),
                   const SizedBox(height: 28),
                   _buildWhereToWatchSection(context),
                   const SizedBox(height: 28),
@@ -400,6 +508,28 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             letterSpacing: 0.5,
           ),
         ),
+        if (_director != null) ...[
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const Text(
+                'Directed by ',
+                style: TextStyle(
+                  color: FlixieColors.medium,
+                  fontSize: 13,
+                ),
+              ),
+              Text(
+                _director!,
+                style: const TextStyle(
+                  color: FlixieColors.light,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ],
         if (meta.isNotEmpty) ...[
           const SizedBox(height: 6),
           Text(
@@ -411,6 +541,38 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           ),
         ],
       ],
+    );
+  }
+
+  // ---- Genre pills ---------------------------------------------------------
+
+  Widget _buildGenrePills(Movie movie) {
+    if (movie.genres == null || movie.genres!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final colors = [
+      const Color(0xFF6366F1), // Indigo
+      const Color(0xFFEC4899), // Pink
+      const Color(0xFF8B5CF6), // Purple
+      const Color(0xFF10B981), // Green
+      const Color(0xFFF59E0B), // Amber
+      const Color(0xFF3B82F6), // Blue
+      const Color(0xFFEF4444), // Red
+      const Color(0xFF14B8A6), // Teal
+    ];
+
+    final random = Random();
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: movie.genres!
+          .map((genre) => _GenreChip(
+                label: genre.name.toUpperCase(),
+                color: colors[random.nextInt(colors.length)],
+              ))
+          .toList(),
     );
   }
 
@@ -561,28 +723,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   // ---- CTA buttons ---------------------------------------------------------
 
-  Widget _buildWatchNowButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: FlixieColors.primary,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        icon: const Icon(Icons.play_arrow),
-        label: const Text(
-          'Watch Now',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
-        onPressed: () {},
-      ),
-    );
-  }
-
   Widget _buildActionButtons() {
     return Row(
       children: [
@@ -699,6 +839,36 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     );
   }
 
+  // ---- Trailers -----------------------------------------------------------
+
+  Widget _buildTrailersSection(BuildContext context, Movie movie) {
+    final videos = movie.videos;
+    if (videos == null || videos.isEmpty) return const SizedBox.shrink();
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Trailers',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: FlixieColors.white,
+                fontWeight: FontWeight.bold,
+              ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 200,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: videos.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, i) => _VideoCard(video: videos[i]),
+          ),
+        ),
+      ],
+    );
+  }
+
   // ---- Where to watch ------------------------------------------------------
 
   Widget _buildWhereToWatchSection(BuildContext context) {
@@ -730,6 +900,136 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   // ---- Top cast ------------------------------------------------------------
 
+  void _showAllCast(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF0D1B2A),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: FlixieColors.medium,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Header
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Full Cast (${_cast.length})',
+                      style: const TextStyle(
+                        color: FlixieColors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: FlixieColors.light),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(color: Color(0xFF1E2D40), height: 1),
+              // Cast list
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _cast.length,
+                  itemBuilder: (context, index) {
+                    final member = _cast[index];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1B2E42),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          // Profile image
+                          Container(
+                            width: 60,
+                            height: 80,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF253A50),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: member.profileImage != null
+                                ? CachedNetworkImage(
+                                    imageUrl: 'https://image.tmdb.org/t/p/w185${member.profileImage}',
+                                    fit: BoxFit.cover,
+                                    errorWidget: (_, __, ___) => const Icon(
+                                      Icons.person,
+                                      color: FlixieColors.medium,
+                                      size: 32,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.person,
+                                    color: FlixieColors.medium,
+                                    size: 32,
+                                  ),
+                          ),
+                          const SizedBox(width: 12),
+                          // Name and character
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  member.name,
+                                  style: const TextStyle(
+                                    color: FlixieColors.white,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  member.character,
+                                  style: const TextStyle(
+                                    color: FlixieColors.medium,
+                                    fontSize: 13,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildTopCastSection(BuildContext context) {
     if (_cast.isEmpty) return const SizedBox.shrink();
     
@@ -747,7 +1047,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   ),
             ),
             TextButton(
-              onPressed: () {},
+              onPressed: () => _showAllCast(context),
               child: const Row(
                 children: [
                   Text(
@@ -914,22 +1214,25 @@ class _HeroBackdrop extends StatelessWidget {
 }
 
 class _GenreChip extends StatelessWidget {
-  const _GenreChip({required this.label});
+  const _GenreChip({required this.label, this.color});
 
   final String label;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
+    final chipColor = color ?? FlixieColors.primary;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        border: Border.all(color: FlixieColors.primary.withValues(alpha: 0.7)),
+        color: chipColor.withValues(alpha: 0.15),
+        border: Border.all(color: chipColor.withValues(alpha: 0.5)),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
         label,
-        style: const TextStyle(
-          color: FlixieColors.primary,
+        style: TextStyle(
+          color: chipColor,
           fontSize: 11,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.5,
@@ -1203,6 +1506,119 @@ class _SimilarCard extends StatelessWidget {
           Icons.movie_creation_outlined,
           color: FlixieColors.medium,
           size: 36,
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Video Card
+// ---------------------------------------------------------------------------
+
+class _VideoCard extends StatelessWidget {
+  const _VideoCard({required this.video});
+
+  final MovieVideo video;
+
+  Future<void> _launchVideo(BuildContext context) async {
+    final url = video.youtubeUrl;
+    final uri = Uri.parse(url);
+    
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not open video'),
+              backgroundColor: Color(0xFFEF4444),
+            ),
+          );
+        }
+        logger.w('Could not launch YouTube URL: $url');
+      }
+    } catch (e) {
+      logger.e('Error launching video', error: e);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error opening video'),
+            backgroundColor: Color(0xFFEF4444),
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _launchVideo(context),
+      child: SizedBox(
+        width: 300,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              children: [
+                Container(
+                  height: 170,
+                  width: 300,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1B2E42),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: CachedNetworkImage(
+                    imageUrl: video.thumbnailUrl,
+                    fit: BoxFit.cover,
+                    errorWidget: (_, __, ___) => _thumbnailFallback(),
+                  ),
+                ),
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.play_circle_filled,
+                        color: Colors.white,
+                        size: 56,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              video.name,
+              style: const TextStyle(
+                color: FlixieColors.light,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _thumbnailFallback() {
+    return Container(
+      color: const Color(0xFF253A50),
+      child: const Center(
+        child: Icon(
+          Icons.play_circle_outline,
+          color: FlixieColors.medium,
+          size: 48,
         ),
       ),
     );

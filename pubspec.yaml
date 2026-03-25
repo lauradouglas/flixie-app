@@ -33,6 +33,12 @@ dependencies:
   firebase_core: ^3.6.0
   firebase_auth: ^5.3.1
 
+  # Logging
+  logger: ^2.0.0
+
+  # URL launcher
+  url_launcher: ^6.2.5
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

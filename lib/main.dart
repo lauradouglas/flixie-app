@@ -9,6 +9,7 @@ import 'providers/auth_provider.dart';
 import 'services/auth_service.dart';
 import 'services/movie_cache_service.dart';
 import 'theme/app_theme.dart';
+import 'utils/app_logger.dart';
 import 'screens/home_screen.dart';
 import 'screens/movie_detail_screen.dart';
 import 'screens/search_screen.dart';
@@ -29,7 +30,7 @@ void main() async {
       );
     }
   } catch (e) {
-    print('Firebase initialization error: $e');
+    logger.e('Firebase initialization error: $e');
   }
 
   // Clear stale movie cache from previous days
@@ -61,10 +62,10 @@ void main() async {
   );
 }
 
-/// Builds the GoRouter, refreshing whenever [AuthProvider] changes.
+/// Builds the GoRouter, refreshing only when auth status changes (not user data).
 GoRouter _buildRouter(AuthProvider authProvider) {
   return GoRouter(
-    refreshListenable: authProvider,
+    refreshListenable: authProvider.authStatusListenable,
     redirect: (context, state) {
       final isAuthenticated = authProvider.isAuthenticated;
       final isAuthRoute = state.matchedLocation.startsWith('/auth');
@@ -124,19 +125,31 @@ GoRouter _buildRouter(AuthProvider authProvider) {
   );
 }
 
-class FlixieApp extends StatelessWidget {
+class FlixieApp extends StatefulWidget {
   const FlixieApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final authProvider = context.watch<AuthProvider>();
-    final router = _buildRouter(authProvider);
+  State<FlixieApp> createState() => _FlixieAppState();
+}
 
+class _FlixieAppState extends State<FlixieApp> {
+  late final GoRouter _router;
+
+  @override
+  void initState() {
+    super.initState();
+    // Create router once - it will refresh via authStatusListenable, not by rebuilding this widget
+    final authProvider = context.read<AuthProvider>();
+    _router = _buildRouter(authProvider);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'Flixie',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      routerConfig: router,
+      routerConfig: _router,
     );
   }
 }

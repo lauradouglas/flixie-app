@@ -1,3 +1,6 @@
+import 'genre.dart';
+import 'movie_video.dart';
+
 class Movie {
   final int id;
   final String title;
@@ -11,6 +14,8 @@ class Movie {
   final int? runtime;
   final String? tagline;
   final String? status;
+  final List<Genre>? genres;
+  final List<MovieVideo>? videos;
 
   const Movie({
     required this.id,
@@ -25,6 +30,8 @@ class Movie {
     this.runtime,
     this.tagline,
     this.status,
+    this.genres,
+    this.videos,
   });
 
   factory Movie.fromJson(Map<String, dynamic> json) {
@@ -41,6 +48,16 @@ class Movie {
       runtime: _parseInt(json['runtime']),
       tagline: json['tagline'] as String?,
       status: json['status'] as String?,
+      genres: json['genres'] != null
+          ? (json['genres'] as List<dynamic>)
+              .map((e) => Genre.fromJson(e as Map<String, dynamic>))
+              .toList()
+          : null,
+      videos: json['videos'] != null
+          ? (json['videos'] as List<dynamic>)
+              .map((e) => MovieVideo.fromJson(e as Map<String, dynamic>))
+              .toList()
+          : null,
     );
   }
 
@@ -74,6 +91,8 @@ class Movie {
       'runtime': runtime,
       'tagline': tagline,
       'status': status,
+      'genres': genres?.map((e) => e.toJson()).toList(),
+      'videos': videos?.map((e) => e.toJson()).toList(),
     };
   }
 }
