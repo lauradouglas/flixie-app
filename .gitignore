@@ -65,9 +65,6 @@ coverage/
 # Generated files
 lib/generated_plugin_registrant.dart
 
-# Firebase / secrets — never commit real credentials
+# Local dev config — contains device IP and secrets, never commit
 .firebase.json
-lib/firebase_options.dart
-android/app/google-services.json
-ios/Runner/GoogleService-Info.plist
 
