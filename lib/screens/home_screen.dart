@@ -167,10 +167,10 @@ class _FeaturedCard extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (movie.releaseDate != null) ...[  
+                    if (movie.releaseDate != null && movie.releaseDate!.length >= 4) ...[
                       const SizedBox(height: 4),
                       Text(
-                        movie.releaseDate!.substring(movie.releaseDate!.length - 4),
+                        movie.releaseDate!.substring(0, 4),
                         style: const TextStyle(
                           color: Colors.white70,
                           fontSize: 12,
