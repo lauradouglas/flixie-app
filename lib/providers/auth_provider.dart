@@ -48,7 +48,14 @@ class AuthProvider extends ChangeNotifier {
   /// Use this for router refresh to avoid unnecessary navigation rebuilds.
   Listenable get authStatusListenable => _authStatusNotifier;
 
+  // Flag set during sign-up to prevent _onAuthStateChanged from running
+  // getUserByExternalId before the DB user has been created.
+  bool _isSigningUp = false;
+
   void _onAuthStateChanged(firebase_auth.User? user) async {
+    // During sign-up the flow is managed directly in signUp(); skip here.
+    if (_isSigningUp) return;
+
     logger.i('Auth state changed');
     logger.d('Firebase user: ${user?.email ?? "null"} (uid: ${user?.uid ?? "null"})');
     
@@ -131,20 +138,61 @@ class AuthProvider extends ChangeNotifier {
   }
 
   /// Creates a new account. Returns `true` on success.
-  Future<bool> signUp(
-    String email,
-    String password,
-    String displayName,
-  ) async {
+  ///
+  /// Creates the Firebase user first, then registers the user in the backend
+  /// database. If the database call fails, the Firebase account is deleted so
+  /// no orphaned credential is left behind.
+  Future<bool> signUp({
+    required String email,
+    required String password,
+    required String firstName,
+    required String lastName,
+    required String username,
+    required int languageId,
+    required int countryId,
+  }) async {
     _setLoading(true);
     _setError(null);
+    _isSigningUp = true;
+    firebase_auth.UserCredential? credential;
     try {
-      await _authService.signUp(email, password, displayName);
+      final displayName = '${firstName.trim()} ${lastName.trim()}';
+      credential = await _authService.signUp(email, password, displayName);
+
+      final uid = credential.user!.uid;
+
+      // Register in the backend database.
+      _dbUser = await UserService.createUser({
+        'externalId': uid,
+        'firstName': firstName.trim(),
+        'lastName': lastName.trim(),
+        'email': email.trim(),
+        'username': username.trim(),
+        'bio': '',
+        'languageId': languageId,
+        'countryId': countryId,
+      });
+
+      _firebaseUser = credential.user;
+      _status = AuthStatus.authenticated;
+      _authStatusNotifier.notify();
+      notifyListeners();
       return true;
     } on firebase_auth.FirebaseAuthException catch (e) {
       _setError(AuthService.messageFromAuthException(e));
       return false;
+    } catch (e) {
+      logger.e('Error during sign-up: $e');
+      _setError('Failed to create account. Please try again.');
+      // Roll back the Firebase account so the user can try again.
+      try {
+        await credential?.user?.delete();
+      } catch (deleteError) {
+        logger.e('Failed to roll back Firebase account: $deleteError');
+      }
+      return false;
     } finally {
+      _isSigningUp = false;
       _setLoading(false);
     }
   }
