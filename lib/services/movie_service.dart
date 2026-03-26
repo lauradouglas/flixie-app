@@ -132,6 +132,14 @@ class MovieService {
         .map((e) => Review.fromJson(e as Map<String, dynamic>))
         .toList();
   }
+  static Future<List<MovieShort>> getTopRatedMovies({String region = 'US'}) async {
+    apiLogger.d('Fetching top rated movies for region $region');
+    final data = await ApiClient.get('/movies/top_rated', queryParams: {'region': region});
+    return (data as List<dynamic>)
+        .map((e) => MovieShort.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   static Future<List<MovieShort>> getNowPlayingMovies({String region = 'US'}) async {
     apiLogger.d('Fetching now playing movies for region $region');
     final data = await ApiClient.get('/movies/now_playing', queryParams: {'region': region});

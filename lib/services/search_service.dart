@@ -1,9 +1,23 @@
 import '../models/movie.dart';
 import '../models/show.dart';
 import '../models/person.dart';
+import '../models/search_result.dart';
 import 'api_client.dart';
 
 class SearchService {
+  static Future<SearchResults> search(
+    String value, {
+    String type = 'ALL',
+    int page = 1,
+  }) async {
+    final data = await ApiClient.get('/search', queryParams: {
+      'value': value,
+      'type': type,
+      'page': page.toString(),
+    });
+    return SearchResults.fromJson(data as Map<String, dynamic>);
+  }
+
   static Future<List<Movie>> searchMovies(String query) async {
     final data = await ApiClient.get('/search/movies',
         queryParams: {'query': query});
