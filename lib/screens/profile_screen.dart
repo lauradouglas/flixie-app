@@ -1,11 +1,70 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/activity_list_item.dart';
 import '../providers/auth_provider.dart';
+import '../services/user_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/app_logger.dart';
+import 'profile/activity_tile.dart';
+import 'profile/profile_header.dart';
+import 'profile/profile_stats_row.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  List<ActivityListItem> _activity = [];
+  bool _activityLoading = true;
+  String? _loadedForUserId;
+  int _lastActivityVersion = -1;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AuthProvider>().addListener(_onAuthChanged);
+      _loadActivity();
+    });
+  }
+
+  @override
+  void dispose() {
+    context.read<AuthProvider>().removeListener(_onAuthChanged);
+    super.dispose();
+  }
+
+  void _onAuthChanged() {
+    final auth = context.read<AuthProvider>();
+    final userId = auth.dbUser?.id;
+    final version = auth.activityVersion;
+    if (userId != null && (userId != _loadedForUserId || version != _lastActivityVersion)) {
+      _loadActivity();
+    }
+  }
+
+  Future<void> _loadActivity() async {
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (userId == null) return;
+    try {
+      final activity = await UserService.getUserActivity(userId);
+      if (mounted) {
+        setState(() {
+          _activity = activity.take(12).toList();
+          _loadedForUserId = userId;
+          _lastActivityVersion = context.read<AuthProvider>().activityVersion;
+          _activityLoading = false;
+        });
+      }
+    } catch (e) {
+      logger.e('[ProfileScreen] activity load error: $e');
+      if (mounted) setState(() => _activityLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,44 +94,19 @@ class ProfileScreen extends StatelessWidget {
         child: Column(
           children: [
             // Avatar & name
-            const SizedBox(height: 16),
-            CircleAvatar(
-              radius: 48,
-              backgroundColor: FlixieColors.primary.withValues(alpha: 0.3),
-              backgroundImage:
-                  photoUrl != null ? NetworkImage(photoUrl) : null,
-              child: photoUrl == null
-                  ? const Icon(
-                      Icons.person,
-                      size: 48,
-                      color: FlixieColors.primary,
-                    )
-                  : null,
+            ProfileHeader(
+              displayName: displayName,
+              email: email,
+              photoUrl: photoUrl,
             ),
-            const SizedBox(height: 12),
-            Text(displayName, style: textTheme.headlineMedium),
-            if (email.isNotEmpty)
-              Text(email, style: textTheme.bodySmall),
 
             const SizedBox(height: 24),
 
             // Stats row
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _StatItem(
-                  value: '${(dbUser?.watchedMovies?.length ?? 0) + (dbUser?.watchedShows?.length ?? 0)}',
-                  label: 'Watched',
-                ),
-                _StatItem(
-                  value: '${(dbUser?.movieWatchlist?.length ?? 0) + (dbUser?.showWatchlist?.length ?? 0)}',
-                  label: 'Watchlist',
-                ),
-                _StatItem(
-                  value: '${(dbUser?.favoriteMovies?.length ?? 0) + (dbUser?.favoriteShows?.length ?? 0)}',
-                  label: 'Favorites',
-                ),
-              ],
+            ProfileStatsRow(
+              watched: (dbUser?.watchedMovies?.length ?? 0) + (dbUser?.watchedShows?.length ?? 0),
+              watchlist: (dbUser?.movieWatchlist?.length ?? 0) + (dbUser?.showWatchlist?.length ?? 0),
+              favorites: (dbUser?.favoriteMovies?.length ?? 0) + (dbUser?.favoriteShows?.length ?? 0),
             ),
 
             const SizedBox(height: 24),
@@ -110,6 +144,42 @@ class ProfileScreen extends StatelessWidget {
               const SizedBox(height: 24),
             ],
 
+            const Divider(),
+            const SizedBox(height: 8),
+
+            // Activity section
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Recent Activity', style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+            if (_activityLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_activity.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  'No activity yet.',
+                  style: textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
+                ),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _activity.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (_, i) => ActivityTile(item: _activity[i]),
+              ),
+
+            const SizedBox(height: 16),
             const Divider(),
             const SizedBox(height: 8),
 
@@ -154,29 +224,6 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
-class _StatItem extends StatelessWidget {
-  const _StatItem({required this.value, required this.label});
-
-  final String value;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                color: FlixieColors.primary,
-                fontWeight: FontWeight.bold,
-              ),
-        ),
-        Text(label, style: Theme.of(context).textTheme.bodySmall),
-      ],
-    );
-  }
-}
-
 class _MenuItem {
   const _MenuItem({required this.icon, required this.label});
   final IconData icon;
@@ -190,3 +237,4 @@ const List<_MenuItem> _menuItems = [
   _MenuItem(icon: Icons.notifications_outlined, label: 'Notifications'),
   _MenuItem(icon: Icons.help_outline, label: 'Help & Support'),
 ];
+

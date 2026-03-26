@@ -9,6 +9,7 @@ import '../providers/auth_provider.dart';
 import '../services/movie_service.dart';
 import '../services/trending_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/app_logger.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,33 +22,51 @@ class _HomeScreenState extends State<HomeScreen> {
   List<MovieShort> _featuredMovies = [];
   List<MovieShort> _nowPlayingMovies = [];
   bool _isLoading = true;
+  String? _loadedForUserId;
 
   @override
   void initState() {
     super.initState();
-    _loadFeaturedMovies();
+    // Listen for dbUser becoming available after auth resolves
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AuthProvider>().addListener(_onAuthChanged);
+      _loadFeaturedMovies();
+    });
+  }
+
+  @override
+  void dispose() {
+    context.read<AuthProvider>().removeListener(_onAuthChanged);
+    super.dispose();
+  }
+
+  void _onAuthChanged() {
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (userId != null && userId != _loadedForUserId) {
+      _loadFeaturedMovies();
+    }
   }
 
   Future<void> _loadFeaturedMovies() async {
-    // Derive region from the user's country profile (e.g. {"isoCode": "GB"}),
-    // falling back to 'US'.
     final user = context.read<AuthProvider>().dbUser;
     final region = (user?.country?['isoCode'] as String?)?.toUpperCase() ?? 'US';
-    debugPrint('[HomeScreen] user country: ${user?.country}, resolved region: $region');
+    logger.d('[HomeScreen] loading, user=${user?.id}, region=$region');
 
     try {
-      final results = await Future.wait([
+      final futures = await Future.wait([
         TrendingService.getTrendingMovies(),
         MovieService.getNowPlayingMovies(region: region),
       ]);
       if (mounted) {
         setState(() {
-          _featuredMovies = results[0] as List<MovieShort>;
-          _nowPlayingMovies = results[1] as List<MovieShort>;
+          _featuredMovies = futures[0];
+          _nowPlayingMovies = futures[1];
+          _loadedForUserId = user?.id;
           _isLoading = false;
         });
       }
     } catch (e) {
+      logger.e('[HomeScreen] load error: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;

@@ -1,3 +1,4 @@
+import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/models/review.dart';
 
 import '../models/user.dart';
@@ -54,9 +55,13 @@ class UserService {
     await ApiClient.delete('/users/external-id/$externalId');
   }
 
-  static Future<List<dynamic>> getUserActivity(String userId) async {
+  static Future<List<ActivityListItem>> getUserActivity(String userId) async {
     final data = await ApiClient.get('/users/$userId/activity');
-    return data as List<dynamic>;
+    apiLogger.d('[Activity] raw response type: ${data.runtimeType}');
+    apiLogger.d('[Activity] raw response: $data');
+    return (data as List<dynamic>)
+        .map((e) => ActivityListItem.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   static Future<User> toggleDarkMode(String userId, bool darkMode) async {
@@ -160,6 +165,20 @@ class UserService {
   }
 
   // ---- Reviews -------------------------------------------------------------
+
+  static Future<Review> voteOnReview({
+    required String mediaType,
+    required String mediaId,
+    required String reviewId,
+    required String voteType,
+  }) async {
+    assert(voteType == 'upvote' || voteType == 'downvote');
+    final data = await ApiClient.post(
+      '/users/$mediaType/$mediaId/review/$reviewId/vote',
+      body: {'voteType': voteType},
+    );
+    return Review.fromJson(data as Map<String, dynamic>);
+  }
 
   static Future<Review> addMovieReview(Review review) async {
     apiLogger.d('POST /users/add/MOVIE/review');

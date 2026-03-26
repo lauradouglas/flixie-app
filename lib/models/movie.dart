@@ -14,8 +14,13 @@ class Movie {
   final int? runtime;
   final String? tagline;
   final String? status;
+  final int? budget;
   final List<Genre>? genres;
   final List<MovieVideo>? videos;
+  final String? imdbId;
+  final String? homepage;
+  final String? instagramId;
+  final String? twitterId;
 
   const Movie({
     required this.id,
@@ -30,8 +35,13 @@ class Movie {
     this.runtime,
     this.tagline,
     this.status,
+    this.budget,
     this.genres,
     this.videos,
+    this.imdbId,
+    this.homepage,
+    this.instagramId,
+    this.twitterId,
   });
 
   factory Movie.fromJson(Map<String, dynamic> json) {
@@ -48,6 +58,7 @@ class Movie {
       runtime: _parseInt(json['runtime']),
       tagline: json['tagline'] as String?,
       status: json['status'] as String?,
+      budget: _parseInt(json['budget']),
       genres: json['genres'] != null
           ? (json['genres'] as List<dynamic>)
               .map((e) => Genre.fromJson(e as Map<String, dynamic>))
@@ -58,6 +69,10 @@ class Movie {
               .map((e) => MovieVideo.fromJson(e as Map<String, dynamic>))
               .toList()
           : null,
+      imdbId: json['imdbId'] as String?,
+      homepage: json['homepage'] as String?,
+      instagramId: json['instagramId'] as String?,
+      twitterId: json['twitterId'] as String?,
     );
   }
 

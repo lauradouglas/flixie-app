@@ -27,6 +27,7 @@ class AuthProvider extends ChangeNotifier {
   models.User? _dbUser;
   bool _isLoading = false;
   String? _errorMessage;
+  int _activityVersion = 0;
 
   AuthStatus get status => _status;
   firebase_auth.User? get firebaseUser => _firebaseUser;
@@ -34,6 +35,13 @@ class AuthProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isAuthenticated => _status == AuthStatus.authenticated;
+  int get activityVersion => _activityVersion;
+
+  /// Call after adding an item to any list so activity-watching screens can refresh.
+  void markActivityChanged() {
+    _activityVersion++;
+    notifyListeners();
+  }
   
   /// A Listenable that only notifies when auth status changes, not when user data changes.
   /// Use this for router refresh to avoid unnecessary navigation rebuilds.
@@ -177,6 +185,7 @@ class AuthProvider extends ChangeNotifier {
     List<dynamic>? watchedMovies,
     List<dynamic>? movieWatchlist,
     List<dynamic>? favoriteMovies,
+    List<dynamic>? favoritePeople,
   }) {
     if (_dbUser == null) return;
     
@@ -184,11 +193,13 @@ class AuthProvider extends ChangeNotifier {
     if (watchedMovies != null) logger.d('Watched: ${watchedMovies.length} items');
     if (movieWatchlist != null) logger.d('Watchlist: ${movieWatchlist.length} items');
     if (favoriteMovies != null) logger.d('Favorites: ${favoriteMovies.length} items');
+    if (favoritePeople != null) logger.d('Fav people: ${favoritePeople.length} items');
     
     _dbUser = _dbUser!.copyWith(
       watchedMovies: watchedMovies ?? _dbUser!.watchedMovies,
       movieWatchlist: movieWatchlist ?? _dbUser!.movieWatchlist,
       favoriteMovies: favoriteMovies ?? _dbUser!.favoriteMovies,
+      favoritePeople: favoritePeople ?? _dbUser!.favoritePeople,
     );
     notifyListeners();
   }

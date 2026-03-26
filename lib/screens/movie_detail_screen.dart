@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/movie.dart';
 import '../models/movie_credits.dart';
@@ -47,6 +48,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   List<MovieCastMember> _cast = [];
   List<WatchProvider> _watchProviders = [];
   String? _director;
+  List<String> _producers = [];
+  List<String> _writers = [];
   bool _isLoading = true;
   String? _error;
   bool _inWatchlist = false;
@@ -99,6 +102,22 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               .where((crew) => crew.job == 'Director')
               .map((crew) => crew.name)
               .firstOrNull;
+          final execProducers = credits.crewMembers
+              .where((crew) => crew.job == 'Executive Producer')
+              .map((crew) => crew.name)
+              .toList();
+          final producers = credits.crewMembers
+              .where((crew) => crew.job == 'Producer')
+              .map((crew) => crew.name)
+              .toList();
+          _producers = [...execProducers, ...producers].toSet().toList();
+          _writers = credits.crewMembers
+              .where((crew) =>
+                  crew.job == 'Screenplay' ||
+                  crew.job == 'Head of Story')
+              .map((crew) => crew.name)
+              .toSet()
+              .toList();
           _watchProviders = results[3] as List<WatchProvider>;
           _reviews = results[4] as List<Review>;
           
@@ -172,6 +191,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           if (!updatedWatchlist.contains(movieId)) {
             updatedWatchlist.add(movieId);
           }
+          authProvider.markActivityChanged();
         } else {
           updatedWatchlist.remove(movieId);
         }
@@ -235,6 +255,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           if (!updatedWatched.contains(movieId)) {
             updatedWatched.add(movieId);
           }
+          authProvider.markActivityChanged();
         } else {
           updatedWatched.remove(movieId);
         }
@@ -302,6 +323,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           if (!updatedFavorites.contains(movieId)) {
             updatedFavorites.add(movieId);
           }
+          authProvider.markActivityChanged();
         } else {
           updatedFavorites.remove(movieId);
         }
@@ -421,6 +443,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   const Divider(height: 32, color: Color(0xFF1E2D40)),
                   _buildSynopsis(context, movie),
                   const SizedBox(height: 16),
+                  _buildFilmInfoCard(movie),
+                  const SizedBox(height: 16),
                   _buildActionButtons(),
                   const SizedBox(height: 28),
                   _buildTrailersSection(context, movie),
@@ -430,6 +454,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   _buildTopCastSection(context),
                   const SizedBox(height: 28),
                   _buildUserReviewsSection(context),
+                  const SizedBox(height: 28),
+                  _buildExternalLinksSection(context, movie),
                   const SizedBox(height: 28),
                   _buildMoreLikeThisSection(context),
                   const SizedBox(height: 32),
@@ -506,28 +532,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             letterSpacing: 0.5,
           ),
         ),
-        if (_director != null) ...[
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              const Text(
-                'Directed by ',
-                style: TextStyle(
-                  color: FlixieColors.medium,
-                  fontSize: 13,
-                ),
-              ),
-              Text(
-                _director!,
-                style: const TextStyle(
-                  color: FlixieColors.light,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ],
         if (meta.isNotEmpty) ...[
           const SizedBox(height: 6),
           Text(
@@ -688,6 +692,91 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       return '${(count / 1000).toStringAsFixed(1)}K';
     }
     return count.toString();
+  }
+
+  // ---- Film info card (director / writers / budget) -----------------------
+
+  Widget _buildFilmInfoCard(Movie movie) {
+    final hasProducers = _producers.isNotEmpty;
+    final hasDirector = _director != null;
+    final hasWriters = _writers.isNotEmpty;
+    final hasBudget = movie.budget != null && movie.budget! > 0;
+
+    if (!hasProducers && !hasDirector && !hasWriters && !hasBudget) return const SizedBox.shrink();
+
+    Widget row(String label, String value) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: const TextStyle(
+              color: FlixieColors.medium,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1.1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              color: FlixieColors.light,
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      );
+    }
+
+    const divider = Column(
+      children: [
+        SizedBox(height: 12),
+        Divider(color: Color(0xFF1E2D40), thickness: 1, height: 1),
+        SizedBox(height: 12),
+      ],
+    );
+
+    String _formatBudget(int amount) {
+      if (amount >= 1000000) {
+        final m = amount / 1000000;
+        return '\$${m % 1 == 0 ? m.toStringAsFixed(0) : m.toStringAsFixed(1)}M';
+      }
+      if (amount >= 1000) {
+        return '\$${(amount / 1000).toStringAsFixed(0)}K';
+      }
+      return '\$$amount';
+    }
+
+    final rows = <Widget>[];
+    if (hasDirector) rows.add(row('Director', _director!));
+    if (hasWriters) {
+      if (rows.isNotEmpty) rows.add(divider);
+      rows.add(row(_writers.length == 1 ? 'Writer' : 'Writers', _writers.join(', ')));
+    }
+    if (hasBudget) {
+      if (rows.isNotEmpty) rows.add(divider);
+      rows.add(row('Budget', _formatBudget(movie.budget!)));
+    }
+    if (hasProducers) {
+      if (rows.isNotEmpty) rows.add(divider);
+      rows.add(row(_producers.length == 1 ? 'Producer' : 'Producers', _producers.join(', ')));
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F2033),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF1E2D40)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: rows,
+      ),
+    );
   }
 
   // ---- Synopsis ------------------------------------------------------------
@@ -1104,7 +1193,77 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   // ---- User reviews --------------------------------------------------------
 
+  void _showAllReviews(BuildContext context) {
+    final currentUserId = context.read<AuthProvider>().dbUser?.id;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (ctx, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF0D1B2A),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: FlixieColors.medium,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'All Reviews (${_reviews.length})',
+                      style: const TextStyle(
+                        color: FlixieColors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: FlixieColors.light),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(color: Color(0xFF1E2D40), height: 1),
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _reviews.length,
+                  itemBuilder: (_, i) => ReviewCard(
+                    review: _reviews[i],
+                    currentUserId: currentUserId,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildUserReviewsSection(BuildContext context) {
+    const previewCount = 5;
+    final preview = _reviews.take(previewCount).toList();
+    final hasMore = _reviews.length > previewCount;
+    final currentUserId = context.read<AuthProvider>().dbUser?.id;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1145,8 +1304,164 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               style: TextStyle(color: FlixieColors.medium, fontSize: 13),
             ),
           )
-        else
-          ..._reviews.map((r) => ReviewCard(review: r)),
+        else ...[
+          ...preview.map((r) => ReviewCard(
+                review: r,
+                currentUserId: currentUserId,
+              )),
+          if (hasMore)
+            TextButton(
+              onPressed: () => _showAllReviews(context),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'View all ${_reviews.length} reviews',
+                    style: const TextStyle(
+                      color: FlixieColors.primary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right,
+                      color: FlixieColors.primary, size: 18),
+                ],
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+
+  // ---- External links -----------------------------------------------------
+
+  Widget _buildExternalLinksSection(BuildContext context, Movie movie) {
+    final hasImdb = movie.imdbId != null && movie.imdbId!.isNotEmpty;
+    final hasHomepage = movie.homepage != null && movie.homepage!.isNotEmpty;
+    final hasInstagram = movie.instagramId != null && movie.instagramId!.isNotEmpty;
+    final hasTwitter = movie.twitterId != null && movie.twitterId!.isNotEmpty;
+
+    if (!hasImdb && !hasHomepage && !hasInstagram && !hasTwitter) {
+      return const SizedBox.shrink();
+    }
+
+    Future<void> launch(String url) async {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+
+    Widget linkCard({
+      required Widget leading,
+      required String label,
+      required VoidCallback onTap,
+      bool fullWidth = false,
+    }) {
+      return GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F2033),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFF1E2D40)),
+          ),
+          child: Row(
+            mainAxisAlignment: fullWidth ? MainAxisAlignment.spaceBetween : MainAxisAlignment.center,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  leading,
+                  const SizedBox(width: 12),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: FlixieColors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              if (fullWidth)
+                const Icon(Icons.open_in_new, color: FlixieColors.medium, size: 18),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final hasSocials = hasInstagram || hasTwitter;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'External Links',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: FlixieColors.white,
+                fontWeight: FontWeight.bold,
+              ),
+        ),
+        const SizedBox(height: 12),
+        if (hasImdb)
+          linkCard(
+            fullWidth: true,
+            leading: Container(
+              width: 36,
+              height: 28,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5C518),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              alignment: Alignment.center,
+              child: const Text(
+                'IMDb',
+                style: TextStyle(
+                  color: Color(0xFF000000),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ),
+            label: 'Official Profile',
+            onTap: () => launch('https://www.imdb.com/title/${movie.imdbId}'),
+          ),
+        if (hasImdb && (hasHomepage || hasSocials)) const SizedBox(height: 10),
+        if (hasHomepage)
+          linkCard(
+            fullWidth: true,
+            leading: const Icon(Icons.language, color: FlixieColors.medium, size: 20),
+            label: 'Official Website',
+            onTap: () => launch(movie.homepage!),
+          ),
+        if (hasHomepage && hasSocials) const SizedBox(height: 10),
+        if (hasSocials)
+          Row(
+            children: [
+              if (hasInstagram)
+                Expanded(
+                  child: linkCard(
+                    leading: const Icon(Icons.language, color: FlixieColors.medium, size: 20),
+                    label: 'INSTAGRAM',
+                    onTap: () => launch('https://www.instagram.com/${movie.instagramId}'),
+                  ),
+                ),
+              if (hasInstagram && hasTwitter) const SizedBox(width: 10),
+              if (hasTwitter)
+                Expanded(
+                  child: linkCard(
+                    leading: const Text(
+                      '@',
+                      style: TextStyle(color: FlixieColors.medium, fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    label: 'TWITTER',
+                    onTap: () => launch('https://twitter.com/${movie.twitterId}'),
+                  ),
+                ),
+            ],
+          ),
       ],
     );
   }

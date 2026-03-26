@@ -143,6 +143,22 @@ class User {
     }
   }
 
+  bool isPersonFavorite(int personId) {
+    if (favoritePeople == null) return false;
+    try {
+      return favoritePeople!.any((item) {
+        if (item is Map<String, dynamic>) {
+          return item['personId'] == personId || item['id'] == personId;
+        }
+        if (item is int) return item == personId;
+        return false;
+      });
+    } catch (e) {
+      logger.w('Error checking person favorite: $e');
+      return false;
+    }
+  }
+
   // Create a copy of User with updated fields
   User copyWith({
     String? id,

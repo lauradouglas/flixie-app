@@ -12,6 +12,7 @@ import 'theme/app_theme.dart';
 import 'utils/app_logger.dart';
 import 'screens/home_screen.dart';
 import 'screens/movie_detail_screen.dart';
+import 'screens/person_detail_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/watchlist_screen.dart';
 import 'screens/profile_screen.dart';
@@ -103,6 +104,12 @@ GoRouter _buildRouter(AuthProvider authProvider) {
             path: '/movies/:id',
             builder: (context, state) => MovieDetailScreen(
               movieId: state.pathParameters['id'] ?? '0',
+            ),
+          ),
+          GoRoute(
+            path: '/people/:id',
+            builder: (context, state) => PersonDetailScreen(
+              personId: state.pathParameters['id'] ?? '0',
             ),
           ),
         ],
