@@ -7,6 +7,7 @@ class MovieShort {
   final String? overview;
   final Trailer? trailer;
   final String? mediaType;
+  final double? voteAverage;
 
   const MovieShort({
     required this.id,
@@ -17,6 +18,7 @@ class MovieShort {
     this.overview,
     this.trailer,
     this.mediaType,
+    this.voteAverage,
   });
 
   factory MovieShort.fromJson(Map<String, dynamic> json) {
@@ -27,10 +29,11 @@ class MovieShort {
       poster: json['poster'] as String?,
       releaseDate: json['releaseDate'] as String?,
       overview: json['overview'] as String?,
-      trailer: json['trailer'] != null 
+      trailer: json['trailer'] != null
           ? Trailer.fromJson(json['trailer'] as Map<String, dynamic>)
           : null,
       mediaType: json['mediaType'] as String?,
+      voteAverage: (json['voteAverage'] as num?)?.toDouble(),
     );
   }
 
@@ -44,6 +47,7 @@ class MovieShort {
       'overview': overview,
       'trailer': trailer?.toJson(),
       'mediaType': mediaType,
+      'voteAverage': voteAverage,
     };
   }
 }
