@@ -100,11 +100,21 @@ class AuthProvider extends ChangeNotifier {
     
     // Notify auth status listener only if status actually changed
     if (oldStatus != _status) {
-      _authStatusNotifier.notify();
-      // Defer the broader notifyListeners to after the current frame so GoRouter
-      // can finish processing the route redirect before Provider tries to rebuild
-      // widgets (avoids _elements.contains(element) assertion failure).
-      SchedulerBinding.instance.addPostFrameCallback((_) => notifyListeners());
+      // Defer _authStatusNotifier.notify() to a post-frame callback so that
+      // GoRouter's redirect is scheduled for a *later* frame than the one
+      // where _setLoading(false) marks the current auth screen dirty.  If
+      // both the dirty-marking and the Navigator deactivation land in the
+      // same build scope Flutter throws:
+      //   '_elements.contains(element)': is not true.
+      // By deferring the router notification we guarantee:
+      //   Frame A – _setLoading(false) dirty-mark is processed, screen rebuilds.
+      //   Frame B – GoRouter redirects and deactivates the auth screen (clean).
+      //   Post-frame B – notifyListeners() fires; screen is already inactive so
+      //                  markNeedsBuild() returns early with no crash.
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        _authStatusNotifier.notify();
+        SchedulerBinding.instance.addPostFrameCallback((_) => notifyListeners());
+      });
     } else {
       notifyListeners();
     }
@@ -175,8 +185,15 @@ class AuthProvider extends ChangeNotifier {
 
       _firebaseUser = credential.user;
       _status = AuthStatus.authenticated;
-      _authStatusNotifier.notify();
-      notifyListeners();
+      // Defer router notification and provider rebuild for the same reason as
+      // in _onAuthStateChanged: _setLoading(false) in the finally block calls
+      // notifyListeners() immediately, marking the signup screen dirty.  If
+      // _authStatusNotifier.notify() fired in the same frame, GoRouter would
+      // deactivate the screen while it is still in _dirtyElements → crash.
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        _authStatusNotifier.notify();
+        SchedulerBinding.instance.addPostFrameCallback((_) => notifyListeners());
+      });
       return true;
     } on firebase_auth.FirebaseAuthException catch (e) {
       _setError(AuthService.messageFromAuthException(e));
