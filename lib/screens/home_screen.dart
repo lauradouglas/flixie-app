@@ -189,10 +189,19 @@ class _FeaturedCard extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (movie.releaseDate != null && movie.releaseDate!.length >= 4) ...[
+                    if (movie.releaseDate != null && movie.releaseDate!.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
-                        movie.releaseDate!.substring(0, 4),
+                        () {
+                          final raw = movie.releaseDate!;
+                          // Handle ISO format: "2026-03-15" or "2026-03-15T..."
+                          final iso = DateTime.tryParse(raw);
+                          if (iso != null) return iso.year.toString();
+                          // Handle JS date string: "Sun Mar 15 2026"
+                          final parts = raw.split(' ');
+                          if (parts.length == 4) return '${parts[2]} ${parts[1]} ${parts[3]}';
+                          return raw;
+                        }(),
                         style: const TextStyle(
                           color: Colors.white70,
                           fontSize: 12,
