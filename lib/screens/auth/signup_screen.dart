@@ -1,3 +1,4 @@
+import 'package:dropdown_flutter/custom_dropdown.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -112,12 +113,15 @@ class _SignupScreenState extends State<SignupScreen> {
     // Re-validate form (also triggers username field validator).
     if (!_formKey.currentState!.validate()) return;
 
+    // Capture messenger before any await so it's safe after navigation
+    final messenger = ScaffoldMessenger.of(context);
+
     // Ensure username availability has been confirmed.
     if (_usernameAvailable != true) {
       await _checkUsernameAvailability();
       if (!mounted) return;
       if (_usernameAvailable != true) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           const SnackBar(
             content: Text('Please choose an available username.'),
             backgroundColor: FlixieColors.danger,
@@ -128,7 +132,7 @@ class _SignupScreenState extends State<SignupScreen> {
     }
 
     if (_selectedLanguage == null || _selectedCountry == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(
           content: Text('Please select a language and country.'),
           backgroundColor: FlixieColors.danger,
@@ -150,7 +154,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
     if (!mounted) return;
     if (!success) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: Text(auth.errorMessage ?? 'Sign up failed.'),
           backgroundColor: FlixieColors.danger,
@@ -301,26 +305,45 @@ class _SignupScreenState extends State<SignupScreen> {
                 else if (_refDataError)
                   _buildRefDataErrorRow(onRetry: _loadReferenceData)
                 else
-                  DropdownButtonFormField<Language>(
-                        value: _selectedLanguage,
-                        decoration: const InputDecoration(
-                          labelText: 'Language',
-                          prefixIcon: Icon(Icons.language),
-                        ),
-                        items: _languages
-                            .map(
-                              (l) => DropdownMenuItem(
-                                value: l,
-                                child: Text(l.name),
-                              ),
-                            )
-                            .toList(),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      DropdownFlutter<Language>(
+                        items: _languages,
+                        initialItem: _selectedLanguage,
+                        hintText: 'Select Language',
                         onChanged: (l) =>
                             setState(() => _selectedLanguage = l),
-                        validator: (v) => v == null
-                            ? 'Please select a language.'
-                            : null,
+                        headerBuilder: (ctx, item, _) =>
+                            Text(item.name),
+                        listItemBuilder: (ctx, item, isSelected, _) =>
+                            Text(item.name),
+                        decoration: CustomDropdownDecoration(
+                          closedFillColor:
+                              Theme.of(context).inputDecorationTheme.fillColor,
+                          expandedFillColor:
+                              Theme.of(context).scaffoldBackgroundColor,
+                          closedBorder: Border.all(
+                            color: FlixieColors.primary.withValues(alpha: 0.4),
+                          ),
+                          expandedBorder: Border.all(
+                            color: FlixieColors.primary,
+                          ),
+                        ),
                       ),
+                      if (_selectedLanguage == null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6, left: 12),
+                          child: Text(
+                            'Please select a language.',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 const SizedBox(height: 16),
 
                 // Country dropdown
@@ -329,26 +352,49 @@ class _SignupScreenState extends State<SignupScreen> {
                 else if (_refDataError)
                   const SizedBox.shrink()
                 else
-                  DropdownButtonFormField<Country>(
-                        value: _selectedCountry,
-                        decoration: const InputDecoration(
-                          labelText: 'Country',
-                          prefixIcon: Icon(Icons.flag_outlined),
-                        ),
-                        items: _countries
-                            .map(
-                              (c) => DropdownMenuItem(
-                                value: c,
-                                child: Text(c.name),
-                              ),
-                            )
-                            .toList(),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      DropdownFlutter<Country>.search(
+                        items: _countries,
+                        initialItem: _selectedCountry,
+                        hintText: 'Select Country',
                         onChanged: (c) =>
                             setState(() => _selectedCountry = c),
-                        validator: (v) => v == null
-                            ? 'Please select a country.'
-                            : null,
+                        headerBuilder: (ctx, item, _) =>
+                            Text(item.name),
+                        listItemBuilder: (ctx, item, isSelected, _) =>
+                            Text(item.name),
+                        decoration: CustomDropdownDecoration(
+                          closedFillColor:
+                              Theme.of(context).inputDecorationTheme.fillColor,
+                          expandedFillColor:
+                              Theme.of(context).scaffoldBackgroundColor,
+                          closedBorder: Border.all(
+                            color: FlixieColors.primary.withValues(alpha: 0.4),
+                          ),
+                          expandedBorder: Border.all(
+                            color: FlixieColors.primary,
+                          ),
+                          searchFieldDecoration: SearchFieldDecoration(
+                            fillColor:
+                                Theme.of(context).inputDecorationTheme.fillColor,
+                          ),
+                        ),
                       ),
+                      if (_selectedCountry == null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6, left: 12),
+                          child: Text(
+                            'Please select a country.',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 const SizedBox(height: 16),
 
                 // Password

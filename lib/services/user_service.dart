@@ -10,7 +10,7 @@ import 'api_client.dart';
 
 class UserService {
   static Future<User> createUser(Map<String, dynamic> body) async {
-    final data = await ApiClient.post('/users/create-users', body: body);
+    final data = await ApiClient.post('/users', body: body);
     return User.fromJson(data as Map<String, dynamic>);
   }
 
@@ -37,7 +37,7 @@ class UserService {
   }
 
   static Future<bool> usernameExists(String username) async {
-    final data = await ApiClient.get('/users/$username/exists');
+    final data = await ApiClient.get('/utils/$username/exists');
     return data as bool;
   }
 
