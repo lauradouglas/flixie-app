@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../models/user.dart' as models;
 import '../services/api_client.dart';
@@ -93,9 +94,13 @@ class AuthProvider extends ChangeNotifier {
     // Notify auth status listener only if status actually changed
     if (oldStatus != _status) {
       _authStatusNotifier.notify();
+      // Defer the broader notifyListeners to after the current frame so GoRouter
+      // can finish processing the route redirect before Provider tries to rebuild
+      // widgets (avoids _elements.contains(element) assertion failure).
+      SchedulerBinding.instance.addPostFrameCallback((_) => notifyListeners());
+    } else {
+      notifyListeners();
     }
-    
-    notifyListeners();
   }
 
   void _setLoading(bool value) {

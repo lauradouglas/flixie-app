@@ -13,7 +13,7 @@ class SearchResultItem {
   });
 
   factory SearchResultItem.fromJson(Map<String, dynamic> json) {
-    final mediaType = json['mediaType'] as String?;
+    final mediaType = json['media_type'] as String?;
     if (mediaType == 'person') {
       return SearchResultItem._(isPerson: true, person: Person.fromJson(json));
     }

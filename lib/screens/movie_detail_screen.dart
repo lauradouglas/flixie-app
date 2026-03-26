@@ -55,6 +55,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   bool _inWatchlist = false;
   bool _isWatched = false;
   bool _isFavorite = false;
+  int? _userRating;
+  bool _isRatingLoading = false;
   ListUpdateType? _currentlyUpdating;
   int _watchlistBounceKey = 0;
   int _watchedBounceKey = 0;
@@ -85,13 +87,17 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final userId = authProvider.dbUser?.id;
     
     try {
-      final results = await Future.wait([
+      final futures = <Future>[
         MovieService.getMovieById(id, userId: userId),
         MovieService.getMovieRecommendations(id),
         MovieService.getMovieCredits(id),
         MovieService.getMovieWatchProviders(id, 'US'), // TODO: Get region from user profile
         MovieService.getMovieReviews(id),
-      ]);
+      ];
+      if (userId != null) {
+        futures.add(MovieService.getUserMovieRating(id, userId));
+      }
+      final results = await Future.wait(futures);
       if (mounted) {
         setState(() {
           _movie = results[0] as Movie;
@@ -127,6 +133,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             _inWatchlist = user.isMovieInWatchlist(id);
             _isWatched = user.isMovieWatched(id);
             _isFavorite = user.isMovieFavorite(id);
+          }
+          // Load existing user rating from API
+          if (userId != null && results.length > 5) {
+            _userRating = results[5] as int?;
           }
           
           _isLoading = false;
@@ -578,6 +588,103 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     );
   }
 
+  // ---- User Rating ----------------------------------------------------------
+
+  Future<void> _setUserRating(int rating) async {
+    final authProvider = context.read<AuthProvider>();
+    final user = authProvider.dbUser;
+    final movieId = int.tryParse(widget.movieId);
+    if (user == null || movieId == null) return;
+
+    setState(() => _isRatingLoading = true);
+    try {
+      await MovieService.addMovieRating(movieId, user.id, rating);
+      // Reload movie to get updated aggregate rating
+      final updatedMovie = await MovieService.getMovieById(movieId, userId: user.id);
+      if (mounted) {
+        HapticFeedback.lightImpact();
+        setState(() {
+          _userRating = rating;
+          _movie = updatedMovie;
+          _isRatingLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to set rating: $e');
+      if (mounted) setState(() => _isRatingLoading = false);
+    }
+  }
+
+  void _showRatingSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF1B2E42),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Rate this movie',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Tap a score from 1–10',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: FlixieColors.medium),
+              ),
+              const SizedBox(height: 20),
+              GridView.count(
+                crossAxisCount: 5,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                children: List.generate(10, (i) {
+                  final rating = i + 1;
+                  final isSelected = _userRating == rating;
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _setUserRating(rating);
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? FlixieColors.primary
+                            : FlixieColors.primary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '$rating',
+                        style: TextStyle(
+                          color: isSelected
+                              ? Colors.white
+                              : FlixieColors.medium,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   // ---- Score row -----------------------------------------------------------
 
   String _formatFlixScore(double score) {
@@ -615,6 +722,21 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             valueColor: FlixieColors.success,
             label: 'RATING(S)',
           ),
+        const Spacer(),
+        GestureDetector(
+          onTap: _showRatingSheet,
+          child: ScoreTile(
+            value: _isRatingLoading
+                ? '...'
+                : _userRating != null
+                    ? '$_userRating /10'
+                    : '+ Rate',
+            valueColor: _userRating != null
+                ? FlixieColors.tertiary
+                : FlixieColors.medium,
+            label: 'YOUR RATING',
+          ),
+        ),
       ],
     );
   }

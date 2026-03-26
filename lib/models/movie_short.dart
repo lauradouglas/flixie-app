@@ -26,7 +26,7 @@ class MovieShort {
       id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
       name: (json['name'] ?? json['title']) as String,
       originalLanguage: json['originalLanguage'] as String?,
-      poster: json['poster'] as String?,
+      poster: json['poster'] as String? ?? json['poster_path'] as String?,
       releaseDate: json['releaseDate'] as String?,
       overview: json['overview'] as String?,
       trailer: json['trailer'] != null

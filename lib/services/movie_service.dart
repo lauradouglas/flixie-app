@@ -38,8 +38,21 @@ class MovieService {
   }
 
   static Future<void> addMovieRating(
-      int movieId, Map<String, dynamic> body) async {
-    await ApiClient.post('/movies/$movieId/ratings', body: body);
+      int movieId, String userId, int rating) async {
+    await ApiClient.post('/movies/$movieId/add/rating',
+        body: {'userId': userId, 'rating': rating});
+  }
+
+  static Future<int?> getUserMovieRating(int movieId, String userId) async {
+    try {
+      final data = await ApiClient.post('/movies/$movieId/user/rating',
+          body: {'userId': userId});
+      if (data != null && data is Map<String, dynamic>) {
+        final r = data['rating'];
+        if (r != null) return (r as num).toInt();
+      }
+    } catch (_) {}
+    return null;
   }
 
   static Future<void> addToWatchlist(String userId, int movieId) async {
