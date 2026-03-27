@@ -5,6 +5,7 @@ import '../models/user.dart';
 import '../models/favorite_movie.dart';
 import '../models/watchlist_movie.dart';
 import '../models/watched_movie.dart';
+import '../models/movie_rating.dart';
 import '../utils/app_logger.dart';
 import 'api_client.dart';
 
@@ -28,7 +29,8 @@ class UserService {
     apiLogger.d('GET /users/external-id/$externalId');
     try {
       final data = await ApiClient.get('/users/external-id/$externalId');
-      apiLogger.i('User data received: ${(data as Map<String, dynamic>)['username']}');
+      apiLogger.i(
+          'User data received: ${(data as Map<String, dynamic>)['username']}');
       return User.fromJson(data);
     } catch (e) {
       apiLogger.e('Error fetching user by externalId: $e');
@@ -116,7 +118,7 @@ class UserService {
     return WatchlistMovie.fromJson(data as Map<String, dynamic>);
   }
 
-  static Future<WatchedMovie> addToWatched(String userId, int movieId) async {
+  static Future<WatchedMovie?> addToWatched(String userId, int movieId) async {
     apiLogger.d('POST /users/$userId/movie/watched/$movieId');
     final data = await ApiClient.post(
       '/users/$userId/movie/watched/$movieId',
@@ -124,19 +126,21 @@ class UserService {
     );
 
     if (data == null) {
-      throw Exception('API returned null response');
+      apiLogger.w('API returned null response for addToWatched');
+      return null;
     }
     return WatchedMovie.fromJson(data as Map<String, dynamic>);
   }
 
-  static Future<WatchedMovie> removeFromWatched(
+  static Future<WatchedMovie?> removeFromWatched(
       String userId, int movieId) async {
     apiLogger.d('DELETE /users/$userId/movie/watched/$movieId');
     final data =
         await ApiClient.delete('/users/$userId/movie/watched/$movieId');
 
     if (data == null) {
-      throw Exception('API returned null response');
+      apiLogger.w('API returned null response for removeFromWatched');
+      return null;
     }
     return WatchedMovie.fromJson(data as Map<String, dynamic>);
   }
@@ -165,6 +169,14 @@ class UserService {
   }
 
   // ---- Reviews -------------------------------------------------------------
+
+  static Future<List<Review>> getUserMovieReviews(String userId) async {
+    apiLogger.d('GET /users/$userId/movies/reviews');
+    final data = await ApiClient.get('/users/$userId/movies/reviews');
+    return (data as List<dynamic>)
+        .map((e) => Review.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
 
   static Future<Review> voteOnReview({
     required String mediaType,
@@ -201,5 +213,43 @@ class UserService {
       },
     );
     return Review.fromJson(data as Map<String, dynamic>);
+  }
+
+  // ---- Ratings -------------------------------------------------------------
+
+  static Future<List<MovieRating>> getUserMovieRatings(String userId) async {
+    apiLogger.d('GET /users/$userId/movies/ratings');
+    try {
+      final data = await ApiClient.get('/users/$userId/movies/ratings');
+      apiLogger.d('[Ratings] Raw response type: ${data.runtimeType}');
+      apiLogger.d('[Ratings] Raw response: $data');
+      final ratings = (data as List<dynamic>)
+          .map((e) => MovieRating.fromJson(e as Map<String, dynamic>))
+          .toList();
+      apiLogger.i('[Ratings] Parsed ${ratings.length} ratings');
+      return ratings;
+    } catch (e) {
+      apiLogger.e('[Ratings] Error fetching ratings: $e');
+      rethrow;
+    }
+  }
+
+  // ---- Watchlist -------------------------------------------------------------
+
+  static Future<List<WatchlistMovie>> getUserWatchlist(String userId) async {
+    apiLogger.d('GET /users/$userId/movies/watchlist');
+    try {
+      final data = await ApiClient.get('/users/$userId/movies/watchlist');
+      apiLogger.d('[Watchlist] Raw response type: ${data.runtimeType}');
+      apiLogger.d('[Watchlist] Raw response: $data');
+      final watchlist = (data as List<dynamic>)
+          .map((e) => WatchlistMovie.fromJson(e as Map<String, dynamic>))
+          .toList();
+      apiLogger.i('[Watchlist] Parsed ${watchlist.length} items');
+      return watchlist;
+    } catch (e) {
+      apiLogger.e('[Watchlist] Error fetching watchlist: $e');
+      rethrow;
+    }
   }
 }

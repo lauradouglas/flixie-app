@@ -1,12 +1,11 @@
 import '../models/friend.dart';
+import '../models/friendship.dart';
 import 'api_client.dart';
 
 class FriendService {
-  static Future<List<Friend>> getFriends(String userId) async {
+  static Future<FriendsData> getFriends(String userId) async {
     final data = await ApiClient.get('/friends/$userId');
-    return (data as List<dynamic>)
-        .map((e) => Friend.fromJson(e as Map<String, dynamic>))
-        .toList();
+    return FriendsData.fromJson(data as Map<String, dynamic>);
   }
 
   static Future<void> addFriend(String userId, String friendId) async {

@@ -21,7 +21,7 @@ class ProfileStatsRow extends StatelessWidget {
       children: [
         _StatItem(value: '$watched', label: 'Watched'),
         _StatItem(value: '$watchlist', label: 'Watchlist'),
-        _StatItem(value: '$favorites', label: 'Favorites'),
+        _StatItem(value: '$favorites', label: 'Favourites'),
       ],
     );
   }

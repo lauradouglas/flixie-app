@@ -81,17 +81,18 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       }
       return;
     }
-    
+
     // Get userId from AuthProvider
     final authProvider = context.read<AuthProvider>();
     final userId = authProvider.dbUser?.id;
-    
+
     try {
       final futures = <Future>[
         MovieService.getMovieById(id, userId: userId),
         MovieService.getMovieRecommendations(id),
         MovieService.getMovieCredits(id),
-        MovieService.getMovieWatchProviders(id, 'US'), // TODO: Get region from user profile
+        MovieService.getMovieWatchProviders(
+            id, 'US'), // TODO: Get region from user profile
         MovieService.getMovieReviews(id),
       ];
       if (userId != null) {
@@ -116,17 +117,16 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               .where((crew) => crew.job == 'Producer')
               .map((crew) => crew.name)
               .toList();
-          _producers = [...execProducers, ...producers].toSet().toList();
+          _producers = <String>{...execProducers, ...producers}.toList();
           _writers = credits.crewMembers
               .where((crew) =>
-                  crew.job == 'Screenplay' ||
-                  crew.job == 'Head of Story')
+                  crew.job == 'Screenplay' || crew.job == 'Head of Story')
               .map((crew) => crew.name)
               .toSet()
               .toList();
           _watchProviders = results[3] as List<WatchProvider>;
           _reviews = results[4] as List<Review>;
-          
+
           // Check movie status in user's lists
           final user = authProvider.dbUser;
           if (user != null) {
@@ -138,7 +138,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           if (userId != null && results.length > 5) {
             _userRating = results[5] as int?;
           }
-          
+
           _isLoading = false;
         });
       }
@@ -158,16 +158,16 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final authProvider = context.read<AuthProvider>();
     final user = authProvider.dbUser;
     final movieId = int.tryParse(widget.movieId);
-    
+
     if (user == null || movieId == null) return;
-    
+
     setState(() => _currentlyUpdating = ListUpdateType.watchlist);
-    
+
     try {
       await (_inWatchlist
           ? UserService.removeFromWatchlist(user.id, movieId)
           : UserService.addToWatchlist(user.id, movieId));
-      
+
       // Successfully updated on server, toggle UI state and update user list
       if (mounted) {
         HapticFeedback.lightImpact();
@@ -176,10 +176,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           _currentlyUpdating = null;
           _watchlistBounceKey++;
         });
-        
+
         final currentWatchlist = user.movieWatchlist ?? [];
         final updatedWatchlist = <int>[];
-        
+
         try {
           for (var item in currentWatchlist) {
             if (item is int) {
@@ -196,7 +196,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           logger.d('currentWatchlist type: ${currentWatchlist.runtimeType}');
           logger.d('currentWatchlist: $currentWatchlist');
         }
-        
+
         if (_inWatchlist) {
           if (!updatedWatchlist.contains(movieId)) {
             updatedWatchlist.add(movieId);
@@ -222,16 +222,16 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final authProvider = context.read<AuthProvider>();
     final user = authProvider.dbUser;
     final movieId = int.tryParse(widget.movieId);
-    
+
     if (user == null || movieId == null) return;
-    
+
     setState(() => _currentlyUpdating = ListUpdateType.watched);
-    
+
     try {
       await (_isWatched
           ? UserService.removeFromWatched(user.id, movieId)
           : UserService.addToWatched(user.id, movieId));
-      
+
       // Successfully updated on server, toggle UI state and update user list
       if (mounted) {
         HapticFeedback.lightImpact();
@@ -240,10 +240,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           _currentlyUpdating = null;
           _watchedBounceKey++;
         });
-        
+
         final currentWatched = user.watchedMovies ?? [];
         final updatedWatched = <int>[];
-        
+
         try {
           for (var item in currentWatched) {
             if (item is int) {
@@ -260,7 +260,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           logger.d('currentWatched type: ${currentWatched.runtimeType}');
           logger.d('currentWatched: $currentWatched');
         }
-        
+
         if (_isWatched) {
           if (!updatedWatched.contains(movieId)) {
             updatedWatched.add(movieId);
@@ -286,15 +286,15 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final authProvider = context.read<AuthProvider>();
     final user = authProvider.dbUser;
     final movieId = int.tryParse(widget.movieId);
-    
+
     if (user == null || movieId == null) return;
-    
+
     setState(() => _currentlyUpdating = ListUpdateType.favorite);
     try {
       await (_isFavorite
           ? UserService.removeFromFavorites(user.id, movieId)
           : UserService.addToFavorites(user.id, movieId));
-      
+
       // Successfully updated on server, toggle UI state and update user list
       if (mounted) {
         HapticFeedback.lightImpact();
@@ -303,14 +303,14 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           _currentlyUpdating = null;
           _favoriteBounceKey++;
         });
-        
+
         final currentFavorites = user.favoriteMovies ?? [];
         final updatedFavorites = <int>[];
-        
+
         for (var item in currentFavorites) {
           try {
             int? movieIdToAdd;
-            
+
             if (item is int) {
               movieIdToAdd = item;
             } else if (item is Map) {
@@ -318,7 +318,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               movieIdToAdd = map['movieId'] as int?;
               movieIdToAdd ??= map['id'] as int?;
             }
-            
+
             if (movieIdToAdd != null) {
               updatedFavorites.add(movieIdToAdd);
             }
@@ -328,7 +328,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             logger.d('Item value: $item');
           }
         }
-        
+
         if (_isFavorite) {
           if (!updatedFavorites.contains(movieId)) {
             updatedFavorites.add(movieId);
@@ -482,7 +482,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   Widget _buildSliverAppBar(BuildContext context, Movie movie) {
     return SliverAppBar(
-      expandedHeight: 240,
+      expandedHeight: 450,
       pinned: true,
       backgroundColor: const Color(0xFF0D1B2A),
       title: const Text(
@@ -594,13 +594,27 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final authProvider = context.read<AuthProvider>();
     final user = authProvider.dbUser;
     final movieId = int.tryParse(widget.movieId);
-    if (user == null || movieId == null) return;
+    if (user == null || movieId == null || _movie == null) return;
 
     setState(() => _isRatingLoading = true);
     try {
-      await MovieService.addMovieRating(movieId, user.id, rating);
-      // Reload movie to get updated aggregate rating
-      final updatedMovie = await MovieService.getMovieById(movieId, userId: user.id);
+      // Add rating and get updated vote average and count
+      final response =
+          await MovieService.addMovieRating(movieId, user.id, rating);
+
+      // Extract updated vote data from response (safely parse types)
+      final newVoteAverage = _parseDouble(response['voteAverage']);
+      final newVoteCount = _parseInt(response['voteCount']);
+
+      // Update the movie with new vote data
+      final updatedMovie = _movie!.copyWith(
+        voteAverage: newVoteAverage,
+        voteCount: newVoteCount,
+      );
+
+      // Update cache with the new movie data
+      MovieService.updateCachedMovie(updatedMovie);
+
       if (mounted) {
         HapticFeedback.lightImpact();
         setState(() {
@@ -667,9 +681,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                       child: Text(
                         '$rating',
                         style: TextStyle(
-                          color: isSelected
-                              ? Colors.white
-                              : FlixieColors.medium,
+                          color:
+                              isSelected ? Colors.white : FlixieColors.medium,
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
                         ),
@@ -816,6 +829,24 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     return count.toString();
   }
 
+  // ---- Type parsing helpers ------------------------------------------------
+
+  double? _parseDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
+  int? _parseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
   // ---- Film info card (director / writers / budget) -----------------------
 
   Widget _buildFilmInfoCard(Movie movie) {
@@ -823,8 +854,14 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final hasDirector = _director != null;
     final hasWriters = _writers.isNotEmpty;
     final hasBudget = movie.budget != null && movie.budget! > 0;
+    final hasCollection =
+        movie.collection != null && movie.collection!['name'] != null;
 
-    if (!hasProducers && !hasDirector && !hasWriters && !hasBudget) return const SizedBox.shrink();
+    if (!hasProducers &&
+        !hasDirector &&
+        !hasWriters &&
+        !hasBudget &&
+        !hasCollection) return const SizedBox.shrink();
 
     Widget row(String label, String value) {
       return Column(
@@ -860,7 +897,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       ],
     );
 
-    String _formatBudget(int amount) {
+    String formatBudget(int amount) {
       if (amount >= 1000000) {
         final m = amount / 1000000;
         return '\$${m % 1 == 0 ? m.toStringAsFixed(0) : m.toStringAsFixed(1)}M';
@@ -875,15 +912,21 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     if (hasDirector) rows.add(row('Director', _director!));
     if (hasWriters) {
       if (rows.isNotEmpty) rows.add(divider);
-      rows.add(row(_writers.length == 1 ? 'Writer' : 'Writers', _writers.join(', ')));
+      rows.add(row(
+          _writers.length == 1 ? 'Writer' : 'Writers', _writers.join(', ')));
     }
     if (hasBudget) {
       if (rows.isNotEmpty) rows.add(divider);
-      rows.add(row('Budget', _formatBudget(movie.budget!)));
+      rows.add(row('Budget', formatBudget(movie.budget!)));
     }
     if (hasProducers) {
       if (rows.isNotEmpty) rows.add(divider);
-      rows.add(row(_producers.length == 1 ? 'Producer' : 'Producers', _producers.join(', ')));
+      rows.add(row(_producers.length == 1 ? 'Producer' : 'Producers',
+          _producers.join(', ')));
+    }
+    if (hasCollection) {
+      if (rows.isNotEmpty) rows.add(divider);
+      rows.add(row('Collection', movie.collection!['name'] as String));
     }
 
     return Container(
@@ -962,7 +1005,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         Expanded(
           child: _buildActionButton(
             icon: _isFavorite ? Icons.favorite : Icons.favorite_outline,
-            label: 'Favorite',
+            label: 'Favourite',
             isActive: _isFavorite,
             color: Colors.red,
             isLoading: _currentlyUpdating == ListUpdateType.favorite,
@@ -1053,7 +1096,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   Widget _buildTrailersSection(BuildContext context, Movie movie) {
     final videos = movie.videos;
     if (videos == null || videos.isEmpty) return const SizedBox.shrink();
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1082,7 +1125,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   Widget _buildWhereToWatchSection(BuildContext context) {
     if (_watchProviders.isEmpty) return const SizedBox.shrink();
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1100,7 +1143,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             scrollDirection: Axis.horizontal,
             itemCount: _watchProviders.length,
             separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, i) => WatchProviderCard(provider: _watchProviders[i]),
+            itemBuilder: (context, i) =>
+                WatchProviderCard(provider: _watchProviders[i]),
           ),
         ),
       ],
@@ -1137,7 +1181,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               ),
               // Header
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -1185,7 +1230,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                             clipBehavior: Clip.antiAlias,
                             child: member.profileImage != null
                                 ? CachedNetworkImage(
-                                    imageUrl: 'https://image.tmdb.org/t/p/w185${member.profileImage}',
+                                    imageUrl:
+                                        'https://image.tmdb.org/t/p/w185${member.profileImage}',
                                     fit: BoxFit.cover,
                                     errorWidget: (_, __, ___) => const Icon(
                                       Icons.person,
@@ -1241,7 +1287,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   Widget _buildTopCastSection(BuildContext context) {
     if (_cast.isEmpty) return const SizedBox.shrink();
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1342,7 +1388,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -1460,7 +1507,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   Widget _buildExternalLinksSection(BuildContext context, Movie movie) {
     final hasImdb = movie.imdbId != null && movie.imdbId!.isNotEmpty;
     final hasHomepage = movie.homepage != null && movie.homepage!.isNotEmpty;
-    final hasInstagram = movie.instagramId != null && movie.instagramId!.isNotEmpty;
+    final hasInstagram =
+        movie.instagramId != null && movie.instagramId!.isNotEmpty;
     final hasTwitter = movie.twitterId != null && movie.twitterId!.isNotEmpty;
 
     if (!hasImdb && !hasHomepage && !hasInstagram && !hasTwitter) {
@@ -1469,7 +1517,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
     Future<void> launch(String url) async {
       final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (await canLaunchUrl(uri))
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
 
     Widget linkCard({
@@ -1488,7 +1537,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             border: Border.all(color: const Color(0xFF1E2D40)),
           ),
           child: Row(
-            mainAxisAlignment: fullWidth ? MainAxisAlignment.spaceBetween : MainAxisAlignment.center,
+            mainAxisAlignment: fullWidth
+                ? MainAxisAlignment.spaceBetween
+                : MainAxisAlignment.center,
             children: [
               Row(
                 mainAxisSize: MainAxisSize.min,
@@ -1506,7 +1557,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 ],
               ),
               if (fullWidth)
-                const Icon(Icons.open_in_new, color: FlixieColors.medium, size: 18),
+                const Icon(Icons.open_in_new,
+                    color: FlixieColors.medium, size: 18),
             ],
           ),
         ),
@@ -1554,7 +1606,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         if (hasHomepage)
           linkCard(
             fullWidth: true,
-            leading: const Icon(Icons.language, color: FlixieColors.medium, size: 20),
+            leading: const Icon(Icons.language,
+                color: FlixieColors.medium, size: 20),
             label: 'Official Website',
             onTap: () => launch(movie.homepage!),
           ),
@@ -1565,9 +1618,11 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               if (hasInstagram)
                 Expanded(
                   child: linkCard(
-                    leading: const Icon(Icons.language, color: FlixieColors.medium, size: 20),
+                    leading: const Icon(Icons.language,
+                        color: FlixieColors.medium, size: 20),
                     label: 'INSTAGRAM',
-                    onTap: () => launch('https://www.instagram.com/${movie.instagramId}'),
+                    onTap: () => launch(
+                        'https://www.instagram.com/${movie.instagramId}'),
                   ),
                 ),
               if (hasInstagram && hasTwitter) const SizedBox(width: 10),
@@ -1576,10 +1631,14 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   child: linkCard(
                     leading: const Text(
                       '@',
-                      style: TextStyle(color: FlixieColors.medium, fontSize: 20, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                          color: FlixieColors.medium,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold),
                     ),
                     label: 'TWITTER',
-                    onTap: () => launch('https://twitter.com/${movie.twitterId}'),
+                    onTap: () =>
+                        launch('https://twitter.com/${movie.twitterId}'),
                   ),
                 ),
             ],
@@ -1808,8 +1867,7 @@ class _WriteReviewSheetState extends State<_WriteReviewSheet> {
                       style: const TextStyle(color: FlixieColors.white),
                       decoration: InputDecoration(
                         hintText: 'Give your review a title',
-                        hintStyle:
-                            const TextStyle(color: FlixieColors.medium),
+                        hintStyle: const TextStyle(color: FlixieColors.medium),
                         filled: true,
                         fillColor: const Color(0xFF1B2E42),
                         border: OutlineInputBorder(
@@ -1836,8 +1894,7 @@ class _WriteReviewSheetState extends State<_WriteReviewSheet> {
                       maxLines: 6,
                       decoration: InputDecoration(
                         hintText: 'Share your thoughts about the movie...',
-                        hintStyle:
-                            const TextStyle(color: FlixieColors.medium),
+                        hintStyle: const TextStyle(color: FlixieColors.medium),
                         filled: true,
                         fillColor: const Color(0xFF1B2E42),
                         border: OutlineInputBorder(
@@ -1859,8 +1916,7 @@ class _WriteReviewSheetState extends State<_WriteReviewSheet> {
                     _ToggleTile(
                       label: 'Contains spoilers',
                       value: _containsSpoilers,
-                      onChanged: (v) =>
-                          setState(() => _containsSpoilers = v),
+                      onChanged: (v) => setState(() => _containsSpoilers = v),
                     ),
                     const SizedBox(height: 28),
                     // Submit
@@ -1929,7 +1985,7 @@ class _WriteReviewSheetState extends State<_WriteReviewSheet> {
                 ),
               ),
             ),
-          ),  // Flexible
+          ), // Flexible
         ],
       ),
     );

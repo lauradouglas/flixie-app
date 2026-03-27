@@ -48,9 +48,24 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadFeaturedMovies() async {
-    final user = context.read<AuthProvider>().dbUser;
+    final auth = context.read<AuthProvider>();
+    final user = auth.dbUser;
     final region = (user?.country?['isoCode'] as String?)?.toUpperCase() ?? 'US';
     logger.d('[HomeScreen] loading, user=${user?.id}, region=$region');
+
+    // Use prefetched cache if ready — no spinner needed
+    if (auth.cachedTrending != null && auth.cachedNowPlaying != null) {
+      logger.d('[HomeScreen] Using prefetched home data');
+      if (mounted) {
+        setState(() {
+          _featuredMovies = auth.cachedTrending!;
+          _nowPlayingMovies = auth.cachedNowPlaying!;
+          _loadedForUserId = user?.id;
+          _isLoading = false;
+        });
+      }
+      return;
+    }
 
     try {
       final futures = await Future.wait([

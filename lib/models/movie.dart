@@ -21,6 +21,7 @@ class Movie {
   final String? homepage;
   final String? instagramId;
   final String? twitterId;
+  final Map<String, dynamic>? collection;
 
   const Movie({
     required this.id,
@@ -42,6 +43,7 @@ class Movie {
     this.homepage,
     this.instagramId,
     this.twitterId,
+    this.collection,
   });
 
   factory Movie.fromJson(Map<String, dynamic> json) {
@@ -73,6 +75,7 @@ class Movie {
       homepage: json['homepage'] as String?,
       instagramId: json['instagramId'] as String?,
       twitterId: json['twitterId'] as String?,
+      collection: json['collection'] as Map<String, dynamic>?,
     );
   }
 
@@ -90,6 +93,52 @@ class Movie {
     if (value is double) return value.toInt();
     if (value is String) return int.tryParse(value);
     return null;
+  }
+
+  Movie copyWith({
+    int? id,
+    String? title,
+    String? releaseDate,
+    String? overview,
+    String? posterPath,
+    String? backdropPath,
+    double? popularity,
+    double? voteAverage,
+    int? voteCount,
+    int? runtime,
+    String? tagline,
+    String? status,
+    int? budget,
+    List<Genre>? genres,
+    List<MovieVideo>? videos,
+    String? imdbId,
+    String? homepage,
+    String? instagramId,
+    String? twitterId,
+    Map<String, dynamic>? collection,
+  }) {
+    return Movie(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      releaseDate: releaseDate ?? this.releaseDate,
+      overview: overview ?? this.overview,
+      posterPath: posterPath ?? this.posterPath,
+      backdropPath: backdropPath ?? this.backdropPath,
+      popularity: popularity ?? this.popularity,
+      voteAverage: voteAverage ?? this.voteAverage,
+      voteCount: voteCount ?? this.voteCount,
+      runtime: runtime ?? this.runtime,
+      tagline: tagline ?? this.tagline,
+      status: status ?? this.status,
+      budget: budget ?? this.budget,
+      genres: genres ?? this.genres,
+      videos: videos ?? this.videos,
+      imdbId: imdbId ?? this.imdbId,
+      homepage: homepage ?? this.homepage,
+      instagramId: instagramId ?? this.instagramId,
+      twitterId: twitterId ?? this.twitterId,
+      collection: collection ?? this.collection,
+    );
   }
 
   Map<String, dynamic> toJson() {

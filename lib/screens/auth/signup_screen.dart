@@ -312,10 +312,8 @@ class _SignupScreenState extends State<SignupScreen> {
                         items: _languages,
                         initialItem: _selectedLanguage,
                         hintText: 'Select Language',
-                        onChanged: (l) =>
-                            setState(() => _selectedLanguage = l),
-                        headerBuilder: (ctx, item, _) =>
-                            Text(item.name),
+                        onChanged: (l) => setState(() => _selectedLanguage = l),
+                        headerBuilder: (ctx, item, _) => Text(item.name),
                         listItemBuilder: (ctx, item, isSelected, _) =>
                             Text(item.name),
                         decoration: CustomDropdownDecoration(
@@ -359,10 +357,8 @@ class _SignupScreenState extends State<SignupScreen> {
                         items: _countries,
                         initialItem: _selectedCountry,
                         hintText: 'Select Country',
-                        onChanged: (c) =>
-                            setState(() => _selectedCountry = c),
-                        headerBuilder: (ctx, item, _) =>
-                            Text(item.name),
+                        onChanged: (c) => setState(() => _selectedCountry = c),
+                        headerBuilder: (ctx, item, _) => Text(item.name),
                         listItemBuilder: (ctx, item, isSelected, _) =>
                             Text(item.name),
                         decoration: CustomDropdownDecoration(
@@ -377,8 +373,9 @@ class _SignupScreenState extends State<SignupScreen> {
                             color: FlixieColors.primary,
                           ),
                           searchFieldDecoration: SearchFieldDecoration(
-                            fillColor:
-                                Theme.of(context).inputDecorationTheme.fillColor,
+                            fillColor: Theme.of(context)
+                                .inputDecorationTheme
+                                .fillColor,
                           ),
                         ),
                       ),
@@ -411,8 +408,8 @@ class _SignupScreenState extends State<SignupScreen> {
                             ? Icons.visibility_outlined
                             : Icons.visibility_off_outlined,
                       ),
-                      onPressed: () => setState(
-                          () => _obscurePassword = !_obscurePassword),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
                   validator: (v) {
@@ -502,7 +499,7 @@ class _SignupScreenState extends State<SignupScreen> {
       children: [
         const Icon(Icons.error_outline, color: FlixieColors.danger, size: 20),
         const SizedBox(width: 8),
-        Expanded(
+        const Expanded(
           child: Text(
             'Failed to load options.',
             style: TextStyle(color: FlixieColors.danger),
@@ -536,4 +533,3 @@ class _SignupScreenState extends State<SignupScreen> {
     return null;
   }
 }
-
