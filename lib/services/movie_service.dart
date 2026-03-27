@@ -11,6 +11,11 @@ import 'movie_cache_service.dart';
 class MovieService {
   static final _cache = MovieCacheService();
 
+  /// Update a movie in the cache with new data
+  static void updateCachedMovie(Movie movie) {
+    _cache.cacheMovie(movie);
+  }
+
   static Future<Movie> getMovieById(int id, {String? userId}) async {
     // Check cache first
     final cachedMovie = _cache.getMovie(id);
@@ -21,12 +26,13 @@ class MovieService {
     // Fetch from API
     apiLogger.d('Fetching movie $id from API');
     final queryParams = userId != null ? {'userId': userId} : null;
-    final data = await ApiClient.get('/movies/id/$id', queryParams: queryParams);
+    final data =
+        await ApiClient.get('/movies/id/$id', queryParams: queryParams);
     final movie = Movie.fromJson(data as Map<String, dynamic>);
-    
+
     // Cache the movie
     _cache.cacheMovie(movie);
-    
+
     return movie;
   }
 
@@ -37,10 +43,11 @@ class MovieService {
         .toList();
   }
 
-  static Future<void> addMovieRating(
+  static Future<Map<String, dynamic>> addMovieRating(
       int movieId, String userId, int rating) async {
-    await ApiClient.post('/movies/$movieId/add/rating',
+    final data = await ApiClient.post('/movies/$movieId/add/rating',
         body: {'userId': userId, 'rating': rating});
+    return data as Map<String, dynamic>;
   }
 
   static Future<int?> getUserMovieRating(int movieId, String userId) async {
@@ -96,10 +103,10 @@ class MovieService {
     final recommendations = (data as List<dynamic>)
         .map((e) => SimilarMovie.fromJson(e as Map<String, dynamic>))
         .toList();
-    
+
     // Cache the recommendations
     _cache.cacheRecommendations(movieId, recommendations);
-    
+
     return recommendations;
   }
 
@@ -114,27 +121,31 @@ class MovieService {
     apiLogger.d('Fetching credits for movie $movieId from API');
     final data = await ApiClient.get('/movies/$movieId/credits');
     final credits = MovieCredits.fromJson(data as Map<String, dynamic>);
-    
+
     // Cache the credits
     _cache.cacheCredits(movieId, credits);
-    
+
     return credits;
   }
 
-  static Future<List<WatchProvider>> getMovieWatchProviders(int movieId, String region) async {
-    apiLogger.d('Fetching watch providers for movie $movieId in region $region from API');
-    final data = await ApiClient.get('/movies/$movieId/$region/watch/providers');
+  static Future<List<WatchProvider>> getMovieWatchProviders(
+      int movieId, String region) async {
+    apiLogger.d(
+        'Fetching watch providers for movie $movieId in region $region from API');
+    final data =
+        await ApiClient.get('/movies/$movieId/$region/watch/providers');
     final allProviders = (data as List<dynamic>)
         .map((e) => WatchProvider.fromJson(e as Map<String, dynamic>))
         .toList();
-    
+
     // Filter to only show providers with displayPriority <= 50
     final filteredProviders = allProviders
         .where((provider) => provider.displayPriority <= 50)
         .toList();
-    
-    apiLogger.d('Filtered ${filteredProviders.length} providers from ${allProviders.length} total (displayPriority <= 50)');
-    
+
+    apiLogger.d(
+        'Filtered ${filteredProviders.length} providers from ${allProviders.length} total (displayPriority <= 50)');
+
     return filteredProviders;
   }
 
@@ -145,17 +156,22 @@ class MovieService {
         .map((e) => Review.fromJson(e as Map<String, dynamic>))
         .toList();
   }
-  static Future<List<MovieShort>> getTopRatedMovies({String region = 'US'}) async {
+
+  static Future<List<MovieShort>> getTopRatedMovies(
+      {String region = 'US'}) async {
     apiLogger.d('Fetching top rated movies for region $region');
-    final data = await ApiClient.get('/movies/top_rated', queryParams: {'region': region});
+    final data = await ApiClient.get('/movies/top_rated',
+        queryParams: {'region': region});
     return (data as List<dynamic>)
         .map((e) => MovieShort.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
-  static Future<List<MovieShort>> getNowPlayingMovies({String region = 'US'}) async {
+  static Future<List<MovieShort>> getNowPlayingMovies(
+      {String region = 'US'}) async {
     apiLogger.d('Fetching now playing movies for region $region');
-    final data = await ApiClient.get('/movies/now_playing', queryParams: {'region': region});
+    final data = await ApiClient.get('/movies/now_playing',
+        queryParams: {'region': region});
     apiLogger.d('now_playing raw response type: ${data.runtimeType}');
     apiLogger.d('now_playing response: $data');
     final movies = (data as List<dynamic>)

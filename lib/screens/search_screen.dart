@@ -41,7 +41,7 @@ class _SearchScreenState extends State<SearchScreen> {
   bool _isLoadingDefault = true;
 
   // Discover section filter
-  bool _discoverAll = true;
+  final bool _discoverAll = true;
 
   // Search results
   SearchResults? _searchResults;
@@ -68,8 +68,8 @@ class _SearchScreenState extends State<SearchScreen> {
       ]);
       if (mounted) {
         setState(() {
-          _trendingMovies = results[0] as List<MovieShort>;
-          _topRatedMovies = results[1] as List<MovieShort>;
+          _trendingMovies = results[0];
+          _topRatedMovies = results[1];
           _isLoadingDefault = false;
         });
       }
@@ -420,8 +420,8 @@ class _TopRatedListItem extends StatelessWidget {
                       )
                     : Container(
                         color: FlixieColors.primary.withValues(alpha: 0.3),
-                        child:
-                            const Icon(Icons.movie, color: FlixieColors.primary),
+                        child: const Icon(Icons.movie,
+                            color: FlixieColors.primary),
                       ),
               ),
             ),
@@ -446,9 +446,7 @@ class _TopRatedListItem extends StatelessWidget {
                           size: 14, color: FlixieColors.warning),
                       const SizedBox(width: 4),
                       Text(
-                        voteAvg != null
-                            ? voteAvg.toStringAsFixed(1)
-                            : '—',
+                        voteAvg != null ? voteAvg.toStringAsFixed(1) : '—',
                         style: Theme.of(context)
                             .textTheme
                             .bodySmall
@@ -489,8 +487,7 @@ class _DiscoverCard extends StatelessWidget {
                 fit: BoxFit.cover,
                 errorWidget: (_, __, ___) => Container(
                   color: FlixieColors.primary.withValues(alpha: 0.3),
-                  child:
-                      const Icon(Icons.movie_outlined, size: 48),
+                  child: const Icon(Icons.movie_outlined, size: 48),
                 ),
               )
             else
@@ -536,7 +533,7 @@ class _DiscoverCard extends StatelessWidget {
                     if (movie.mediaType != null &&
                         movie.mediaType!.toLowerCase() == 'tv') ...[
                       const SizedBox(height: 4),
-                      Text(
+                      const Text(
                         'TV Series',
                         style: TextStyle(
                           color: FlixieColors.tertiary,

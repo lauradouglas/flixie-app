@@ -66,9 +66,9 @@ class ActivityTile extends StatelessWidget {
         return 'Added to watchlist';
       case ActivityListType.favoriteMovie:
       case ActivityListType.favoriteShow:
-        return 'Tagged as Must Watch';
+        return 'Added to favourite movies';
       case ActivityListType.favoritePerson:
-        return 'Added to favourites';
+        return 'Added to favourite cast';
       case ActivityListType.watchRequestSent:
         return 'Sent a watch request';
       case ActivityListType.watchRequestAccepted:
@@ -89,8 +89,18 @@ class ActivityTile extends StatelessWidget {
       if (diff.inDays == 1) return 'Yesterday';
       if (diff.inDays < 7) return '${diff.inDays} days ago';
       const months = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
       ];
       return '${dt.day} ${months[dt.month - 1]}';
     } catch (_) {

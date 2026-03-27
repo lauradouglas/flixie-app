@@ -39,7 +39,11 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
   Future<void> _load() async {
     final id = int.tryParse(widget.personId);
     if (id == null || id <= 0) {
-      if (mounted) setState(() { _error = 'Invalid person ID.'; _isLoading = false; });
+      if (mounted)
+        setState(() {
+          _error = 'Invalid person ID.';
+          _isLoading = false;
+        });
       return;
     }
     try {
@@ -61,7 +65,11 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
         }
       }
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _isLoading = false; });
+      if (mounted)
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
     }
   }
 
@@ -84,7 +92,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
         if (_isFavorite) {
           currentList.removeWhere((item) {
             if (item is int) return item == personId;
-            if (item is Map) return item['personId'] == personId || item['id'] == personId;
+            if (item is Map)
+              return item['personId'] == personId || item['id'] == personId;
             return false;
           });
         } else {
@@ -103,14 +112,28 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
 
   Future<void> _launch(String url) async {
     final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (await canLaunchUrl(uri))
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   String _formatDate(String? raw) {
     if (raw == null || raw.isEmpty) return '';
     final parts = raw.split('-');
     if (parts.length < 3) return raw;
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
     final month = int.tryParse(parts[1]);
     if (month == null || month < 1 || month > 12) return raw;
     return '${months[month - 1]} ${parts[2]}, ${parts[0]}';
@@ -138,16 +161,24 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline, color: FlixieColors.danger, size: 56),
+                const Icon(Icons.error_outline,
+                    color: FlixieColors.danger, size: 56),
                 const SizedBox(height: 16),
-                Text('Failed to load person', style: Theme.of(context).textTheme.titleMedium),
+                Text('Failed to load person',
+                    style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
                 Text(_error ?? 'Unknown error',
                     style: Theme.of(context).textTheme.bodySmall,
                     textAlign: TextAlign.center),
                 const SizedBox(height: 24),
                 ElevatedButton(
-                  onPressed: () { setState(() { _isLoading = true; _error = null; }); _load(); },
+                  onPressed: () {
+                    setState(() {
+                      _isLoading = true;
+                      _error = null;
+                    });
+                    _load();
+                  },
                   child: const Text('Retry'),
                 ),
               ],
@@ -168,7 +199,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
         slivers: [
           // ---- App bar with hero portrait ----------------------------------
           SliverAppBar(
-            expandedHeight: 320,
+            expandedHeight: 540,
             pinned: true,
             backgroundColor: const Color(0xFF0D1B2A),
             leading: IconButton(
@@ -213,7 +244,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                       fit: BoxFit.cover,
                       color: Colors.black.withValues(alpha: 0.25),
                       colorBlendMode: BlendMode.darken,
-                      errorWidget: (_, __, ___) => _portraitFallback(person.name),
+                      errorWidget: (_, __, ___) =>
+                          _portraitFallback(person.name),
                     )
                   : _portraitFallback(person.name),
             ),
@@ -229,13 +261,16 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                   const SizedBox(height: 20),
 
                   // Department badge
-                  if (person.department != null && person.department!.isNotEmpty) ...[
+                  if (person.department != null &&
+                      person.department!.isNotEmpty) ...[
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
                         color: FlixieColors.primary.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: FlixieColors.primary.withValues(alpha: 0.4)),
+                        border: Border.all(
+                            color: FlixieColors.primary.withValues(alpha: 0.4)),
                       ),
                       child: Text(
                         person.department!.toUpperCase(),
@@ -264,13 +299,17 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                   const SizedBox(height: 14),
 
                   // Date of birth
-                  if (person.dateOfBirth != null && person.dateOfBirth!.isNotEmpty)
-                    _metaRow(Icons.calendar_today_outlined, _formatDate(person.dateOfBirth)),
+                  if (person.dateOfBirth != null &&
+                      person.dateOfBirth!.isNotEmpty)
+                    _metaRow(Icons.calendar_today_outlined,
+                        _formatDate(person.dateOfBirth)),
 
                   // Place of birth
-                  if (person.placeOfBirth != null && person.placeOfBirth!.isNotEmpty) ...[
+                  if (person.placeOfBirth != null &&
+                      person.placeOfBirth!.isNotEmpty) ...[
                     const SizedBox(height: 6),
-                    _metaRow(Icons.place_outlined, person.placeOfBirth!.toUpperCase()),
+                    _metaRow(Icons.place_outlined,
+                        person.placeOfBirth!.toUpperCase()),
                   ],
 
                   const SizedBox(height: 24),
@@ -387,7 +426,9 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                 ),
                 const SizedBox(width: 4),
                 Icon(
-                  _bioExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                  _bioExpanded
+                      ? Icons.keyboard_arrow_up
+                      : Icons.keyboard_arrow_down,
                   color: FlixieColors.primary,
                   size: 16,
                 ),
@@ -401,7 +442,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
 
   Widget _buildExternalLinks(Person person) {
     final hasImdb = person.imdbId != null && person.imdbId!.isNotEmpty;
-    final hasInstagram = person.instagramId != null && person.instagramId!.isNotEmpty;
+    final hasInstagram =
+        person.instagramId != null && person.instagramId!.isNotEmpty;
 
     if (!hasImdb && !hasInstagram) return const SizedBox.shrink();
 
@@ -441,7 +483,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                 ],
               ),
               if (fullWidth)
-                const Icon(Icons.open_in_new, color: FlixieColors.medium, size: 18),
+                const Icon(Icons.open_in_new,
+                    color: FlixieColors.medium, size: 18),
             ],
           ),
         ),
@@ -486,9 +529,11 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
         if (hasImdb && hasInstagram) const SizedBox(height: 10),
         if (hasInstagram)
           linkCard(
-            leading: const Icon(Icons.language, color: FlixieColors.medium, size: 20),
+            leading: const Icon(Icons.language,
+                color: FlixieColors.medium, size: 20),
             label: 'INSTAGRAM',
-            onTap: () => _launch('https://www.instagram.com/${person.instagramId}'),
+            onTap: () =>
+                _launch('https://www.instagram.com/${person.instagramId}'),
           ),
       ],
     );
@@ -498,19 +543,17 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
     const posterBase = 'https://image.tmdb.org/t/p/w342';
     const thumbBase = 'https://image.tmdb.org/t/p/w185';
 
-    final knownFor = credits.knownForCredits
-        .where((c) => c.type == 'movie')
-        .toList();
+    final knownFor =
+        credits.knownForCredits.where((c) => c.type == 'movie').toList();
 
-    final filmography = credits.allCredits
-        .where((c) => c.type == 'movie')
-        .toList()
-      ..sort((a, b) {
-        if (a.releaseDate == null && b.releaseDate == null) return 0;
-        if (a.releaseDate == null) return 1;
-        if (b.releaseDate == null) return -1;
-        return b.releaseDate!.compareTo(a.releaseDate!);
-      });
+    final filmography =
+        credits.allCredits.where((c) => c.type == 'movie').toList()
+          ..sort((a, b) {
+            if (a.releaseDate == null && b.releaseDate == null) return 0;
+            if (a.releaseDate == null) return 1;
+            if (b.releaseDate == null) return -1;
+            return b.releaseDate!.compareTo(a.releaseDate!);
+          });
 
     if (knownFor.isEmpty && filmography.isEmpty) return const SizedBox.shrink();
 
@@ -529,9 +572,10 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
       final year = item.releaseDate != null && item.releaseDate!.length >= 4
           ? item.releaseDate!.substring(0, 4)
           : null;
-      final character = item.characters.isNotEmpty && item.characters.first.isNotEmpty
-          ? item.characters.first
-          : null;
+      final character =
+          item.characters.isNotEmpty && item.characters.first.isNotEmpty
+              ? item.characters.first
+              : null;
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -566,7 +610,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                   const SizedBox(height: 3),
                   Text(
                     year,
-                    style: const TextStyle(color: FlixieColors.medium, fontSize: 12),
+                    style: const TextStyle(
+                        color: FlixieColors.medium, fontSize: 12),
                   ),
                 ],
                 if (character != null) ...[
@@ -603,35 +648,37 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                   child: GestureDetector(
                     onTap: () => context.push('/movies/${knownFor[i].id}'),
                     child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: AspectRatio(
-                          aspectRatio: 2 / 3,
-                          child: knownFor[i].posterPath != null
-                              ? CachedNetworkImage(
-                                  imageUrl: '$posterBase${knownFor[i].posterPath}',
-                                  fit: BoxFit.cover,
-                                  errorWidget: (_, __, ___) => _posterFallback(),
-                                )
-                              : _posterFallback(),
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: AspectRatio(
+                            aspectRatio: 2 / 3,
+                            child: knownFor[i].posterPath != null
+                                ? CachedNetworkImage(
+                                    imageUrl:
+                                        '$posterBase${knownFor[i].posterPath}',
+                                    fit: BoxFit.cover,
+                                    errorWidget: (_, __, ___) =>
+                                        _posterFallback(),
+                                  )
+                                : _posterFallback(),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        knownFor[i].title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: FlixieColors.light,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          height: 1.3,
+                        const SizedBox(height: 6),
+                        Text(
+                          knownFor[i].title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: FlixieColors.light,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            height: 1.3,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
                   ),
                 ),
                 if (i < knownFor.length - 1) const SizedBox(width: 10),
@@ -685,7 +732,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                       ),
                     ),
                     const SizedBox(width: 6),
-                    const Icon(Icons.keyboard_arrow_down, color: FlixieColors.primary, size: 18),
+                    const Icon(Icons.keyboard_arrow_down,
+                        color: FlixieColors.primary, size: 18),
                   ],
                 ),
               ),
@@ -696,7 +744,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
     );
   }
 
-  void _showAllFilmography(BuildContext context, List<PersonCreditItem> filmography) {
+  void _showAllFilmography(
+      BuildContext context, List<PersonCreditItem> filmography) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -711,7 +760,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
   Widget _posterFallback() {
     return Container(
       color: const Color(0xFF1B2E42),
-      child: const Icon(Icons.movie_outlined, color: Color(0xFF2E4057), size: 24),
+      child:
+          const Icon(Icons.movie_outlined, color: Color(0xFF2E4057), size: 24),
     );
   }
 
@@ -776,7 +826,8 @@ class _FilmographySheetState extends State<_FilmographySheet> {
 
   Widget _posterFallback() => Container(
         color: const Color(0xFF1B2E42),
-        child: const Icon(Icons.movie_outlined, color: Color(0xFF2E4057), size: 20),
+        child: const Icon(Icons.movie_outlined,
+            color: Color(0xFF2E4057), size: 20),
       );
 
   @override
@@ -816,7 +867,8 @@ class _FilmographySheetState extends State<_FilmographySheet> {
                   ),
                   Text(
                     '${_filtered.length} films',
-                    style: const TextStyle(color: FlixieColors.medium, fontSize: 13),
+                    style: const TextStyle(
+                        color: FlixieColors.medium, fontSize: 13),
                   ),
                 ],
               ),
@@ -831,11 +883,14 @@ class _FilmographySheetState extends State<_FilmographySheet> {
                 style: const TextStyle(color: FlixieColors.white, fontSize: 14),
                 decoration: InputDecoration(
                   hintText: 'Search films...',
-                  hintStyle: const TextStyle(color: FlixieColors.medium, fontSize: 14),
-                  prefixIcon: const Icon(Icons.search, color: FlixieColors.medium, size: 20),
+                  hintStyle:
+                      const TextStyle(color: FlixieColors.medium, fontSize: 14),
+                  prefixIcon: const Icon(Icons.search,
+                      color: FlixieColors.medium, size: 20),
                   suffixIcon: _controller.text.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.close, color: FlixieColors.medium, size: 18),
+                          icon: const Icon(Icons.close,
+                              color: FlixieColors.medium, size: 18),
                           onPressed: () => _controller.clear(),
                         )
                       : null,
@@ -852,7 +907,8 @@ class _FilmographySheetState extends State<_FilmographySheet> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: FlixieColors.primary.withValues(alpha: 0.6)),
+                    borderSide: BorderSide(
+                        color: FlixieColors.primary.withValues(alpha: 0.6)),
                   ),
                 ),
               ),
@@ -872,7 +928,8 @@ class _FilmographySheetState extends State<_FilmographySheet> {
                     )
                   : ListView.separated(
                       controller: scrollController,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
                       itemCount: _filtered.length,
                       separatorBuilder: (_, __) => const Divider(
                         color: Color(0xFF1E2D40),
@@ -891,68 +948,69 @@ class _FilmographySheetState extends State<_FilmographySheet> {
                         return GestureDetector(
                           onTap: () => context.push('/movies/${item.id}'),
                           child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(6),
-                                child: SizedBox(
-                                  width: 46,
-                                  height: 68,
-                                  child: item.posterPath != null
-                                      ? CachedNetworkImage(
-                                          imageUrl:
-                                              '$_thumbBase${item.posterPath}',
-                                          fit: BoxFit.cover,
-                                          errorWidget: (_, __, ___) =>
-                                              _posterFallback(),
-                                        )
-                                      : _posterFallback(),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: SizedBox(
+                                    width: 46,
+                                    height: 68,
+                                    child: item.posterPath != null
+                                        ? CachedNetworkImage(
+                                            imageUrl:
+                                                '$_thumbBase${item.posterPath}',
+                                            fit: BoxFit.cover,
+                                            errorWidget: (_, __, ___) =>
+                                                _posterFallback(),
+                                          )
+                                        : _posterFallback(),
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      item.title,
-                                      style: const TextStyle(
-                                        color: FlixieColors.white,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    if (year != null) ...[
-                                      const SizedBox(height: 3),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
                                       Text(
-                                        year,
+                                        item.title,
                                         style: const TextStyle(
-                                          color: FlixieColors.medium,
-                                          fontSize: 12,
+                                          color: FlixieColors.white,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
                                         ),
                                       ),
-                                    ],
-                                    if (character != null) ...[
-                                      const SizedBox(height: 3),
-                                      Text(
-                                        character,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: FlixieColors.medium,
-                                          fontSize: 12,
-                                          fontStyle: FontStyle.italic,
+                                      if (year != null) ...[
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          year,
+                                          style: const TextStyle(
+                                            color: FlixieColors.medium,
+                                            fontSize: 12,
+                                          ),
                                         ),
-                                      ),
+                                      ],
+                                      if (character != null) ...[
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          character,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: FlixieColors.medium,
+                                            fontSize: 12,
+                                            fontStyle: FontStyle.italic,
+                                          ),
+                                        ),
+                                      ],
                                     ],
-                                  ],
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
                         );
                       },
                     ),

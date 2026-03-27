@@ -122,8 +122,8 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
               prefixIcon: Icon(Icons.info_outline),
               alignLabelWithHint: true,
             ),
-            maxLines: 3,
-            maxLength: 200,
+            maxLines: 6,
+            maxLength: 500,
             textInputAction: TextInputAction.done,
           ),
           if (_errorMessage != null) ...[

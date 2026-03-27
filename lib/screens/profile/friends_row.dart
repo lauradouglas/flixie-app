@@ -33,25 +33,36 @@ class FriendsRow extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'FOLLOWING FRIENDS',
-              style: textTheme.titleMedium?.copyWith(
-                color: FlixieColors.primary,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: [
+              Container(
+                width: 4,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: FlixieColors.primary,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            TextButton(
-              onPressed: () => _showAllFriendsSheet(context),
-              child: const Text(
-                'See All',
-                style: TextStyle(color: FlixieColors.primary),
+              const SizedBox(width: 10),
+              Text(
+                'FRIENDS',
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                ),
               ),
-            ),
-          ],
+              const Spacer(),
+              TextButton(
+                onPressed: () => _showAllFriendsSheet(context),
+                child: const Text(
+                  'See All',
+                  style: TextStyle(color: FlixieColors.primary),
+                ),
+              ),
+            ],
+          ),
         ),
         if (isLoading)
           const Center(child: CircularProgressIndicator())
@@ -65,7 +76,7 @@ class FriendsRow extends StatelessWidget {
           )
         else
           SizedBox(
-            height: 90,
+            height: 108,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: friends.length,
@@ -87,7 +98,7 @@ class _FriendAvatar extends StatelessWidget {
   final FriendshipUser user;
 
   Color get _avatarColor {
-    final hex = user.iconColor?['hex'] as String?;
+    final hex = user.iconColor?['hexCode'] as String?;
     if (hex != null) {
       try {
         return Color(int.parse(hex.replaceFirst('#', 'FF'), radix: 16));
@@ -102,22 +113,22 @@ class _FriendAvatar extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         CircleAvatar(
-          radius: 30,
+          radius: 38,
           backgroundColor: _avatarColor.withValues(alpha: 0.3),
           child: Text(
             user.initials ?? user.username.substring(0, 1).toUpperCase(),
             style: TextStyle(
               color: _avatarColor,
               fontWeight: FontWeight.bold,
-              fontSize: 16,
+              fontSize: 18,
             ),
           ),
         ),
         const SizedBox(height: 4),
         SizedBox(
-          width: 60,
+          width: 76,
           child: Text(
-            user.shortName,
+            user.username,
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -132,152 +143,229 @@ class _FriendAvatar extends StatelessWidget {
   }
 }
 
-class _AllFriendsSheet extends StatelessWidget {
+class _AllFriendsSheet extends StatefulWidget {
   const _AllFriendsSheet({required this.data});
   final FriendsData data;
+
+  @override
+  State<_AllFriendsSheet> createState() => _AllFriendsSheetState();
+}
+
+class _AllFriendsSheetState extends State<_AllFriendsSheet>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.7,
-      minChildSize: 0.4,
-      maxChildSize: 0.95,
-      expand: false,
-      builder: (_, scrollController) => Column(
-        children: [
-          const SizedBox(height: 12),
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: FlixieColors.medium.withValues(alpha: 0.4),
-              borderRadius: BorderRadius.circular(2),
+    return DefaultTabController(
+      length: 3,
+      child: DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.4,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (_, scrollController) => Column(
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: FlixieColors.medium.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                Text(
-                  'Friends',
-                  style: textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: FlixieColors.primary.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '${data.friendships.length}',
-                    style: const TextStyle(
-                      color: FlixieColors.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: ListView(
-              controller: scrollController,
+            const SizedBox(height: 16),
+            Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              children: [
-                if (data.friendships.isNotEmpty) ...[
-                  _SectionHeader(title: 'Friends', count: data.friendships.length),
-                  ...data.friendships.map((f) {
-                    final user = f.friendUser;
-                    if (user == null) return const SizedBox.shrink();
-                    return _FriendListTile(
-                      user: user,
-                      subtitle: 'Friend',
-                      accentColor: FlixieColors.primary,
-                    );
-                  }),
-                ],
-                if (data.pendingFriends.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  _SectionHeader(
-                    title: 'Pending Requests',
-                    count: data.pendingFriends.length,
-                    color: FlixieColors.warning,
+              child: Text(
+                'Friends',
+                style: textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TabBar(
+              controller: _tabController,
+              labelColor: FlixieColors.primary,
+              unselectedLabelColor: FlixieColors.medium,
+              indicatorColor: FlixieColors.primary,
+              tabs: [
+                Tab(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Friends'),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: FlixieColors.primary.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${widget.data.friendships.length}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  ...data.pendingFriends.map((r) {
-                    final user = r.sender;
-                    if (user == null) return const SizedBox.shrink();
-                    return _FriendListTile(
-                      user: user,
-                      subtitle: 'Wants to be your friend',
-                      accentColor: FlixieColors.warning,
-                    );
-                  }),
-                ],
-                if (data.requestedFriends.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  _SectionHeader(
-                    title: 'Sent Requests',
-                    count: data.requestedFriends.length,
-                    color: FlixieColors.medium,
+                ),
+                Tab(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Pending'),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: FlixieColors.warning.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${widget.data.pendingFriends.length}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  ...data.requestedFriends.map((r) {
-                    final user = r.receiver;
-                    if (user == null) return const SizedBox.shrink();
-                    return _FriendListTile(
-                      user: user,
-                      subtitle: 'Request sent',
-                      accentColor: FlixieColors.medium,
-                    );
-                  }),
-                ],
-                const SizedBox(height: 24),
+                ),
+                Tab(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Sent'),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: FlixieColors.medium.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${widget.data.requestedFriends.length}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.title,
-    required this.count,
-    this.color = FlixieColors.primary,
-  });
-  final String title;
-  final int count;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Text(
-            title.toUpperCase(),
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-              letterSpacing: 1.2,
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  // Friends tab
+                  widget.data.friendships.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Text(
+                              'No friends yet.',
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(color: FlixieColors.medium),
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(20),
+                          itemCount: widget.data.friendships.length,
+                          itemBuilder: (_, i) {
+                            final user = widget.data.friendships[i].friendUser;
+                            if (user == null) return const SizedBox.shrink();
+                            return _FriendListTile(
+                              user: user,
+                              subtitle: 'Friend',
+                              accentColor: FlixieColors.primary,
+                            );
+                          },
+                        ),
+                  // Pending tab
+                  widget.data.pendingFriends.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Text(
+                              'No pending friend requests.',
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(color: FlixieColors.medium),
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(20),
+                          itemCount: widget.data.pendingFriends.length,
+                          itemBuilder: (_, i) {
+                            final user =
+                                widget.data.pendingFriends[i].friendUser;
+                            if (user == null) return const SizedBox.shrink();
+                            return _FriendListTile(
+                              user: user,
+                              subtitle: 'Wants to be your friend',
+                              accentColor: FlixieColors.warning,
+                            );
+                          },
+                        ),
+                  // Sent tab
+                  widget.data.requestedFriends.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Text(
+                              'No sent friend requests.',
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(color: FlixieColors.medium),
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(20),
+                          itemCount: widget.data.requestedFriends.length,
+                          itemBuilder: (_, i) {
+                            final user =
+                                widget.data.requestedFriends[i].friendUser;
+                            if (user == null) return const SizedBox.shrink();
+                            return _FriendListTile(
+                              user: user,
+                              subtitle: 'Request sent',
+                              accentColor: FlixieColors.medium,
+                            );
+                          },
+                        ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            '($count)',
-            style: const TextStyle(color: FlixieColors.medium, fontSize: 12),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -295,7 +383,7 @@ class _FriendListTile extends StatelessWidget {
   final Color accentColor;
 
   Color get _avatarColor {
-    final hex = user.iconColor?['hex'] as String?;
+    final hex = user.iconColor?['hexCode'] as String?;
     if (hex != null) {
       try {
         return Color(int.parse(hex.replaceFirst('#', 'FF'), radix: 16));
@@ -318,7 +406,8 @@ class _FriendListTile extends StatelessWidget {
           ),
         ),
       ),
-      title: Text(user.displayName, style: const TextStyle(color: FlixieColors.light)),
+      title: Text(user.displayName,
+          style: const TextStyle(color: FlixieColors.light)),
       subtitle: Text(
         subtitle,
         style: TextStyle(color: accentColor, fontSize: 12),

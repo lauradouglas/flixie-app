@@ -12,8 +12,6 @@ class FavoriteMoviesSection extends StatelessWidget {
 
   final List<dynamic> favoriteMovies;
 
-  static const String _imgBase = 'https://image.tmdb.org/t/p/w185';
-
   void _showAllMoviesSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -31,62 +29,69 @@ class FavoriteMoviesSection extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final top3 = favoriteMovies.take(3).toList();
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: FlixieColors.tabBarBackgroundFocused,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
             children: [
+              Container(
+                width: 4,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: FlixieColors.primary,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 10),
               Text(
-                'FAVORITE MOVIES',
+                'FAVOURITE MOVIES',
                 style: textTheme.titleMedium?.copyWith(
-                  color: FlixieColors.primary,
                   fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
+                  letterSpacing: 1.5,
                 ),
               ),
-              IconButton(
-                icon: const Icon(
-                  Icons.arrow_forward,
-                  color: FlixieColors.primary,
-                  size: 20,
+              const Spacer(),
+              if (favoriteMovies.length > 3)
+                IconButton(
+                  icon: const Icon(
+                    Icons.arrow_forward,
+                    color: FlixieColors.primary,
+                    size: 20,
+                  ),
+                  onPressed: () => _showAllMoviesSheet(context),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                 ),
-                onPressed: () => _showAllMoviesSheet(context),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
             ],
           ),
-          const SizedBox(height: 12),
-          if (top3.isEmpty)
-            Text(
+        ),
+        if (top3.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Text(
               'No favourite movies yet.',
               style: textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
-            )
-          else
-            Row(
-              children: top3.map((item) {
-                final movie = _parseMovie(item);
-                return Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: _MoviePosterCard(
-                      movieId: movie.$1,
-                      title: movie.$2,
-                      posterPath: movie.$3,
-                    ),
-                  ),
-                );
-              }).toList(),
             ),
-        ],
-      ),
+          )
+        else
+          Row(
+            children: top3.map((item) {
+              final movie = _parseMovie(item);
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: _MoviePosterCard(
+                    movieId: movie.$1,
+                    title: movie.$2,
+                    posterPath: movie.$3,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+      ],
     );
   }
 
@@ -94,8 +99,8 @@ class FavoriteMoviesSection extends StatelessWidget {
   (int?, String, String?) _parseMovie(dynamic item) {
     if (item is Map<String, dynamic>) {
       final movie = item['movie'] as Map<String, dynamic>?;
-      final id = (item['movieId'] as num?)?.toInt()
-          ?? (movie?['id'] as num?)?.toInt();
+      final id =
+          (item['movieId'] as num?)?.toInt() ?? (movie?['id'] as num?)?.toInt();
       final title = movie?['title'] as String? ?? 'Unknown';
       final poster = movie?['posterPath'] as String?;
       return (id, title, poster);
@@ -120,11 +125,10 @@ class _MoviePosterCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: movieId != null
-          ? () => context.push('/movies/$movieId')
-          : null,
+      onTap: movieId != null ? () => context.push('/movies/$movieId') : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
@@ -139,16 +143,18 @@ class _MoviePosterCard extends StatelessWidget {
                   : _fallback(),
             ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            title.toUpperCase(),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: FlixieColors.light,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.8,
+          const SizedBox(height: 4),
+          Flexible(
+            child: Text(
+              title.toUpperCase(),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: FlixieColors.light,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.8,
+              ),
             ),
           ),
         ],
@@ -172,13 +178,11 @@ class _AllFavoriteMoviesSheet extends StatelessWidget {
   const _AllFavoriteMoviesSheet({required this.favoriteMovies});
   final List<dynamic> favoriteMovies;
 
-  static const String _imgBase = 'https://image.tmdb.org/t/p/w185';
-
   (int?, String, String?) _parseMovie(dynamic item) {
     if (item is Map<String, dynamic>) {
       final movie = item['movie'] as Map<String, dynamic>?;
-      final id = (item['movieId'] as num?)?.toInt()
-          ?? (movie?['id'] as num?)?.toInt();
+      final id =
+          (item['movieId'] as num?)?.toInt() ?? (movie?['id'] as num?)?.toInt();
       final title = movie?['title'] as String? ?? 'Unknown';
       final poster = movie?['posterPath'] as String?;
       return (id, title, poster);
@@ -219,7 +223,8 @@ class _AllFavoriteMoviesSheet extends StatelessWidget {
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: FlixieColors.primary.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),

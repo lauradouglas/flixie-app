@@ -348,6 +348,37 @@ class _ReviewCardState extends State<ReviewCard> {
                     color: FlixieColors.primary, size: 16),
               ],
             ),
+            // Recommended badge
+            if (review.recommended) ...
+              [
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: FlixieColors.success.withValues(alpha: 0.15),
+                    border: Border.all(
+                        color: FlixieColors.success, width: 1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.thumb_up,
+                          color: FlixieColors.success, size: 12),
+                      SizedBox(width: 4),
+                      Text(
+                        'Recommended',
+                        style: TextStyle(
+                          color: FlixieColors.success,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
           ],
         ),
       ),

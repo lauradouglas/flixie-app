@@ -12,8 +12,6 @@ class FavoritePeopleSection extends StatelessWidget {
 
   final List<dynamic> favoritePeople;
 
-  static const String _imgBase = 'https://image.tmdb.org/t/p/w185';
-
   void _showAllPeopleSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -30,71 +28,79 @@ class FavoritePeopleSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final top12 = favoritePeople.take(12).toList();
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: FlixieColors.tabBarBackgroundFocused,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
             children: [
+              Container(
+                width: 4,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: FlixieColors.primary,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 10),
               Text(
-                'FAVORITE CAST',
+                'FAVOURITE CAST',
                 style: textTheme.titleMedium?.copyWith(
-                  color: FlixieColors.tertiary,
                   fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
+                  letterSpacing: 1.5,
                 ),
               ),
-              TextButton(
-                onPressed: () => _showAllPeopleSheet(context),
-                child: const Text(
-                  'See All',
-                  style: TextStyle(color: FlixieColors.primary),
+              const Spacer(),
+              if (favoritePeople.length > 12)
+                IconButton(
+                  icon: const Icon(
+                    Icons.arrow_forward,
+                    color: FlixieColors.primary,
+                    size: 20,
+                  ),
+                  onPressed: () => _showAllPeopleSheet(context),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                 ),
-              ),
             ],
           ),
-          const SizedBox(height: 8),
-          if (top12.isEmpty)
-            Text(
+        ),
+        if (top12.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Text(
               'No favourite people yet.',
               style: textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
-            )
-          else
-            SizedBox(
-              height: 96,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: top12.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 16),
-                itemBuilder: (_, i) {
-                  final person = _parsePerson(top12[i]);
-                  return _PersonAvatar(
-                    personId: person.$1,
-                    name: person.$2,
-                    profilePath: person.$3,
-                  );
-                },
-              ),
             ),
-        ],
-      ),
+          )
+        else
+          SizedBox(
+            height: 112,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: top12.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 16),
+              itemBuilder: (_, i) {
+                final person = _parsePerson(top12[i]);
+                return _PersonAvatar(
+                  personId: person.$1,
+                  name: person.$2,
+                  profilePath: person.$3,
+                );
+              },
+            ),
+          ),
+      ],
     );
   }
 
   (int?, String, String?) _parsePerson(dynamic item) {
     if (item is Map<String, dynamic>) {
-      final person = item['person'] as Map<String, dynamic>?;
-      final id = (item['personId'] as num?)?.toInt()
-          ?? (person?['id'] as num?)?.toInt();
-      final name = person?['name'] as String? ?? 'Unknown';
-      final profile = person?['profileImgUrl'] as String?;
+      // Data is directly on the item, not nested under 'person'
+      final id = (item['id'] as num?)?.toInt();
+      final name = item['name'] as String? ?? 'Unknown';
+      final profile = item['profileImgUrl'] as String?;
       return (id, name, profile);
     }
     return (null, 'Unknown', null);
@@ -130,18 +136,18 @@ class _PersonAvatar extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           CircleAvatar(
-            radius: 32,
+            radius: 40,
             backgroundColor: FlixieColors.tabBarBorder,
             backgroundImage: profilePath != null
                 ? CachedNetworkImageProvider('$_imgBase$profilePath')
                 : null,
             child: profilePath == null
-                ? const Icon(Icons.person, color: FlixieColors.medium, size: 28)
+                ? const Icon(Icons.person, color: FlixieColors.medium, size: 34)
                 : null,
           ),
           const SizedBox(height: 4),
           SizedBox(
-            width: 64,
+            width: 80,
             child: Text(
               _shortName,
               textAlign: TextAlign.center,
@@ -163,15 +169,12 @@ class _AllFavoritePeopleSheet extends StatelessWidget {
   const _AllFavoritePeopleSheet({required this.favoritePeople});
   final List<dynamic> favoritePeople;
 
-  static const String _imgBase = 'https://image.tmdb.org/t/p/w185';
-
   (int?, String, String?) _parsePerson(dynamic item) {
     if (item is Map<String, dynamic>) {
-      final person = item['person'] as Map<String, dynamic>?;
-      final id = (item['personId'] as num?)?.toInt()
-          ?? (person?['id'] as num?)?.toInt();
-      final name = person?['name'] as String? ?? 'Unknown';
-      final profile = person?['profileImgUrl'] as String?;
+      // Data is directly on the item, not nested under 'person'
+      final id = (item['id'] as num?)?.toInt();
+      final name = item['name'] as String? ?? 'Unknown';
+      final profile = item['profileImgUrl'] as String?;
       return (id, name, profile);
     }
     return (null, 'Unknown', null);
@@ -210,7 +213,8 @@ class _AllFavoritePeopleSheet extends StatelessWidget {
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: FlixieColors.tertiary.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),

@@ -16,6 +16,7 @@ import 'screens/person_detail_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/watchlist_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/my_reviews_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/signup_screen.dart';
 import 'screens/auth/forgot_password_screen.dart';
@@ -29,9 +30,15 @@ void main() async {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
+      logger.i('Firebase initialized successfully');
+    } else {
+      logger.d('Firebase already initialized, skipping');
     }
   } catch (e) {
-    logger.e('Firebase initialization error: $e');
+    // Only log non-duplicate app errors
+    if (!e.toString().contains('duplicate-app')) {
+      logger.e('Firebase initialization error: $e');
+    }
   }
 
   // Clear stale movie cache from previous days
@@ -81,8 +88,7 @@ GoRouter _buildRouter(AuthProvider authProvider) {
     routes: [
       // Main shell (authenticated)
       ShellRoute(
-        builder: (context, state, child) =>
-            MainNavigationShell(child: child),
+        builder: (context, state, child) => MainNavigationShell(child: child),
         routes: [
           GoRoute(
             path: '/',
@@ -111,6 +117,10 @@ GoRouter _buildRouter(AuthProvider authProvider) {
             builder: (context, state) => PersonDetailScreen(
               personId: state.pathParameters['id'] ?? '0',
             ),
+          ),
+          GoRoute(
+            path: '/my-reviews',
+            builder: (context, state) => const MyReviewsScreen(),
           ),
         ],
       ),
@@ -174,7 +184,12 @@ class MainNavigationShell extends StatelessWidget {
     return 0;
   }
 
-  static const List<String> _routes = ['/', '/search', '/watchlist', '/profile'];
+  static const List<String> _routes = [
+    '/',
+    '/search',
+    '/watchlist',
+    '/profile'
+  ];
 
   @override
   Widget build(BuildContext context) {

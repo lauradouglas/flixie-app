@@ -44,8 +44,8 @@ class FriendshipUser {
 
 /// A confirmed friendship between two users.
 class Friendship {
-  final int id;
-  final int? friendId;
+  final String id;
+  final String? friendId;
   final FriendshipUser? friend;
   final FriendshipUser? recipient;
   final FriendshipUser? requester;
@@ -64,8 +64,8 @@ class Friendship {
 
   factory Friendship.fromJson(Map<String, dynamic> json) {
     return Friendship(
-      id: (json['id'] as num).toInt(),
-      friendId: (json['friendId'] as num?)?.toInt(),
+      id: json['id']?.toString() ?? '',
+      friendId: json['friendId']?.toString(),
       friend: json['friend'] != null
           ? FriendshipUser.fromJson(json['friend'] as Map<String, dynamic>)
           : null,
@@ -86,10 +86,10 @@ class Friendship {
 
 /// A pending or outgoing friend request between two users.
 class FriendRelationship {
-  final int id;
-  final int? senderId;
+  final String id;
+  final String? senderId;
   final FriendshipUser? sender;
-  final int? receiverId;
+  final String? receiverId;
   final FriendshipUser? receiver;
   final String createdAt;
   final String updatedAt;
@@ -106,12 +106,12 @@ class FriendRelationship {
 
   factory FriendRelationship.fromJson(Map<String, dynamic> json) {
     return FriendRelationship(
-      id: (json['id'] as num).toInt(),
-      senderId: (json['senderId'] as num?)?.toInt(),
+      id: json['id']?.toString() ?? '',
+      senderId: json['senderId']?.toString(),
       sender: json['sender'] != null
           ? FriendshipUser.fromJson(json['sender'] as Map<String, dynamic>)
           : null,
-      receiverId: (json['receiverId'] as num?)?.toInt(),
+      receiverId: json['receiverId']?.toString(),
       receiver: json['receiver'] != null
           ? FriendshipUser.fromJson(json['receiver'] as Map<String, dynamic>)
           : null,
@@ -124,8 +124,8 @@ class FriendRelationship {
 /// The combined friends response returned by GET /friends/:userId
 class FriendsData {
   final List<Friendship> friendships;
-  final List<FriendRelationship> pendingFriends;
-  final List<FriendRelationship> requestedFriends;
+  final List<Friendship> pendingFriends;
+  final List<Friendship> requestedFriends;
 
   const FriendsData({
     required this.friendships,
@@ -134,17 +134,47 @@ class FriendsData {
   });
 
   factory FriendsData.fromJson(Map<String, dynamic> json) {
-    return FriendsData(
-      friendships: (json['friendships'] as List<dynamic>? ?? [])
-          .map((e) => Friendship.fromJson(e as Map<String, dynamic>))
-          .toList(),
-      pendingFriends: (json['pendingFriends'] as List<dynamic>? ?? [])
-          .map((e) => FriendRelationship.fromJson(e as Map<String, dynamic>))
-          .toList(),
-      requestedFriends: (json['requestedFriends'] as List<dynamic>? ?? [])
-          .map((e) => FriendRelationship.fromJson(e as Map<String, dynamic>))
-          .toList(),
-    );
+    try {
+      final friendshipsRaw = json['friendships'] as List<dynamic>? ?? [];
+      final pendingRaw = json['pendingFriends'] as List<dynamic>? ?? [];
+      final requestedRaw = json['requestedFriends'] as List<dynamic>? ?? [];
+
+      final friendships = friendshipsRaw.map((e) {
+        try {
+          return Friendship.fromJson(e as Map<String, dynamic>);
+        } catch (err) {
+          print('[FriendsData] Error parsing friendship: $err');
+          rethrow;
+        }
+      }).toList();
+
+      final pendingFriends = pendingRaw.map((e) {
+        try {
+          return Friendship.fromJson(e as Map<String, dynamic>);
+        } catch (err) {
+          print('[FriendsData] Error parsing pending friend: $err');
+          rethrow;
+        }
+      }).toList();
+
+      final requestedFriends = requestedRaw.map((e) {
+        try {
+          return Friendship.fromJson(e as Map<String, dynamic>);
+        } catch (err) {
+          print('[FriendsData] Error parsing requested friend: $err');
+          rethrow;
+        }
+      }).toList();
+
+      return FriendsData(
+        friendships: friendships,
+        pendingFriends: pendingFriends,
+        requestedFriends: requestedFriends,
+      );
+    } catch (e) {
+      print('[FriendsData] Error in fromJson: $e');
+      rethrow;
+    }
   }
 
   int get totalCount =>
