@@ -1,7 +1,7 @@
 import '../models/movie.dart';
 import '../models/movie_credits.dart';
 import '../models/similar_movie.dart';
-import '../models/trending_movie.dart';
+import '../models/movie_short.dart';
 import '../utils/app_logger.dart';
 
 /// Simple in-memory cache for movies, credits, recommendations, and trending movies viewed during the current day.
@@ -110,7 +110,7 @@ class MovieCacheService {
   // ---- Trending Movies Caching ----
 
   /// Get trending movies from cache if they exist and were cached today
-  List<TrendingMovie>? getTrendingMovies(String timeWindow) {
+  List<MovieShort>? getTrendingMovies(String timeWindow) {
     final cached = _trendingMoviesCache[timeWindow];
     if (cached == null) {
       return null;
@@ -126,7 +126,7 @@ class MovieCacheService {
   }
 
   /// Cache trending movies with the current timestamp
-  void cacheTrendingMovies(String timeWindow, List<TrendingMovie> movies) {
+  void cacheTrendingMovies(String timeWindow, List<MovieShort> movies) {
     final now = DateTime.now();
     _trendingMoviesCache[timeWindow] = _CachedTrendingMovies(
       movies: movies,
@@ -230,7 +230,7 @@ class _CachedRecommendations {
 }
 
 class _CachedTrendingMovies {
-  final List<TrendingMovie> movies;
+  final List<MovieShort> movies;
   final DateTime timestamp;
 
   _CachedTrendingMovies({

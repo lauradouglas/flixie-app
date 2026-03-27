@@ -1,4 +1,4 @@
-class TrendingMovie {
+class MovieShort {
   final int id;
   final String name;
   final String? originalLanguage;
@@ -7,8 +7,9 @@ class TrendingMovie {
   final String? overview;
   final Trailer? trailer;
   final String? mediaType;
+  final double? voteAverage;
 
-  const TrendingMovie({
+  const MovieShort({
     required this.id,
     required this.name,
     this.originalLanguage,
@@ -17,20 +18,22 @@ class TrendingMovie {
     this.overview,
     this.trailer,
     this.mediaType,
+    this.voteAverage,
   });
 
-  factory TrendingMovie.fromJson(Map<String, dynamic> json) {
-    return TrendingMovie(
+  factory MovieShort.fromJson(Map<String, dynamic> json) {
+    return MovieShort(
       id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
-      name: json['name'] as String,
+      name: (json['name'] ?? json['title']) as String,
       originalLanguage: json['originalLanguage'] as String?,
-      poster: json['poster'] as String?,
+      poster: json['poster'] as String? ?? json['poster_path'] as String?,
       releaseDate: json['releaseDate'] as String?,
       overview: json['overview'] as String?,
-      trailer: json['trailer'] != null 
+      trailer: json['trailer'] != null
           ? Trailer.fromJson(json['trailer'] as Map<String, dynamic>)
           : null,
       mediaType: json['mediaType'] as String?,
+      voteAverage: (json['voteAverage'] as num?)?.toDouble(),
     );
   }
 
@@ -44,6 +47,7 @@ class TrendingMovie {
       'overview': overview,
       'trailer': trailer?.toJson(),
       'mediaType': mediaType,
+      'voteAverage': voteAverage,
     };
   }
 }

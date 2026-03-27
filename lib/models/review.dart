@@ -16,6 +16,7 @@ class Review {
   final String createdAt;
   final String updatedAt;
   final User? user;
+  final String? movieTitle;
 
   const Review({
     required this.id,
@@ -33,6 +34,7 @@ class Review {
     required this.createdAt,
     required this.updatedAt,
     this.user,
+    this.movieTitle,
   });
 
   factory Review.fromJson(Map<String, dynamic> json) {
@@ -51,9 +53,12 @@ class Review {
       recommended: json['recommended'] as bool? ?? true,
       createdAt: json['createdAt'] as String,
       updatedAt: json['updatedAt'] as String,
-      user: json['user'] != null 
+      user: json['user'] != null
           ? User.fromJson(json['user'] as Map<String, dynamic>)
           : null,
+      movieTitle: json['movie'] != null
+          ? (json['movie'] as Map<String, dynamic>)['title'] as String?
+          : json['movieTitle'] as String?,
     );
   }
 
@@ -73,23 +78,23 @@ class Review {
       'recommended': recommended,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
-      if (user != null) 'user': {
-        'id': user!.id,
-        'externalId': user!.externalId,
-        'firstName': user!.firstName,
-        'lastName': user!.lastName,
-        'username': user!.username,
-        'email': user!.email,
-        'bio': user!.bio,
-        'iconColorId': user!.iconColorId,
-        'countryId': user!.countryId,
-        'languageId': user!.languageId,
-        'completedSetup': user!.completedSetup,
-        'darkMode': user!.darkMode,
-        'createdAt': user!.createdAt,
-        'updatedAt': user!.updatedAt,
-      },
+      if (user != null)
+        'user': {
+          'id': user!.id,
+          'externalId': user!.externalId,
+          'firstName': user!.firstName,
+          'lastName': user!.lastName,
+          'username': user!.username,
+          'email': user!.email,
+          'bio': user!.bio,
+          'iconColorId': user!.iconColorId,
+          'countryId': user!.countryId,
+          'languageId': user!.languageId,
+          'completedSetup': user!.completedSetup,
+          'darkMode': user!.darkMode,
+          'createdAt': user!.createdAt,
+          'updatedAt': user!.updatedAt,
+        },
     };
   }
 }
-

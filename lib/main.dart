@@ -12,9 +12,12 @@ import 'theme/app_theme.dart';
 import 'utils/app_logger.dart';
 import 'screens/home_screen.dart';
 import 'screens/movie_detail_screen.dart';
+import 'screens/person_detail_screen.dart';
 import 'screens/search_screen.dart';
+import 'screens/splash_screen.dart';
 import 'screens/watchlist_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/my_reviews_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/signup_screen.dart';
 import 'screens/auth/forgot_password_screen.dart';
@@ -28,9 +31,15 @@ void main() async {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
+      logger.i('Firebase initialized successfully');
+    } else {
+      logger.d('Firebase already initialized, skipping');
     }
   } catch (e) {
-    logger.e('Firebase initialization error: $e');
+    // Only log non-duplicate app errors
+    if (!e.toString().contains('duplicate-app')) {
+      logger.e('Firebase initialization error: $e');
+    }
   }
 
   // Clear stale movie cache from previous days
@@ -67,21 +76,34 @@ GoRouter _buildRouter(AuthProvider authProvider) {
   return GoRouter(
     refreshListenable: authProvider.authStatusListenable,
     redirect: (context, state) {
-      final isAuthenticated = authProvider.isAuthenticated;
+      final status = authProvider.status;
+      final isPrefetching = authProvider.isPrefetching;
       final isAuthRoute = state.matchedLocation.startsWith('/auth');
+      final isSplash = state.matchedLocation == '/splash';
 
-      // Still determining auth state – stay put
-      if (authProvider.status == AuthStatus.unknown) return null;
+      // Show splash while Firebase resolves auth state or prefetch is running
+      if (status == AuthStatus.unknown ||
+          (status == AuthStatus.authenticated && isPrefetching)) {
+        return isSplash ? null : '/splash';
+      }
 
-      if (!isAuthenticated && !isAuthRoute) return '/auth/login';
-      if (isAuthenticated && isAuthRoute) return '/';
+      if (status == AuthStatus.unauthenticated && !isAuthRoute) {
+        return '/auth/login';
+      }
+      if (status == AuthStatus.authenticated && (isAuthRoute || isSplash)) {
+        return '/';
+      }
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
+
       // Main shell (authenticated)
       ShellRoute(
-        builder: (context, state, child) =>
-            MainNavigationShell(child: child),
+        builder: (context, state, child) => MainNavigationShell(child: child),
         routes: [
           GoRoute(
             path: '/',
@@ -104,6 +126,16 @@ GoRouter _buildRouter(AuthProvider authProvider) {
             builder: (context, state) => MovieDetailScreen(
               movieId: state.pathParameters['id'] ?? '0',
             ),
+          ),
+          GoRoute(
+            path: '/people/:id',
+            builder: (context, state) => PersonDetailScreen(
+              personId: state.pathParameters['id'] ?? '0',
+            ),
+          ),
+          GoRoute(
+            path: '/my-reviews',
+            builder: (context, state) => const MyReviewsScreen(),
           ),
         ],
       ),
@@ -167,7 +199,12 @@ class MainNavigationShell extends StatelessWidget {
     return 0;
   }
 
-  static const List<String> _routes = ['/', '/search', '/watchlist', '/profile'];
+  static const List<String> _routes = [
+    '/',
+    '/search',
+    '/watchlist',
+    '/profile'
+  ];
 
   @override
   Widget build(BuildContext context) {

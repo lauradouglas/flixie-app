@@ -9,7 +9,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/movie.dart';
 import '../models/movie_credits.dart';
-import '../models/movie_video.dart';
 import '../models/review.dart';
 import '../models/similar_movie.dart';
 import '../models/watch_provider.dart';
@@ -18,6 +17,14 @@ import '../services/movie_service.dart';
 import '../services/user_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_logger.dart';
+import 'movie_detail/cast_card.dart';
+import 'movie_detail/genre_chip.dart';
+import 'movie_detail/hero_backdrop.dart';
+import 'movie_detail/review_card.dart';
+import 'movie_detail/score_tile.dart';
+import 'movie_detail/similar_card.dart';
+import 'movie_detail/video_card.dart';
+import 'movie_detail/watch_provider_card.dart';
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -41,11 +48,15 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   List<MovieCastMember> _cast = [];
   List<WatchProvider> _watchProviders = [];
   String? _director;
+  List<String> _producers = [];
+  List<String> _writers = [];
   bool _isLoading = true;
   String? _error;
   bool _inWatchlist = false;
   bool _isWatched = false;
   bool _isFavorite = false;
+  int? _userRating;
+  bool _isRatingLoading = false;
   ListUpdateType? _currentlyUpdating;
   int _watchlistBounceKey = 0;
   int _watchedBounceKey = 0;
@@ -70,19 +81,24 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       }
       return;
     }
-    
+
     // Get userId from AuthProvider
     final authProvider = context.read<AuthProvider>();
     final userId = authProvider.dbUser?.id;
-    
+
     try {
-      final results = await Future.wait([
+      final futures = <Future>[
         MovieService.getMovieById(id, userId: userId),
         MovieService.getMovieRecommendations(id),
         MovieService.getMovieCredits(id),
-        MovieService.getMovieWatchProviders(id, 'US'), // TODO: Get region from user profile
+        MovieService.getMovieWatchProviders(
+            id, 'US'), // TODO: Get region from user profile
         MovieService.getMovieReviews(id),
-      ]);
+      ];
+      if (userId != null) {
+        futures.add(MovieService.getUserMovieRating(id, userId));
+      }
+      final results = await Future.wait(futures);
       if (mounted) {
         setState(() {
           _movie = results[0] as Movie;
@@ -93,9 +109,24 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               .where((crew) => crew.job == 'Director')
               .map((crew) => crew.name)
               .firstOrNull;
+          final execProducers = credits.crewMembers
+              .where((crew) => crew.job == 'Executive Producer')
+              .map((crew) => crew.name)
+              .toList();
+          final producers = credits.crewMembers
+              .where((crew) => crew.job == 'Producer')
+              .map((crew) => crew.name)
+              .toList();
+          _producers = <String>{...execProducers, ...producers}.toList();
+          _writers = credits.crewMembers
+              .where((crew) =>
+                  crew.job == 'Screenplay' || crew.job == 'Head of Story')
+              .map((crew) => crew.name)
+              .toSet()
+              .toList();
           _watchProviders = results[3] as List<WatchProvider>;
           _reviews = results[4] as List<Review>;
-          
+
           // Check movie status in user's lists
           final user = authProvider.dbUser;
           if (user != null) {
@@ -103,7 +134,11 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             _isWatched = user.isMovieWatched(id);
             _isFavorite = user.isMovieFavorite(id);
           }
-          
+          // Load existing user rating from API
+          if (userId != null && results.length > 5) {
+            _userRating = results[5] as int?;
+          }
+
           _isLoading = false;
         });
       }
@@ -123,16 +158,16 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final authProvider = context.read<AuthProvider>();
     final user = authProvider.dbUser;
     final movieId = int.tryParse(widget.movieId);
-    
+
     if (user == null || movieId == null) return;
-    
+
     setState(() => _currentlyUpdating = ListUpdateType.watchlist);
-    
+
     try {
       await (_inWatchlist
           ? UserService.removeFromWatchlist(user.id, movieId)
           : UserService.addToWatchlist(user.id, movieId));
-      
+
       // Successfully updated on server, toggle UI state and update user list
       if (mounted) {
         HapticFeedback.lightImpact();
@@ -141,10 +176,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           _currentlyUpdating = null;
           _watchlistBounceKey++;
         });
-        
+
         final currentWatchlist = user.movieWatchlist ?? [];
         final updatedWatchlist = <int>[];
-        
+
         try {
           for (var item in currentWatchlist) {
             if (item is int) {
@@ -161,11 +196,12 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           logger.d('currentWatchlist type: ${currentWatchlist.runtimeType}');
           logger.d('currentWatchlist: $currentWatchlist');
         }
-        
+
         if (_inWatchlist) {
           if (!updatedWatchlist.contains(movieId)) {
             updatedWatchlist.add(movieId);
           }
+          authProvider.markActivityChanged();
         } else {
           updatedWatchlist.remove(movieId);
         }
@@ -186,16 +222,16 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final authProvider = context.read<AuthProvider>();
     final user = authProvider.dbUser;
     final movieId = int.tryParse(widget.movieId);
-    
+
     if (user == null || movieId == null) return;
-    
+
     setState(() => _currentlyUpdating = ListUpdateType.watched);
-    
+
     try {
       await (_isWatched
           ? UserService.removeFromWatched(user.id, movieId)
           : UserService.addToWatched(user.id, movieId));
-      
+
       // Successfully updated on server, toggle UI state and update user list
       if (mounted) {
         HapticFeedback.lightImpact();
@@ -204,10 +240,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           _currentlyUpdating = null;
           _watchedBounceKey++;
         });
-        
+
         final currentWatched = user.watchedMovies ?? [];
         final updatedWatched = <int>[];
-        
+
         try {
           for (var item in currentWatched) {
             if (item is int) {
@@ -224,11 +260,12 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           logger.d('currentWatched type: ${currentWatched.runtimeType}');
           logger.d('currentWatched: $currentWatched');
         }
-        
+
         if (_isWatched) {
           if (!updatedWatched.contains(movieId)) {
             updatedWatched.add(movieId);
           }
+          authProvider.markActivityChanged();
         } else {
           updatedWatched.remove(movieId);
         }
@@ -249,15 +286,15 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final authProvider = context.read<AuthProvider>();
     final user = authProvider.dbUser;
     final movieId = int.tryParse(widget.movieId);
-    
+
     if (user == null || movieId == null) return;
-    
+
     setState(() => _currentlyUpdating = ListUpdateType.favorite);
     try {
       await (_isFavorite
           ? UserService.removeFromFavorites(user.id, movieId)
           : UserService.addToFavorites(user.id, movieId));
-      
+
       // Successfully updated on server, toggle UI state and update user list
       if (mounted) {
         HapticFeedback.lightImpact();
@@ -266,14 +303,14 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           _currentlyUpdating = null;
           _favoriteBounceKey++;
         });
-        
+
         final currentFavorites = user.favoriteMovies ?? [];
         final updatedFavorites = <int>[];
-        
+
         for (var item in currentFavorites) {
           try {
             int? movieIdToAdd;
-            
+
             if (item is int) {
               movieIdToAdd = item;
             } else if (item is Map) {
@@ -281,7 +318,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               movieIdToAdd = map['movieId'] as int?;
               movieIdToAdd ??= map['id'] as int?;
             }
-            
+
             if (movieIdToAdd != null) {
               updatedFavorites.add(movieIdToAdd);
             }
@@ -291,11 +328,12 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             logger.d('Item value: $item');
           }
         }
-        
+
         if (_isFavorite) {
           if (!updatedFavorites.contains(movieId)) {
             updatedFavorites.add(movieId);
           }
+          authProvider.markActivityChanged();
         } else {
           updatedFavorites.remove(movieId);
         }
@@ -415,6 +453,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   const Divider(height: 32, color: Color(0xFF1E2D40)),
                   _buildSynopsis(context, movie),
                   const SizedBox(height: 16),
+                  _buildFilmInfoCard(movie),
+                  const SizedBox(height: 16),
                   _buildActionButtons(),
                   const SizedBox(height: 28),
                   _buildTrailersSection(context, movie),
@@ -424,6 +464,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   _buildTopCastSection(context),
                   const SizedBox(height: 28),
                   _buildUserReviewsSection(context),
+                  const SizedBox(height: 28),
+                  _buildExternalLinksSection(context, movie),
                   const SizedBox(height: 28),
                   _buildMoreLikeThisSection(context),
                   const SizedBox(height: 32),
@@ -440,7 +482,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   Widget _buildSliverAppBar(BuildContext context, Movie movie) {
     return SliverAppBar(
-      expandedHeight: 240,
+      expandedHeight: 450,
       pinned: true,
       backgroundColor: const Color(0xFF0D1B2A),
       title: const Text(
@@ -464,7 +506,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         ),
       ],
       flexibleSpace: FlexibleSpaceBar(
-        background: _HeroBackdrop(
+        background: MovieHeroBackdrop(
           imagePath: movie.backdropPath != null
               ? 'https://image.tmdb.org/t/p/w780${movie.posterPath}'
               : (movie.posterPath != null
@@ -478,7 +520,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   // ---- Tagline chip --------------------------------------------------------
 
   Widget _buildTaglineChip(String tagline) {
-    return _GenreChip(label: tagline.toUpperCase());
+    return GenreChip(label: tagline.toUpperCase());
   }
 
   // ---- Title + meta --------------------------------------------------------
@@ -500,28 +542,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             letterSpacing: 0.5,
           ),
         ),
-        if (_director != null) ...[
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              const Text(
-                'Directed by ',
-                style: TextStyle(
-                  color: FlixieColors.medium,
-                  fontSize: 13,
-                ),
-              ),
-              Text(
-                _director!,
-                style: const TextStyle(
-                  color: FlixieColors.light,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ],
         if (meta.isNotEmpty) ...[
           const SizedBox(height: 6),
           Text(
@@ -560,11 +580,121 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       spacing: 8,
       runSpacing: 8,
       children: movie.genres!
-          .map((genre) => _GenreChip(
+          .map((genre) => GenreChip(
                 label: genre.name.toUpperCase(),
                 color: colors[random.nextInt(colors.length)],
               ))
           .toList(),
+    );
+  }
+
+  // ---- User Rating ----------------------------------------------------------
+
+  Future<void> _setUserRating(int rating) async {
+    final authProvider = context.read<AuthProvider>();
+    final user = authProvider.dbUser;
+    final movieId = int.tryParse(widget.movieId);
+    if (user == null || movieId == null || _movie == null) return;
+
+    setState(() => _isRatingLoading = true);
+    try {
+      // Add rating and get updated vote average and count
+      final response =
+          await MovieService.addMovieRating(movieId, user.id, rating);
+
+      // Extract updated vote data from response (safely parse types)
+      final newVoteAverage = _parseDouble(response['voteAverage']);
+      final newVoteCount = _parseInt(response['voteCount']);
+
+      // Update the movie with new vote data
+      final updatedMovie = _movie!.copyWith(
+        voteAverage: newVoteAverage,
+        voteCount: newVoteCount,
+      );
+
+      // Update cache with the new movie data
+      MovieService.updateCachedMovie(updatedMovie);
+
+      if (mounted) {
+        HapticFeedback.lightImpact();
+        setState(() {
+          _userRating = rating;
+          _movie = updatedMovie;
+          _isRatingLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to set rating: $e');
+      if (mounted) setState(() => _isRatingLoading = false);
+    }
+  }
+
+  void _showRatingSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF1B2E42),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Rate this movie',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Tap a score from 1–10',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: FlixieColors.medium),
+              ),
+              const SizedBox(height: 20),
+              GridView.count(
+                crossAxisCount: 5,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                children: List.generate(10, (i) {
+                  final rating = i + 1;
+                  final isSelected = _userRating == rating;
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _setUserRating(rating);
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? FlixieColors.primary
+                            : FlixieColors.primary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '$rating',
+                        style: TextStyle(
+                          color:
+                              isSelected ? Colors.white : FlixieColors.medium,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -593,18 +723,33 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     return Row(
       children: [
         if (score != null)
-          _ScoreTile(
+          ScoreTile(
             value: _formatFlixScore(score),
             label: 'FLIXSCORE',
             onInfoTap: () => _showFlixScoreInfo(context),
           ),
         if (score != null && voteCount != null) const SizedBox(width: 28),
         if (voteCount != null)
-          _ScoreTile(
+          ScoreTile(
             value: _formatVoteCount(voteCount),
             valueColor: FlixieColors.success,
             label: 'RATING(S)',
           ),
+        const Spacer(),
+        GestureDetector(
+          onTap: _showRatingSheet,
+          child: ScoreTile(
+            value: _isRatingLoading
+                ? '...'
+                : _userRating != null
+                    ? '$_userRating /10'
+                    : '+ Rate',
+            valueColor: _userRating != null
+                ? FlixieColors.tertiary
+                : FlixieColors.medium,
+            label: 'YOUR RATING',
+          ),
+        ),
       ],
     );
   }
@@ -684,6 +829,121 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     return count.toString();
   }
 
+  // ---- Type parsing helpers ------------------------------------------------
+
+  double? _parseDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
+  int? _parseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
+  // ---- Film info card (director / writers / budget) -----------------------
+
+  Widget _buildFilmInfoCard(Movie movie) {
+    final hasProducers = _producers.isNotEmpty;
+    final hasDirector = _director != null;
+    final hasWriters = _writers.isNotEmpty;
+    final hasBudget = movie.budget != null && movie.budget! > 0;
+    final hasCollection =
+        movie.collection != null && movie.collection!['name'] != null;
+
+    if (!hasProducers &&
+        !hasDirector &&
+        !hasWriters &&
+        !hasBudget &&
+        !hasCollection) return const SizedBox.shrink();
+
+    Widget row(String label, String value) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: const TextStyle(
+              color: FlixieColors.medium,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1.1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              color: FlixieColors.light,
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      );
+    }
+
+    const divider = Column(
+      children: [
+        SizedBox(height: 12),
+        Divider(color: Color(0xFF1E2D40), thickness: 1, height: 1),
+        SizedBox(height: 12),
+      ],
+    );
+
+    String formatBudget(int amount) {
+      if (amount >= 1000000) {
+        final m = amount / 1000000;
+        return '\$${m % 1 == 0 ? m.toStringAsFixed(0) : m.toStringAsFixed(1)}M';
+      }
+      if (amount >= 1000) {
+        return '\$${(amount / 1000).toStringAsFixed(0)}K';
+      }
+      return '\$$amount';
+    }
+
+    final rows = <Widget>[];
+    if (hasDirector) rows.add(row('Director', _director!));
+    if (hasWriters) {
+      if (rows.isNotEmpty) rows.add(divider);
+      rows.add(row(
+          _writers.length == 1 ? 'Writer' : 'Writers', _writers.join(', ')));
+    }
+    if (hasBudget) {
+      if (rows.isNotEmpty) rows.add(divider);
+      rows.add(row('Budget', formatBudget(movie.budget!)));
+    }
+    if (hasProducers) {
+      if (rows.isNotEmpty) rows.add(divider);
+      rows.add(row(_producers.length == 1 ? 'Producer' : 'Producers',
+          _producers.join(', ')));
+    }
+    if (hasCollection) {
+      if (rows.isNotEmpty) rows.add(divider);
+      rows.add(row('Collection', movie.collection!['name'] as String));
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F2033),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF1E2D40)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: rows,
+      ),
+    );
+  }
+
   // ---- Synopsis ------------------------------------------------------------
 
   Widget _buildSynopsis(BuildContext context, Movie movie) {
@@ -745,7 +1005,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         Expanded(
           child: _buildActionButton(
             icon: _isFavorite ? Icons.favorite : Icons.favorite_outline,
-            label: 'Favorite',
+            label: 'Favourite',
             isActive: _isFavorite,
             color: Colors.red,
             isLoading: _currentlyUpdating == ListUpdateType.favorite,
@@ -836,7 +1096,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   Widget _buildTrailersSection(BuildContext context, Movie movie) {
     final videos = movie.videos;
     if (videos == null || videos.isEmpty) return const SizedBox.shrink();
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -854,7 +1114,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             scrollDirection: Axis.horizontal,
             itemCount: videos.length,
             separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, i) => _VideoCard(video: videos[i]),
+            itemBuilder: (context, i) => VideoCard(video: videos[i]),
           ),
         ),
       ],
@@ -865,7 +1125,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   Widget _buildWhereToWatchSection(BuildContext context) {
     if (_watchProviders.isEmpty) return const SizedBox.shrink();
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -883,7 +1143,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             scrollDirection: Axis.horizontal,
             itemCount: _watchProviders.length,
             separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, i) => _WatchProviderCard(provider: _watchProviders[i]),
+            itemBuilder: (context, i) =>
+                WatchProviderCard(provider: _watchProviders[i]),
           ),
         ),
       ],
@@ -920,7 +1181,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               ),
               // Header
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -968,7 +1230,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                             clipBehavior: Clip.antiAlias,
                             child: member.profileImage != null
                                 ? CachedNetworkImage(
-                                    imageUrl: 'https://image.tmdb.org/t/p/w185${member.profileImage}',
+                                    imageUrl:
+                                        'https://image.tmdb.org/t/p/w185${member.profileImage}',
                                     fit: BoxFit.cover,
                                     errorWidget: (_, __, ___) => const Icon(
                                       Icons.person,
@@ -1024,7 +1287,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   Widget _buildTopCastSection(BuildContext context) {
     if (_cast.isEmpty) return const SizedBox.shrink();
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1066,16 +1329,110 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             scrollDirection: Axis.horizontal,
             itemCount: _cast.length > 6 ? 6 : _cast.length,
             separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, i) => _CastCard(member: _cast[i]),
+            itemBuilder: (context, i) => CastCard(member: _cast[i]),
           ),
         ),
       ],
     );
   }
 
+  // ---- Write review -------------------------------------------------------
+
+  void _showWriteReviewSheet(BuildContext context) {
+    final user = context.read<AuthProvider>().dbUser;
+    if (user == null) return;
+    final movieId = int.tryParse(widget.movieId);
+    if (movieId == null) return;
+
+    showModalBottomSheet(
+      context: context,
+      useRootNavigator: false,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _WriteReviewSheet(
+        movieId: movieId,
+        userId: user.id,
+        onSubmitted: (review) {
+          setState(() => _reviews = [review, ..._reviews]);
+        },
+      ),
+    );
+  }
+
   // ---- User reviews --------------------------------------------------------
 
+  void _showAllReviews(BuildContext context) {
+    final currentUserId = context.read<AuthProvider>().dbUser?.id;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (ctx, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF0D1B2A),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: FlixieColors.medium,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'All Reviews (${_reviews.length})',
+                      style: const TextStyle(
+                        color: FlixieColors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: FlixieColors.light),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(color: Color(0xFF1E2D40), height: 1),
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _reviews.length,
+                  itemBuilder: (_, i) => ReviewCard(
+                    review: _reviews[i],
+                    currentUserId: currentUserId,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildUserReviewsSection(BuildContext context) {
+    const previewCount = 5;
+    final preview = _reviews.take(previewCount).toList();
+    final hasMore = _reviews.length > previewCount;
+    final currentUserId = context.read<AuthProvider>().dbUser?.id;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1099,7 +1456,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              onPressed: () {},
+              onPressed: () => _showWriteReviewSheet(context),
               child: const Text(
                 'Write Review',
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
@@ -1116,8 +1473,176 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               style: TextStyle(color: FlixieColors.medium, fontSize: 13),
             ),
           )
-        else
-          ..._reviews.map((r) => _ReviewCard(review: r)),
+        else ...[
+          ...preview.map((r) => ReviewCard(
+                review: r,
+                currentUserId: currentUserId,
+              )),
+          if (hasMore)
+            TextButton(
+              onPressed: () => _showAllReviews(context),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'View all ${_reviews.length} reviews',
+                    style: const TextStyle(
+                      color: FlixieColors.primary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right,
+                      color: FlixieColors.primary, size: 18),
+                ],
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+
+  // ---- External links -----------------------------------------------------
+
+  Widget _buildExternalLinksSection(BuildContext context, Movie movie) {
+    final hasImdb = movie.imdbId != null && movie.imdbId!.isNotEmpty;
+    final hasHomepage = movie.homepage != null && movie.homepage!.isNotEmpty;
+    final hasInstagram =
+        movie.instagramId != null && movie.instagramId!.isNotEmpty;
+    final hasTwitter = movie.twitterId != null && movie.twitterId!.isNotEmpty;
+
+    if (!hasImdb && !hasHomepage && !hasInstagram && !hasTwitter) {
+      return const SizedBox.shrink();
+    }
+
+    Future<void> launch(String url) async {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri))
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+
+    Widget linkCard({
+      required Widget leading,
+      required String label,
+      required VoidCallback onTap,
+      bool fullWidth = false,
+    }) {
+      return GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F2033),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFF1E2D40)),
+          ),
+          child: Row(
+            mainAxisAlignment: fullWidth
+                ? MainAxisAlignment.spaceBetween
+                : MainAxisAlignment.center,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  leading,
+                  const SizedBox(width: 12),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: FlixieColors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              if (fullWidth)
+                const Icon(Icons.open_in_new,
+                    color: FlixieColors.medium, size: 18),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final hasSocials = hasInstagram || hasTwitter;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'External Links',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: FlixieColors.white,
+                fontWeight: FontWeight.bold,
+              ),
+        ),
+        const SizedBox(height: 12),
+        if (hasImdb)
+          linkCard(
+            fullWidth: true,
+            leading: Container(
+              width: 36,
+              height: 28,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5C518),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              alignment: Alignment.center,
+              child: const Text(
+                'IMDb',
+                style: TextStyle(
+                  color: Color(0xFF000000),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ),
+            label: 'Official Profile',
+            onTap: () => launch('https://www.imdb.com/title/${movie.imdbId}'),
+          ),
+        if (hasImdb && (hasHomepage || hasSocials)) const SizedBox(height: 10),
+        if (hasHomepage)
+          linkCard(
+            fullWidth: true,
+            leading: const Icon(Icons.language,
+                color: FlixieColors.medium, size: 20),
+            label: 'Official Website',
+            onTap: () => launch(movie.homepage!),
+          ),
+        if (hasHomepage && hasSocials) const SizedBox(height: 10),
+        if (hasSocials)
+          Row(
+            children: [
+              if (hasInstagram)
+                Expanded(
+                  child: linkCard(
+                    leading: const Icon(Icons.language,
+                        color: FlixieColors.medium, size: 20),
+                    label: 'INSTAGRAM',
+                    onTap: () => launch(
+                        'https://www.instagram.com/${movie.instagramId}'),
+                  ),
+                ),
+              if (hasInstagram && hasTwitter) const SizedBox(width: 10),
+              if (hasTwitter)
+                Expanded(
+                  child: linkCard(
+                    leading: const Text(
+                      '@',
+                      style: TextStyle(
+                          color: FlixieColors.medium,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold),
+                    ),
+                    label: 'TWITTER',
+                    onTap: () =>
+                        launch('https://twitter.com/${movie.twitterId}'),
+                  ),
+                ),
+            ],
+          ),
       ],
     );
   }
@@ -1142,7 +1667,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             scrollDirection: Axis.horizontal,
             itemCount: _similar.length,
             separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, i) => _SimilarCard(movie: _similar[i]),
+            itemBuilder: (context, i) => SimilarMovieCard(movie: _similar[i]),
           ),
         ),
       ],
@@ -1150,570 +1675,353 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Sub-widgets
-// ---------------------------------------------------------------------------
+// (sub-widgets moved to lib/screens/movie_detail/)
 
-class _HeroBackdrop extends StatelessWidget {
-  const _HeroBackdrop({this.imagePath});
+// ---- Write Review bottom sheet --------------------------------------------
 
-  final String? imagePath;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        imagePath != null
-            ? CachedNetworkImage(
-                imageUrl: imagePath!,
-                fit: BoxFit.cover,
-                errorWidget: (_, __, ___) => _placeholder(),
-              )
-            : _placeholder(),
-        // Dark gradient overlay
-        Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color(0x44000000),
-                Color(0xBB000000),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _placeholder() {
-    return Container(
-      color: const Color(0xFF1B2E42),
-      child: const Center(
-        child: Icon(
-          Icons.movie_creation_outlined,
-          color: FlixieColors.medium,
-          size: 64,
-        ),
-      ),
-    );
-  }
-}
-
-class _GenreChip extends StatelessWidget {
-  const _GenreChip({required this.label, this.color});
-
-  final String label;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    final chipColor = color ?? FlixieColors.primary;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: chipColor.withValues(alpha: 0.15),
-        border: Border.all(color: chipColor.withValues(alpha: 0.5)),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: chipColor,
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
-  }
-}
-
-class _ScoreTile extends StatelessWidget {
-  const _ScoreTile({
-    required this.value,
-    required this.label,
-    this.valueColor = FlixieColors.white,
-    this.onInfoTap,
+class _WriteReviewSheet extends StatefulWidget {
+  const _WriteReviewSheet({
+    required this.movieId,
+    required this.userId,
+    required this.onSubmitted,
   });
 
-  final String value;
-  final String label;
-  final Color valueColor;
-  final VoidCallback? onInfoTap;
+  final int movieId;
+  final String userId;
+  final void Function(Review review) onSubmitted;
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            color: valueColor,
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Row(
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                color: FlixieColors.medium,
-                fontSize: 10,
-                letterSpacing: 0.8,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            if (onInfoTap != null) ...[
-              const SizedBox(width: 4),
-              GestureDetector(
-                onTap: onInfoTap,
-                child: const Icon(
-                  Icons.info_outline,
-                  size: 14,
-                  color: FlixieColors.medium,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ],
-    );
-  }
+  State<_WriteReviewSheet> createState() => _WriteReviewSheetState();
 }
 
-class _CastCard extends StatelessWidget {
-  const _CastCard({required this.member});
+class _WriteReviewSheetState extends State<_WriteReviewSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _titleController = TextEditingController();
+  final _bodyController = TextEditingController();
 
-  final MovieCastMember member;
+  int _rating = 5;
+  bool _recommended = true;
+  bool _containsSpoilers = false;
+  bool _isSubmitting = false;
 
   @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 100,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Profile image
-          Container(
-            height: 120,
-            width: 100,
-            decoration: BoxDecoration(
-              color: const Color(0xFF1B2E42),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: member.profileImage != null
-                ? CachedNetworkImage(
-                    imageUrl: 'https://image.tmdb.org/t/p/w185${member.profileImage}',
-                    fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) => _avatarFallback(),
-                  )
-                : _avatarFallback(),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            member.name,
-            style: const TextStyle(
-              color: FlixieColors.light,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          Text(
-            member.character,
-            style: const TextStyle(
-              color: FlixieColors.medium,
-              fontSize: 11,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
+  void dispose() {
+    _titleController.dispose();
+    _bodyController.dispose();
+    super.dispose();
   }
 
-  Widget _avatarFallback() {
-    return Container(
-      color: const Color(0xFF253A50),
-      child: const Center(
-        child: Icon(Icons.person, color: FlixieColors.medium, size: 40),
-      ),
-    );
-  }
-}
+  bool _submitted = false;
 
-class _ReviewCard extends StatelessWidget {
-  const _ReviewCard({required this.review});
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isSubmitting = true);
 
-  final Review review;
-
-  String _getInitials() {
-    final username = review.user?.username ?? review.userId;
-    return username.isNotEmpty ? username[0].toUpperCase() : '?';
-  }
-
-  String _getDisplayName() {
-    return review.user?.username ?? 'Anonymous';
-  }
-
-  String _formatDate(String dateStr) {
     try {
-      final date = DateTime.parse(dateStr);
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      final reviewDay = DateTime(date.year, date.month, date.day);
-      final diff = today.difference(reviewDay).inDays;
+      final draft = Review(
+        id: '',
+        userId: widget.userId,
+        movieId: widget.movieId,
+        showId: null,
+        rating: _rating,
+        title: _titleController.text.trim(),
+        body: _bodyController.text.trim(),
+        upvotes: 0,
+        downvotes: 0,
+        containsSpoilers: _containsSpoilers,
+        language: 'en',
+        recommended: _recommended,
+        createdAt: DateTime.now().toIso8601String(),
+        updatedAt: DateTime.now().toIso8601String(),
+      );
 
-      if (diff == 0) return 'Today';
-      if (diff == 1) return 'Yesterday';
-
-      const months = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-      ];
-      final day = date.day.toString().padLeft(2, '0');
-      final month = months[date.month - 1];
-      final year = date.year.toString().substring(2);
-      return '$day $month $year';
+      final created = await UserService.addMovieReview(draft);
+      if (mounted) {
+        widget.onSubmitted(created);
+        setState(() => _submitted = true);
+        await Future.delayed(const Duration(milliseconds: 1400));
+        if (mounted) Navigator.of(context).pop();
+      }
     } catch (e) {
-      return dateStr;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white, size: 18),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Failed to submit review: $e')),
+              ],
+            ),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1B2E42),
-        borderRadius: BorderRadius.circular(12),
+      decoration: const BoxDecoration(
+        color: Color(0xFF0D1B2A),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
+      padding: EdgeInsets.only(bottom: bottomInset),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
-              // Avatar
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: FlixieColors.primary.withValues(alpha: 0.3),
-                child: Text(
-                  _getInitials(),
-                  style: const TextStyle(
-                    color: FlixieColors.primary,
+          // Handle bar
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: FlixieColors.medium,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // Header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Write a Review',
+                  style: TextStyle(
+                    color: FlixieColors.white,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    fontSize: 13,
                   ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
+                IconButton(
+                  icon: const Icon(Icons.close, color: FlixieColors.light),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+          ),
+          const Divider(color: Color(0xFF1E2D40), height: 1),
+          // Form
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Form(
+                key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (review.title.isNotEmpty)
-                      Text(
-                        review.title,
-                        style: const TextStyle(
-                          color: FlixieColors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
+                    // Rating
+                    const Text(
+                      'Rating',
+                      style: TextStyle(
+                        color: FlixieColors.light,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: List.generate(10, (i) {
+                        final value = i + 1;
+                        final isSelected = value <= _rating;
+                        return GestureDetector(
+                          onTap: () => setState(() => _rating = value),
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: Icon(
+                              isSelected ? Icons.star : Icons.star_border,
+                              color: isSelected
+                                  ? Colors.amber
+                                  : FlixieColors.medium,
+                              size: 28,
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$_rating / 10',
+                      style: const TextStyle(
+                        color: FlixieColors.medium,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // Title
+                    const Text(
+                      'Title',
+                      style: TextStyle(
+                        color: FlixieColors.light,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _titleController,
+                      style: const TextStyle(color: FlixieColors.white),
+                      decoration: InputDecoration(
+                        hintText: 'Give your review a title',
+                        hintStyle: const TextStyle(color: FlixieColors.medium),
+                        filled: true,
+                        fillColor: const Color(0xFF1B2E42),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none,
                         ),
                       ),
-                    Text(
-                      _getDisplayName(),
-                      style: const TextStyle(
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    // Body
+                    const Text(
+                      'Review',
+                      style: TextStyle(
                         color: FlixieColors.light,
-                        fontSize: 13,
-                        fontStyle: FontStyle.italic,
+                        fontWeight: FontWeight.w600,
                       ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _bodyController,
+                      style: const TextStyle(color: FlixieColors.white),
+                      maxLines: 6,
+                      decoration: InputDecoration(
+                        hintText: 'Share your thoughts about the movie...',
+                        hintStyle: const TextStyle(color: FlixieColors.medium),
+                        filled: true,
+                        fillColor: const Color(0xFF1B2E42),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    ),
+                    const SizedBox(height: 20),
+                    // Toggles
+                    _ToggleTile(
+                      label: 'I recommend this movie',
+                      value: _recommended,
+                      onChanged: (v) => setState(() => _recommended = v),
+                    ),
+                    const SizedBox(height: 8),
+                    _ToggleTile(
+                      label: 'Contains spoilers',
+                      value: _containsSpoilers,
+                      onChanged: (v) => setState(() => _containsSpoilers = v),
+                    ),
+                    const SizedBox(height: 28),
+                    // Submit
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      child: _submitted
+                          ? Container(
+                              key: const ValueKey('success'),
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade700,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.check_circle,
+                                      color: Colors.white, size: 20),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Review submitted!',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : SizedBox(
+                              key: const ValueKey('button'),
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: FlixieColors.primary,
+                                  foregroundColor: Colors.white,
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                onPressed: _isSubmitting ? null : _submit,
+                                child: _isSubmitting
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.5,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Text(
+                                        'Submit Review',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15,
+                                        ),
+                                      ),
+                              ),
+                            ),
                     ),
                   ],
                 ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.star, color: FlixieColors.warning, size: 14),
-                      const SizedBox(width: 3),
-                      Text(
-                        '${review.rating}/10',
-                        style: const TextStyle(
-                          color: FlixieColors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Text(
-                    _formatDate(review.createdAt),
-                    style: const TextStyle(
-                      color: FlixieColors.medium,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            review.body,
-            style: const TextStyle(
-              color: FlixieColors.light,
-              fontSize: 13,
-              height: 1.5,
             ),
-          ),
+          ), // Flexible
         ],
       ),
     );
   }
 }
 
-class _SimilarCard extends StatelessWidget {
-  const _SimilarCard({required this.movie});
+class _ToggleTile extends StatelessWidget {
+  const _ToggleTile({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
 
-  final SimilarMovie movie;
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => context.push('/movies/${movie.id}'),
-      child: SizedBox(
-        width: 120,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              height: 160,
-              width: 120,
-              decoration: BoxDecoration(
-                color: const Color(0xFF1B2E42),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: movie.posterPath != null
-                  ? CachedNetworkImage(
-                      imageUrl:
-                          'https://image.tmdb.org/t/p/w342${movie.posterPath!}',
-                      fit: BoxFit.cover,
-                      errorWidget: (_, __, ___) => _posterFallback(),
-                    )
-                  : _posterFallback(),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              movie.title,
-              style: const TextStyle(
-                color: FlixieColors.light,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _posterFallback() {
     return Container(
-      color: const Color(0xFF253A50),
-      child: const Center(
-        child: Icon(
-          Icons.movie_creation_outlined,
-          color: FlixieColors.medium,
-          size: 36,
-        ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1B2E42),
+        borderRadius: BorderRadius.circular(10),
       ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Video Card
-// ---------------------------------------------------------------------------
-
-class _VideoCard extends StatelessWidget {
-  const _VideoCard({required this.video});
-
-  final MovieVideo video;
-
-  Future<void> _launchVideo(BuildContext context) async {
-    final url = video.youtubeUrl;
-    final uri = Uri.parse(url);
-    
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Could not open video'),
-              backgroundColor: Color(0xFFEF4444),
-            ),
-          );
-        }
-        logger.w('Could not launch YouTube URL: $url');
-      }
-    } catch (e) {
-      logger.e('Error launching video', error: e);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Error opening video'),
-            backgroundColor: Color(0xFFEF4444),
-          ),
-        );
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => _launchVideo(context),
-      child: SizedBox(
-        width: 300,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
-              children: [
-                Container(
-                  height: 170,
-                  width: 300,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1B2E42),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: CachedNetworkImage(
-                    imageUrl: video.thumbnailUrl,
-                    fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) => _thumbnailFallback(),
-                  ),
-                ),
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Center(
-                      child: Icon(
-                        Icons.play_circle_filled,
-                        color: Colors.white,
-                        size: 56,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              video.name,
-              style: const TextStyle(
-                color: FlixieColors.light,
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _thumbnailFallback() {
-    return Container(
-      color: const Color(0xFF253A50),
-      child: const Center(
-        child: Icon(
-          Icons.play_circle_outline,
-          color: FlixieColors.medium,
-          size: 48,
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Watch Provider Card
-// ---------------------------------------------------------------------------
-
-class _WatchProviderCard extends StatelessWidget {
-  const _WatchProviderCard({required this.provider});
-
-  final WatchProvider provider;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 80,
-      child: Column(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Container(
-            height: 60,
-            width: 60,
-            decoration: BoxDecoration(
-              color: const Color(0xFF1B2E42),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: CachedNetworkImage(
-              imageUrl: 'https://image.tmdb.org/t/p/w92${provider.logoPath}',
-              fit: BoxFit.cover,
-              errorWidget: (_, __, ___) => _logoFallback(),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            provider.providerName,
-            style: const TextStyle(
-              color: FlixieColors.light,
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
+          Text(label,
+              style: const TextStyle(color: FlixieColors.light, fontSize: 14)),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeThumbColor: FlixieColors.primary,
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _logoFallback() {
-    return Container(
-      color: const Color(0xFF253A50),
-      child: const Center(
-        child: Icon(
-          Icons.play_circle_outline,
-          color: FlixieColors.medium,
-          size: 28,
-        ),
       ),
     );
   }

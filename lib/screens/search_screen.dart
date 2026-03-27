@@ -1,6 +1,27 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import '../models/movie_short.dart';
+import '../models/person.dart';
+import '../models/search_result.dart';
+import '../services/movie_service.dart';
+import '../services/search_service.dart';
+import '../services/trending_service.dart';
 import '../theme/app_theme.dart';
+
+/// Extracts a 4-digit year string from a release date in various formats.
+String? _extractYear(String? releaseDate) {
+  if (releaseDate == null || releaseDate.isEmpty) return null;
+  final iso = DateTime.tryParse(releaseDate);
+  if (iso != null) return iso.year.toString();
+  final parts = releaseDate.split(' ');
+  if (parts.length == 4) return parts[3];
+  if (releaseDate.length >= 4) return releaseDate.substring(0, 4);
+  return null;
+}
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -12,135 +33,679 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _controller = TextEditingController();
   String _query = '';
+  Timer? _debounce;
+
+  // Default view data
+  List<MovieShort> _trendingMovies = [];
+  List<MovieShort> _topRatedMovies = [];
+  bool _isLoadingDefault = true;
+
+  // Discover section filter
+  final bool _discoverAll = true;
+
+  // Search results
+  SearchResults? _searchResults;
+  bool _isSearching = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDefaultData();
+  }
 
   @override
   void dispose() {
     _controller.dispose();
+    _debounce?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadDefaultData() async {
+    try {
+      final results = await Future.wait([
+        TrendingService.getTrendingMovies(),
+        MovieService.getTopRatedMovies(),
+      ]);
+      if (mounted) {
+        setState(() {
+          _trendingMovies = results[0];
+          _topRatedMovies = results[1];
+          _isLoadingDefault = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingDefault = false);
+      }
+    }
+  }
+
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    setState(() => _query = value);
+    if (value.trim().length < 3) {
+      setState(() {
+        _searchResults = null;
+        _isSearching = false;
+      });
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      _performSearch(value.trim());
+    });
+  }
+
+  Future<void> _performSearch(String query) async {
+    setState(() => _isSearching = true);
+    try {
+      final results = await SearchService.search(query);
+      if (mounted) {
+        setState(() {
+          _searchResults = results;
+          _isSearching = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSearching = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Search')),
-      body: Column(
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildSearchBar(),
+            Expanded(
+              child: _query.trim().isEmpty
+                  ? _buildDefaultView()
+                  : _buildSearchResultsView(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: TextField(
+        controller: _controller,
+        onChanged: _onSearchChanged,
+        decoration: InputDecoration(
+          hintText: 'Movies, actors, directors...',
+          prefixIcon: const Icon(Icons.search),
+          suffixIcon: _query.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () {
+                    _controller.clear();
+                    _onSearchChanged('');
+                  },
+                )
+              : const Icon(Icons.tune),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDefaultView() {
+    if (_isLoadingDefault) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final discoverMovies = _discoverAll
+        ? _trendingMovies
+        : _trendingMovies
+            .where((m) => m.mediaType == null || m.mediaType == 'movie')
+            .toList();
+
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _controller,
-              autofocus: false,
-              decoration: const InputDecoration(
-                hintText: 'Search movies, shows…',
-                prefixIcon: Icon(Icons.search),
-                suffixIcon: null,
-              ),
-              onChanged: (value) => setState(() => _query = value),
-            ),
-          ),
-          if (_query.isEmpty)
-            Expanded(
-              child: _GenreGrid(),
-            )
-          else
-            Expanded(
-              child: _SearchResults(query: _query),
-            ),
+          // Discover section
+          const SizedBox(height: 24),
+          _buildDiscoverSection(discoverMovies),
+
+          // Top Rated section
+          if (_topRatedMovies.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            const _SectionHeader(title: 'Top Rated'),
+            const SizedBox(height: 8),
+            ..._topRatedMovies.take(5).map(
+                  (m) => _TopRatedListItem(
+                    movie: m,
+                    onTap: () => context.push('/movies/${m.id}'),
+                  ),
+                ),
+          ],
+
+          const SizedBox(height: 24),
         ],
       ),
     );
   }
+
+  Widget _buildDiscoverSection(List<MovieShort> movies) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Discover',
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  Text(
+                    'Hand-picked for your taste',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: FlixieColors.medium,
+                        ),
+                  ),
+                ],
+              ),
+              // Row(
+              //   children: [
+              //     _DiscoverFilterChip(
+              //       label: 'ALL',
+              //       selected: _discoverAll,
+              //       onTap: () => setState(() => _discoverAll = true),
+              //     ),
+              //     const SizedBox(width: 8),
+              //     _DiscoverFilterChip(
+              //       label: 'MOVIES',
+              //       selected: !_discoverAll,
+              //       onTap: () => setState(() => _discoverAll = false),
+              //     ),
+              //   ],
+              // ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        if (movies.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 0.65,
+              ),
+              itemCount: movies.length,
+              itemBuilder: (context, index) => _DiscoverCard(
+                movie: movies[index],
+                onTap: () => context.push('/movies/${movies[index].id}'),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildSearchResultsView() {
+    if (_isSearching) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final results = _searchResults?.results ?? [];
+
+    if (_searchResults != null && results.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.search_off, size: 64, color: FlixieColors.medium),
+            const SizedBox(height: 16),
+            Text(
+              'No results for "$_query"',
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (results.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final filtered = results.where((item) {
+      if (item.isPerson) return true;
+      return item.movie?.mediaType != 'tv';
+    }).toList();
+
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      itemCount: filtered.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final item = filtered[index];
+        if (item.isPerson && item.person != null) {
+          return _PersonResultTile(
+            person: item.person!,
+            onTap: () => context.push('/people/${item.person!.id}'),
+          );
+        } else if (item.movie != null) {
+          return _MovieResultTile(
+            movie: item.movie!,
+            onTap: () => context.push('/movies/${item.movie!.id}'),
+          );
+        }
+        return const SizedBox.shrink();
+      },
+    );
+  }
 }
 
-class _GenreGrid extends StatelessWidget {
-  final List<Map<String, dynamic>> _genres = const [
-    {'label': 'Action', 'color': FlixieColors.primary},
-    {'label': 'Comedy', 'color': FlixieColors.secondary},
-    {'label': 'Drama', 'color': FlixieColors.tertiary},
-    {'label': 'Horror', 'color': FlixieColors.danger},
-    {'label': 'Sci-Fi', 'color': FlixieColors.dark},
-    {'label': 'Romance', 'color': FlixieColors.warning},
-    {'label': 'Thriller', 'color': FlixieColors.primaryShade},
-    {'label': 'Animation', 'color': FlixieColors.success},
-  ];
+// ─── Section header with left accent bar ───────────────────────────────────
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title});
+
+  final String title;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Text(
-            'Browse by Genre',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: GridView.builder(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 2.5,
-              ),
-              itemCount: _genres.length,
-              itemBuilder: (context, index) {
-                final genre = _genres[index];
-                return Card(
-                  color: (genre['color'] as Color).withValues(alpha: 0.3),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: () {},
-                    child: Center(
-                      child: Text(
-                        genre['label'] as String,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              color: genre['color'] as Color,
-                              fontWeight: FontWeight.bold,
-                            ),
-                      ),
-                    ),
-                  ),
-                );
-              },
+          Container(
+            width: 4,
+            height: 20,
+            decoration: BoxDecoration(
+              color: FlixieColors.tertiary,
+              borderRadius: BorderRadius.circular(2),
             ),
           ),
+          const SizedBox(width: 8),
+          Text(title, style: Theme.of(context).textTheme.titleLarge),
         ],
       ),
     );
   }
 }
 
-class _SearchResults extends StatelessWidget {
-  const _SearchResults({required this.query});
+// ─── Discover filter chip (ALL / MOVIES) ────────────────────────────────────
 
-  final String query;
+class _DiscoverFilterChip extends StatelessWidget {
+  const _DiscoverFilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: 8,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        return Card(
-          child: ListTile(
-            leading: Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: FlixieColors.secondary.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.movie, color: FlixieColors.secondary),
-            ),
-            title: Text('Result for "$query" #${index + 1}'),
-            subtitle: const Text('Genre • Year'),
-            onTap: () {},
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected ? FlixieColors.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? FlixieColors.primary : FlixieColors.medium,
           ),
-        );
-      },
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.black : FlixieColors.medium,
+            fontWeight: FontWeight.w600,
+            fontSize: 12,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Top-rated list item ────────────────────────────────────────────────────
+
+class _TopRatedListItem extends StatelessWidget {
+  const _TopRatedListItem({required this.movie, this.onTap});
+
+  final MovieShort movie;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final voteAvg = movie.voteAverage;
+
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: SizedBox(
+                width: 60,
+                height: 80,
+                child: movie.poster != null
+                    ? CachedNetworkImage(
+                        imageUrl:
+                            'https://image.tmdb.org/t/p/w92${movie.poster}',
+                        fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) => Container(
+                          color: FlixieColors.primary.withValues(alpha: 0.3),
+                          child: const Icon(Icons.movie,
+                              color: FlixieColors.primary),
+                        ),
+                      )
+                    : Container(
+                        color: FlixieColors.primary.withValues(alpha: 0.3),
+                        child: const Icon(Icons.movie,
+                            color: FlixieColors.primary),
+                      ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    movie.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyLarge
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.star,
+                          size: 14, color: FlixieColors.warning),
+                      const SizedBox(width: 4),
+                      Text(
+                        voteAvg != null ? voteAvg.toStringAsFixed(1) : '—',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: FlixieColors.warning),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Discover grid card ─────────────────────────────────────────────────────
+
+class _DiscoverCard extends StatelessWidget {
+  const _DiscoverCard({required this.movie, this.onTap});
+
+  final MovieShort movie;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (movie.poster != null)
+              CachedNetworkImage(
+                imageUrl: 'https://image.tmdb.org/t/p/w342${movie.poster}',
+                fit: BoxFit.cover,
+                errorWidget: (_, __, ___) => Container(
+                  color: FlixieColors.primary.withValues(alpha: 0.3),
+                  child: const Icon(Icons.movie_outlined, size: 48),
+                ),
+              )
+            else
+              Container(
+                color: FlixieColors.primary.withValues(alpha: 0.3),
+                child: const Icon(Icons.movie_outlined, size: 48),
+              ),
+            // Gradient overlay
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  stops: const [0.5, 1.0],
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.85),
+                  ],
+                ),
+              ),
+            ),
+            // Title and media type
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      movie.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    if (movie.mediaType != null &&
+                        movie.mediaType!.toLowerCase() == 'tv') ...[
+                      const SizedBox(height: 4),
+                      const Text(
+                        'TV Series',
+                        style: TextStyle(
+                          color: FlixieColors.tertiary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Search result: movie tile ───────────────────────────────────────────────
+
+class _MovieResultTile extends StatelessWidget {
+  const _MovieResultTile({required this.movie, this.onTap});
+
+  final MovieShort movie;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final year = _extractYear(movie.releaseDate);
+
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: SizedBox(
+                  width: 50,
+                  height: 75,
+                  child: movie.poster != null
+                      ? CachedNetworkImage(
+                          imageUrl:
+                              'https://image.tmdb.org/t/p/w92${movie.poster}',
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) => Container(
+                            color:
+                                FlixieColors.secondary.withValues(alpha: 0.3),
+                            child: const Icon(Icons.movie,
+                                color: FlixieColors.secondary),
+                          ),
+                        )
+                      : Container(
+                          color: FlixieColors.secondary.withValues(alpha: 0.3),
+                          child: const Icon(Icons.movie,
+                              color: FlixieColors.secondary),
+                        ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      movie.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyLarge
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    if (year != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        year,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: FlixieColors.medium),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: FlixieColors.medium),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Search result: person tile ──────────────────────────────────────────────
+
+class _PersonResultTile extends StatelessWidget {
+  const _PersonResultTile({required this.person, this.onTap});
+
+  final Person person;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: SizedBox(
+                  width: 50,
+                  height: 75,
+                  child: person.profileImgUrl != null
+                      ? CachedNetworkImage(
+                          imageUrl:
+                              'https://image.tmdb.org/t/p/w185${person.profileImgUrl}',
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) => Container(
+                            color:
+                                FlixieColors.secondary.withValues(alpha: 0.3),
+                            child: const Icon(Icons.person,
+                                color: FlixieColors.secondary),
+                          ),
+                        )
+                      : Container(
+                          color: FlixieColors.secondary.withValues(alpha: 0.3),
+                          child: const Icon(Icons.person,
+                              color: FlixieColors.secondary),
+                        ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      person.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyLarge
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    if (person.department != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        person.department!,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: FlixieColors.medium),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

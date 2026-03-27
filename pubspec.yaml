@@ -38,6 +38,7 @@ dependencies:
 
   # URL launcher
   url_launcher: ^6.2.5
+  dropdown_flutter: ^1.0.3
 
 dev_dependencies:
   flutter_test:
@@ -50,6 +51,7 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/icon/
 
 flutter_launcher_icons:
   android: "launcher_icon"
