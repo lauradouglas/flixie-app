@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +10,28 @@ class ActivityTile extends StatelessWidget {
   const ActivityTile({super.key, required this.item});
 
   final ActivityListItem item;
+
+  static const String _imgBase = 'https://image.tmdb.org/t/p/w92';
+
+  Color get _accentColor {
+    switch (item.type) {
+      case ActivityListType.movieWatched:
+      case ActivityListType.showWatched:
+        return const Color(0xFF30C48D); // green
+      case ActivityListType.movieWatchlist:
+      case ActivityListType.showWatchlist:
+        return const Color(0xFFFFD166); // amber
+      case ActivityListType.favoriteMovie:
+      case ActivityListType.favoriteShow:
+      case ActivityListType.favoritePerson:
+        return Colors.redAccent;
+      case ActivityListType.watchRequestSent:
+      case ActivityListType.watchRequestAccepted:
+        return FlixieColors.primary;
+      case ActivityListType.unknown:
+        return FlixieColors.medium;
+    }
+  }
 
   IconData get _icon {
     switch (item.type) {
@@ -31,110 +54,27 @@ class ActivityTile extends StatelessWidget {
     }
   }
 
-  Color get _iconColor {
+  String get _actionLabel {
+    final rating = item.mediaRating;
     switch (item.type) {
       case ActivityListType.movieWatched:
       case ActivityListType.showWatched:
-        return Colors.green;
+        if (rating != null) return 'Rated ${rating.toStringAsFixed(0)}/10';
+        return 'Marked as watched';
       case ActivityListType.movieWatchlist:
       case ActivityListType.showWatchlist:
-        return Colors.amber;
+        return 'Added to watchlist';
       case ActivityListType.favoriteMovie:
       case ActivityListType.favoriteShow:
+        return 'Tagged as Must Watch';
       case ActivityListType.favoritePerson:
-        return Colors.redAccent;
+        return 'Added to favourites';
       case ActivityListType.watchRequestSent:
+        return 'Sent a watch request';
       case ActivityListType.watchRequestAccepted:
-        return FlixieColors.primary;
+        return 'Accepted a watch request';
       case ActivityListType.unknown:
-        return FlixieColors.medium;
-    }
-  }
-
-  Widget _buildLabel(BuildContext context) {
-    final title = item.mediaTitle;
-    final bool isPerson = item.type == ActivityListType.favoritePerson;
-    final int? navId = isPerson ? item.personId : item.movieId;
-    final bool canNavigate = navId != null &&
-        (item.type == ActivityListType.movieWatched ||
-            item.type == ActivityListType.movieWatchlist ||
-            item.type == ActivityListType.favoriteMovie ||
-            item.type == ActivityListType.favoritePerson);
-
-    String prefix;
-    String suffix;
-    switch (item.type) {
-      case ActivityListType.movieWatched:
-      case ActivityListType.showWatched:
-        prefix = 'Marked ';
-        suffix = ' as watched';
-      case ActivityListType.movieWatchlist:
-      case ActivityListType.showWatchlist:
-        prefix = 'Added ';
-        suffix = ' to watchlist';
-      case ActivityListType.favoriteMovie:
-      case ActivityListType.favoriteShow:
-      case ActivityListType.favoritePerson:
-        prefix = 'Favourited ';
-        suffix = '';
-      case ActivityListType.watchRequestSent:
-        return const Text('Sent a watch request',
-            style: TextStyle(color: FlixieColors.light, fontSize: 13));
-      case ActivityListType.watchRequestAccepted:
-        return const Text('Accepted a watch request',
-            style: TextStyle(color: FlixieColors.light, fontSize: 13));
-      case ActivityListType.unknown:
-        return const Text('Activity',
-            style: TextStyle(color: FlixieColors.light, fontSize: 13));
-    }
-
-    if (title == null) {
-      return Text(
-        '$prefix${_fallbackNoun()}$suffix',
-        style: const TextStyle(color: FlixieColors.light, fontSize: 13),
-      );
-    }
-
-    final boldSpan = TextSpan(
-      text: title,
-      style: TextStyle(
-        color: canNavigate ? FlixieColors.primary : FlixieColors.light,
-        fontSize: 13,
-        fontWeight: FontWeight.bold,
-      ),
-      recognizer: canNavigate
-          ? (TapGestureRecognizer()
-            ..onTap = () =>
-                context.push(isPerson ? '/people/$navId' : '/movies/$navId'))
-          : null,
-    );
-
-    return RichText(
-      text: TextSpan(
-        style: const TextStyle(color: FlixieColors.light, fontSize: 13),
-        children: [
-          TextSpan(text: prefix),
-          boldSpan,
-          TextSpan(text: suffix),
-        ],
-      ),
-    );
-  }
-
-  String _fallbackNoun() {
-    switch (item.type) {
-      case ActivityListType.movieWatched:
-      case ActivityListType.movieWatchlist:
-      case ActivityListType.favoriteMovie:
-        return 'a movie';
-      case ActivityListType.showWatched:
-      case ActivityListType.showWatchlist:
-      case ActivityListType.favoriteShow:
-        return 'a show';
-      case ActivityListType.favoritePerson:
-        return 'a person';
-      default:
-        return 'an item';
+        return 'Activity';
     }
   }
 
@@ -143,10 +83,11 @@ class ActivityTile extends StatelessWidget {
       final dt = DateTime.parse(iso);
       final now = DateTime.now();
       final diff = now.difference(dt);
-      if (diff.inMinutes < 1) return 'just now';
+      if (diff.inMinutes < 1) return 'Just now';
       if (diff.inHours < 1) return '${diff.inMinutes}m ago';
-      if (diff.inDays < 1) return '${diff.inHours}h ago';
-      if (diff.inDays < 7) return '${diff.inDays}d ago';
+      if (diff.inHours < 24) return '${diff.inHours}h ago';
+      if (diff.inDays == 1) return 'Yesterday';
+      if (diff.inDays < 7) return '${diff.inDays} days ago';
       const months = [
         'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
         'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
@@ -157,36 +98,128 @@ class ActivityTile extends StatelessWidget {
     }
   }
 
+  Widget _buildThumbnail() {
+    final path = item.mediaPosterPath;
+    final bool isPerson = item.type == ActivityListType.favoritePerson;
+    final url = path != null ? '$_imgBase$path' : null;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox(
+        width: 60,
+        height: 80,
+        child: url != null
+            ? CachedNetworkImage(
+                imageUrl: url,
+                fit: BoxFit.cover,
+                errorWidget: (_, __, ___) => _fallbackThumb(isPerson),
+              )
+            : _fallbackThumb(isPerson),
+      ),
+    );
+  }
+
+  Widget _fallbackThumb(bool isPerson) {
+    return Container(
+      color: FlixieColors.tabBarBorder,
+      child: Icon(
+        isPerson ? Icons.person : Icons.movie_outlined,
+        color: FlixieColors.medium,
+        size: 28,
+      ),
+    );
+  }
+
+  Widget _buildTitle(BuildContext context) {
+    final title = item.mediaTitle;
+    final bool isPerson = item.type == ActivityListType.favoritePerson;
+    final int? navId = isPerson ? item.personId : item.movieId;
+    final bool canNavigate = navId != null &&
+        (item.type == ActivityListType.movieWatched ||
+            item.type == ActivityListType.movieWatchlist ||
+            item.type == ActivityListType.favoriteMovie ||
+            item.type == ActivityListType.favoritePerson);
+
+    if (title == null) return const SizedBox.shrink();
+
+    return RichText(
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      text: TextSpan(
+        text: title,
+        style: TextStyle(
+          color: canNavigate ? FlixieColors.primary : FlixieColors.light,
+          fontSize: 15,
+          fontWeight: FontWeight.bold,
+        ),
+        recognizer: canNavigate
+            ? (TapGestureRecognizer()
+              ..onTap = () =>
+                  context.push(isPerson ? '/people/$navId' : '/movies/$navId'))
+            : null,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final dateStr = _formatDate(item.createdAt).toUpperCase();
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: FlixieColors.tabBarBackgroundFocused,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: FlixieColors.medium.withValues(alpha: 0.2),
+        border: Border(
+          left: BorderSide(color: _accentColor, width: 3),
         ),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: _iconColor.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildThumbnail(),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: _buildTitle(context)),
+                      const SizedBox(width: 8),
+                      Text(
+                        dateStr,
+                        style: const TextStyle(
+                          color: FlixieColors.medium,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Icon(_icon, color: _accentColor, size: 14),
+                      const SizedBox(width: 4),
+                      Text(
+                        _actionLabel,
+                        style: TextStyle(
+                          color: _accentColor,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-            child: Icon(_icon, color: _iconColor, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(child: _buildLabel(context)),
-          const SizedBox(width: 8),
-          Text(
-            _formatDate(item.createdAt),
-            style: const TextStyle(color: FlixieColors.medium, fontSize: 11),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
