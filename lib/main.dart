@@ -14,6 +14,7 @@ import 'screens/home_screen.dart';
 import 'screens/movie_detail_screen.dart';
 import 'screens/person_detail_screen.dart';
 import 'screens/search_screen.dart';
+import 'screens/splash_screen.dart';
 import 'screens/watchlist_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/my_reviews_screen.dart';
@@ -75,17 +76,31 @@ GoRouter _buildRouter(AuthProvider authProvider) {
   return GoRouter(
     refreshListenable: authProvider.authStatusListenable,
     redirect: (context, state) {
-      final isAuthenticated = authProvider.isAuthenticated;
+      final status = authProvider.status;
+      final isPrefetching = authProvider.isPrefetching;
       final isAuthRoute = state.matchedLocation.startsWith('/auth');
+      final isSplash = state.matchedLocation == '/splash';
 
-      // Still determining auth state – stay put
-      if (authProvider.status == AuthStatus.unknown) return null;
+      // Show splash while Firebase resolves auth state or prefetch is running
+      if (status == AuthStatus.unknown ||
+          (status == AuthStatus.authenticated && isPrefetching)) {
+        return isSplash ? null : '/splash';
+      }
 
-      if (!isAuthenticated && !isAuthRoute) return '/auth/login';
-      if (isAuthenticated && isAuthRoute) return '/';
+      if (status == AuthStatus.unauthenticated && !isAuthRoute) {
+        return '/auth/login';
+      }
+      if (status == AuthStatus.authenticated && (isAuthRoute || isSplash)) {
+        return '/';
+      }
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
+
       // Main shell (authenticated)
       ShellRoute(
         builder: (context, state, child) => MainNavigationShell(child: child),

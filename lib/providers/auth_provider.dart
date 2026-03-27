@@ -5,11 +5,14 @@ import 'package:flutter/scheduler.dart';
 import '../models/activity_list_item.dart';
 import '../models/friendship.dart';
 import '../models/movie_rating.dart';
+import '../models/movie_short.dart';
 import '../models/review.dart';
 import '../models/user.dart' as models;
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../services/friend_service.dart';
+import '../services/movie_service.dart';
+import '../services/trending_service.dart';
 import '../services/user_service.dart';
 import '../utils/app_logger.dart';
 
@@ -40,6 +43,8 @@ class AuthProvider extends ChangeNotifier {
   FriendsData? _cachedFriends;
   List<MovieRating>? _cachedRatings;
   List<Review>? _cachedReviews;
+  List<MovieShort>? _cachedTrending;
+  List<MovieShort>? _cachedNowPlaying;
   bool _isPrefetching = false;
 
   AuthStatus get status => _status;
@@ -54,6 +59,8 @@ class AuthProvider extends ChangeNotifier {
   FriendsData? get cachedFriends => _cachedFriends;
   List<MovieRating>? get cachedRatings => _cachedRatings;
   List<Review>? get cachedReviews => _cachedReviews;
+  List<MovieShort>? get cachedTrending => _cachedTrending;
+  List<MovieShort>? get cachedNowPlaying => _cachedNowPlaying;
   bool get isPrefetching => _isPrefetching;
 
   /// Update the reviews cache, e.g. after writing a new review.
@@ -111,7 +118,9 @@ class AuthProvider extends ChangeNotifier {
         logger.d('Name: ${_dbUser?.firstName} ${_dbUser?.lastName}');
         _status = AuthStatus.authenticated;
         // Kick off background prefetch so screens have data ready immediately
-        if (_dbUser?.id != null) _prefetch(_dbUser!.id);
+        final region =
+            (_dbUser?.country?['isoCode'] as String?)?.toUpperCase() ?? 'US';
+        if (_dbUser?.id != null) _prefetch(_dbUser!.id, region: region);
       } catch (e, stackTrace) {
         logger.e('Error fetching database user: $e',
             error: e, stackTrace: stackTrace);
@@ -128,6 +137,8 @@ class AuthProvider extends ChangeNotifier {
       _cachedFriends = null;
       _cachedRatings = null;
       _cachedReviews = null;
+      _cachedTrending = null;
+      _cachedNowPlaying = null;
     }
 
     logger.d('Final status: $_status');
@@ -155,9 +166,10 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Fetches activity, friends, ratings and reviews in parallel right after
-  /// login. Screens consume the results to avoid showing spinners on first load.
-  void _prefetch(String userId) {
+  /// Fetches activity, friends, ratings, reviews and home content in parallel
+  /// right after login. Screens consume the results to avoid showing spinners.
+  void _prefetch(String userId, {String region = 'US'}) {
+    _isPrefetching = true;
     Future.wait([
       UserService.getUserActivity(userId)
           .then((v) => _cachedActivity = v, onError: (_) {}),
@@ -167,11 +179,20 @@ class AuthProvider extends ChangeNotifier {
           .then((v) => _cachedRatings = v, onError: (_) {}),
       UserService.getUserMovieReviews(userId)
           .then((v) => _cachedReviews = v, onError: (_) {}),
+      TrendingService.getTrendingMovies()
+          .then((v) => _cachedTrending = v, onError: (_) {}),
+      MovieService.getNowPlayingMovies(region: region)
+          .then((v) => _cachedNowPlaying = v, onError: (_) {}),
     ]).then((_) {
       logger.i('[AuthProvider] Prefetch complete for $userId');
+      _isPrefetching = false;
+      _authStatusNotifier.notify();
       notifyListeners();
     }).catchError((e) {
       logger.w('[AuthProvider] Prefetch error: $e');
+      _isPrefetching = false;
+      _authStatusNotifier.notify();
+      notifyListeners();
     });
   }
 
@@ -240,7 +261,7 @@ class AuthProvider extends ChangeNotifier {
 
       _firebaseUser = credential.user;
       _status = AuthStatus.authenticated;
-      if (_dbUser?.id != null) _prefetch(_dbUser!.id);
+      if (_dbUser?.id != null) _prefetch(_dbUser!.id); // region defaults to 'US' for new sign-ups
       // Defer router notification: _setLoading(false) in the finally block calls
       // notifyListeners() immediately, marking the signup screen dirty. If
       // _authStatusNotifier.notify() fired in the same frame, GoRouter would
