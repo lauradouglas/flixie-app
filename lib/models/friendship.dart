@@ -35,9 +35,10 @@ class FriendshipUser {
   }
 
   String get shortName {
-    if (firstName != null && lastName != null) {
+    if (firstName != null && lastName != null && lastName!.isNotEmpty) {
       return '${firstName!} ${lastName![0]}.';
     }
+    if (firstName != null && firstName!.isNotEmpty) return firstName!;
     return username;
   }
 }

@@ -83,10 +83,10 @@ class ActivityTile extends StatelessWidget {
       final dt = DateTime.parse(iso);
       final now = DateTime.now();
       final diff = now.difference(dt);
-      if (diff.inMinutes < 1) return 'Just now';
+      if (diff.inMinutes < 1) return 'just now';
       if (diff.inHours < 1) return '${diff.inMinutes}m ago';
       if (diff.inHours < 24) return '${diff.inHours}h ago';
-      if (diff.inDays == 1) return 'Yesterday';
+      if (diff.inDays == 1) return 'yesterday';
       if (diff.inDays < 7) return '${diff.inDays} days ago';
       const months = [
         'Jan',

@@ -88,12 +88,12 @@ class ProfileHeader extends StatelessWidget {
         ),
         if (email.isNotEmpty)
           Text(email, style: textTheme.bodySmall),
-        if (bio != null && bio!.isNotEmpty) ...[
+        if (bio != null && bio.isNotEmpty) ...[
           const SizedBox(height: 8),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Text(
-              bio!,
+              bio,
               textAlign: TextAlign.center,
               style: textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
               maxLines: 3,
