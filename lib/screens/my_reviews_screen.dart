@@ -36,9 +36,20 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
   }
 
   Future<void> _loadReviews() async {
-    final userId = context.read<AuthProvider>().dbUser?.id;
+    final auth = context.read<AuthProvider>();
+    final userId = auth.dbUser?.id;
     if (userId == null) {
       setState(() => _loading = false);
+      return;
+    }
+
+    // Use prefetched cache if ready — no spinner needed
+    if (auth.cachedReviews != null) {
+      setState(() {
+        _allReviews = auth.cachedReviews!;
+        _filterReviews();
+        _loading = false;
+      });
       return;
     }
 

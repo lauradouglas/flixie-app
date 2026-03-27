@@ -77,8 +77,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadActivity() async {
-    final userId = context.read<AuthProvider>().dbUser?.id;
+    final auth = context.read<AuthProvider>();
+    final userId = auth.dbUser?.id;
     if (userId == null) return;
+
+    // Use prefetched cache if ready — no spinner needed
+    if (auth.cachedActivity != null) {
+      if (mounted) {
+        setState(() {
+          _activity = auth.cachedActivity!.take(12).toList();
+          _loadedForUserId = userId;
+          _lastActivityVersion = auth.activityVersion;
+          _activityLoading = false;
+        });
+      }
+      return;
+    }
+
     try {
       final activity = await UserService.getUserActivity(userId);
       if (mounted) {
@@ -96,8 +111,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadFriends() async {
-    final userId = context.read<AuthProvider>().dbUser?.id;
+    final auth = context.read<AuthProvider>();
+    final userId = auth.dbUser?.id;
     if (userId == null) return;
+
+    // Use prefetched cache if ready
+    if (auth.cachedFriends != null) {
+      if (mounted) {
+        setState(() {
+          _friendsData = auth.cachedFriends;
+          _friendsLoading = false;
+        });
+      }
+      return;
+    }
+
     try {
       final data = await FriendService.getFriends(userId);
       if (mounted) {
@@ -123,12 +151,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadRatings() async {
     logger.d('[ProfileScreen] _loadRatings called');
-    final userId = context.read<AuthProvider>().dbUser?.id;
+    final auth = context.read<AuthProvider>();
+    final userId = auth.dbUser?.id;
     logger.d('[ProfileScreen] userId for ratings: $userId');
     if (userId == null) {
       logger.w('[ProfileScreen] Cannot load ratings - userId is null');
       return;
     }
+
+    // Use prefetched cache if ready
+    if (auth.cachedRatings != null) {
+      logger.i(
+          '[ProfileScreen] Using cached ratings (${auth.cachedRatings!.length})');
+      if (mounted) {
+        setState(() {
+          _ratings = auth.cachedRatings!;
+          _ratingsLoading = false;
+        });
+      }
+      return;
+    }
+
     try {
       logger.d('[ProfileScreen] Calling UserService.getUserMovieRatings...');
       final ratings = await UserService.getUserMovieRatings(userId);

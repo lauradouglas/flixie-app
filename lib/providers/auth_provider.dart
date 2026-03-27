@@ -2,9 +2,14 @@ import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 
+import '../models/activity_list_item.dart';
+import '../models/friendship.dart';
+import '../models/movie_rating.dart';
+import '../models/review.dart';
 import '../models/user.dart' as models;
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
+import '../services/friend_service.dart';
 import '../services/user_service.dart';
 import '../utils/app_logger.dart';
 
@@ -30,6 +35,13 @@ class AuthProvider extends ChangeNotifier {
   String? _errorMessage;
   int _activityVersion = 0;
 
+  // Prefetched at login — screens use these to skip spinners
+  List<ActivityListItem>? _cachedActivity;
+  FriendsData? _cachedFriends;
+  List<MovieRating>? _cachedRatings;
+  List<Review>? _cachedReviews;
+  bool _isPrefetching = false;
+
   AuthStatus get status => _status;
   firebase_auth.User? get firebaseUser => _firebaseUser;
   models.User? get dbUser => _dbUser;
@@ -38,12 +50,24 @@ class AuthProvider extends ChangeNotifier {
   bool get isAuthenticated => _status == AuthStatus.authenticated;
   int get activityVersion => _activityVersion;
 
+  List<ActivityListItem>? get cachedActivity => _cachedActivity;
+  FriendsData? get cachedFriends => _cachedFriends;
+  List<MovieRating>? get cachedRatings => _cachedRatings;
+  List<Review>? get cachedReviews => _cachedReviews;
+  bool get isPrefetching => _isPrefetching;
+
+  /// Update the reviews cache, e.g. after writing a new review.
+  void updateCachedReviews(List<Review> reviews) {
+    _cachedReviews = reviews;
+    notifyListeners();
+  }
+
   /// Call after adding an item to any list so activity-watching screens can refresh.
   void markActivityChanged() {
     _activityVersion++;
     notifyListeners();
   }
-  
+
   /// A Listenable that only notifies when auth status changes, not when user data changes.
   /// Use this for router refresh to avoid unnecessary navigation rebuilds.
   Listenable get authStatusListenable => _authStatusNotifier;
@@ -57,11 +81,12 @@ class AuthProvider extends ChangeNotifier {
     if (_isSigningUp) return;
 
     logger.i('Auth state changed');
-    logger.d('Firebase user: ${user?.email ?? "null"} (uid: ${user?.uid ?? "null"})');
-    
+    logger.d(
+        'Firebase user: ${user?.email ?? "null"} (uid: ${user?.uid ?? "null"})');
+
     _firebaseUser = user;
     final oldStatus = _status;
-    
+
     if (user != null) {
       // FIRST: Get Firebase ID token and set it in ApiClient
       try {
@@ -75,17 +100,21 @@ class AuthProvider extends ChangeNotifier {
       } catch (e) {
         logger.w('Failed to get ID token: $e');
       }
-      
+
       // THEN: Fetch the database user using Firebase UID as externalId
       logger.d('Fetching database user with externalId: ${user.uid}');
       try {
         _dbUser = await UserService.getUserByExternalId(user.uid);
-        logger.i('Database user fetched: ${_dbUser?.username} (id: ${_dbUser?.id})');
+        logger.i(
+            'Database user fetched: ${_dbUser?.username} (id: ${_dbUser?.id})');
         logger.d('Email: ${_dbUser?.email}');
         logger.d('Name: ${_dbUser?.firstName} ${_dbUser?.lastName}');
         _status = AuthStatus.authenticated;
+        // Kick off background prefetch so screens have data ready immediately
+        if (_dbUser?.id != null) _prefetch(_dbUser!.id);
       } catch (e, stackTrace) {
-        logger.e('Error fetching database user: $e', error: e, stackTrace: stackTrace);
+        logger.e('Error fetching database user: $e',
+            error: e, stackTrace: stackTrace);
         _dbUser = null;
         _status = AuthStatus.unauthenticated;
       }
@@ -94,10 +123,15 @@ class AuthProvider extends ChangeNotifier {
       ApiClient.setToken(null);
       _dbUser = null;
       _status = AuthStatus.unauthenticated;
+      _isPrefetching = false;
+      _cachedActivity = null;
+      _cachedFriends = null;
+      _cachedRatings = null;
+      _cachedReviews = null;
     }
-    
+
     logger.d('Final status: $_status');
-    
+
     // Notify auth status listener only if status actually changed
     if (oldStatus != _status) {
       // Defer _authStatusNotifier.notify() to a post-frame callback so that
@@ -113,11 +147,32 @@ class AuthProvider extends ChangeNotifier {
       //                  markNeedsBuild() returns early with no crash.
       SchedulerBinding.instance.addPostFrameCallback((_) {
         _authStatusNotifier.notify();
-        SchedulerBinding.instance.addPostFrameCallback((_) => notifyListeners());
+        SchedulerBinding.instance
+            .addPostFrameCallback((_) => notifyListeners());
       });
     } else {
       notifyListeners();
     }
+  }
+
+  /// Fetches activity, friends, ratings and reviews in parallel right after
+  /// login. Screens consume the results to avoid showing spinners on first load.
+  void _prefetch(String userId) {
+    Future.wait([
+      UserService.getUserActivity(userId)
+          .then((v) => _cachedActivity = v, onError: (_) {}),
+      FriendService.getFriends(userId)
+          .then((v) => _cachedFriends = v, onError: (_) {}),
+      UserService.getUserMovieRatings(userId)
+          .then((v) => _cachedRatings = v, onError: (_) {}),
+      UserService.getUserMovieReviews(userId)
+          .then((v) => _cachedReviews = v, onError: (_) {}),
+    ]).then((_) {
+      logger.i('[AuthProvider] Prefetch complete for $userId');
+      notifyListeners();
+    }).catchError((e) {
+      logger.w('[AuthProvider] Prefetch error: $e');
+    });
   }
 
   void _setLoading(bool value) {
@@ -185,14 +240,15 @@ class AuthProvider extends ChangeNotifier {
 
       _firebaseUser = credential.user;
       _status = AuthStatus.authenticated;
-      // Defer router notification and provider rebuild for the same reason as
-      // in _onAuthStateChanged: _setLoading(false) in the finally block calls
-      // notifyListeners() immediately, marking the signup screen dirty.  If
+      if (_dbUser?.id != null) _prefetch(_dbUser!.id);
+      // Defer router notification: _setLoading(false) in the finally block calls
+      // notifyListeners() immediately, marking the signup screen dirty. If
       // _authStatusNotifier.notify() fired in the same frame, GoRouter would
       // deactivate the screen while it is still in _dirtyElements → crash.
       SchedulerBinding.instance.addPostFrameCallback((_) {
         _authStatusNotifier.notify();
-        SchedulerBinding.instance.addPostFrameCallback((_) => notifyListeners());
+        SchedulerBinding.instance
+            .addPostFrameCallback((_) => notifyListeners());
       });
       return true;
     } on firebase_auth.FirebaseAuthException catch (e) {
@@ -241,7 +297,7 @@ class AuthProvider extends ChangeNotifier {
 
   /// Reloads and returns the current user profile from Firebase.
   Future<firebase_auth.User?> getUserProfile() => _authService.getUserProfile();
-  
+
   /// Updates the database user without making an API call.
   /// Use this when you already have updated user data from an API response.
   void updateDbUser(models.User user) {
@@ -258,13 +314,17 @@ class AuthProvider extends ChangeNotifier {
     List<dynamic>? favoritePeople,
   }) {
     if (_dbUser == null) return;
-    
+
     logger.d('Updating user lists:');
-    if (watchedMovies != null) logger.d('Watched: ${watchedMovies.length} items');
-    if (movieWatchlist != null) logger.d('Watchlist: ${movieWatchlist.length} items');
-    if (favoriteMovies != null) logger.d('Favorites: ${favoriteMovies.length} items');
-    if (favoritePeople != null) logger.d('Fav people: ${favoritePeople.length} items');
-    
+    if (watchedMovies != null)
+      logger.d('Watched: ${watchedMovies.length} items');
+    if (movieWatchlist != null)
+      logger.d('Watchlist: ${movieWatchlist.length} items');
+    if (favoriteMovies != null)
+      logger.d('Favorites: ${favoriteMovies.length} items');
+    if (favoritePeople != null)
+      logger.d('Fav people: ${favoritePeople.length} items');
+
     _dbUser = _dbUser!.copyWith(
       watchedMovies: watchedMovies ?? _dbUser!.watchedMovies,
       movieWatchlist: movieWatchlist ?? _dbUser!.movieWatchlist,
@@ -273,7 +333,7 @@ class AuthProvider extends ChangeNotifier {
     );
     notifyListeners();
   }
-  
+
   /// Refreshes the database user from the backend.
   Future<void> refreshDbUser() async {
     logger.d('Manually refreshing database user');
@@ -287,7 +347,8 @@ class AuthProvider extends ChangeNotifier {
       logger.i('Database user refreshed: ${_dbUser?.username}');
       notifyListeners();
     } catch (e, stackTrace) {
-      logger.e('Error refreshing database user: $e', error: e, stackTrace: stackTrace);
+      logger.e('Error refreshing database user: $e',
+          error: e, stackTrace: stackTrace);
     }
   }
 }
