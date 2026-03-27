@@ -131,6 +131,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       await FriendService.sendFriendRequest({
         'requesterId': myId,
         'recipientId': widget.userId,
+        'responderUsername': _user!.username,
         'message': '',
         'type': 'FRIEND_REQUEST',
       });
@@ -141,7 +142,8 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Friend request sent to ${_user?.username ?? 'user'}')),
+              content:
+                  Text('Friend request sent to ${_user?.username ?? 'user'}')),
         );
       }
     } catch (e) {
@@ -165,8 +167,8 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       builder: (_) => AlertDialog(
         backgroundColor: FlixieColors.tabBarBackgroundFocused,
         title: const Text('Remove Friend'),
-        content: Text(
-            'Remove ${_user?.username ?? 'this user'} from your friends?'),
+        content:
+            Text('Remove ${_user?.username ?? 'this user'} from your friends?'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -192,8 +194,8 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(
-                  '${_user?.username ?? 'User'} removed from friends')),
+              content:
+                  Text('${_user?.username ?? 'User'} removed from friends')),
         );
       }
     } catch (e) {
@@ -211,8 +213,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     if (_friendshipId == null) return;
     setState(() => _actionLoading = true);
     try {
-      await FriendService.updateRequest(
-          _friendshipId!, {'status': 'ACCEPTED'});
+      await FriendService.updateRequest(_friendshipId!, 'ACCEPTED');
       if (mounted) {
         setState(() {
           _friendshipStatus = _FriendshipStatus.friends;
@@ -220,7 +221,8 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('You are now friends with ${_user?.username ?? 'this user'}')),
+              content: Text(
+                  'You are now friends with ${_user?.username ?? 'this user'}')),
         );
       }
     } catch (e) {
@@ -238,8 +240,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     if (_friendshipId == null) return;
     setState(() => _actionLoading = true);
     try {
-      await FriendService.updateRequest(
-          _friendshipId!, {'status': 'DECLINED'});
+      await FriendService.updateRequest(_friendshipId!, 'DECLINED');
       if (mounted) {
         setState(() {
           _friendshipStatus = _FriendshipStatus.none;
@@ -341,8 +342,9 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final visibleReviews =
-        _showAllReviews ? _reviews : _reviews.take(_initialReviewCount).toList();
+    final visibleReviews = _showAllReviews
+        ? _reviews
+        : _reviews.take(_initialReviewCount).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -387,8 +389,8 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                   // Full name if available
                   if ((_user?.firstName != null || _user?.lastName != null) &&
                       '${_user?.firstName ?? ''} ${_user?.lastName ?? ''}'
-                              .trim()
-                              .isNotEmpty)
+                          .trim()
+                          .isNotEmpty)
                     Text(
                       '${_user?.firstName ?? ''} ${_user?.lastName ?? ''}'
                           .trim(),
@@ -494,8 +496,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: visibleReviews.length,
-                      separatorBuilder: (_, __) =>
-                          const SizedBox(height: 12),
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
                       itemBuilder: (_, i) => ReviewCard(
                         review: visibleReviews[i],
                         onTap: () {
@@ -517,16 +518,13 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                             foregroundColor: FlixieColors.light,
                             side: const BorderSide(
                                 color: FlixieColors.tabBarBorder),
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 14),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
                           child: Text(
-                            _showAllReviews
-                                ? 'SHOW LESS'
-                                : 'VIEW ALL REVIEWS',
+                            _showAllReviews ? 'SHOW LESS' : 'VIEW ALL REVIEWS',
                             style: const TextStyle(
                               letterSpacing: 1.2,
                               fontWeight: FontWeight.w600,

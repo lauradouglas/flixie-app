@@ -9,15 +9,26 @@ import '../../services/friend_service.dart';
 import '../../services/user_service.dart';
 import '../../theme/app_theme.dart';
 
-class FriendsRow extends StatelessWidget {
+class FriendsRow extends StatefulWidget {
   const FriendsRow({
     super.key,
     required this.data,
     this.isLoading = false,
+    this.onFriendsChanged,
   });
 
   final FriendsData data;
   final bool isLoading;
+  final void Function(FriendsData)? onFriendsChanged;
+
+  @override
+  State<FriendsRow> createState() => _FriendsRowState();
+}
+
+class _FriendsRowState extends State<FriendsRow> {
+  // Tracks users for whom a request was sent this session,
+  // so they appear immediately in the Sent tab.
+  final List<FriendshipUser> _extraSentUsers = [];
 
   void _showAllFriendsSheet(BuildContext context) {
     showModalBottomSheet(
@@ -27,7 +38,11 @@ class FriendsRow extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _AllFriendsSheet(data: data),
+      builder: (_) => _AllFriendsSheet(
+        data: widget.data,
+        extraSentUsers: List.unmodifiable(_extraSentUsers),
+        onFriendsChanged: widget.onFriendsChanged,
+      ),
     );
   }
 
@@ -39,14 +54,18 @@ class FriendsRow extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => const _AddFriendSheet(),
+      builder: (_) => _AddFriendSheet(
+        onRequestSent: (user) {
+          if (mounted) setState(() => _extraSentUsers.add(user));
+        },
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final friends = data.friendships;
+    final friends = widget.data.friendships;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -91,7 +110,7 @@ class FriendsRow extends StatelessWidget {
             ],
           ),
         ),
-        if (isLoading)
+        if (widget.isLoading)
           const Center(child: CircularProgressIndicator())
         else if (friends.isEmpty)
           Padding(
@@ -181,8 +200,14 @@ class _FriendAvatar extends StatelessWidget {
 // -------------------------------------------------------------------------
 
 class _AllFriendsSheet extends StatefulWidget {
-  const _AllFriendsSheet({required this.data});
+  const _AllFriendsSheet({
+    required this.data,
+    this.extraSentUsers = const [],
+    this.onFriendsChanged,
+  });
   final FriendsData data;
+  final List<FriendshipUser> extraSentUsers;
+  final void Function(FriendsData)? onFriendsChanged;
 
   @override
   State<_AllFriendsSheet> createState() => _AllFriendsSheetState();
@@ -192,12 +217,21 @@ class _AllFriendsSheetState extends State<_AllFriendsSheet>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late List<Friendship> _pendingFriends;
+  late List<FriendshipUser> _sentUsers;
+  late List<Friendship> _friends;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _pendingFriends = List.from(widget.data.pendingFriends);
+    _friends = List.from(widget.data.friendships);
+    _sentUsers = [
+      ...widget.data.requestedFriends
+          .map((f) => f.friendUser)
+          .whereType<FriendshipUser>(),
+      ...widget.extraSentUsers,
+    ];
   }
 
   @override
@@ -208,11 +242,25 @@ class _AllFriendsSheetState extends State<_AllFriendsSheet>
 
   Future<void> _acceptRequest(Friendship friendship) async {
     try {
-      await FriendService.updateRequest(friendship.id, {'status': 'ACCEPTED'});
+      await FriendService.updateRequest(friendship.id, 'ACCEPTED');
       if (mounted) {
         setState(() {
           _pendingFriends.removeWhere((f) => f.id == friendship.id);
+          if (friendship.friendUser != null) {
+            _friends.add(Friendship(
+              id: friendship.id,
+              friend: friendship.friendUser,
+              createdAt: '',
+              updatedAt: '',
+            ));
+          }
         });
+        widget.onFriendsChanged?.call(
+          widget.data.copyWith(
+            friendships: List.unmodifiable(_friends),
+            pendingFriends: List.unmodifiable(_pendingFriends),
+          ),
+        );
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(
@@ -230,12 +278,16 @@ class _AllFriendsSheetState extends State<_AllFriendsSheet>
 
   Future<void> _declineRequest(Friendship friendship) async {
     try {
-      await FriendService.updateRequest(
-          friendship.id, {'status': 'DECLINED'});
+      await FriendService.updateRequest(friendship.id, 'DECLINED');
       if (mounted) {
         setState(() {
           _pendingFriends.removeWhere((f) => f.id == friendship.id);
         });
+        widget.onFriendsChanged?.call(
+          widget.data.copyWith(
+            pendingFriends: List.unmodifiable(_pendingFriends),
+          ),
+        );
       }
     } catch (_) {
       if (mounted) {
@@ -292,7 +344,7 @@ class _AllFriendsSheetState extends State<_AllFriendsSheet>
                       const Text('Friends'),
                       const SizedBox(width: 6),
                       _TabBadge(
-                        count: widget.data.friendships.length,
+                        count: _friends.length,
                         color: FlixieColors.primary,
                       ),
                     ],
@@ -318,7 +370,7 @@ class _AllFriendsSheetState extends State<_AllFriendsSheet>
                       const Text('Sent'),
                       const SizedBox(width: 6),
                       _TabBadge(
-                        count: widget.data.requestedFriends.length,
+                        count: _sentUsers.length,
                         color: FlixieColors.medium,
                       ),
                     ],
@@ -331,14 +383,13 @@ class _AllFriendsSheetState extends State<_AllFriendsSheet>
                 controller: _tabController,
                 children: [
                   // Friends tab
-                  widget.data.friendships.isEmpty
-                      ? _EmptyTab(message: 'No friends yet.')
+                  _friends.isEmpty
+                      ? const _EmptyTab(message: 'No friends yet.')
                       : ListView.builder(
                           padding: const EdgeInsets.all(20),
-                          itemCount: widget.data.friendships.length,
+                          itemCount: _friends.length,
                           itemBuilder: (_, i) {
-                            final user =
-                                widget.data.friendships[i].friendUser;
+                            final user = _friends[i].friendUser;
                             if (user == null) return const SizedBox.shrink();
                             return _FriendListTile(
                               user: user,
@@ -355,7 +406,7 @@ class _AllFriendsSheetState extends State<_AllFriendsSheet>
 
                   // Pending tab (incoming requests)
                   _pendingFriends.isEmpty
-                      ? _EmptyTab(message: 'No pending friend requests.')
+                      ? const _EmptyTab(message: 'No pending friend requests.')
                       : ListView.builder(
                           padding: const EdgeInsets.all(20),
                           itemCount: _pendingFriends.length,
@@ -367,28 +418,24 @@ class _AllFriendsSheetState extends State<_AllFriendsSheet>
                               user: user,
                               onAccept: () => _acceptRequest(friendship),
                               onDecline: () => _declineRequest(friendship),
-                              onTap: () =>
-                                  context.push('/friends/${user.id}'),
+                              onTap: () => context.push('/friends/${user.id}'),
                             );
                           },
                         ),
 
                   // Sent tab
-                  widget.data.requestedFriends.isEmpty
-                      ? _EmptyTab(message: 'No sent friend requests.')
+                  _sentUsers.isEmpty
+                      ? const _EmptyTab(message: 'No sent friend requests.')
                       : ListView.builder(
                           padding: const EdgeInsets.all(20),
-                          itemCount: widget.data.requestedFriends.length,
+                          itemCount: _sentUsers.length,
                           itemBuilder: (_, i) {
-                            final user =
-                                widget.data.requestedFriends[i].friendUser;
-                            if (user == null) return const SizedBox.shrink();
+                            final user = _sentUsers[i];
                             return _FriendListTile(
                               user: user,
                               subtitle: 'Request sent',
                               accentColor: FlixieColors.medium,
-                              onTap: () =>
-                                  context.push('/friends/${user.id}'),
+                              onTap: () => context.push('/friends/${user.id}'),
                             );
                           },
                         ),
@@ -496,12 +543,21 @@ class _PendingRequestTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(user.displayName,
-                      style: const TextStyle(color: FlixieColors.light)),
+                  Text(
+                    '@${user.username}',
+                    style: const TextStyle(color: FlixieColors.light),
+                  ),
+                  if (user.firstName != null)
+                    Text(
+                      '${user.firstName}'.trim(),
+                      style: TextStyle(
+                        color: FlixieColors.light.withValues(alpha: 0.6),
+                        fontSize: 12,
+                      ),
+                    ),
                   const Text(
                     'Wants to be your friend',
-                    style:
-                        TextStyle(color: FlixieColors.warning, fontSize: 12),
+                    style: TextStyle(color: FlixieColors.warning, fontSize: 12),
                   ),
                 ],
               ),
@@ -520,8 +576,8 @@ class _PendingRequestTile extends StatelessWidget {
               ),
               IconButton(
                 onPressed: onDecline,
-                icon:
-                    const Icon(Icons.cancel_outlined, color: FlixieColors.danger),
+                icon: const Icon(Icons.cancel_outlined,
+                    color: FlixieColors.danger),
                 tooltip: 'Decline',
                 constraints: const BoxConstraints(),
                 padding: const EdgeInsets.all(6),
@@ -566,9 +622,7 @@ class _FriendListTile extends StatelessWidget {
         backgroundColor: _avatarColor.withValues(alpha: 0.25),
         child: Text(
           user.initials ??
-              (user.username.isNotEmpty
-                  ? user.username[0].toUpperCase()
-                  : '?'),
+              (user.username.isNotEmpty ? user.username[0].toUpperCase() : '?'),
           style: TextStyle(
             color: _avatarColor,
             fontWeight: FontWeight.bold,
@@ -591,7 +645,9 @@ class _FriendListTile extends StatelessWidget {
 // -------------------------------------------------------------------------
 
 class _AddFriendSheet extends StatefulWidget {
-  const _AddFriendSheet();
+  const _AddFriendSheet({this.onRequestSent});
+
+  final void Function(FriendshipUser user)? onRequestSent;
 
   @override
   State<_AddFriendSheet> createState() => _AddFriendSheetState();
@@ -671,9 +727,21 @@ class _AddFriendSheetState extends State<_AddFriendSheet> {
       await FriendService.sendFriendRequest({
         'requesterId': myId,
         'recipientId': user.id,
+        'responderUsername': user.username,
         'message': '',
         'type': 'FRIEND_REQUEST',
       });
+      // Notify parent so the Sent tab updates immediately
+      widget.onRequestSent?.call(
+        FriendshipUser(
+          id: user.id,
+          username: user.username,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          initials: user.initials,
+          iconColor: user.iconColor,
+        ),
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Friend request sent to ${user.username}')),
@@ -733,8 +801,7 @@ class _AddFriendSheetState extends State<_AddFriendSheet> {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text(
               'Search by username or email',
-              style:
-                  textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
+              style: textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
             ),
           ),
           const SizedBox(height: 16),
@@ -748,10 +815,9 @@ class _AddFriendSheetState extends State<_AddFriendSheet> {
                     style: const TextStyle(color: FlixieColors.light),
                     decoration: InputDecoration(
                       hintText: 'Username or email…',
-                      hintStyle:
-                          const TextStyle(color: FlixieColors.medium),
-                      prefixIcon: const Icon(Icons.search,
-                          color: FlixieColors.medium),
+                      hintStyle: const TextStyle(color: FlixieColors.medium),
+                      prefixIcon:
+                          const Icon(Icons.search, color: FlixieColors.medium),
                       filled: true,
                       fillColor: FlixieColors.tabBarBackground,
                       border: OutlineInputBorder(
@@ -816,13 +882,11 @@ class _AddFriendSheetState extends State<_AddFriendSheet> {
                                     ? user.username[0].toUpperCase()
                                     : '?'),
                             style: TextStyle(
-                                color: color,
-                                fontWeight: FontWeight.bold),
+                                color: color, fontWeight: FontWeight.bold),
                           ),
                         ),
                         title: Text(user.username,
-                            style: const TextStyle(
-                                color: FlixieColors.light)),
+                            style: const TextStyle(color: FlixieColors.light)),
                         subtitle: Text(
                           user.email,
                           style: const TextStyle(
@@ -838,8 +902,7 @@ class _AddFriendSheetState extends State<_AddFriendSheet> {
                                   foregroundColor: Colors.black,
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 12, vertical: 8),
-                                  textStyle:
-                                      const TextStyle(fontSize: 12),
+                                  textStyle: const TextStyle(fontSize: 12),
                                 ),
                                 child: const Text('Add'),
                               ),

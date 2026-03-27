@@ -33,8 +33,12 @@ class FriendService {
         .toList();
   }
 
-  static Future<void> updateRequest(
-      String requestId, Map<String, dynamic> body) async {
-    await ApiClient.put('/requests/$requestId', body: body);
+  static Future<void> updateRequest(String requestId, String status,
+      {String response = ''}) async {
+    await ApiClient.post('/requests/update', body: {
+      'id': requestId,
+      'status': status,
+      'response': response,
+    });
   }
 }

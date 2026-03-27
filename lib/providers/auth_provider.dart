@@ -69,6 +69,12 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Update the friends cache, e.g. after accepting/declining a request.
+  void updateCachedFriends(FriendsData friends) {
+    _cachedFriends = friends;
+    notifyListeners();
+  }
+
   /// Call after adding an item to any list so activity-watching screens can refresh.
   void markActivityChanged() {
     _activityVersion++;
@@ -186,13 +192,21 @@ class AuthProvider extends ChangeNotifier {
     ]).then((_) {
       logger.i('[AuthProvider] Prefetch complete for $userId');
       _isPrefetching = false;
-      _authStatusNotifier.notify();
-      notifyListeners();
+      // Defer navigation trigger to avoid mid-frame widget tree mutations
+      // (same pattern used in _onAuthStateChanged).
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        _authStatusNotifier.notify();
+        SchedulerBinding.instance
+            .addPostFrameCallback((_) => notifyListeners());
+      });
     }).catchError((e) {
       logger.w('[AuthProvider] Prefetch error: $e');
       _isPrefetching = false;
-      _authStatusNotifier.notify();
-      notifyListeners();
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        _authStatusNotifier.notify();
+        SchedulerBinding.instance
+            .addPostFrameCallback((_) => notifyListeners());
+      });
     });
   }
 
@@ -214,15 +228,26 @@ class AuthProvider extends ChangeNotifier {
     _setError(null);
     try {
       await _authService.signIn(email, password);
+      // On success, silently clear loading without calling notifyListeners().
+      // _onAuthStateChanged already schedules a deferred post-frame notification
+      // so GoRouter navigates *after* the current frame builds cleanly.
+      // Calling notifyListeners() here would mark the auth screen dirty in the
+      // same frame that GoRouter deactivates it, causing duplicate-GlobalKey /
+      // inactive-lifecycle crashes.
+      _isLoading = false;
       return true;
     } on firebase_auth.FirebaseAuthException catch (e) {
-      _setError(AuthService.messageFromAuthException(e));
-      return false;
-    } finally {
+      _errorMessage = AuthService.messageFromAuthException(e);
       _setLoading(false);
+      return false;
     }
   }
 
+  /// Creates a new account. Returns `true` on success.
+  ///
+  /// Creates the Firebase user first, then registers the user in the backend
+  /// database. If the database call fails, the Firebase account is deleted so
+  /// no orphaned credential is left behind.
   /// Creates a new account. Returns `true` on success.
   ///
   /// Creates the Firebase user first, then registers the user in the backend
@@ -241,6 +266,7 @@ class AuthProvider extends ChangeNotifier {
     _setError(null);
     _isSigningUp = true;
     firebase_auth.UserCredential? credential;
+    bool _succeeded = false;
     try {
       final displayName = '${firstName.trim()} ${lastName.trim()}';
       credential = await _authService.signUp(email, password, displayName);
@@ -261,23 +287,24 @@ class AuthProvider extends ChangeNotifier {
 
       _firebaseUser = credential.user;
       _status = AuthStatus.authenticated;
-      if (_dbUser?.id != null) _prefetch(_dbUser!.id); // region defaults to 'US' for new sign-ups
-      // Defer router notification: _setLoading(false) in the finally block calls
-      // notifyListeners() immediately, marking the signup screen dirty. If
-      // _authStatusNotifier.notify() fired in the same frame, GoRouter would
-      // deactivate the screen while it is still in _dirtyElements → crash.
+      if (_dbUser?.id != null) {
+        _prefetch(_dbUser!.id); // region defaults to 'US' for new sign-ups
+      }
+      // Defer router notification so GoRouter navigates *after* the current
+      // frame builds cleanly (same pattern as _onAuthStateChanged).
       SchedulerBinding.instance.addPostFrameCallback((_) {
         _authStatusNotifier.notify();
         SchedulerBinding.instance
             .addPostFrameCallback((_) => notifyListeners());
       });
+      _succeeded = true;
       return true;
     } on firebase_auth.FirebaseAuthException catch (e) {
-      _setError(AuthService.messageFromAuthException(e));
+      _errorMessage = AuthService.messageFromAuthException(e);
       return false;
     } catch (e) {
       logger.e('Error during sign-up: $e');
-      _setError('Failed to create account. Please try again.');
+      _errorMessage = 'Failed to create account. Please try again.';
       // Roll back the Firebase account so the user can try again.
       try {
         await credential?.user?.delete();
@@ -287,7 +314,16 @@ class AuthProvider extends ChangeNotifier {
       return false;
     } finally {
       _isSigningUp = false;
-      _setLoading(false);
+      if (_succeeded) {
+        // On success, silently clear loading without triggering notifyListeners().
+        // The deferred post-frame callback above already schedules the next
+        // notification. Calling notifyListeners() now would mark the signup
+        // screen dirty in the same frame GoRouter deactivates it → crash.
+        _isLoading = false;
+      } else {
+        // On failure, notify immediately so the error state is visible.
+        _setLoading(false);
+      }
     }
   }
 
@@ -337,14 +373,18 @@ class AuthProvider extends ChangeNotifier {
     if (_dbUser == null) return;
 
     logger.d('Updating user lists:');
-    if (watchedMovies != null)
+    if (watchedMovies != null) {
       logger.d('Watched: ${watchedMovies.length} items');
-    if (movieWatchlist != null)
+    }
+    if (movieWatchlist != null) {
       logger.d('Watchlist: ${movieWatchlist.length} items');
-    if (favoriteMovies != null)
+    }
+    if (favoriteMovies != null) {
       logger.d('Favorites: ${favoriteMovies.length} items');
-    if (favoritePeople != null)
+    }
+    if (favoritePeople != null) {
       logger.d('Fav people: ${favoritePeople.length} items');
+    }
 
     _dbUser = _dbUser!.copyWith(
       watchedMovies: watchedMovies ?? _dbUser!.watchedMovies,
