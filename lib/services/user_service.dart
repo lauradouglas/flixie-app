@@ -25,6 +25,16 @@ class UserService {
     return User.fromJson(data as Map<String, dynamic>);
   }
 
+  static Future<List<User>> searchUsers(String query) async {
+    final data = await ApiClient.get(
+      '/users/search',
+      queryParams: {'q': query},
+    );
+    return (data as List<dynamic>)
+        .map((e) => User.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   static Future<User> getUserByExternalId(String externalId) async {
     apiLogger.d('GET /users/external-id/$externalId');
     try {

@@ -17,6 +17,7 @@ import 'screens/search_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/watchlist_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/friend_profile_screen.dart';
 import 'screens/my_reviews_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/signup_screen.dart';
@@ -136,6 +137,12 @@ GoRouter _buildRouter(AuthProvider authProvider) {
           GoRoute(
             path: '/my-reviews',
             builder: (context, state) => const MyReviewsScreen(),
+          ),
+          GoRoute(
+            path: '/friends/:id',
+            builder: (context, state) => FriendProfileScreen(
+              userId: state.pathParameters['id'] ?? '',
+            ),
           ),
         ],
       ),
