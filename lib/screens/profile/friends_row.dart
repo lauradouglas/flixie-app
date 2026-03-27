@@ -105,7 +105,7 @@ class _FriendAvatar extends StatelessWidget {
           radius: 30,
           backgroundColor: _avatarColor.withValues(alpha: 0.3),
           child: Text(
-            user.initials ?? user.username.substring(0, 1).toUpperCase(),
+            user.initials ?? (user.username.isNotEmpty ? user.username[0].toUpperCase() : '?'),
             style: TextStyle(
               color: _avatarColor,
               fontWeight: FontWeight.bold,
@@ -311,7 +311,7 @@ class _FriendListTile extends StatelessWidget {
       leading: CircleAvatar(
         backgroundColor: _avatarColor.withValues(alpha: 0.25),
         child: Text(
-          user.initials ?? user.username.substring(0, 1).toUpperCase(),
+          user.initials ?? (user.username.isNotEmpty ? user.username[0].toUpperCase() : '?'),
           style: TextStyle(
             color: _avatarColor,
             fontWeight: FontWeight.bold,

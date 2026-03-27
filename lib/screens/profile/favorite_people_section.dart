@@ -115,7 +115,7 @@ class _PersonAvatar extends StatelessWidget {
   static const String _imgBase = 'https://image.tmdb.org/t/p/w185';
 
   String get _shortName {
-    final parts = name.split(' ');
+    final parts = name.split(' ').where((p) => p.isNotEmpty).toList();
     if (parts.length >= 2) {
       return '${parts.first[0]}. ${parts.last}';
     }
