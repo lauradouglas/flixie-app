@@ -44,9 +44,11 @@ class ProfileHeader extends StatelessWidget {
             CircleAvatar(
               radius: 48,
               backgroundColor: FlixieColors.primary.withValues(alpha: 0.3),
-              backgroundImage: photoUrl != null ? NetworkImage(photoUrl!) : null,
+              backgroundImage:
+                  photoUrl != null ? NetworkImage(photoUrl!) : null,
               child: photoUrl == null
-                  ? const Icon(Icons.person, size: 48, color: FlixieColors.primary)
+                  ? const Icon(Icons.person,
+                      size: 48, color: FlixieColors.primary)
                   : null,
             ),
             Positioned(
@@ -86,17 +88,17 @@ class ProfileHeader extends StatelessWidget {
             ),
           ],
         ),
-        if (email.isNotEmpty)
-          Text(email, style: textTheme.bodySmall),
-        if (bio != null && bio.isNotEmpty) ...[
+        if (email.isNotEmpty) Text(email, style: textTheme.bodySmall),
+        if (bio case final bioText
+            when bioText != null && bioText.isNotEmpty) ...[
           const SizedBox(height: 8),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Text(
-              bio,
+              bioText,
               textAlign: TextAlign.center,
               style: textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
-              maxLines: 3,
+              maxLines: 5,
               overflow: TextOverflow.ellipsis,
             ),
           ),

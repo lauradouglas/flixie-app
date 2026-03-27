@@ -53,7 +53,7 @@ class Review {
       recommended: json['recommended'] as bool? ?? true,
       createdAt: json['createdAt'] as String,
       updatedAt: json['updatedAt'] as String,
-      user: json['user'] != null 
+      user: json['user'] != null
           ? User.fromJson(json['user'] as Map<String, dynamic>)
           : null,
       movieTitle: json['movie'] != null
@@ -78,23 +78,23 @@ class Review {
       'recommended': recommended,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
-      if (user != null) 'user': {
-        'id': user!.id,
-        'externalId': user!.externalId,
-        'firstName': user!.firstName,
-        'lastName': user!.lastName,
-        'username': user!.username,
-        'email': user!.email,
-        'bio': user!.bio,
-        'iconColorId': user!.iconColorId,
-        'countryId': user!.countryId,
-        'languageId': user!.languageId,
-        'completedSetup': user!.completedSetup,
-        'darkMode': user!.darkMode,
-        'createdAt': user!.createdAt,
-        'updatedAt': user!.updatedAt,
-      },
+      if (user != null)
+        'user': {
+          'id': user!.id,
+          'externalId': user!.externalId,
+          'firstName': user!.firstName,
+          'lastName': user!.lastName,
+          'username': user!.username,
+          'email': user!.email,
+          'bio': user!.bio,
+          'iconColorId': user!.iconColorId,
+          'countryId': user!.countryId,
+          'languageId': user!.languageId,
+          'completedSetup': user!.completedSetup,
+          'darkMode': user!.darkMode,
+          'createdAt': user!.createdAt,
+          'updatedAt': user!.updatedAt,
+        },
     };
   }
 }
-

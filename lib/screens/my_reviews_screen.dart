@@ -260,19 +260,18 @@ class ReviewCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Movie title (if available)
-            if (review.movieTitle != null) ...
-              [
-                Text(
-                  review.movieTitle!,
-                  style: const TextStyle(
-                    color: FlixieColors.warning,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.3,
-                  ),
+            if (review.movieTitle != null) ...[
+              Text(
+                review.movieTitle!,
+                style: const TextStyle(
+                  color: FlixieColors.warning,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.3,
                 ),
-                const SizedBox(height: 8),
-              ],
+              ),
+              const SizedBox(height: 8),
+            ],
             // Header row with rating and date
             Row(
               children: [

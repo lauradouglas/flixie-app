@@ -302,33 +302,41 @@ class _ReviewCardState extends State<ReviewCard> {
             Row(
               children: [
                 if (!_isOwnReview) ...[
-                  _VoteButton(
-                    icon: Icons.thumb_up_outlined,
-                    activeIcon: Icons.thumb_up,
-                    count: _upvotes,
-                    isActive: _userVote == 'upvote',
-                    isLoading: _votingType == 'upvote',
-                    onTap: () => _vote('upvote'),
-                  ),
-                  const SizedBox(width: 16),
-                  _VoteButton(
-                    icon: Icons.thumb_down_outlined,
-                    activeIcon: Icons.thumb_down,
-                    count: _downvotes,
-                    isActive: _userVote == 'downvote',
-                    isLoading: _votingType == 'downvote',
-                    onTap: () => _vote('downvote'),
-                    activeColor: Colors.redAccent,
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {},
+                    child: Row(
+                      children: [
+                        _VoteButton(
+                          icon: Icons.arrow_upward,
+                          activeIcon: Icons.arrow_upward,
+                          count: _upvotes,
+                          isActive: _userVote == 'upvote',
+                          isLoading: _votingType == 'upvote',
+                          onTap: () => _vote('upvote'),
+                        ),
+                        const SizedBox(width: 16),
+                        _VoteButton(
+                          icon: Icons.arrow_downward,
+                          activeIcon: Icons.arrow_downward,
+                          count: _downvotes,
+                          isActive: _userVote == 'downvote',
+                          isLoading: _votingType == 'downvote',
+                          onTap: () => _vote('downvote'),
+                          activeColor: Colors.redAccent,
+                        ),
+                      ],
+                    ),
                   ),
                 ] else ...[
-                  const Icon(Icons.thumb_up_outlined,
+                  const Icon(Icons.arrow_upward,
                       size: 14, color: FlixieColors.medium),
                   const SizedBox(width: 4),
                   Text('$_upvotes',
                       style: const TextStyle(
                           color: FlixieColors.medium, fontSize: 12)),
                   const SizedBox(width: 12),
-                  const Icon(Icons.thumb_down_outlined,
+                  const Icon(Icons.arrow_downward,
                       size: 14, color: FlixieColors.medium),
                   const SizedBox(width: 4),
                   Text('$_downvotes',
@@ -349,36 +357,32 @@ class _ReviewCardState extends State<ReviewCard> {
               ],
             ),
             // Recommended badge
-            if (review.recommended) ...
-              [
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: FlixieColors.success.withValues(alpha: 0.15),
-                    border: Border.all(
-                        color: FlixieColors.success, width: 1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.thumb_up,
-                          color: FlixieColors.success, size: 12),
-                      SizedBox(width: 4),
-                      Text(
-                        'Recommended',
-                        style: TextStyle(
-                          color: FlixieColors.success,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
+            if (review.recommended) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: FlixieColors.success.withValues(alpha: 0.15),
+                  border: Border.all(color: FlixieColors.success, width: 1),
+                  borderRadius: BorderRadius.circular(6),
                 ),
-              ],
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.thumb_up, color: FlixieColors.success, size: 12),
+                    SizedBox(width: 4),
+                    Text(
+                      'Recommended',
+                      style: TextStyle(
+                        color: FlixieColors.success,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -680,7 +684,8 @@ class _VoteButtonState extends State<_VoteButton>
   Widget build(BuildContext context) {
     final color = widget.isActive ? widget.activeColor : FlixieColors.medium;
     return GestureDetector(
-      onTap: widget.isLoading ? null : widget.onTap,
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.isLoading ? () {} : widget.onTap,
       child: Row(
         children: [
           SizedBox(
