@@ -1,0 +1,35 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "flixie-app (Chrome)",
+            "cwd": "${workspaceFolder}",
+            "request": "launch",
+            "type": "dart",
+            "toolArgs": [
+                "--dart-define-from-file",
+                ".env"
+            ],
+            "args": [
+                "-d",
+                "chrome",
+                "--web-port=5000"
+            ]
+        },
+        {
+            "name": "flixie-app (Local Web)",
+            "cwd": "${workspaceFolder}",
+            "request": "launch",
+            "type": "dart",
+            "toolArgs": [
+                "--dart-define-from-file",
+                ".env"
+            ],
+            "args": [
+                "-d",
+                "web-server",
+                "--web-port=5000"
+            ]
+        }
+    ]
+}
