@@ -257,6 +257,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     requestedFriends: [],
                   ),
               isLoading: _friendsLoading,
+              onFriendsChanged: (updated) {
+                setState(() => _friendsData = updated);
+                context.read<AuthProvider>().updateCachedFriends(updated);
+              },
             ),
 
             const SizedBox(height: 24),

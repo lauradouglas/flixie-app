@@ -180,4 +180,16 @@ class FriendsData {
 
   int get totalCount =>
       friendships.length + pendingFriends.length + requestedFriends.length;
+
+  FriendsData copyWith({
+    List<Friendship>? friendships,
+    List<Friendship>? pendingFriends,
+    List<Friendship>? requestedFriends,
+  }) {
+    return FriendsData(
+      friendships: friendships ?? this.friendships,
+      pendingFriends: pendingFriends ?? this.pendingFriends,
+      requestedFriends: requestedFriends ?? this.requestedFriends,
+    );
+  }
 }
