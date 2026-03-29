@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/movie_short.dart';
 import '../providers/auth_provider.dart';
 import '../services/movie_service.dart';
+import '../services/notification_service.dart';
 import '../services/trending_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_logger.dart';
@@ -24,6 +27,9 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   String? _loadedForUserId;
 
+  int _unreadCount = 0;
+  Timer? _notifPollTimer;
+
   @override
   void initState() {
     super.initState();
@@ -31,19 +37,43 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AuthProvider>().addListener(_onAuthChanged);
       _loadFeaturedMovies();
+      _pollNotifications();
+      _notifPollTimer = Timer.periodic(
+        const Duration(seconds: 30),
+        (_) => _pollNotifications(),
+      );
     });
   }
 
   @override
   void dispose() {
+    _notifPollTimer?.cancel();
     context.read<AuthProvider>().removeListener(_onAuthChanged);
     super.dispose();
+  }
+
+  Future<void> _pollNotifications() async {
+    if (!mounted) return;
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (userId == null) return;
+    try {
+      final notifications =
+          await NotificationService.getNotifications(userId);
+      if (mounted) {
+        setState(() {
+          _unreadCount = notifications.where((n) => !n.isRead).length;
+        });
+      }
+    } catch (e) {
+      logger.w('[HomeScreen] notification poll error: $e');
+    }
   }
 
   void _onAuthChanged() {
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (userId != null && userId != _loadedForUserId) {
       _loadFeaturedMovies();
+      _pollNotifications();
     }
   }
 
@@ -99,8 +129,20 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('Flixie'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {},
+            icon: Badge(
+              isLabelVisible: _unreadCount > 0,
+              label: _unreadCount < 100
+                  ? Text('$_unreadCount')
+                  : const Text('99+'),
+              backgroundColor: FlixieColors.tertiary,
+              textColor: Colors.black,
+              child: const Icon(Icons.notifications_outlined),
+            ),
+            onPressed: () async {
+              await context.push('/notifications');
+              // Refresh the badge count once the user returns from the screen
+              _pollNotifications();
+            },
           ),
         ],
       ),
