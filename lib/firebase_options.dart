@@ -2,11 +2,12 @@ import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
 
-// Values are injected at build time via --dart-define-from-file=.env
-// Never hardcode credentials here. See .env.example for the required keys.
+// Values are injected at build time via --dart-define-from-file=.firebase.json
+// Never hardcode credentials here. See .firebase.json.example for the required keys.
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
+      print('Using web Firebase options');
       return web;
     }
     switch (defaultTargetPlatform) {

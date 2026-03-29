@@ -2,13 +2,53 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "flixie-app (Chrome - Dev Env)",
+            "cwd": "${workspaceFolder}",
+            "request": "launch",
+            "type": "dart",
+            "toolArgs": [
+                "--dart-define-from-file",
+                ".firebase.json"
+            ],
+            "args": [
+                "-d",
+                "chrome",
+                "--web-port=5000"
+            ]
+        },
+        {
+            "name": "flixie-app (Web - Dev Env)",
+            "cwd": "${workspaceFolder}",
+            "request": "launch",
+            "type": "dart",
+            "toolArgs": [
+                "--dart-define-from-file",
+                ".firebase.json"
+            ],
+            "args": [
+                "-d",
+                "web-server",
+                "--web-port=5000"
+            ]
+        },
+        {
+            "name": "flixie-app (Mobile - Dev Env)",
+            "cwd": "${workspaceFolder}",
+            "request": "launch",
+            "type": "dart",
+            "toolArgs": [
+                "--dart-define-from-file",
+                ".firebase.json"
+            ]
+        },
+        {
             "name": "flixie-app (Chrome)",
             "cwd": "${workspaceFolder}",
             "request": "launch",
             "type": "dart",
             "toolArgs": [
                 "--dart-define-from-file",
-                ".env"
+                ".firebase.json"
             ],
             "args": [
                 "-d",
@@ -23,7 +63,7 @@
             "type": "dart",
             "toolArgs": [
                 "--dart-define-from-file",
-                ".env"
+                ".firebase.json"
             ],
             "args": [
                 "-d",

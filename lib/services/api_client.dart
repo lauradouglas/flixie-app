@@ -15,7 +15,7 @@ class ApiException implements Exception {
 class ApiClient {
   // Use Mac's local IP for testing on physical device
   // Change back to 'http://localhost:3000' when using simulator
-  static const String baseUrl = 'http://192.168.1.203:3000';
+  static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://localhost:3000');
 
   static String? _token;
 
