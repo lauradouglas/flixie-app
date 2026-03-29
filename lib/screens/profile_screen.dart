@@ -215,8 +215,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: const Text('Profile'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {},
+            icon: Badge(
+              isLabelVisible: auth.unreadNotificationCount > 0,
+              label: auth.unreadNotificationCount < 100
+                  ? Text('${auth.unreadNotificationCount}')
+                  : const Text('99+'),
+              backgroundColor: FlixieColors.tertiary,
+              textColor: Colors.black,
+              child: const Icon(Icons.notifications_outlined),
+            ),
+            onPressed: () async {
+              await context.push('/notifications');
+              if (mounted) {
+                context.read<AuthProvider>().refreshNotificationCount();
+              }
+            },
           ),
         ],
       ),

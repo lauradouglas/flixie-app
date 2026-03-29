@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -9,7 +7,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/movie_short.dart';
 import '../providers/auth_provider.dart';
 import '../services/movie_service.dart';
-import '../services/notification_service.dart';
 import '../services/trending_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_logger.dart';
@@ -27,9 +24,6 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   String? _loadedForUserId;
 
-  int _unreadCount = 0;
-  Timer? _notifPollTimer;
-
   @override
   void initState() {
     super.initState();
@@ -37,50 +31,27 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AuthProvider>().addListener(_onAuthChanged);
       _loadFeaturedMovies();
-      _pollNotifications();
-      _notifPollTimer = Timer.periodic(
-        const Duration(seconds: 30),
-        (_) => _pollNotifications(),
-      );
     });
   }
 
   @override
   void dispose() {
-    _notifPollTimer?.cancel();
     context.read<AuthProvider>().removeListener(_onAuthChanged);
     super.dispose();
-  }
-
-  Future<void> _pollNotifications() async {
-    if (!mounted) return;
-    final userId = context.read<AuthProvider>().dbUser?.id;
-    if (userId == null) return;
-    try {
-      final notifications =
-          await NotificationService.getNotifications(userId);
-      if (mounted) {
-        setState(() {
-          _unreadCount = notifications.where((n) => !n.isRead).length;
-        });
-      }
-    } catch (e) {
-      logger.w('[HomeScreen] notification poll error: $e');
-    }
   }
 
   void _onAuthChanged() {
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (userId != null && userId != _loadedForUserId) {
       _loadFeaturedMovies();
-      _pollNotifications();
     }
   }
 
   Future<void> _loadFeaturedMovies() async {
     final auth = context.read<AuthProvider>();
     final user = auth.dbUser;
-    final region = (user?.country?['isoCode'] as String?)?.toUpperCase() ?? 'US';
+    final region =
+        (user?.country?['isoCode'] as String?)?.toUpperCase() ?? 'US';
     logger.d('[HomeScreen] loading, user=${user?.id}, region=$region');
 
     // Use prefetched cache if ready — no spinner needed
@@ -123,6 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final unreadCount = context.watch<AuthProvider>().unreadNotificationCount;
 
     return Scaffold(
       appBar: AppBar(
@@ -130,10 +102,9 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
             icon: Badge(
-              isLabelVisible: _unreadCount > 0,
-              label: _unreadCount < 100
-                  ? Text('$_unreadCount')
-                  : const Text('99+'),
+              isLabelVisible: unreadCount > 0,
+              label:
+                  unreadCount < 100 ? Text('$unreadCount') : const Text('99+'),
               backgroundColor: FlixieColors.tertiary,
               textColor: Colors.black,
               child: const Icon(Icons.notifications_outlined),
@@ -141,7 +112,9 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () async {
               await context.push('/notifications');
               // Refresh the badge count once the user returns from the screen
-              _pollNotifications();
+              if (mounted) {
+                context.read<AuthProvider>().refreshNotificationCount();
+              }
             },
           ),
         ],
@@ -168,7 +141,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       separatorBuilder: (_, __) => const SizedBox(width: 12),
                       itemBuilder: (context, index) => _FeaturedCard(
                         movie: _featuredMovies[index],
-                        onTap: () => context.push('/movies/${_featuredMovies[index].id}'),
+                        onTap: () => context
+                            .push('/movies/${_featuredMovies[index].id}'),
                       ),
                     ),
             ),
@@ -265,7 +239,8 @@ class _FeaturedCard extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (movie.releaseDate != null && movie.releaseDate!.isNotEmpty) ...[
+                    if (movie.releaseDate != null &&
+                        movie.releaseDate!.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
                         () {
@@ -275,7 +250,8 @@ class _FeaturedCard extends StatelessWidget {
                           if (iso != null) return iso.year.toString();
                           // Handle JS date string: "Sun Mar 15 2026"
                           final parts = raw.split(' ');
-                          if (parts.length == 4) return '${parts[2]} ${parts[1]} ${parts[3]}';
+                          if (parts.length == 4)
+                            return '${parts[2]} ${parts[1]} ${parts[3]}';
                           return raw;
                         }(),
                         style: const TextStyle(
@@ -329,10 +305,11 @@ class _ListCard extends StatelessWidget {
                   color: FlixieColors.primary.withValues(alpha: 0.3),
                   child: movie.poster != null
                       ? CachedNetworkImage(
-                          imageUrl: 'https://image.tmdb.org/t/p/w92${movie.poster}',
+                          imageUrl:
+                              'https://image.tmdb.org/t/p/w92${movie.poster}',
                           fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) =>
-                              const Icon(Icons.movie, color: FlixieColors.primary),
+                          errorWidget: (_, __, ___) => const Icon(Icons.movie,
+                              color: FlixieColors.primary),
                         )
                       : const Icon(Icons.movie, color: FlixieColors.primary),
                 ),
@@ -348,13 +325,16 @@ class _ListCard extends StatelessWidget {
                       movie.name,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                      style: textTheme.bodyLarge
+                          ?.copyWith(fontWeight: FontWeight.w600),
                     ),
-                    if (movie.releaseDate != null && movie.releaseDate!.length >= 4) ...[
+                    if (movie.releaseDate != null &&
+                        movie.releaseDate!.length >= 4) ...[
                       const SizedBox(height: 4),
                       Text(
                         'Released: ${movie.releaseDate!}',
-                        style: textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
+                        style: textTheme.bodySmall
+                            ?.copyWith(color: FlixieColors.medium),
                       ),
                     ],
                   ],

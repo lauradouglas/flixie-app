@@ -13,16 +13,25 @@ import '../utils/app_logger.dart';
 const Duration _kPollInterval = Duration(seconds: 30);
 
 const List<String> _kMonths = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ];
 
 /// Parses the `iconColor` map from a user object into a [Color].
 Color _avatarColorFromIconColor(Map<String, dynamic>? iconColor,
     {Color fallback = FlixieColors.primary}) {
   if (iconColor == null) return fallback;
-  final hex =
-      (iconColor['hex'] as String? ?? '').replaceAll('#', '');
+  final hex = (iconColor['hex'] as String? ?? '').replaceAll('#', '');
   return Color(int.tryParse('0xFF$hex') ?? fallback.value);
 }
 
@@ -75,11 +84,15 @@ class _NotificationScreenState extends State<NotificationScreen> {
   /// clear existing notifications while fetching, so the UI stays stable.
   Future<void> _poll() async {
     if (!mounted) return;
-    final userId = context.read<AuthProvider>().dbUser?.id;
+    final auth = context.read<AuthProvider>();
+    final userId = auth.dbUser?.id;
     if (userId == null) return;
     try {
       final fresh = await NotificationService.getNotifications(userId);
-      if (mounted) setState(() => _notifications = fresh);
+      if (mounted) {
+        setState(() => _notifications = fresh);
+        auth.setUnreadNotificationCount(fresh.where((n) => !n.isRead).length);
+      }
     } catch (e) {
       // Polling errors are intentionally silent; the user is not disrupted.
       logger.w('[NotificationScreen] poll error: $e');
@@ -105,6 +118,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
           _isLoading = false;
           _error = null;
         });
+        context.read<AuthProvider>().setUnreadNotificationCount(
+            notifications.where((n) => !n.isRead).length);
       }
     } catch (e) {
       logger.e('[NotificationScreen] load error: $e');
@@ -177,18 +192,18 @@ class _NotificationScreenState extends State<NotificationScreen> {
   // ---- Sections for "All" view ----------------------------------------------
 
   /// Pending requests that still need a response.
-  List<FlixieNotification> get _pendingRequests => _notifications
-      .where((n) => _isRequestType(n) && n.isPending)
-      .toList();
+  List<FlixieNotification> get _pendingRequests =>
+      _notifications.where((n) => _isRequestType(n) && n.isPending).toList();
 
   /// Unread non-request notifications.
-  List<FlixieNotification> get _newNotifications => _notifications
-      .where((n) => !_isRequestType(n) && !n.isRead)
-      .toList();
+  List<FlixieNotification> get _newNotifications =>
+      _notifications.where((n) => !_isRequestType(n) && !n.isRead).toList();
 
-  /// Read non-request notifications.
+  /// Read non-request notifications + resolved requests.
   List<FlixieNotification> get _earlierNotifications => _notifications
-      .where((n) => !_isRequestType(n) && n.isRead)
+      .where((n) =>
+          (!_isRequestType(n) && n.isRead) ||
+          (_isRequestType(n) && !n.isPending))
       .toList();
 
   // ---- Helpers --------------------------------------------------------------
@@ -265,36 +280,41 @@ class _NotificationScreenState extends State<NotificationScreen> {
     final filters = [
       (_NotificationFilter.all, 'All'),
       (_NotificationFilter.requests, 'Requests'),
-      (_NotificationFilter.activity, 'Activity'),
-      (_NotificationFilter.alerts, 'Alerts'),
+      // TODO: uncomment when activity notifications are implemented
+      // (_NotificationFilter.activity, 'Activity'),
+      // TODO: uncomment when alert notifications are implemented
+      // (_NotificationFilter.alerts, 'Alerts'),
     ];
 
     return Container(
+      width: double.infinity,
       color: FlixieColors.tabBarBackgroundFocused,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        children: filters.map((entry) {
-          final (f, label) = entry;
-          final selected = _filter == f;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ChoiceChip(
-              label: Text(label),
-              selected: selected,
-              onSelected: (_) => setState(() => _filter = f),
-              selectedColor: FlixieColors.primary,
-              backgroundColor: FlixieColors.tabBarBorder,
-              labelStyle: TextStyle(
-                color: selected ? Colors.black : FlixieColors.light,
-                fontWeight:
-                    selected ? FontWeight.w600 : FontWeight.normal,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: filters.map((entry) {
+            final (f, label) = entry;
+            final selected = _filter == f;
+
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: Text(label),
+                selected: selected,
+                onSelected: (_) => setState(() => _filter = f),
+                selectedColor: FlixieColors.primary,
+                backgroundColor: FlixieColors.tabBarBorder,
+                labelStyle: TextStyle(
+                  color: selected ? Colors.black : FlixieColors.light,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                side: BorderSide.none,
               ),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-              side: BorderSide.none,
-            ),
-          );
-        }).toList(),
+            );
+          }).toList(),
+        ),
       ),
     );
   }
@@ -456,11 +476,13 @@ class _RequestCard extends StatelessWidget {
         return 'Requested to join your group';
       case FlixieNotification.movieWatchRequest:
         return 'Sent you a movie watch request';
-      case FlixieNotification.showWatchRequest:
-        return 'Sent you a show watch request';
+      // case FlixieNotification.showWatchRequest:
+      //   return 'Sent you a show watch request';
       case FlixieNotification.friendRequest:
       default:
-        return notification.message.isNotEmpty ? notification.message : 'Sent you a friend request';
+        return notification.message.isNotEmpty
+            ? notification.message
+            : 'Sent you a friend request';
     }
   }
 
@@ -470,7 +492,7 @@ class _RequestCard extends StatelessWidget {
       case FlixieNotification.groupRequest:
         return Icons.group;
       case FlixieNotification.movieWatchRequest:
-      case FlixieNotification.showWatchRequest:
+        // case FlixieNotification.showWatchRequest:
         return Icons.play_circle_outline;
       case FlixieNotification.friendRequest:
       default:
@@ -541,13 +563,12 @@ class _RequestCard extends StatelessWidget {
           const SizedBox(height: 12),
           if (_isResolved)
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: _resolvedColor.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                    color: _resolvedColor.withValues(alpha: 0.4)),
+                border:
+                    Border.all(color: _resolvedColor.withValues(alpha: 0.4)),
               ),
               child: Text(
                 _resolvedLabel,
@@ -589,8 +610,7 @@ class _RequestCard extends StatelessWidget {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: FlixieColors.light,
                       side: BorderSide(
-                          color:
-                              FlixieColors.medium.withValues(alpha: 0.5)),
+                          color: FlixieColors.medium.withValues(alpha: 0.5)),
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
