@@ -15,7 +15,11 @@ class ApiException implements Exception {
 class ApiClient {
   // Use Mac's local IP for testing on physical device
   // Change back to 'http://localhost:3000' when using simulator
-  static const String baseUrl = 'http://192.168.1.203:3000';
+  // static const String baseUrl = 'http://192.168.1.203:3000';
+
+  // static const String baseUrl =
+  //     'https://flixibe.graysea-314b1b40.northeurope.azurecontainerapps.io';
+  static const String baseUrl = 'http://192.168.68.111:3000';
 
   static String? _token;
 
@@ -69,11 +73,11 @@ class ApiClient {
     final uri = _buildUri(path, queryParams: queryParams);
     apiLogger.d('GET $uri');
     apiLogger.d('Headers: ${_headers()}');
-    
+
     final response = await http.get(uri, headers: _headers());
-    
+
     apiLogger.d('Response ${response.statusCode}');
-    
+
     return _parseResponse(response);
   }
 

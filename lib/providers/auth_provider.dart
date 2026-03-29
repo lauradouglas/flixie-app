@@ -189,7 +189,7 @@ class AuthProvider extends ChangeNotifier {
           .then((v) => _cachedTrending = v, onError: (_) {}),
       MovieService.getNowPlayingMovies(region: region)
           .then((v) => _cachedNowPlaying = v, onError: (_) {}),
-    ]).then((_) {
+    ]).timeout(const Duration(seconds: 10), onTimeout: () => []).then((_) {
       logger.i('[AuthProvider] Prefetch complete for $userId');
       _isPrefetching = false;
       // Defer navigation trigger to avoid mid-frame widget tree mutations
