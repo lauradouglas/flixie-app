@@ -31,12 +31,13 @@ const List<String> _kMonths = [
 Color _avatarColorFromIconColor(Map<String, dynamic>? iconColor,
     {Color fallback = FlixieColors.primary}) {
   if (iconColor == null) return fallback;
-  final hex = (iconColor['hex'] as String? ?? '').replaceAll('#', '');
+  final hex = ((iconColor['hexCode'] ?? iconColor['hex']) as String? ?? '')
+      .replaceAll('#', '');
   return Color(int.tryParse('0xFF$hex') ?? fallback.value);
 }
 
 /// Notification filter tabs.
-enum _NotificationFilter { all, requests, activity, alerts }
+enum _NotificationFilter { all, friendRequests, watchRequests, groupRequests, activity, alerts }
 
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
@@ -180,8 +181,22 @@ class _NotificationScreenState extends State<NotificationScreen> {
     switch (_filter) {
       case _NotificationFilter.all:
         return _notifications;
-      case _NotificationFilter.requests:
-        return _notifications.where(_isRequestType).toList();
+      case _NotificationFilter.friendRequests:
+        return _notifications
+            .where((n) => n.type == FlixieNotification.friendRequest)
+            .toList();
+      case _NotificationFilter.watchRequests:
+        return _notifications
+            .where((n) =>
+                n.type == FlixieNotification.movieWatchRequest ||
+                n.type == FlixieNotification.showWatchRequest)
+            .toList();
+      case _NotificationFilter.groupRequests:
+        return _notifications
+            .where((n) =>
+                n.type == FlixieNotification.groupRequest ||
+                n.type == FlixieNotification.groupInvite)
+            .toList();
       case _NotificationFilter.activity:
         return _notifications.where(_isActivityType).toList();
       case _NotificationFilter.alerts:
@@ -279,7 +294,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
   Widget _buildFilterChips() {
     final filters = [
       (_NotificationFilter.all, 'All'),
-      (_NotificationFilter.requests, 'Requests'),
+      (_NotificationFilter.friendRequests, 'Friends'),
+      (_NotificationFilter.watchRequests, 'Watch'),
+      (_NotificationFilter.groupRequests, 'Groups'),
       // TODO: uncomment when activity notifications are implemented
       // (_NotificationFilter.activity, 'Activity'),
       // TODO: uncomment when alert notifications are implemented

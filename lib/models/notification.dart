@@ -28,6 +28,9 @@ class FlixieNotification {
   /// The related user (e.g. the sender of a friend request).
   final Map<String, dynamic>? senderUser;
 
+  /// The raw link object from the API (contains embedded request/groupRequest).
+  final Map<String, dynamic>? link;
+
   const FlixieNotification({
     this.id,
     required this.userId,
@@ -42,6 +45,7 @@ class FlixieNotification {
     this.createdAt,
     this.updatedAt,
     this.senderUser,
+    this.link,
   });
 
   /// Whether this notification is a request type that can be accepted/declined.
@@ -57,25 +61,39 @@ class FlixieNotification {
 
   bool get isRead => read ?? false;
 
-  /// The best available timestamp for this notification.
   String get receivedAt => notificationReceived ?? createdAt ?? updatedAt ?? '';
 
-  /// The display name of the related user.
-  String get senderName {
-    if (senderUser == null) return '';
-    final firstName = senderUser!['firstName'] as String? ?? '';
-    final lastName = senderUser!['lastName'] as String? ?? '';
-    if (firstName.isNotEmpty && lastName.isNotEmpty) {
-      return '$firstName $lastName';
-    }
-    if (firstName.isNotEmpty) return firstName;
-    return senderUser!['username'] as String? ?? '';
+  Map<String, dynamic>? get _linkOtherUser {
+    final l = link;
+    if (l == null) return senderUser;
+    final request =
+        (l['request'] ?? l['groupRequest']) as Map<String, dynamic>?;
+    if (request == null) return senderUser;
+    final requester = request['requester'] as Map<String, dynamic>?;
+    final recipient = request['recipient'] as Map<String, dynamic>?;
+    final requesterId =
+        request['requesterId'] as String? ?? requester?['id'] as String?;
+    if (requesterId == userId) return recipient;
+    return requester;
   }
 
-  String? get senderInitials => senderUser?['initials'] as String?;
+  String get senderName {
+    final u = _linkOtherUser;
+    if (u == null) return '';
+    return u['username'] as String? ?? '';
+  }
+
+  String? get senderInitials {
+    final u = _linkOtherUser;
+    if (u == null) return null;
+    // final initials = u['initials'] as String?;
+    // if (initials != null && initials.isNotEmpty) return initials;
+    final username = u['username'] as String? ?? '';
+    return username.isNotEmpty ? username[0].toUpperCase() : null;
+  }
 
   Map<String, dynamic>? get senderIconColor =>
-      senderUser?['iconColor'] as Map<String, dynamic>?;
+      (_linkOtherUser)?['iconColor'] as Map<String, dynamic>?;
 
   factory FlixieNotification.fromJson(Map<String, dynamic> json) {
     return FlixieNotification(
@@ -92,6 +110,7 @@ class FlixieNotification {
       createdAt: json['createdAt'] as String?,
       updatedAt: json['updatedAt'] as String?,
       senderUser: json['user'] as Map<String, dynamic>?,
+      link: json['link'] as Map<String, dynamic>?,
     );
   }
 
@@ -109,6 +128,7 @@ class FlixieNotification {
     String? createdAt,
     String? updatedAt,
     Map<String, dynamic>? senderUser,
+    Map<String, dynamic>? link,
   }) {
     return FlixieNotification(
       id: id ?? this.id,
@@ -124,6 +144,7 @@ class FlixieNotification {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       senderUser: senderUser ?? this.senderUser,
+      link: link ?? this.link,
     );
   }
 
