@@ -861,7 +861,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         !hasDirector &&
         !hasWriters &&
         !hasBudget &&
-        !hasCollection) return const SizedBox.shrink();
+        !hasCollection) {
+      return const SizedBox.shrink();
+    }
 
     Widget row(String label, String value) {
       return Column(
@@ -1517,8 +1519,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
     Future<void> launch(String url) async {
       final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri))
+      if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
     }
 
     Widget linkCard({
