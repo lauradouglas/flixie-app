@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
@@ -12,6 +14,7 @@ import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../services/friend_service.dart';
 import '../services/movie_service.dart';
+import '../services/notification_service.dart';
 import '../services/trending_service.dart';
 import '../services/user_service.dart';
 import '../utils/app_logger.dart';
@@ -47,6 +50,9 @@ class AuthProvider extends ChangeNotifier {
   List<MovieShort>? _cachedNowPlaying;
   bool _isPrefetching = false;
 
+  int _unreadNotificationCount = 0;
+  Timer? _notifPollTimer;
+
   AuthStatus get status => _status;
   firebase_auth.User? get firebaseUser => _firebaseUser;
   models.User? get dbUser => _dbUser;
@@ -62,6 +68,7 @@ class AuthProvider extends ChangeNotifier {
   List<MovieShort>? get cachedTrending => _cachedTrending;
   List<MovieShort>? get cachedNowPlaying => _cachedNowPlaying;
   bool get isPrefetching => _isPrefetching;
+  int get unreadNotificationCount => _unreadNotificationCount;
 
   /// Update the reviews cache, e.g. after writing a new review.
   void updateCachedReviews(List<Review> reviews) {
@@ -145,6 +152,9 @@ class AuthProvider extends ChangeNotifier {
       _cachedReviews = null;
       _cachedTrending = null;
       _cachedNowPlaying = null;
+      _notifPollTimer?.cancel();
+      _notifPollTimer = null;
+      _unreadNotificationCount = 0;
     }
 
     logger.d('Final status: $_status');
@@ -189,9 +199,17 @@ class AuthProvider extends ChangeNotifier {
           .then((v) => _cachedTrending = v, onError: (_) {}),
       MovieService.getNowPlayingMovies(region: region)
           .then((v) => _cachedNowPlaying = v, onError: (_) {}),
+      NotificationService.getNotifications(userId).then(
+          (v) => _unreadNotificationCount = v.where((n) => !n.isRead).length,
+          onError: (_) {}),
     ]).timeout(const Duration(seconds: 10), onTimeout: () => []).then((_) {
       logger.i('[AuthProvider] Prefetch complete for $userId');
       _isPrefetching = false;
+      _notifPollTimer?.cancel();
+      _notifPollTimer = Timer.periodic(
+        const Duration(seconds: 30),
+        (_) => refreshNotificationCount(),
+      );
       // Defer navigation trigger to avoid mid-frame widget tree mutations
       // (same pattern used in _onAuthStateChanged).
       SchedulerBinding.instance.addPostFrameCallback((_) {
@@ -208,6 +226,26 @@ class AuthProvider extends ChangeNotifier {
             .addPostFrameCallback((_) => notifyListeners());
       });
     });
+  }
+
+  /// Directly updates the unread count from already-fetched notification data.
+  /// Use this to keep the badge in sync without making an extra API call.
+  void setUnreadNotificationCount(int count) {
+    _unreadNotificationCount = count;
+    notifyListeners();
+  }
+
+  /// Fetches the current user's unread notification count and notifies listeners.
+  Future<void> refreshNotificationCount() async {
+    final userId = _dbUser?.id;
+    if (userId == null) return;
+    try {
+      final notifications = await NotificationService.getNotifications(userId);
+      _unreadNotificationCount = notifications.where((n) => !n.isRead).length;
+      notifyListeners();
+    } catch (e) {
+      logger.w('[AuthProvider] notification count refresh error: $e');
+    }
   }
 
   void _setLoading(bool value) {
@@ -266,7 +304,7 @@ class AuthProvider extends ChangeNotifier {
     _setError(null);
     _isSigningUp = true;
     firebase_auth.UserCredential? credential;
-    bool _succeeded = false;
+    bool succeeded = false;
     try {
       final displayName = '${firstName.trim()} ${lastName.trim()}';
       credential = await _authService.signUp(email, password, displayName);
@@ -297,7 +335,7 @@ class AuthProvider extends ChangeNotifier {
         SchedulerBinding.instance
             .addPostFrameCallback((_) => notifyListeners());
       });
-      _succeeded = true;
+      succeeded = true;
       return true;
     } on firebase_auth.FirebaseAuthException catch (e) {
       _errorMessage = AuthService.messageFromAuthException(e);
@@ -314,7 +352,7 @@ class AuthProvider extends ChangeNotifier {
       return false;
     } finally {
       _isSigningUp = false;
-      if (_succeeded) {
+      if (succeeded) {
         // On success, silently clear loading without triggering notifyListeners().
         // The deferred post-frame callback above already schedules the next
         // notification. Calling notifyListeners() now would mark the signup

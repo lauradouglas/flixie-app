@@ -336,6 +336,8 @@ class _AllFriendsSheetState extends State<_AllFriendsSheet>
               labelColor: FlixieColors.primary,
               unselectedLabelColor: FlixieColors.medium,
               indicatorColor: FlixieColors.primary,
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
               tabs: [
                 Tab(
                   child: Row(
@@ -546,10 +548,12 @@ class _PendingRequestTile extends StatelessWidget {
                   Text(
                     '@${user.username}',
                     style: const TextStyle(color: FlixieColors.light),
+                    overflow: TextOverflow.ellipsis,
                   ),
                   if (user.firstName != null)
                     Text(
                       '${user.firstName}'.trim(),
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: FlixieColors.light.withValues(alpha: 0.6),
                         fontSize: 12,
@@ -557,6 +561,7 @@ class _PendingRequestTile extends StatelessWidget {
                     ),
                   const Text(
                     'Wants to be your friend',
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(color: FlixieColors.warning, fontSize: 12),
                   ),
                 ],
@@ -571,16 +576,19 @@ class _PendingRequestTile extends StatelessWidget {
                 icon: const Icon(Icons.check_circle_outline,
                     color: FlixieColors.success),
                 tooltip: 'Accept',
+                iconSize: 20,
                 constraints: const BoxConstraints(),
-                padding: const EdgeInsets.all(6),
+                padding: const EdgeInsets.all(4),
               ),
+              const SizedBox(width: 4),
               IconButton(
                 onPressed: onDecline,
                 icon: const Icon(Icons.cancel_outlined,
                     color: FlixieColors.danger),
                 tooltip: 'Decline',
+                iconSize: 20,
                 constraints: const BoxConstraints(),
-                padding: const EdgeInsets.all(6),
+                padding: const EdgeInsets.all(4),
               ),
             ],
           ),
