@@ -87,9 +87,8 @@ GoRouter _buildRouter(AuthProvider authProvider) {
       final isAuthRoute = state.matchedLocation.startsWith('/auth');
       final isSplash = state.matchedLocation == '/splash';
 
-      // Show splash while Firebase resolves auth state or prefetch is running
-      if (status == AuthStatus.unknown ||
-          (status == AuthStatus.authenticated && isPrefetching)) {
+      // Show splash only while Firebase resolves initial auth state
+      if (status == AuthStatus.unknown) {
         return isSplash ? null : '/splash';
       }
 
