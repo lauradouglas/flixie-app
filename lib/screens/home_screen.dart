@@ -5,6 +5,9 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/movie_short.dart';
+import '../models/activity_list_item.dart';
+import '../services/friend_service.dart';
+import 'profile/activity_tile.dart';
 import '../providers/auth_provider.dart';
 import '../services/movie_service.dart';
 import '../services/trending_service.dart';
@@ -21,7 +24,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<MovieShort> _featuredMovies = [];
   List<MovieShort> _nowPlayingMovies = [];
+  List<ActivityListItem> _friendsActivity = [];
   bool _isLoading = true;
+  bool _activityLoading = true;
   String? _loadedForUserId;
 
   @override
@@ -30,7 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // Listen for dbUser becoming available after auth resolves
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AuthProvider>().addListener(_onAuthChanged);
-      _loadFeaturedMovies();
+      _loadAll();
     });
   }
 
@@ -43,42 +48,39 @@ class _HomeScreenState extends State<HomeScreen> {
   void _onAuthChanged() {
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (userId != null && userId != _loadedForUserId) {
-      _loadFeaturedMovies();
+      _loadAll();
     }
   }
 
-  Future<void> _loadFeaturedMovies() async {
+  Future<void> _loadAll() async {
+    setState(() {
+      _isLoading = true;
+      _activityLoading = true;
+    });
     final auth = context.read<AuthProvider>();
     final user = auth.dbUser;
     final region =
         (user?.country?['isoCode'] as String?)?.toUpperCase() ?? 'US';
-    logger.d('[HomeScreen] loading, user=${user?.id}, region=$region');
-
-    // Use prefetched cache if ready — no spinner needed
-    if (auth.cachedTrending != null && auth.cachedNowPlaying != null) {
-      logger.d('[HomeScreen] Using prefetched home data');
-      if (mounted) {
-        setState(() {
-          _featuredMovies = auth.cachedTrending!;
-          _nowPlayingMovies = auth.cachedNowPlaying!;
-          _loadedForUserId = user?.id;
-          _isLoading = false;
-        });
-      }
-      return;
-    }
+    logger.d('[HomeScreen] loading, user=[200b${user?.id}, region=$region');
 
     try {
-      final futures = await Future.wait([
+      final results = await Future.wait([
         TrendingService.getTrendingMovies(),
         MovieService.getNowPlayingMovies(region: region),
+        if (user != null)
+          FriendService.getFriendsActivityLists(user.id)
+        else
+          Future.value([]),
       ]);
       if (mounted) {
         setState(() {
-          _featuredMovies = futures[0];
-          _nowPlayingMovies = futures[1];
+          _featuredMovies = results[0] as List<MovieShort>;
+          _nowPlayingMovies = results[1] as List<MovieShort>;
+          _friendsActivity =
+              results.length > 2 ? results[2] as List<ActivityListItem> : [];
           _loadedForUserId = user?.id;
           _isLoading = false;
+          _activityLoading = false;
         });
       }
     } catch (e) {
@@ -86,6 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _activityLoading = false;
         });
       }
     }
@@ -125,10 +128,7 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Featured section
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text('Featured', style: textTheme.headlineSmall),
-            ),
+            _SectionHeader(title: 'Featured'),
             const SizedBox(height: 12),
             SizedBox(
               height: 220,
@@ -146,14 +146,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
             ),
-
             const SizedBox(height: 24),
-
             // Popular section
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text('In Theatres Now', style: textTheme.headlineSmall),
-            ),
+            _SectionHeader(title: 'In Theatres Now'),
             const SizedBox(height: 12),
             if (!_isLoading)
               ListView.separated(
@@ -169,6 +164,31 @@ class _HomeScreenState extends State<HomeScreen> {
                     onTap: () => context.push('/movies/${movie.id}'),
                   );
                 },
+              ),
+            const SizedBox(height: 24),
+
+            // Friends Activity section
+            _SectionHeader(title: 'Friends Activity'),
+            const SizedBox(height: 12),
+            if (_activityLoading)
+              const Center(child: CircularProgressIndicator())
+            else if (_friendsActivity.isEmpty)
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Text('No recent activity from friends.',
+                    style: textTheme.bodySmall
+                        ?.copyWith(color: FlixieColors.medium)),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount:
+                    _friendsActivity.length > 10 ? 10 : _friendsActivity.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (_, i) => ActivityTile(item: _friendsActivity[i]),
               ),
           ],
         ),
@@ -250,8 +270,9 @@ class _FeaturedCard extends StatelessWidget {
                           if (iso != null) return iso.year.toString();
                           // Handle JS date string: "Sun Mar 15 2026"
                           final parts = raw.split(' ');
-                          if (parts.length == 4)
+                          if (parts.length == 4) {
                             return '${parts[2]} ${parts[1]} ${parts[3]}';
+                          }
                           return raw;
                         }(),
                         style: const TextStyle(
@@ -351,6 +372,39 @@ class _ListCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  const _SectionHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 22,
+            decoration: BoxDecoration(
+              color: FlixieColors.primary,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            title.toUpperCase(),
+            style: textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.5,
+            ),
+          ),
+        ],
       ),
     );
   }

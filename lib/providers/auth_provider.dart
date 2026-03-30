@@ -27,6 +27,9 @@ enum AuthStatus { unknown, authenticated, unauthenticated }
 /// Screens can read [status], [firebaseUser], [dbUser], [isLoading] and [errorMessage] and call
 /// [signIn], [signUp], [signOut] and [sendPasswordResetEmail].
 class AuthProvider extends ChangeNotifier {
+  // Prefetched friends activity for home screen
+  List<ActivityListItem>? _cachedFriendsActivity;
+  List<ActivityListItem>? get cachedFriendsActivity => _cachedFriendsActivity;
   AuthProvider(this._authService) {
     _authService.authStateChanges.listen(_onAuthStateChanged);
   }
@@ -108,17 +111,31 @@ class AuthProvider extends ChangeNotifier {
     final oldStatus = _status;
 
     if (user != null) {
-      // FIRST: Get Firebase ID token and set it in ApiClient
+      // FIRST: Get Firebase ID token and set it in ApiClient.
+      // Try a forced refresh first; on network failure fall back to the cached
+      // token so the app stays authenticated on a flaky connection.
       try {
-        final idToken = await user.getIdToken();
+        final idToken = await user.getIdToken(true);
         if (idToken != null) {
-          logger.d('Got Firebase ID token, setting in ApiClient');
+          logger.d('Got Firebase ID token (fresh), setting in ApiClient');
           ApiClient.setToken(idToken);
         } else {
           logger.w('ID token is null');
         }
       } catch (e) {
-        logger.w('Failed to get ID token: $e');
+        logger.w('Failed to get fresh ID token: $e — trying cached token');
+        try {
+          final cachedToken = await user.getIdToken(false);
+          if (cachedToken != null) {
+            logger.d('Got Firebase ID token (cached), setting in ApiClient');
+            ApiClient.setToken(cachedToken);
+          } else {
+            logger.w(
+                'Cached ID token is also null — API calls will be unauthorized');
+          }
+        } catch (e2) {
+          logger.w('Failed to get cached ID token: $e2');
+        }
       }
 
       // THEN: Fetch the database user using Firebase UID as externalId
@@ -191,6 +208,9 @@ class AuthProvider extends ChangeNotifier {
           .then((v) => _cachedActivity = v, onError: (_) {}),
       FriendService.getFriends(userId)
           .then((v) => _cachedFriends = v, onError: (_) {}),
+      // Prefetch friends activity for home screen
+      FriendService.getFriendsActivityLists(userId)
+          .then((v) => _cachedFriendsActivity = v, onError: (_) {}),
       UserService.getUserMovieRatings(userId)
           .then((v) => _cachedRatings = v, onError: (_) {}),
       UserService.getUserMovieReviews(userId)
@@ -385,6 +405,24 @@ class AuthProvider extends ChangeNotifier {
     } on firebase_auth.FirebaseAuthException catch (e) {
       _setError(AuthService.messageFromAuthException(e));
       return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Reauthenticates and updates the current user's password.
+  /// Returns `null` on success, or an error message string on failure.
+  Future<String?> updatePassword(
+      String currentPassword, String newPassword) async {
+    _setLoading(true);
+    _setError(null);
+    try {
+      await _authService.updatePassword(currentPassword, newPassword);
+      return null;
+    } on firebase_auth.FirebaseAuthException catch (e) {
+      final msg = AuthService.messageFromAuthException(e);
+      _setError(msg);
+      return msg;
     } finally {
       _setLoading(false);
     }

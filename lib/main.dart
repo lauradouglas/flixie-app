@@ -20,6 +20,10 @@ import 'screens/profile_screen.dart';
 import 'screens/friend_profile_screen.dart';
 import 'screens/my_reviews_screen.dart';
 import 'screens/notification_screen.dart';
+import 'screens/help_support_screen.dart';
+import 'screens/settings_screen.dart';
+import 'screens/watch_history_screen.dart';
+import 'screens/watch_requests_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/signup_screen.dart';
 import 'screens/auth/forgot_password_screen.dart';
@@ -148,6 +152,22 @@ GoRouter _buildRouter(AuthProvider authProvider) {
           GoRoute(
             path: '/notifications',
             builder: (context, state) => const NotificationScreen(),
+          ),
+          GoRoute(
+            path: '/watch-history',
+            builder: (context, state) => const WatchHistoryScreen(),
+          ),
+          GoRoute(
+            path: '/watch-requests',
+            builder: (context, state) => const WatchRequestsScreen(),
+          ),
+          GoRoute(
+            path: '/help-support',
+            builder: (context, state) => const HelpSupportScreen(),
+          ),
+          GoRoute(
+            path: '/settings',
+            builder: (context, state) => const SettingsScreen(),
           ),
         ],
       ),

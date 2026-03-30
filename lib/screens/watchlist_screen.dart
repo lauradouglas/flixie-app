@@ -47,8 +47,8 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     try {
       // Parse the watchlist from user data
       final watchlist = userWatchlist
-          .where((item) => item is Map<String, dynamic>)
-          .map((item) => WatchlistMovie.fromJson(item as Map<String, dynamic>))
+          .whereType<Map<String, dynamic>>()
+          .map((item) => WatchlistMovie.fromJson(item))
           .where((item) => item.removed != true)
           .toList();
 

@@ -72,7 +72,12 @@ class ApiClient {
       {Map<String, String>? queryParams}) async {
     final uri = _buildUri(path, queryParams: queryParams);
     apiLogger.d('GET $uri');
-    apiLogger.d('Headers: ${_headers()}');
+    // Redact Authorization header from logs
+    final headersForLog = Map<String, String>.from(_headers());
+    if (headersForLog.containsKey('Authorization')) {
+      headersForLog['Authorization'] = '[REDACTED]';
+    }
+    apiLogger.d('Headers: $headersForLog');
 
     final response = await http.get(uri, headers: _headers());
 
@@ -82,6 +87,20 @@ class ApiClient {
   }
 
   static Future<dynamic> post(String path, {dynamic body}) async {
+    // Redact sensitive fields if present
+    dynamic logBody = body;
+    if (body is Map && body.containsKey('password')) {
+      logBody = Map.of(body);
+      logBody['password'] = '[REDACTED]';
+      if (logBody.containsKey('newPassword'))
+        logBody['newPassword'] = '[REDACTED]';
+      if (logBody.containsKey('currentPassword'))
+        logBody['currentPassword'] = '[REDACTED]';
+    }
+    apiLogger.d('POST $path');
+    apiLogger.d(
+        'Headers: ${_headers().map((k, v) => MapEntry(k, k == "Authorization" ? "[REDACTED]" : v))}');
+    if (logBody != null) apiLogger.d('Body: $logBody');
     final response = await http.post(
       _buildUri(path),
       headers: _headers(),

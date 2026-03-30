@@ -95,6 +95,56 @@ class FlixieNotification {
   Map<String, dynamic>? get senderIconColor =>
       (_linkOtherUser)?['iconColor'] as Map<String, dynamic>?;
 
+  /// The movie/show title embedded in a watch request link, if present.
+  String? get watchMediaTitle {
+    final l = link;
+    if (l == null) return null;
+    final request =
+        (l['request'] ?? l['groupRequest']) as Map<String, dynamic>?;
+    if (request == null) return null;
+    final movie = request['movie'] as Map<String, dynamic>?;
+    if (movie != null) return movie['title'] as String?;
+    final show = request['show'] as Map<String, dynamic>?;
+    return show?['title'] as String?;
+  }
+
+  /// The movie ID embedded in a watch request link, if present.
+  /// Reads `request.movieId` first, then falls back to `request.movie.id`.
+  int? get watchMovieId {
+    final l = link;
+    if (l == null) return null;
+    final request = (l['request']) as Map<String, dynamic>?;
+    if (request == null) return null;
+    // Prefer top-level movieId field
+    final raw = request['movieId'];
+    if (raw is int) return raw;
+    if (raw is String) return int.tryParse(raw);
+    // Fallback: read from embedded movie object
+    final movie = request['movie'] as Map<String, dynamic>?;
+    final movieRaw = movie?['id'];
+    if (movieRaw is int) return movieRaw;
+    if (movieRaw is String) return int.tryParse(movieRaw);
+    return null;
+  }
+
+  /// The message stored on the embedded request (preferred over top-level message).
+  String get watchRequestMessage {
+    final l = link;
+    if (l == null) return message;
+    final request = (l['request']) as Map<String, dynamic>?;
+    if (request == null) return message;
+    final req = request['message'] as String?;
+    return (req != null && req.isNotEmpty) ? req : message;
+  }
+
+  /// The ID of the embedded request object (used to update it on accept/decline).
+  String? get linkedRequestId {
+    final l = link;
+    if (l == null) return relatedId;
+    final request = (l['request']) as Map<String, dynamic>?;
+    return request?['id'] as String? ?? relatedId;
+  }
+
   factory FlixieNotification.fromJson(Map<String, dynamic> json) {
     return FlixieNotification(
       id: json['id'] as String?,

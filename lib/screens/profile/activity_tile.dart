@@ -2,7 +2,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../models/activity_list_item.dart';
 import '../../theme/app_theme.dart';
 
@@ -174,6 +175,8 @@ class ActivityTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dateStr = _formatDate(item.createdAt).toUpperCase();
+    final currentUserId = context.read<AuthProvider>().dbUser?.id;
+    final isCurrentUser = item.userId == currentUserId;
 
     return Container(
       decoration: BoxDecoration(
@@ -194,20 +197,59 @@ class ActivityTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (!isCurrentUser) // Only show for friends' activities
+                    Row(
+                      children: [
+                        Text(
+                          item.username,
+                          style: const TextStyle(
+                            color: FlixieColors.primary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                        if (item.firstName.isNotEmpty ||
+                            item.lastName.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            '(${item.firstName} ${item.lastName})',
+                            style: const TextStyle(
+                              color: FlixieColors.medium,
+                              fontWeight: FontWeight.w400,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                        const Spacer(),
+                        Text(
+                          dateStr,
+                          style: const TextStyle(
+                            color: FlixieColors.medium,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  if (!isCurrentUser) const SizedBox(height: 4),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(child: _buildTitle(context)),
-                      const SizedBox(width: 8),
-                      Text(
-                        dateStr,
-                        style: const TextStyle(
-                          color: FlixieColors.medium,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.5,
+                      if (isCurrentUser)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8.0),
+                          child: Text(
+                            dateStr,
+                            style: const TextStyle(
+                              color: FlixieColors.medium,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
                         ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 6),

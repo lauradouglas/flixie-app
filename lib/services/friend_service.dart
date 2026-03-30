@@ -1,6 +1,8 @@
 import '../models/friend.dart';
 import '../models/friendship.dart';
+import '../models/activity_list_item.dart';
 import 'api_client.dart';
+import 'request_service.dart';
 
 class FriendService {
   static Future<FriendsData> getFriends(String userId) async {
@@ -23,7 +25,7 @@ class FriendService {
   }
 
   static Future<void> sendFriendRequest(Map<String, dynamic> body) async {
-    await ApiClient.post('/requests', body: body);
+    await RequestService.sendRequest(body);
   }
 
   static Future<List<FriendRequest>> getRequests(String userId) async {
@@ -40,5 +42,13 @@ class FriendService {
       'status': status,
       'response': response,
     });
+  }
+
+  static Future<List<ActivityListItem>> getFriendsActivityLists(
+      String userId) async {
+    final data = await ApiClient.get('/friends/$userId/activity-lists');
+    return (data as List<dynamic>)
+        .map((e) => ActivityListItem.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 }

@@ -39,11 +39,12 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
   Future<void> _load() async {
     final id = int.tryParse(widget.personId);
     if (id == null || id <= 0) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _error = 'Invalid person ID.';
           _isLoading = false;
         });
+      }
       return;
     }
     try {
@@ -65,11 +66,12 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
         }
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _error = e.toString();
           _isLoading = false;
         });
+      }
     }
   }
 
@@ -92,8 +94,9 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
         if (_isFavorite) {
           currentList.removeWhere((item) {
             if (item is int) return item == personId;
-            if (item is Map)
+            if (item is Map) {
               return item['personId'] == personId || item['id'] == personId;
+            }
             return false;
           });
         } else {
@@ -112,8 +115,9 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
 
   Future<void> _launch(String url) async {
     final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri))
+    if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   String _formatDate(String? raw) {

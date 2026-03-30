@@ -25,14 +25,14 @@ class AuthService {
       email: email.trim(),
       password: password,
     );
-    
+
     // Get the ID token and set it in ApiClient
     final idToken = await credential.user?.getIdToken();
     if (idToken != null) {
       apiLogger.d('Got Firebase ID token, setting in ApiClient');
       ApiClient.setToken(idToken);
     }
-    
+
     return credential;
   }
 
@@ -49,14 +49,14 @@ class AuthService {
       password: password,
     );
     await credential.user?.updateDisplayName(displayName.trim());
-    
+
     // Get the ID token and set it in ApiClient
     final idToken = await credential.user?.getIdToken();
     if (idToken != null) {
       apiLogger.d('Got Firebase ID token after signup, setting in ApiClient');
       ApiClient.setToken(idToken);
     }
-    
+
     return credential;
   }
 
@@ -72,6 +72,23 @@ class AuthService {
   /// Throws a [FirebaseAuthException] on failure.
   Future<void> sendPasswordResetEmail(String email) {
     return _auth.sendPasswordResetEmail(email: email.trim());
+  }
+
+  /// Reauthenticates then changes the password of the current user.
+  ///
+  /// Throws a [FirebaseAuthException] on failure (e.g. wrong current password).
+  Future<void> updatePassword(
+      String currentPassword, String newPassword) async {
+    final user = _auth.currentUser;
+    if (user == null || user.email == null) {
+      throw FirebaseAuthException(code: 'no-current-user');
+    }
+    final credential = EmailAuthProvider.credential(
+      email: user.email!,
+      password: currentPassword,
+    );
+    await user.reauthenticateWithCredential(credential);
+    await user.updatePassword(newPassword);
   }
 
   /// Reloads and returns an up-to-date [User] profile, or `null` if not

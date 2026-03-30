@@ -1,11 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../models/notification.dart';
 import '../providers/auth_provider.dart';
 import '../services/notification_service.dart';
+import '../services/request_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_logger.dart';
 
@@ -37,7 +39,14 @@ Color _avatarColorFromIconColor(Map<String, dynamic>? iconColor,
 }
 
 /// Notification filter tabs.
-enum _NotificationFilter { all, friendRequests, watchRequests, groupRequests, activity, alerts }
+enum _NotificationFilter {
+  all,
+  friendRequests,
+  watchRequests,
+  groupRequests,
+  activity,
+  alerts
+}
 
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
@@ -47,6 +56,29 @@ class NotificationScreen extends StatefulWidget {
 }
 
 class _NotificationScreenState extends State<NotificationScreen> {
+  Future<void> _closeNotification(FlixieNotification notification) async {
+    final id = notification.id;
+    if (id == null) return;
+    try {
+      await NotificationService.updateNotification(id, closed: true);
+      if (mounted) {
+        setState(() {
+          _notifications.removeWhere((n) => n.id == id);
+        });
+      }
+    } catch (e) {
+      logger.e('[NotificationScreen] close error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Failed to close notification.'),
+            backgroundColor: FlixieColors.danger,
+          ),
+        );
+      }
+    }
+  }
+
   List<FlixieNotification> _notifications = [];
   bool _isLoading = true;
   String? _error;
@@ -138,16 +170,48 @@ class _NotificationScreenState extends State<NotificationScreen> {
     if (id == null) return;
     setState(() => _processingIds.add(id));
     try {
-      final updated = await NotificationService.updateNotification(
+      // For watch requests, also update the underlying request record.
+      if (notification.type == FlixieNotification.movieWatchRequest ||
+          notification.type == FlixieNotification.showWatchRequest) {
+        final requestId = notification.linkedRequestId;
+        if (requestId != null) {
+          final status = action == FlixieNotification.actionAccepted
+              ? 'ACCEPTED'
+              : 'DECLINED';
+          await RequestService.updateRequest(requestId, status);
+        }
+      }
+
+      await NotificationService.updateNotification(
         id,
         action: action,
         read: true,
       );
+
       if (mounted) {
         setState(() {
-          final idx = _notifications.indexWhere((n) => n.id == id);
-          if (idx != -1) _notifications[idx] = updated;
+          // Remove on accept; update in-place on decline so the resolved state shows.
+          if (action == FlixieNotification.actionAccepted) {
+            _notifications.removeWhere((n) => n.id == id);
+          } else {
+            final idx = _notifications.indexWhere((n) => n.id == id);
+            if (idx != -1) {
+              _notifications[idx] =
+                  _notifications[idx].copyWith(action: action, read: true);
+            }
+          }
         });
+        // Show success toast
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              action == FlixieNotification.actionAccepted
+                  ? 'Request accepted successfully.'
+                  : 'Request declined successfully.',
+            ),
+            backgroundColor: FlixieColors.success,
+          ),
+        );
       }
     } catch (e) {
       logger.e('[NotificationScreen] respond error: $e');
@@ -296,7 +360,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
       (_NotificationFilter.all, 'All'),
       (_NotificationFilter.friendRequests, 'Friends'),
       (_NotificationFilter.watchRequests, 'Watch'),
-      (_NotificationFilter.groupRequests, 'Groups'),
+      // TODO: uncomment when activity notifications are implemented
+      // (_NotificationFilter.groupRequests, 'Groups'),
       // TODO: uncomment when activity notifications are implemented
       // (_NotificationFilter.activity, 'Activity'),
       // TODO: uncomment when alert notifications are implemented
@@ -445,11 +510,13 @@ class _NotificationScreenState extends State<NotificationScreen> {
             _respond(notification, FlixieNotification.actionAccepted),
         onDecline: () =>
             _respond(notification, FlixieNotification.actionDeclined),
+        onClose: () => _closeNotification(notification),
       );
     }
     return _ActivityCard(
       notification: notification,
       formatDate: _formatDate,
+      onClose: () => _closeNotification(notification),
     );
   }
 }
@@ -464,12 +531,14 @@ class _RequestCard extends StatelessWidget {
     required this.isProcessing,
     required this.onAccept,
     required this.onDecline,
+    required this.onClose,
   });
 
   final FlixieNotification notification;
   final bool isProcessing;
   final VoidCallback onAccept;
   final VoidCallback onDecline;
+  final VoidCallback onClose;
 
   bool get _isResolved =>
       notification.action == FlixieNotification.actionAccepted ||
@@ -480,10 +549,31 @@ class _RequestCard extends StatelessWidget {
           ? FlixieColors.success
           : FlixieColors.danger;
 
-  String get _resolvedLabel =>
-      notification.action == FlixieNotification.actionAccepted
-          ? 'Accepted'
-          : 'Declined';
+  String get _resolvedLabel {
+    final sender = notification.senderName.isNotEmpty
+        ? notification.senderName
+        : 'Someone';
+    final target = () {
+      switch (notification.type) {
+        case FlixieNotification.friendRequest:
+          return 'your friend request';
+        case FlixieNotification.movieWatchRequest:
+          return 'your watch request';
+        case FlixieNotification.groupInvite:
+          return 'your group invite';
+        case FlixieNotification.groupRequest:
+          return 'your group request';
+        default:
+          return 'your request';
+      }
+    }();
+    if (notification.action == FlixieNotification.actionAccepted) {
+      return '$sender accepted $target';
+    } else if (notification.action == FlixieNotification.actionDeclined) {
+      return '$sender declined $target';
+    }
+    return '';
+  }
 
   String get _subtitle {
     switch (notification.type) {
@@ -492,15 +582,101 @@ class _RequestCard extends StatelessWidget {
       case FlixieNotification.groupRequest:
         return 'Requested to join your group';
       case FlixieNotification.movieWatchRequest:
-        return 'Sent you a movie watch request';
-      // case FlixieNotification.showWatchRequest:
-      //   return 'Sent you a show watch request';
+        return 'sent you a watch request for';
       case FlixieNotification.friendRequest:
       default:
         return notification.message.isNotEmpty
             ? notification.message
             : 'Sent you a friend request';
     }
+  }
+
+  Widget _buildSubtitleWidget(BuildContext context) {
+    // Show accepted/declined message as subtitle if resolved
+    if (_isResolved) {
+      final sender = notification.senderName.isNotEmpty
+          ? notification.senderName
+          : 'Someone';
+      if (notification.type == FlixieNotification.movieWatchRequest) {
+        final title = notification.watchMediaTitle;
+        if (notification.action == FlixieNotification.actionAccepted) {
+          return Text(
+            title != null && title.isNotEmpty
+                ? '$sender accepted your watch request for $title'
+                : '$sender accepted your watch request',
+            style: const TextStyle(color: FlixieColors.light, fontSize: 13),
+          );
+        } else if (notification.action == FlixieNotification.actionDeclined) {
+          return Text(
+            title != null && title.isNotEmpty
+                ? '$sender declined your watch request for $title'
+                : '$sender declined your watch request',
+            style: const TextStyle(color: FlixieColors.light, fontSize: 13),
+          );
+        }
+      } else {
+        final target = () {
+          switch (notification.type) {
+            case FlixieNotification.friendRequest:
+              return 'your friend request';
+            case FlixieNotification.groupInvite:
+              return 'your group invite';
+            case FlixieNotification.groupRequest:
+              return 'your group request';
+            default:
+              return 'your request';
+          }
+        }();
+        if (notification.action == FlixieNotification.actionAccepted) {
+          return Text('$sender accepted $target',
+              style: const TextStyle(color: FlixieColors.light, fontSize: 13));
+        } else if (notification.action == FlixieNotification.actionDeclined) {
+          return Text('$sender declined $target',
+              style: const TextStyle(color: FlixieColors.light, fontSize: 13));
+        }
+      }
+      return const SizedBox.shrink();
+    }
+    // Pending state: show original subtitle
+    if (notification.type == FlixieNotification.movieWatchRequest) {
+      final title = notification.watchMediaTitle;
+      final movieId = notification.watchMovieId;
+      return RichText(
+        text: TextSpan(
+          style: const TextStyle(color: FlixieColors.light, fontSize: 13),
+          children: [
+            const TextSpan(text: 'sent you a watch request for '),
+            if (title != null && title.isNotEmpty)
+              WidgetSpan(
+                alignment: PlaceholderAlignment.baseline,
+                baseline: TextBaseline.alphabetic,
+                child: GestureDetector(
+                  onTap: movieId != null
+                      ? () => context.push('/movies/$movieId')
+                      : null,
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      color: movieId != null
+                          ? FlixieColors.primary
+                          : FlixieColors.light,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      decorationColor: FlixieColors.primary,
+                    ),
+                  ),
+                ),
+              )
+            else
+              const TextSpan(text: 'a movie'),
+          ],
+        ),
+      );
+    }
+    return Text(
+      _subtitle,
+      style: const TextStyle(color: FlixieColors.light, fontSize: 13),
+    );
   }
 
   IconData get _typeIcon {
@@ -565,44 +741,42 @@ class _RequestCard extends StatelessWidget {
                         ),
                       ),
                     const SizedBox(height: 2),
-                    Text(
-                      _subtitle,
-                      style: const TextStyle(
-                        color: FlixieColors.light,
-                        fontSize: 13,
+                    _buildSubtitleWidget(context),
+                    if (notification.type ==
+                            FlixieNotification.movieWatchRequest &&
+                        notification.watchRequestMessage.isNotEmpty &&
+                        notification.action == null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        notification.watchRequestMessage,
+                        style: const TextStyle(
+                          color: FlixieColors.medium,
+                          fontSize: 12,
+                          fontStyle: FontStyle.normal,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
+              ),
+              // Close icon
+              IconButton(
+                icon: const Icon(Icons.close,
+                    size: 20, color: FlixieColors.medium),
+                tooltip: 'Close',
+                onPressed: onClose,
               ),
             ],
           ),
           const SizedBox(height: 12),
-          if (_isResolved)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: _resolvedColor.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
-                border:
-                    Border.all(color: _resolvedColor.withValues(alpha: 0.4)),
-              ),
-              child: Text(
-                _resolvedLabel,
-                style: TextStyle(
-                    color: _resolvedColor,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13),
-              ),
-            )
-          else if (isProcessing)
+          if (isProcessing)
             const Center(
               child: SizedBox(
                 height: 36,
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
             )
-          else
+          else if (!_isResolved)
             Row(
               children: [
                 Expanded(
@@ -653,10 +827,12 @@ class _ActivityCard extends StatelessWidget {
   const _ActivityCard({
     required this.notification,
     required this.formatDate,
+    required this.onClose,
   });
 
   final FlixieNotification notification;
   final String Function(String) formatDate;
+  final VoidCallback onClose;
 
   Color get _accentColor {
     switch (notification.type) {
@@ -754,6 +930,13 @@ class _ActivityCard extends StatelessWidget {
                           ],
                         ),
                       ),
+                    ),
+                    // Close icon
+                    IconButton(
+                      icon: const Icon(Icons.close,
+                          size: 20, color: FlixieColors.medium),
+                      tooltip: 'Close',
+                      onPressed: onClose,
                     ),
                     if (!notification.isRead)
                       Padding(

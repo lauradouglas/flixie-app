@@ -69,19 +69,9 @@ class UserService {
 
   static Future<List<ActivityListItem>> getUserActivity(String userId) async {
     final data = await ApiClient.get('/users/$userId/activity');
-    apiLogger.d('[Activity] raw response type: ${data.runtimeType}');
-    apiLogger.d('[Activity] raw response: $data');
     return (data as List<dynamic>)
         .map((e) => ActivityListItem.fromJson(e as Map<String, dynamic>))
         .toList();
-  }
-
-  static Future<User> toggleDarkMode(String userId, bool darkMode) async {
-    final data = await ApiClient.patch(
-      '/users/$userId/dark-mode',
-      body: {'darkMode': darkMode},
-    );
-    return User.fromJson(data as Map<String, dynamic>);
   }
 
   static Future<User> updateIconColor(String userId, int iconColorId) async {
@@ -231,8 +221,6 @@ class UserService {
     apiLogger.d('GET /users/$userId/movies/ratings');
     try {
       final data = await ApiClient.get('/users/$userId/movies/ratings');
-      apiLogger.d('[Ratings] Raw response type: ${data.runtimeType}');
-      apiLogger.d('[Ratings] Raw response: $data');
       final ratings = (data as List<dynamic>)
           .map((e) => MovieRating.fromJson(e as Map<String, dynamic>))
           .toList();
@@ -250,8 +238,6 @@ class UserService {
     apiLogger.d('GET /users/$userId/movies/watchlist');
     try {
       final data = await ApiClient.get('/users/$userId/movies/watchlist');
-      apiLogger.d('[Watchlist] Raw response type: ${data.runtimeType}');
-      apiLogger.d('[Watchlist] Raw response: $data');
       final watchlist = (data as List<dynamic>)
           .map((e) => WatchlistMovie.fromJson(e as Map<String, dynamic>))
           .toList();
