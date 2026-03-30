@@ -268,6 +268,22 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  /// Re-fetches the db user and re-runs the full prefetch (user data, notifications,
+  /// friends, reviews, trending, now playing). Call on manual pull-to-refresh.
+  Future<void> refreshUserData() async {
+    final firebaseUid = _firebaseUser?.uid;
+    if (firebaseUid == null) return;
+    try {
+      _dbUser = await UserService.getUserByExternalId(firebaseUid);
+      notifyListeners();
+      final region =
+          (_dbUser?.country?['isoCode'] as String?)?.toUpperCase() ?? 'US';
+      if (_dbUser?.id != null) _prefetch(_dbUser!.id, region: region);
+    } catch (e) {
+      logger.w('[AuthProvider] refreshUserData error: $e');
+    }
+  }
+
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();

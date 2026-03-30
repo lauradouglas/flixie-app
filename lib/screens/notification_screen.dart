@@ -544,37 +544,6 @@ class _RequestCard extends StatelessWidget {
       notification.action == FlixieNotification.actionAccepted ||
       notification.action == FlixieNotification.actionDeclined;
 
-  Color get _resolvedColor =>
-      notification.action == FlixieNotification.actionAccepted
-          ? FlixieColors.success
-          : FlixieColors.danger;
-
-  String get _resolvedLabel {
-    final sender = notification.senderName.isNotEmpty
-        ? notification.senderName
-        : 'Someone';
-    final target = () {
-      switch (notification.type) {
-        case FlixieNotification.friendRequest:
-          return 'your friend request';
-        case FlixieNotification.movieWatchRequest:
-          return 'your watch request';
-        case FlixieNotification.groupInvite:
-          return 'your group invite';
-        case FlixieNotification.groupRequest:
-          return 'your group request';
-        default:
-          return 'your request';
-      }
-    }();
-    if (notification.action == FlixieNotification.actionAccepted) {
-      return '$sender accepted $target';
-    } else if (notification.action == FlixieNotification.actionDeclined) {
-      return '$sender declined $target';
-    }
-    return '';
-  }
-
   String get _subtitle {
     switch (notification.type) {
       case FlixieNotification.groupInvite:

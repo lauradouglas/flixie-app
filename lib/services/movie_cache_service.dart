@@ -28,7 +28,7 @@ class MovieCacheService {
     // Check if cached data is from today
     final now = DateTime.now();
     final cacheDate = cached.timestamp;
-    
+
     if (now.year == cacheDate.year &&
         now.month == cacheDate.month &&
         now.day == cacheDate.day) {
@@ -36,7 +36,8 @@ class MovieCacheService {
     }
 
     // Cache is stale, remove it
-    logger.d('Removing stale cache entry for movie $movieId (cached on ${cacheDate.month}/${cacheDate.day})');
+    logger.d(
+        'Removing stale cache entry for movie $movieId (cached on ${cacheDate.month}/${cacheDate.day})');
     _movieCache.remove(movieId);
     return null;
   }
@@ -104,7 +105,8 @@ class MovieCacheService {
       recommendations: recommendations,
       timestamp: now,
     );
-    logger.d('Cached ${recommendations.length} recommendations for movie $movieId');
+    logger.d(
+        'Cached ${recommendations.length} recommendations for movie $movieId');
   }
 
   // ---- Trending Movies Caching ----
@@ -138,18 +140,26 @@ class MovieCacheService {
   // ---- Cache Management ----
 
   /// Clear all cached data
+  /// Remove cached data for a single movie (movie, credits, recommendations).
+  void evictMovie(int movieId) {
+    _movieCache.remove(movieId);
+    _creditsCache.remove(movieId);
+    _recommendationsCache.remove(movieId);
+  }
+
   void clearCache() {
     final movieCount = _movieCache.length;
     final creditsCount = _creditsCache.length;
     final recommendationsCount = _recommendationsCache.length;
     final trendingCount = _trendingMoviesCache.length;
-    
+
     _movieCache.clear();
     _creditsCache.clear();
     _recommendationsCache.clear();
     _trendingMoviesCache.clear();
-    
-    logger.d('Cleared all cache ($movieCount movies, $creditsCount credits, $recommendationsCount recommendations, $trendingCount trending)');
+
+    logger.d(
+        'Cleared all cache ($movieCount movies, $creditsCount credits, $recommendationsCount recommendations, $trendingCount trending)');
   }
 
   /// Clear only stale cache entries (older than today)
@@ -158,20 +168,27 @@ class MovieCacheService {
     final beforeCredits = _creditsCache.length;
     final beforeRecommendations = _recommendationsCache.length;
     final beforeTrending = _trendingMoviesCache.length;
-    
+
     _movieCache.removeWhere((_, cached) => !_isToday(cached.timestamp));
     _creditsCache.removeWhere((_, cached) => !_isToday(cached.timestamp));
-    _recommendationsCache.removeWhere((_, cached) => !_isToday(cached.timestamp));
-    _trendingMoviesCache.removeWhere((_, cached) => !_isToday(cached.timestamp));
-    
+    _recommendationsCache
+        .removeWhere((_, cached) => !_isToday(cached.timestamp));
+    _trendingMoviesCache
+        .removeWhere((_, cached) => !_isToday(cached.timestamp));
+
     final removedMovies = beforeMovies - _movieCache.length;
     final removedCredits = beforeCredits - _creditsCache.length;
-    final removedRecommendations = beforeRecommendations - _recommendationsCache.length;
+    final removedRecommendations =
+        beforeRecommendations - _recommendationsCache.length;
     final removedTrending = beforeTrending - _trendingMoviesCache.length;
-    final totalRemoved = removedMovies + removedCredits + removedRecommendations + removedTrending;
-    
+    final totalRemoved = removedMovies +
+        removedCredits +
+        removedRecommendations +
+        removedTrending;
+
     if (totalRemoved > 0) {
-      logger.d('Removed $totalRemoved stale entries ($removedMovies movies, $removedCredits credits, $removedRecommendations recommendations, $removedTrending trending)');
+      logger.d(
+          'Removed $totalRemoved stale entries ($removedMovies movies, $removedCredits credits, $removedRecommendations recommendations, $removedTrending trending)');
     }
   }
 
@@ -182,10 +199,14 @@ class MovieCacheService {
       'credits': _creditsCache.length,
       'recommendations': _recommendationsCache.length,
       'trending': _trendingMoviesCache.length,
-      'total': _movieCache.length + _creditsCache.length + _recommendationsCache.length + _trendingMoviesCache.length,
+      'total': _movieCache.length +
+          _creditsCache.length +
+          _recommendationsCache.length +
+          _trendingMoviesCache.length,
     };
-    
-    logger.d('Cache stats: ${stats['movies']} movies, ${stats['credits']} credits, ${stats['recommendations']} recommendations, ${stats['trending']} trending');
+
+    logger.d(
+        'Cache stats: ${stats['movies']} movies, ${stats['credits']} credits, ${stats['recommendations']} recommendations, ${stats['trending']} trending');
     return stats;
   }
 

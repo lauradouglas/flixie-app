@@ -83,7 +83,6 @@ GoRouter _buildRouter(AuthProvider authProvider) {
     refreshListenable: authProvider.authStatusListenable,
     redirect: (context, state) {
       final status = authProvider.status;
-      final isPrefetching = authProvider.isPrefetching;
       final isAuthRoute = state.matchedLocation.startsWith('/auth');
       final isSplash = state.matchedLocation == '/splash';
 

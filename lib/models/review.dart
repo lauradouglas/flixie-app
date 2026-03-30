@@ -17,6 +17,8 @@ class Review {
   final String updatedAt;
   final User? user;
   final String? movieTitle;
+  final Map<String, int> reactions;
+  final String? myReaction;
 
   const Review({
     required this.id,
@@ -35,6 +37,8 @@ class Review {
     required this.updatedAt,
     this.user,
     this.movieTitle,
+    this.reactions = const {},
+    this.myReaction,
   });
 
   factory Review.fromJson(Map<String, dynamic> json) {
@@ -59,6 +63,10 @@ class Review {
       movieTitle: json['movie'] != null
           ? (json['movie'] as Map<String, dynamic>)['title'] as String?
           : json['movieTitle'] as String?,
+      reactions: (json['reactions'] as Map<String, dynamic>?)
+              ?.map((k, v) => MapEntry(k, (v as num).toInt())) ??
+          {},
+      myReaction: json['myReaction'] as String?,
     );
   }
 

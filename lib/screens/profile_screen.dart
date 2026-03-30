@@ -233,203 +233,213 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // Avatar, name, bio & edit
-            ProfileHeader(
-              displayName: displayName,
-              email: email,
-              photoUrl: photoUrl,
-              bio: bio,
-            ),
+      body: RefreshIndicator(
+        color: FlixieColors.primary,
+        onRefresh: () async {
+          await context.read<AuthProvider>().refreshUserData();
+          await _loadAll();
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              // Avatar, name, bio & edit
+              ProfileHeader(
+                displayName: displayName,
+                email: email,
+                photoUrl: photoUrl,
+                bio: bio,
+                iconColor: dbUser?.iconColor,
+              ),
 
-            const SizedBox(height: 24),
+              const SizedBox(height: 12),
 
-            // Stats row
-            ProfileStatsRow(
-              watched: (dbUser?.watchedMovies?.length ?? 0) +
-                  (dbUser?.watchedShows?.length ?? 0),
-              watchlist: (dbUser?.movieWatchlist?.length ?? 0) +
-                  (dbUser?.showWatchlist?.length ?? 0),
-              favorites: (dbUser?.favoriteMovies?.length ?? 0) +
-                  (dbUser?.favoriteShows?.length ?? 0),
-            ),
+              // Stats row
+              ProfileStatsRow(
+                watched: (dbUser?.watchedMovies?.length ?? 0) +
+                    (dbUser?.watchedShows?.length ?? 0),
+                watchlist: (dbUser?.movieWatchlist?.length ?? 0) +
+                    (dbUser?.showWatchlist?.length ?? 0),
+                favorites: (dbUser?.favoriteMovies?.length ?? 0) +
+                    (dbUser?.favoriteShows?.length ?? 0),
+              ),
 
-            const SizedBox(height: 24),
-            const Divider(),
-            const SizedBox(height: 16),
-
-            // Friends row
-            FriendsRow(
-              data: _friendsData ??
-                  const FriendsData(
-                    friendships: [],
-                    pendingFriends: [],
-                    requestedFriends: [],
-                  ),
-              isLoading: _friendsLoading,
-              onFriendsChanged: (updated) {
-                setState(() => _friendsData = updated);
-                context.read<AuthProvider>().updateCachedFriends(updated);
-              },
-            ),
-
-            const SizedBox(height: 24),
-
-            // Favorite Movies
-            if (favoriteMovies.isNotEmpty) ...[
-              FavoriteMoviesSection(favoriteMovies: favoriteMovies),
+              const SizedBox(height: 24),
+              const Divider(),
               const SizedBox(height: 16),
-            ],
 
-            // Favorite People
-            if (favoritePeople.isNotEmpty) ...[
-              FavoritePeopleSection(favoritePeople: favoritePeople),
-              const SizedBox(height: 16),
-            ],
-
-            // Ratings (always show for debugging)
-            if (_ratingsLoading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else ...[
-              RatingsSection(ratings: _ratings),
-              const SizedBox(height: 16),
-            ],
-
-            const Divider(),
-            const SizedBox(height: 8),
-
-            // Activity section header
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Row(
-                children: [
-                  Container(
-                    width: 4,
-                    height: 22,
-                    decoration: BoxDecoration(
-                      color: FlixieColors.primary,
-                      borderRadius: BorderRadius.circular(2),
+              // Friends row
+              FriendsRow(
+                data: _friendsData ??
+                    const FriendsData(
+                      friendships: [],
+                      pendingFriends: [],
+                      requestedFriends: [],
                     ),
+                isLoading: _friendsLoading,
+                onFriendsChanged: (updated) {
+                  setState(() => _friendsData = updated);
+                  context.read<AuthProvider>().updateCachedFriends(updated);
+                },
+              ),
+
+              const SizedBox(height: 24),
+
+              // Favorite Movies
+              if (favoriteMovies.isNotEmpty) ...[
+                FavoriteMoviesSection(favoriteMovies: favoriteMovies),
+                const SizedBox(height: 16),
+              ],
+
+              // Favorite People
+              if (favoritePeople.isNotEmpty) ...[
+                FavoritePeopleSection(favoritePeople: favoritePeople),
+                const SizedBox(height: 16),
+              ],
+
+              // Ratings (always show for debugging)
+              if (_ratingsLoading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else ...[
+                RatingsSection(ratings: _ratings),
+                const SizedBox(height: 16),
+              ],
+
+              const Divider(),
+              const SizedBox(height: 8),
+
+              // Activity section header
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 4,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        color: FlixieColors.primary,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'RECENT ACTIVITY',
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              if (_activityLoading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_activity.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    'No activity yet.',
+                    style: textTheme.bodySmall
+                        ?.copyWith(color: FlixieColors.medium),
                   ),
-                  const SizedBox(width: 10),
-                  Text(
-                    'RECENT ACTIVITY',
-                    style: textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.5,
+                )
+              else ...[
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: visibleActivity.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (_, i) => ActivityTile(item: visibleActivity[i]),
+                ),
+                if (_activity.length > _initialActivityCount) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () =>
+                          setState(() => _showAllActivity = !_showAllActivity),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: FlixieColors.light,
+                        side:
+                            const BorderSide(color: FlixieColors.tabBarBorder),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        _showAllActivity ? 'SHOW LESS' : 'LOAD OLDER ACTIVITY',
+                        style: const TextStyle(
+                          letterSpacing: 1.2,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
                     ),
                   ),
                 ],
-              ),
-            ),
-
-            if (_activityLoading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (_activity.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Text(
-                  'No activity yet.',
-                  style:
-                      textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
-                ),
-              )
-            else ...[
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: visibleActivity.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (_, i) => ActivityTile(item: visibleActivity[i]),
-              ),
-              if (_activity.length > _initialActivityCount) ...[
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
-                    onPressed: () =>
-                        setState(() => _showAllActivity = !_showAllActivity),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: FlixieColors.light,
-                      side: const BorderSide(color: FlixieColors.tabBarBorder),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: Text(
-                      _showAllActivity ? 'SHOW LESS' : 'LOAD OLDER ACTIVITY',
-                      style: const TextStyle(
-                        letterSpacing: 1.2,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                ),
               ],
-            ],
 
-            const SizedBox(height: 16),
-            const Divider(),
-            const SizedBox(height: 8),
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 8),
 
-            // Menu items
-            ..._menuItems.map(
-              (item) => ListTile(
-                leading: Icon(item.icon, color: FlixieColors.primary),
-                title: Text(item.label, style: textTheme.bodyLarge),
-                trailing: const Icon(
-                  Icons.chevron_right,
-                  color: FlixieColors.medium,
+              // Menu items
+              ..._menuItems.map(
+                (item) => ListTile(
+                  leading: Icon(item.icon, color: FlixieColors.primary),
+                  title: Text(item.label, style: textTheme.bodyLarge),
+                  trailing: const Icon(
+                    Icons.chevron_right,
+                    color: FlixieColors.medium,
+                  ),
+                  onTap: () {
+                    if (item.label == 'My Reviews') {
+                      context.push('/my-reviews');
+                    } else if (item.label == 'Watch History') {
+                      context.push('/watch-history');
+                    } else if (item.label == 'Watch Requests') {
+                      context.push('/watch-requests');
+                    } else if (item.label == 'Help & Support') {
+                      context.push('/help-support');
+                    } else if (item.label == 'Settings') {
+                      context.push('/settings');
+                    }
+                  },
                 ),
-                onTap: () {
-                  if (item.label == 'My Reviews') {
-                    context.push('/my-reviews');
-                  } else if (item.label == 'Watch History') {
-                    context.push('/watch-history');
-                  } else if (item.label == 'Watch Requests') {
-                    context.push('/watch-requests');
-                  } else if (item.label == 'Help & Support') {
-                    context.push('/help-support');
-                  } else if (item.label == 'Settings') {
-                    context.push('/settings');
-                  }
-                },
               ),
-            ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // Sign out button
-            OutlinedButton.icon(
-              icon: auth.isLoading
-                  ? const SizedBox(
-                      height: 16,
-                      width: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.logout),
-              label: const Text('Sign Out'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: FlixieColors.danger,
-                side: const BorderSide(color: FlixieColors.danger),
-                minimumSize: const Size.fromHeight(48),
+              // Sign out button
+              OutlinedButton.icon(
+                icon: auth.isLoading
+                    ? const SizedBox(
+                        height: 16,
+                        width: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.logout),
+                label: const Text('Sign Out'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: FlixieColors.danger,
+                  side: const BorderSide(color: FlixieColors.danger),
+                  minimumSize: const Size.fromHeight(48),
+                ),
+                onPressed: auth.isLoading ? null : () => auth.signOut(),
               ),
-              onPressed: auth.isLoading ? null : () => auth.signOut(),
-            ),
 
-            const SizedBox(height: 16),
-          ],
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
     );

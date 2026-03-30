@@ -26,6 +26,8 @@ class ActivityTile extends StatelessWidget {
       case ActivityListType.favoriteShow:
       case ActivityListType.favoritePerson:
         return Colors.redAccent;
+      case ActivityListType.movieRating:
+        return FlixieColors.tertiary;
       case ActivityListType.watchRequestSent:
       case ActivityListType.watchRequestAccepted:
         return FlixieColors.primary;
@@ -46,6 +48,8 @@ class ActivityTile extends StatelessWidget {
       case ActivityListType.favoriteShow:
       case ActivityListType.favoritePerson:
         return Icons.favorite_outline;
+      case ActivityListType.movieRating:
+        return Icons.star_rounded;
       case ActivityListType.watchRequestSent:
         return Icons.send_outlined;
       case ActivityListType.watchRequestAccepted:
@@ -70,6 +74,11 @@ class ActivityTile extends StatelessWidget {
         return 'Added to favourite movies';
       case ActivityListType.favoritePerson:
         return 'Added to favourite cast';
+      case ActivityListType.movieRating:
+        final r = item.mediaRating;
+        return r != null
+            ? 'Rated ${r.toStringAsFixed(0)}/10'
+            : 'Rated this movie';
       case ActivityListType.watchRequestSent:
         return 'Sent a watch request';
       case ActivityListType.watchRequestAccepted:
@@ -149,6 +158,7 @@ class ActivityTile extends StatelessWidget {
         (item.type == ActivityListType.movieWatched ||
             item.type == ActivityListType.movieWatchlist ||
             item.type == ActivityListType.favoriteMovie ||
+            item.type == ActivityListType.movieRating ||
             item.type == ActivityListType.favoritePerson);
 
     if (title == null) return const SizedBox.shrink();
@@ -212,7 +222,7 @@ class ActivityTile extends StatelessWidget {
                             item.lastName.isNotEmpty) ...[
                           const SizedBox(width: 6),
                           Text(
-                            '(${item.firstName} ${item.lastName})',
+                            '(${item.firstName})',
                             style: const TextStyle(
                               color: FlixieColors.medium,
                               fontWeight: FontWeight.w400,

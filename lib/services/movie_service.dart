@@ -1,8 +1,10 @@
 import '../models/movie.dart';
 import '../models/movie_credits.dart';
+import '../models/movie_friend_activity.dart';
 import '../models/review.dart';
 import '../models/similar_movie.dart';
 import '../models/movie_short.dart';
+import '../models/top_rated_movie.dart';
 import '../models/watch_provider.dart';
 import '../utils/app_logger.dart';
 import 'api_client.dart';
@@ -146,11 +148,33 @@ class MovieService {
     return filteredProviders;
   }
 
-  static Future<List<Review>> getMovieReviews(int movieId) async {
+  static Future<List<Review>> getMovieReviews(int movieId,
+      {String? userId}) async {
     apiLogger.d('Fetching reviews for movie $movieId from API');
-    final data = await ApiClient.get('/users/MOVIE/$movieId/reviews');
+    final data = await ApiClient.get('/users/MOVIE/$movieId/reviews',
+        queryParams: userId != null ? {'userId': userId} : null);
     return (data as List<dynamic>)
         .map((e) => Review.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  static Future<List<TopRatedMovie>> getTopRatedThisWeek(
+      {int limit = 10}) async {
+    apiLogger.d('Fetching top rated movies this week');
+    final data = await ApiClient.get('/movies/top_rated/this_week',
+        queryParams: {'limit': '$limit'});
+    return (data as List<dynamic>)
+        .map((e) => TopRatedMovie.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  static Future<List<MovieFriendActivity>> getFriendsMovieActivity(
+      int movieId, String userId) async {
+    apiLogger.d('Fetching friends activity for movie $movieId');
+    final data = await ApiClient.get('/movies/id/$movieId/friends-activity',
+        queryParams: {'userId': userId});
+    return (data as List<dynamic>)
+        .map((e) => MovieFriendActivity.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
@@ -175,6 +199,11 @@ class MovieService {
     return movies;
   }
   // ---- Cache management methods ----
+
+  /// Evict a single movie from cache so the next fetch hits the API.
+  static void evictMovie(int movieId) {
+    _cache.evictMovie(movieId);
+  }
 
   /// Clear all cached movies
   static void clearCache() {

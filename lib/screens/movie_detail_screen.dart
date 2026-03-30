@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/movie.dart';
 import '../models/movie_credits.dart';
+import '../models/movie_friend_activity.dart';
 import '../models/friendship.dart';
 import '../models/review.dart';
 import '../models/similar_movie.dart';
@@ -63,6 +64,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   int _watchlistBounceKey = 0;
   int _watchedBounceKey = 0;
   int _favoriteBounceKey = 0;
+  List<MovieFriendActivity> _friendsActivity = [];
 
   // ---- Data loading ---------------------------------------------------------
 
@@ -70,6 +72,12 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  Future<void> _refresh() async {
+    final id = int.tryParse(widget.movieId);
+    if (id != null) MovieService.evictMovie(id);
+    await _load();
   }
 
   Future<void> _load() async {
@@ -95,10 +103,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         MovieService.getMovieCredits(id),
         MovieService.getMovieWatchProviders(
             id, 'US'), // TODO: Get region from user profile
-        MovieService.getMovieReviews(id),
       ];
       if (userId != null) {
         futures.add(MovieService.getUserMovieRating(id, userId));
+        futures.add(MovieService.getFriendsMovieActivity(id, userId));
       }
       final results = await Future.wait(futures);
       if (mounted) {
@@ -127,7 +135,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               .toSet()
               .toList();
           _watchProviders = results[3] as List<WatchProvider>;
-          _reviews = results[4] as List<Review>;
+          _reviews = (_movie!.reviews ?? []).toList();
 
           // Check movie status in user's lists
           final user = authProvider.dbUser;
@@ -137,8 +145,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             _isFavorite = user.isMovieFavorite(id);
           }
           // Load existing user rating from API
-          if (userId != null && results.length > 5) {
-            _userRating = results[5] as int?;
+          if (userId != null && results.length > 4) {
+            _userRating = results[4] as int?;
+            _friendsActivity = results[5] as List<MovieFriendActivity>? ?? [];
           }
 
           _isLoading = false;
@@ -434,48 +443,55 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final movie = _movie!;
     return Scaffold(
       backgroundColor: const Color(0xFF0D1B2A),
-      body: CustomScrollView(
-        slivers: [
-          _buildSliverAppBar(context, movie),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 16),
-                  if (movie.tagline != null && movie.tagline!.isNotEmpty)
-                    _buildTaglineChip(movie.tagline!),
-                  const SizedBox(height: 12),
-                  _buildTitleBlock(context, movie),
-                  const SizedBox(height: 12),
-                  _buildGenrePills(movie),
-                  const SizedBox(height: 16),
-                  _buildScores(context, movie),
-                  const Divider(height: 32, color: Color(0xFF1E2D40)),
-                  _buildSynopsis(context, movie),
-                  const SizedBox(height: 16),
-                  _buildFilmInfoCard(movie),
-                  const SizedBox(height: 16),
-                  _buildActionButtons(),
-                  const SizedBox(height: 28),
-                  _buildTrailersSection(context, movie),
-                  const SizedBox(height: 28),
-                  _buildWhereToWatchSection(context),
-                  const SizedBox(height: 28),
-                  _buildTopCastSection(context),
-                  const SizedBox(height: 28),
-                  _buildUserReviewsSection(context),
-                  const SizedBox(height: 28),
-                  _buildExternalLinksSection(context, movie),
-                  const SizedBox(height: 28),
-                  _buildMoreLikeThisSection(context),
-                  const SizedBox(height: 32),
-                ],
+      body: RefreshIndicator(
+        color: FlixieColors.primary,
+        onRefresh: _refresh,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            _buildSliverAppBar(context, movie),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 16),
+                    if (movie.tagline != null && movie.tagline!.isNotEmpty)
+                      _buildTaglineChip(movie.tagline!),
+                    const SizedBox(height: 12),
+                    _buildTitleBlock(context, movie),
+                    const SizedBox(height: 12),
+                    _buildGenrePills(movie),
+                    const SizedBox(height: 16),
+                    _buildScores(context, movie),
+                    const Divider(height: 32, color: Color(0xFF1E2D40)),
+                    _buildSynopsis(context, movie),
+                    const SizedBox(height: 16),
+                    _buildFilmInfoCard(movie),
+                    const SizedBox(height: 16),
+                    _buildActionButtons(),
+                    const SizedBox(height: 28),
+                    _buildFriendsActivitySection(context),
+                    const SizedBox(height: 28),
+                    _buildTrailersSection(context, movie),
+                    const SizedBox(height: 28),
+                    _buildWhereToWatchSection(context),
+                    const SizedBox(height: 28),
+                    _buildTopCastSection(context),
+                    const SizedBox(height: 28),
+                    _buildUserReviewsSection(context),
+                    const SizedBox(height: 28),
+                    _buildExternalLinksSection(context, movie),
+                    const SizedBox(height: 28),
+                    _buildMoreLikeThisSection(context),
+                    const SizedBox(height: 32),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -634,7 +650,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   void _showRatingSheet() {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF1B2E42),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -739,17 +755,41 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           ),
         const Spacer(),
         GestureDetector(
-          onTap: _showRatingSheet,
-          child: ScoreTile(
-            value: _isRatingLoading
-                ? '...'
-                : _userRating != null
-                    ? '$_userRating /10'
-                    : '+ Rate',
-            valueColor: _userRating != null
-                ? FlixieColors.tertiary
-                : FlixieColors.medium,
-            label: 'YOUR RATING',
+          onTap: _isRatingLoading ? null : _showRatingSheet,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_isRatingLoading)
+                const SizedBox(
+                  height: 26,
+                  width: 26,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: FlixieColors.tertiary,
+                  ),
+                )
+              else
+                Text(
+                  _userRating != null ? '$_userRating /10' : '+ Rate',
+                  style: TextStyle(
+                    color: _userRating != null
+                        ? FlixieColors.tertiary
+                        : FlixieColors.medium,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              const SizedBox(height: 2),
+              const Text(
+                'YOUR RATING',
+                style: TextStyle(
+                  color: FlixieColors.medium,
+                  fontSize: 10,
+                  letterSpacing: 0.8,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -1159,6 +1199,27 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  // ---- Friends activity --------------------------------------------------
+
+  Widget _buildFriendsActivitySection(BuildContext context) {
+    if (_friendsActivity.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Friends',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: FlixieColors.white,
+                fontWeight: FontWeight.bold,
+              ),
+        ),
+        const SizedBox(height: 12),
+        ..._friendsActivity.map((a) => _FriendActivityRow(activity: a)),
+      ],
     );
   }
 
@@ -1757,6 +1818,144 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 // ---- Write Review bottom sheet --------------------------------------------
 
 // ---------------------------------------------------------------------------
+// Friend activity row
+// ---------------------------------------------------------------------------
+
+class _FriendActivityRow extends StatelessWidget {
+  const _FriendActivityRow({required this.activity});
+
+  final MovieFriendActivity activity;
+
+  @override
+  Widget build(BuildContext context) {
+    final hexCode = activity.iconColor?['hexCode'] as String?;
+    Color avatarColor = FlixieColors.primary;
+    if (hexCode != null) {
+      final hex = hexCode.replaceFirst('#', '');
+      final value = int.tryParse(
+          hex.length == 6
+              ? 'FF$hex'
+              : hex.length == 8
+                  ? hex
+                  : 'FF$hex',
+          radix: 16);
+      if (value != null) avatarColor = Color(value);
+    }
+
+    final displayName = activity.firstName?.isNotEmpty == true
+        ? '${activity.username} (${activity.firstName})'
+        : activity.username;
+    final initial =
+        activity.username.isNotEmpty ? activity.username[0].toUpperCase() : '?';
+
+    final badges = <_ActivityBadge>[];
+    if (activity.watched) {
+      badges.add(const _ActivityBadge(
+          icon: Icons.check_circle, label: 'Watched', color: Colors.green));
+    }
+    if (activity.onWatchlist) {
+      badges.add(const _ActivityBadge(
+          icon: Icons.bookmark, label: 'Watchlist', color: Colors.amber));
+    }
+    if (activity.favorited) {
+      badges.add(const _ActivityBadge(
+          icon: Icons.favorite, label: 'Favourite', color: Colors.red));
+    }
+    if (activity.rating != null) {
+      badges.add(_ActivityBadge(
+        icon: Icons.star_rounded,
+        label: '${activity.rating}/10',
+        color: FlixieColors.tertiary,
+      ));
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          // Avatar
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: avatarColor.withValues(alpha: 0.25),
+            child: Text(
+              initial,
+              style: TextStyle(
+                color: avatarColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  displayName,
+                  style: const TextStyle(
+                    color: FlixieColors.light,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                if (badges.isNotEmpty) ...[
+                  const SizedBox(height: 5),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: badges,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActivityBadge extends StatelessWidget {
+  const _ActivityBadge({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Watch-request bottom sheet
 // ---------------------------------------------------------------------------
 
@@ -1814,130 +2013,148 @@ class _WatchRequestSheetState extends State<_WatchRequestSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        24,
-        24,
-        24,
-        MediaQuery.of(context).viewInsets.bottom + 32,
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Invite to Watch',
-              style: Theme.of(context).textTheme.titleLarge),
-          if (widget.movieTitle != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              widget.movieTitle!,
-              style: const TextStyle(color: FlixieColors.medium, fontSize: 13),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          24,
+          24,
+          24,
+          MediaQuery.of(context).viewInsets.bottom + 32,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Invite to Watch',
+                style: Theme.of(context).textTheme.titleLarge),
+            if (widget.movieTitle != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                widget.movieTitle!,
+                style:
+                    const TextStyle(color: FlixieColors.medium, fontSize: 14),
+              ),
+            ],
+            const SizedBox(height: 20),
+            const Text(
+              'SELECT A FRIEND',
+              style: TextStyle(
+                color: FlixieColors.medium,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1.1,
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 44,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: widget.friends.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (_, i) {
+                  final friend = widget.friends[i].friendUser;
+                  if (friend == null) return const SizedBox.shrink();
+                  final isSelected = _selectedFriendId == friend.id;
+                  final iconColor = friend.iconColor;
+                  final hex = ((iconColor?['hexCode'] ?? iconColor?['hex'])
+                              as String? ??
+                          '')
+                      .replaceAll('#', '');
+                  final pillColor = hex.isNotEmpty
+                      ? Color(int.tryParse('0xFF$hex') ??
+                          FlixieColors.primary.toARGB32())
+                      : FlixieColors.primary;
+                  return GestureDetector(
+                    onTap: () => setState(() => _selectedFriendId = friend.id),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? pillColor
+                            : pillColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(
+                          color: isSelected
+                              ? pillColor
+                              : pillColor.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: Text(
+                        friend.displayName,
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : FlixieColors.light,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'MESSAGE (OPTIONAL)',
+              style: TextStyle(
+                color: FlixieColors.medium,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1.1,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _messageController,
+              maxLines: 3,
+              style: const TextStyle(color: FlixieColors.light),
+              decoration: InputDecoration(
+                hintText: 'e.g. Want to watch this together?',
+                hintStyle:
+                    const TextStyle(color: FlixieColors.medium, fontSize: 13),
+                filled: true,
+                fillColor: const Color(0xFF0F2033),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Color(0xFF1E2D40)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Color(0xFF1E2D40)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: FlixieColors.primary),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed:
+                    _isSending || _selectedFriendId == null ? null : _send,
+                child: _isSending
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.black),
+                        ),
+                      )
+                    : const Text('Send Invite'),
+              ),
             ),
           ],
-          const SizedBox(height: 20),
-          const Text(
-            'SELECT A FRIEND',
-            style: TextStyle(
-              color: FlixieColors.medium,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 1.1,
-            ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 44,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: widget.friends.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (_, i) {
-                final friend = widget.friends[i].friendUser;
-                if (friend == null) return const SizedBox.shrink();
-                final isSelected = _selectedFriendId == friend.id;
-                return GestureDetector(
-                  onTap: () => setState(() => _selectedFriendId = friend.id),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? FlixieColors.primary
-                          : FlixieColors.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(
-                        color: isSelected
-                            ? FlixieColors.primary
-                            : FlixieColors.primary.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Text(
-                      friend.displayName,
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : FlixieColors.light,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'MESSAGE (OPTIONAL)',
-            style: TextStyle(
-              color: FlixieColors.medium,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 1.1,
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _messageController,
-            maxLines: 3,
-            style: const TextStyle(color: FlixieColors.light),
-            decoration: InputDecoration(
-              hintText: 'e.g. Want to watch this together?',
-              hintStyle:
-                  const TextStyle(color: FlixieColors.medium, fontSize: 13),
-              filled: true,
-              fillColor: const Color(0xFF0F2033),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Color(0xFF1E2D40)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Color(0xFF1E2D40)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: FlixieColors.primary),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _isSending || _selectedFriendId == null ? null : _send,
-              child: _isSending
-                  ? const SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
-                      ),
-                    )
-                  : const Text('Send Invite'),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

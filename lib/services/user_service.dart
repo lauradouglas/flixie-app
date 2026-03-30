@@ -192,6 +192,27 @@ class UserService {
     return Review.fromJson(data as Map<String, dynamic>);
   }
 
+  /// Adds or removes an emoji reaction on a review.
+  /// Pass [reactionType] as null to remove the current reaction.
+  /// Returns the updated reactions map and the user's current reaction.
+  static Future<({Map<String, int> reactions, String? myReaction})>
+      reactToReview({
+    required String mediaType,
+    required String mediaId,
+    required String reviewId,
+    required String userId,
+    required String? reactionType,
+  }) async {
+    final data = await ApiClient.post(
+      '/users/$mediaType/$mediaId/review/$reviewId/react',
+      body: {'userId': userId, 'reactionType': reactionType},
+    ) as Map<String, dynamic>;
+    final reactions = (data['reactions'] as Map<String, dynamic>?)
+            ?.map((k, v) => MapEntry(k, (v as num).toInt())) ??
+        {};
+    return (reactions: reactions, myReaction: data['myReaction'] as String?);
+  }
+
   static Future<Review> addMovieReview(Review review) async {
     apiLogger.d('POST /users/add/MOVIE/review');
     final data = await ApiClient.post(

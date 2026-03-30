@@ -20,90 +20,24 @@ class ReviewCard extends StatefulWidget {
   State<ReviewCard> createState() => _ReviewCardState();
 }
 
+// Ordered list of supported reactions: (emoji, reactionType key)
+const _kReactions = [
+  ('\u{1F44D}', 'agree'),
+  ('\u{1F525}', 'hot_take'),
+  ('\u{2764}\u{FE0F}', 'love'),
+  ('\u{1F602}', 'funny'),
+  ('\u{1F914}', 'hmm'),
+];
+
 class _ReviewCardState extends State<ReviewCard> {
-  late int _upvotes;
-  late int _downvotes;
-  String? _userVote;
-  String? _votingType;
+  late Map<String, int> _reactions;
+  String? _myReaction;
 
   @override
   void initState() {
     super.initState();
-    _upvotes = widget.review.upvotes;
-    _downvotes = widget.review.downvotes;
-  }
-
-  bool get _isOwnReview =>
-      widget.currentUserId != null &&
-      widget.currentUserId == widget.review.userId;
-
-  Future<void> _vote(String voteType) async {
-    if (_votingType != null) return; // already waiting on a request
-
-    HapticFeedback.lightImpact();
-
-    if (_userVote == voteType) {
-      setState(() {
-        if (voteType == 'upvote') {
-          _upvotes--;
-        } else {
-          _downvotes--;
-        }
-        _userVote = null;
-      });
-      return;
-    }
-
-    final previousVote = _userVote;
-    setState(() {
-      _votingType = voteType;
-      if (voteType == 'upvote') {
-        _upvotes++;
-        if (previousVote == 'downvote') _downvotes--;
-      } else {
-        _downvotes++;
-        if (previousVote == 'upvote') _upvotes--;
-      }
-      _userVote = voteType;
-    });
-
-    try {
-      final review = widget.review;
-      final mediaType = review.movieId != null ? 'MOVIE' : 'SHOW';
-      final mediaId = (review.movieId ?? review.showId)!.toString();
-      final updated = await UserService.voteOnReview(
-        mediaType: mediaType,
-        mediaId: mediaId,
-        reviewId: review.id,
-        voteType: voteType,
-      );
-      if (mounted) {
-        HapticFeedback.mediumImpact();
-        setState(() {
-          _upvotes = updated.upvotes;
-          _downvotes = updated.downvotes;
-        });
-      }
-    } catch (e) {
-      // Revert on failure
-      if (mounted) {
-        setState(() {
-          _upvotes = widget.review.upvotes;
-          _downvotes = widget.review.downvotes;
-          _userVote = previousVote;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to register vote: $e'),
-            backgroundColor: Colors.red.shade700,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-      logger.e('Error voting on review: $e');
-    } finally {
-      if (mounted) setState(() => _votingType = null);
-    }
+    _reactions = Map<String, int>.from(widget.review.reactions);
+    _myReaction = widget.review.myReaction;
   }
 
   String _getInitials() {
@@ -156,12 +90,17 @@ class _ReviewCardState extends State<ReviewCard> {
       backgroundColor: Colors.transparent,
       builder: (_) => _ReviewDetailSheet(
         review: widget.review,
-        upvotes: _upvotes,
-        downvotes: _downvotes,
-        userVote: _userVote,
-        votingType: _votingType,
-        isOwnReview: _isOwnReview,
-        onVote: _vote,
+        currentUserId: widget.currentUserId,
+        initialReactions: _reactions,
+        initialMyReaction: _myReaction,
+        onReactionChanged: (reactions, myReaction) {
+          if (mounted) {
+            setState(() {
+              _reactions = reactions;
+              _myReaction = myReaction;
+            });
+          }
+        },
         displayName: _getDisplayName(),
         initials: _getInitials(),
         formattedDate: _formatDate(widget.review.createdAt),
@@ -177,6 +116,7 @@ class _ReviewCardState extends State<ReviewCard> {
     return GestureDetector(
       onTap: () => _openFullReview(context),
       child: Container(
+        width: double.infinity,
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
@@ -298,52 +238,16 @@ class _ReviewCardState extends State<ReviewCard> {
 
             const SizedBox(height: 10),
 
-            // Footer: votes + "Read more"
+            // Footer: reactions + "Read more"
             Row(
               children: [
-                if (!_isOwnReview) ...[
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () {},
-                    child: Row(
-                      children: [
-                        _VoteButton(
-                          icon: Icons.arrow_upward,
-                          activeIcon: Icons.arrow_upward,
-                          count: _upvotes,
-                          isActive: _userVote == 'upvote',
-                          isLoading: _votingType == 'upvote',
-                          onTap: () => _vote('upvote'),
-                        ),
-                        const SizedBox(width: 16),
-                        _VoteButton(
-                          icon: Icons.arrow_downward,
-                          activeIcon: Icons.arrow_downward,
-                          count: _downvotes,
-                          isActive: _userVote == 'downvote',
-                          isLoading: _votingType == 'downvote',
-                          onTap: () => _vote('downvote'),
-                          activeColor: Colors.redAccent,
-                        ),
-                      ],
-                    ),
-                  ),
-                ] else ...[
-                  const Icon(Icons.arrow_upward,
-                      size: 14, color: FlixieColors.medium),
-                  const SizedBox(width: 4),
-                  Text('$_upvotes',
-                      style: const TextStyle(
-                          color: FlixieColors.medium, fontSize: 12)),
-                  const SizedBox(width: 12),
-                  const Icon(Icons.arrow_downward,
-                      size: 14, color: FlixieColors.medium),
-                  const SizedBox(width: 4),
-                  Text('$_downvotes',
-                      style: const TextStyle(
-                          color: FlixieColors.medium, fontSize: 12)),
-                ],
-                const Spacer(),
+                if (_reactions.isNotEmpty)
+                  Expanded(
+                    child: _ReactionPreview(
+                        reactions: _reactions, myReaction: _myReaction),
+                  )
+                else
+                  const Spacer(),
                 Text(
                   hasSpoilers ? 'View review' : 'Read more',
                   style: const TextStyle(
@@ -394,33 +298,111 @@ class _ReviewCardState extends State<ReviewCard> {
 // Full-review bottom sheet
 // ---------------------------------------------------------------------------
 
-class _ReviewDetailSheet extends StatelessWidget {
+class _ReviewDetailSheet extends StatefulWidget {
   const _ReviewDetailSheet({
     required this.review,
-    required this.upvotes,
-    required this.downvotes,
-    required this.userVote,
-    required this.votingType,
-    required this.isOwnReview,
-    required this.onVote,
+    required this.currentUserId,
+    required this.initialReactions,
+    required this.initialMyReaction,
+    required this.onReactionChanged,
     required this.displayName,
     required this.initials,
     required this.formattedDate,
   });
 
   final Review review;
-  final int upvotes;
-  final int downvotes;
-  final String? userVote;
-  final String? votingType;
-  final bool isOwnReview;
-  final void Function(String) onVote;
+  final String? currentUserId;
+  final Map<String, int> initialReactions;
+  final String? initialMyReaction;
+  final void Function(Map<String, int> reactions, String? myReaction)
+      onReactionChanged;
   final String displayName;
   final String initials;
   final String formattedDate;
 
   @override
+  State<_ReviewDetailSheet> createState() => _ReviewDetailSheetState();
+}
+
+class _ReviewDetailSheetState extends State<_ReviewDetailSheet> {
+  late Map<String, int> _reactions;
+  late String? _myReaction;
+  String? _reactingType;
+
+  @override
+  void initState() {
+    super.initState();
+    _reactions = Map<String, int>.from(widget.initialReactions);
+    _myReaction = widget.initialMyReaction;
+  }
+
+  Future<void> _react(String reactionType) async {
+    HapticFeedback.lightImpact();
+    if (_reactingType != null) return;
+
+    final removing = _myReaction == reactionType;
+    final previousReaction = _myReaction;
+    final previousReactions = Map<String, int>.from(_reactions);
+
+    setState(() {
+      _reactingType = reactionType;
+      if (removing) {
+        _myReaction = null;
+        final current = _reactions[reactionType] ?? 0;
+        if (current <= 1) {
+          _reactions.remove(reactionType);
+        } else {
+          _reactions[reactionType] = current - 1;
+        }
+      } else {
+        if (previousReaction != null) {
+          final old = _reactions[previousReaction] ?? 0;
+          if (old <= 1) {
+            _reactions.remove(previousReaction);
+          } else {
+            _reactions[previousReaction] = old - 1;
+          }
+        }
+        _myReaction = reactionType;
+        _reactions[reactionType] = (_reactions[reactionType] ?? 0) + 1;
+      }
+    });
+
+    try {
+      final review = widget.review;
+      final mediaType = review.movieId != null ? 'MOVIE' : 'SHOW';
+      final mediaId = (review.movieId ?? review.showId)!.toString();
+      final result = await UserService.reactToReview(
+        mediaType: mediaType,
+        mediaId: mediaId,
+        reviewId: review.id,
+        userId: widget.currentUserId ?? '',
+        reactionType: removing ? null : reactionType,
+      );
+      if (mounted) {
+        HapticFeedback.mediumImpact();
+        setState(() {
+          _reactions = Map<String, int>.from(result.reactions);
+          _myReaction = result.myReaction;
+        });
+        widget.onReactionChanged(_reactions, _myReaction);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _reactions = previousReactions;
+          _myReaction = previousReaction;
+        });
+      }
+      logger.e('Error reacting to review: $e');
+    } finally {
+      if (mounted) setState(() => _reactingType = null);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final review = widget.review;
     return DraggableScrollableSheet(
       initialChildSize: 0.7,
       minChildSize: 0.4,
@@ -452,7 +434,7 @@ class _ReviewDetailSheet extends StatelessWidget {
                     backgroundColor:
                         FlixieColors.primary.withValues(alpha: 0.3),
                     child: Text(
-                      initials,
+                      widget.initials,
                       style: const TextStyle(
                         color: FlixieColors.primary,
                         fontWeight: FontWeight.bold,
@@ -475,7 +457,7 @@ class _ReviewDetailSheet extends StatelessWidget {
                             ),
                           ),
                         Text(
-                          displayName,
+                          widget.displayName,
                           style: const TextStyle(
                             color: FlixieColors.light,
                             fontSize: 13,
@@ -504,7 +486,7 @@ class _ReviewDetailSheet extends StatelessWidget {
                         ],
                       ),
                       Text(
-                        formattedDate,
+                        widget.formattedDate,
                         style: const TextStyle(
                           color: FlixieColors.medium,
                           fontSize: 12,
@@ -561,56 +543,13 @@ class _ReviewDetailSheet extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    // Vote row
-                    if (!isOwnReview)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          _VoteButton(
-                            icon: Icons.thumb_up_outlined,
-                            activeIcon: Icons.thumb_up,
-                            count: upvotes,
-                            isActive: userVote == 'upvote',
-                            isLoading: votingType == 'upvote',
-                            onTap: () {
-                              onVote('upvote');
-                              Navigator.pop(context);
-                            },
-                          ),
-                          const SizedBox(width: 20),
-                          _VoteButton(
-                            icon: Icons.thumb_down_outlined,
-                            activeIcon: Icons.thumb_down,
-                            count: downvotes,
-                            isActive: userVote == 'downvote',
-                            isLoading: votingType == 'downvote',
-                            onTap: () {
-                              onVote('downvote');
-                              Navigator.pop(context);
-                            },
-                            activeColor: Colors.redAccent,
-                          ),
-                        ],
-                      )
-                    else
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          const Icon(Icons.thumb_up_outlined,
-                              size: 14, color: FlixieColors.medium),
-                          const SizedBox(width: 4),
-                          Text('$upvotes',
-                              style: const TextStyle(
-                                  color: FlixieColors.medium, fontSize: 12)),
-                          const SizedBox(width: 12),
-                          const Icon(Icons.thumb_down_outlined,
-                              size: 14, color: FlixieColors.medium),
-                          const SizedBox(width: 4),
-                          Text('$downvotes',
-                              style: const TextStyle(
-                                  color: FlixieColors.medium, fontSize: 12)),
-                        ],
-                      ),
+                    // Reaction strip
+                    _ReactionStrip(
+                      reactions: _reactions,
+                      myReaction: _myReaction,
+                      reactingType: _reactingType,
+                      onReact: _react,
+                    ),
                   ],
                 ),
               ),
@@ -623,31 +562,88 @@ class _ReviewDetailSheet extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
+// Reaction strip — shown inside the full-review bottom sheet
+// ---------------------------------------------------------------------------
 
-class _VoteButton extends StatefulWidget {
-  const _VoteButton({
-    required this.icon,
-    required this.activeIcon,
+class _ReactionStrip extends StatelessWidget {
+  const _ReactionStrip({
+    required this.reactions,
+    required this.myReaction,
+    required this.reactingType,
+    required this.onReact,
+  });
+
+  final Map<String, int> reactions;
+  final String? myReaction;
+  final String? reactingType;
+  final void Function(String) onReact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Reactions',
+          style: TextStyle(
+            color: FlixieColors.medium,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _kReactions.map((entry) {
+            final (emoji, type) = entry;
+            final count = reactions[type] ?? 0;
+            final isActive = myReaction == type;
+            final isLoading = reactingType == type;
+
+            return _ReactionChip(
+              emoji: emoji,
+              count: count,
+              isActive: isActive,
+              isLoading: isLoading,
+              onTap: isLoading ? null : () => onReact(type),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Tap to react • tap again to remove',
+          style: TextStyle(
+            color: FlixieColors.medium,
+            fontSize: 11,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ReactionChip extends StatefulWidget {
+  const _ReactionChip({
+    required this.emoji,
     required this.count,
     required this.isActive,
     required this.isLoading,
     required this.onTap,
-    this.activeColor = FlixieColors.primary,
   });
 
-  final IconData icon;
-  final IconData activeIcon;
+  final String emoji;
   final int count;
   final bool isActive;
   final bool isLoading;
-  final VoidCallback onTap;
-  final Color activeColor;
+  final VoidCallback? onTap;
 
   @override
-  State<_VoteButton> createState() => _VoteButtonState();
+  State<_ReactionChip> createState() => _ReactionChipState();
 }
 
-class _VoteButtonState extends State<_VoteButton>
+class _ReactionChipState extends State<_ReactionChip>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _scale;
@@ -657,18 +653,16 @@ class _VoteButtonState extends State<_VoteButton>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 400),
-      value: 1.0, // start at end so icons are normal size before any vote
+      duration: const Duration(milliseconds: 350),
+      value: 1.0,
     );
-    _scale = Tween<double>(begin: 1.5, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
-    );
+    _scale = Tween<double>(begin: 1.4, end: 1.0).animate(
+        CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
   }
 
   @override
-  void didUpdateWidget(_VoteButton old) {
+  void didUpdateWidget(_ReactionChip old) {
     super.didUpdateWidget(old);
-    // Fire bounce when vote is confirmed (loading finished & still active)
     if (!widget.isLoading && old.isLoading && widget.isActive) {
       _controller.forward(from: 0);
     }
@@ -682,46 +676,122 @@ class _VoteButtonState extends State<_VoteButton>
 
   @override
   Widget build(BuildContext context) {
-    final color = widget.isActive ? widget.activeColor : FlixieColors.medium;
+    final activeColor = FlixieColors.primary;
+    final bg = widget.isActive
+        ? activeColor.withValues(alpha: 0.18)
+        : const Color(0xFF1E2D40);
+    final border = widget.isActive ? activeColor : Colors.transparent;
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: widget.isLoading ? () {} : widget.onTap,
-      child: Row(
-        children: [
-          SizedBox(
-            width: 20,
-            height: 20,
-            child: widget.isLoading
-                ? Padding(
-                    padding: const EdgeInsets.all(2),
+      onTap: widget.onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: border, width: 1.2),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            widget.isLoading
+                ? SizedBox(
+                    width: 16,
+                    height: 16,
                     child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(color),
+                      strokeWidth: 1.5,
+                      valueColor: AlwaysStoppedAnimation<Color>(activeColor),
                     ),
                   )
                 : ScaleTransition(
                     scale: _scale,
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 200),
-                      child: Icon(
-                        widget.isActive ? widget.activeIcon : widget.icon,
-                        key: ValueKey<bool>(widget.isActive),
-                        size: 17,
-                        color: color,
-                      ),
+                    child: Text(widget.emoji,
+                        style: const TextStyle(fontSize: 16)),
+                  ),
+            if (widget.count > 0) ...[
+              const SizedBox(width: 5),
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 200),
+                style: TextStyle(
+                  color: widget.isActive ? activeColor : FlixieColors.light,
+                  fontSize: 13,
+                  fontWeight:
+                      widget.isActive ? FontWeight.w700 : FontWeight.normal,
+                ),
+                child: Text('${widget.count}'),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Reaction preview shown on the collapsed card
+// ---------------------------------------------------------------------------
+
+class _ReactionPreview extends StatelessWidget {
+  const _ReactionPreview({
+    required this.reactions,
+    required this.myReaction,
+  });
+
+  final Map<String, int> reactions;
+  final String? myReaction;
+
+  @override
+  Widget build(BuildContext context) {
+    // Show up to 3 reaction types with the highest counts
+    final sorted = reactions.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final top = sorted.take(3).toList();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          ...top.map((e) {
+            final emoji = _kReactions
+                .firstWhere(
+                  (r) => r.$2 == e.key,
+                  orElse: () => ('?', e.key),
+                )
+                .$1;
+            final isMe = myReaction == e.key;
+            return Container(
+              margin: const EdgeInsets.only(right: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: isMe
+                    ? FlixieColors.primary.withValues(alpha: 0.15)
+                    : const Color(0xFF1E2D40),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isMe ? FlixieColors.primary : Colors.transparent,
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(emoji, style: const TextStyle(fontSize: 13)),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${e.value}',
+                    style: TextStyle(
+                      color: isMe ? FlixieColors.primary : FlixieColors.medium,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-          ),
-          const SizedBox(width: 4),
-          AnimatedDefaultTextStyle(
-            duration: const Duration(milliseconds: 200),
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-              fontWeight: widget.isActive ? FontWeight.w700 : FontWeight.normal,
-            ),
-            child: Text('${widget.count}'),
-          ),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );
