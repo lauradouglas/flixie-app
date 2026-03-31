@@ -74,7 +74,7 @@ class ProfileHeader extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 48,
-                    backgroundColor: color.withValues(alpha: 0.75),
+                    backgroundColor: color.withValues(alpha: 0.95),
                     backgroundImage:
                         photoUrl != null ? NetworkImage(photoUrl!) : null,
                     child: photoUrl == null
@@ -82,26 +82,6 @@ class ProfileHeader extends StatelessWidget {
                             size: 48,
                             color: Colors.white.withValues(alpha: 0.70))
                         : null,
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: GestureDetector(
-                      onTap: () => _openEditSheet(context),
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: color,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: FlixieColors.tabBarBackgroundFocused,
-                            width: 2,
-                          ),
-                        ),
-                        child: const Icon(Icons.edit,
-                            size: 14, color: Colors.black),
-                      ),
-                    ),
                   ),
                 ],
               ),

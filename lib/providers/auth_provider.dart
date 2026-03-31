@@ -284,6 +284,13 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  /// Replaces the cached db user with [user] and notifies listeners.
+  /// Use when a service call already returns the updated user model.
+  void updateCachedUser(models.User user) {
+    _dbUser = user;
+    notifyListeners();
+  }
+
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();
@@ -335,6 +342,7 @@ class AuthProvider extends ChangeNotifier {
     required String username,
     required int languageId,
     required int countryId,
+    List<int> genreIds = const [],
   }) async {
     _setLoading(true);
     _setError(null);
@@ -358,6 +366,11 @@ class AuthProvider extends ChangeNotifier {
         'languageId': languageId,
         'countryId': countryId,
       });
+
+      // Save favourite genres if any were selected
+      if (genreIds.isNotEmpty && _dbUser?.id != null) {
+        await UserService.addFavoriteGenres(_dbUser!.id, genreIds);
+      }
 
       _firebaseUser = credential.user;
       _status = AuthStatus.authenticated;

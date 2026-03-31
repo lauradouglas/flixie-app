@@ -14,6 +14,7 @@ import 'profile/activity_tile.dart';
 import 'profile/favorite_movies_section.dart';
 import 'profile/favorite_people_section.dart';
 import 'profile/friends_row.dart';
+import 'profile/movie_taste_badge.dart';
 import 'profile/profile_header.dart';
 import 'profile/profile_stats_row.dart';
 import 'profile/ratings_section.dart';
@@ -268,6 +269,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           (dbUser?.favoriteShows?.length ?? 0),
                     ),
 
+                    // Movie taste badge
+                    if ((dbUser?.favoriteGenres ?? []).isNotEmpty) ...[
+                      const SizedBox(height: 20),
+                      MovieTasteBadge(
+                        favoriteGenres: dbUser!.favoriteGenres!,
+                      ),
+                    ],
+
                     const SizedBox(height: 24),
                     const Divider(),
                     const SizedBox(height: 16),
@@ -414,6 +423,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             context.push('/my-reviews');
                           } else if (item.label == 'Watch History') {
                             context.push('/watch-history');
+                          } else if (item.label == 'My Stats') {
+                            context.push('/stats');
                           } else if (item.label == 'Watch Requests') {
                             context.push('/watch-requests');
                           } else if (item.label == 'Help & Support') {
@@ -465,6 +476,7 @@ class _MenuItem {
 
 const List<_MenuItem> _menuItems = [
   _MenuItem(icon: Icons.history, label: 'Watch History'),
+  _MenuItem(icon: Icons.bar_chart_outlined, label: 'My Stats'),
   _MenuItem(icon: Icons.swap_horiz_outlined, label: 'Watch Requests'),
   _MenuItem(icon: Icons.star_outline, label: 'My Reviews'),
   _MenuItem(icon: Icons.help_outline, label: 'Help & Support'),
