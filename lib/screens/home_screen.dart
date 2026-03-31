@@ -33,16 +33,23 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   bool _showGreeting = true;
   String? _loadedForUserId;
   Timer? _greetingTimer;
+  AuthProvider? _authProvider;
 
   static final RouteObserver<ModalRoute<void>> _routeObserver =
       RouteObserver<ModalRoute<void>>();
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _authProvider ??= context.read<AuthProvider>();
+  }
 
   @override
   void initState() {
     super.initState();
     // Listen for dbUser becoming available after auth resolves
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AuthProvider>().addListener(_onAuthChanged);
+      _authProvider?.addListener(_onAuthChanged);
       _loadAll();
       _greetingTimer = Timer(const Duration(seconds: 10), () {
         if (mounted && _showGreeting) setState(() => _showGreeting = false);
@@ -63,12 +70,12 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   void dispose() {
     _greetingTimer?.cancel();
     _routeObserver.unsubscribe(this);
-    context.read<AuthProvider>().removeListener(_onAuthChanged);
+    _authProvider?.removeListener(_onAuthChanged);
     super.dispose();
   }
 
   void _onAuthChanged() {
-    final userId = context.read<AuthProvider>().dbUser?.id;
+    final userId = _authProvider?.dbUser?.id;
     if (userId != null && userId != _loadedForUserId) {
       _loadAll();
     }
