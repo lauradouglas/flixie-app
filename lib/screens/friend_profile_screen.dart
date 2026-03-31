@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../models/review.dart';
 import '../models/user.dart';
+import '../models/watchlist_movie.dart';
 import '../providers/auth_provider.dart';
 import '../services/friend_service.dart';
 import '../services/user_service.dart';
@@ -11,6 +12,7 @@ import '../theme/app_theme.dart';
 import '../utils/app_logger.dart';
 import 'my_reviews_screen.dart';
 import 'profile/favorite_movies_section.dart';
+import 'profile/movie_taste_badge.dart';
 import 'profile/profile_stats_row.dart';
 
 enum _FriendshipStatus { none, pending, requested, friends }
@@ -430,6 +432,18 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                         (_user?.favoriteShows?.length ?? 0),
                   ),
 
+                  // Favourite genres badge
+                  if ((_user?.favoriteGenres ?? []).isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    MovieTasteBadge(favoriteGenres: _user!.favoriteGenres!),
+                  ],
+
+                  // Mini stats
+                  if ((_user?.watchedMovies?.isNotEmpty ?? false)) ...[
+                    const SizedBox(height: 24),
+                    _MiniStats(watchedMovies: _user!.watchedMovies!),
+                  ],
+
                   const SizedBox(height: 24),
                   const Divider(),
                   const SizedBox(height: 16),
@@ -539,6 +553,166 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                 ],
               ),
             ),
+    );
+  }
+}
+
+// ── Mini stats widget ────────────────────────────────────────────────────────
+
+class _MiniStats extends StatelessWidget {
+  const _MiniStats({required this.watchedMovies});
+  final List<dynamic> watchedMovies;
+
+  List<WatchlistMovieDetails> get _movies {
+    final out = <WatchlistMovieDetails>[];
+    for (final m in watchedMovies.whereType<Map<String, dynamic>>()) {
+      if (m['removed'] == true) continue;
+      if (m['movie'] != null) {
+        try {
+          out.add(WatchlistMovieDetails.fromJson(
+              m['movie'] as Map<String, dynamic>));
+        } catch (_) {}
+      }
+    }
+    return out;
+  }
+
+  String get _runtimeLabel {
+    final mins =
+        _movies.fold<int>(0, (s, m) => s + (m.runtime ?? 0));
+    if (mins == 0) return '—';
+    final d = mins ~/ (60 * 24);
+    final h = (mins % (60 * 24)) ~/ 60;
+    final m = mins % 60;
+    if (d > 0) return '${d}d ${h}h ${m}m';
+    if (h > 0) return '${h}h ${m}m';
+    return '${m}m';
+  }
+
+  List<MapEntry<String, int>> get _topGenres {
+    final counts = <String, int>{};
+    for (final m in _movies) {
+      for (final g in m.genres) {
+        counts[g] = (counts[g] ?? 0) + 1;
+      }
+    }
+    final sorted = counts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return sorted.take(4).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final movies = _movies;
+    final topGenres = _topGenres;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // section header
+        Row(
+          children: [
+            Container(
+              width: 4,
+              height: 18,
+              decoration: BoxDecoration(
+                color: FlixieColors.primary,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'STATS',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // runtime chip
+        Row(
+          children: [
+            _Chip(
+              icon: Icons.schedule_outlined,
+              label: _runtimeLabel,
+              sublabel: 'total runtime',
+            ),
+            const SizedBox(width: 10),
+            _Chip(
+              icon: Icons.movie_outlined,
+              label: movies.isNotEmpty ? '${movies.length}' : '—',
+              sublabel: 'movies watched',
+            ),
+          ],
+        ),
+
+        if (topGenres.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: topGenres
+                .map((e) => Chip(
+                      label: Text(e.key,
+                          style: const TextStyle(
+                              fontSize: 12, color: Colors.white)),
+                      backgroundColor:
+                          FlixieColors.primary.withValues(alpha: 0.15),
+                      side: BorderSide(
+                          color:
+                              FlixieColors.primary.withValues(alpha: 0.4)),
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                    ))
+                .toList(),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _Chip extends StatelessWidget {
+  const _Chip(
+      {required this.icon, required this.label, required this.sublabel});
+  final IconData icon;
+  final String label;
+  final String sublabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: FlixieColors.tabBarBackgroundFocused,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: FlixieColors.primary, size: 18),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14)),
+                Text(sublabel,
+                    style: const TextStyle(
+                        color: FlixieColors.medium, fontSize: 11)),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
