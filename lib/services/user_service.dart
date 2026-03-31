@@ -53,6 +53,16 @@ class UserService {
     return data as bool;
   }
 
+  /// Updates a single field on the user via POST /users/:userId
+  static Future<User> updateUserField(
+      String userId, String field, dynamic value) async {
+    final data = await ApiClient.post(
+      '/users/$userId',
+      body: {field: value},
+    );
+    return User.fromJson(data as Map<String, dynamic>);
+  }
+
   static Future<User> updateUser(Map<String, dynamic> body) async {
     final data = await ApiClient.put('/users/update', body: body);
     return User.fromJson(data as Map<String, dynamic>);
@@ -75,16 +85,23 @@ class UserService {
   }
 
   static Future<User> updateIconColor(String userId, int iconColorId) async {
-    final data = await ApiClient.patch(
+    final data = await ApiClient.post(
       '/users/$userId/icon-color',
-      body: {'iconColorId': iconColorId},
+      body: {'colorId': iconColorId},
     );
     return User.fromJson(data as Map<String, dynamic>);
   }
 
+  static Future<void> addFavoriteGenres(
+      String userId, List<int> genreIds) async {
+    await ApiClient.post(
+      '/users/$userId/genres/favorites',
+      body: {'genreIds': genreIds},
+    );
+  }
+
   static Future<List<Review>> getMovieReviews(int movieId) async {
     final data = await ApiClient.get('/users/movie/$movieId/reviews');
-    // final data = await ApiClient.get('/users/movie/11/reviews');
     return (data as List<dynamic>)
         .map((e) => Review.fromJson(e as Map<String, dynamic>))
         .toList();

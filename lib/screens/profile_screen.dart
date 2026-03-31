@@ -14,6 +14,7 @@ import 'profile/activity_tile.dart';
 import 'profile/favorite_movies_section.dart';
 import 'profile/favorite_people_section.dart';
 import 'profile/friends_row.dart';
+import 'profile/movie_taste_badge.dart';
 import 'profile/profile_header.dart';
 import 'profile/profile_stats_row.dart';
 import 'profile/ratings_section.dart';
@@ -267,6 +268,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       favorites: (dbUser?.favoriteMovies?.length ?? 0) +
                           (dbUser?.favoriteShows?.length ?? 0),
                     ),
+
+                    // Movie taste badge
+                    if ((dbUser?.favoriteGenres ?? []).isNotEmpty) ...[
+                      const SizedBox(height: 20),
+                      MovieTasteBadge(
+                        favoriteGenres: dbUser!.favoriteGenres!,
+                      ),
+                    ],
 
                     const SizedBox(height: 24),
                     const Divider(),
