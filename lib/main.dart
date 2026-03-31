@@ -242,8 +242,9 @@ class MainNavigationShell extends StatelessWidget {
   static int _indexFromLocation(String location) {
     if (location.startsWith('/search')) return 1;
     if (location.startsWith('/watchlist')) return 2;
-    if (location.startsWith('/social') || location.startsWith('/groups')) return 3;
-    if (location.startsWith('/profile')) return 4;
+    // if (location.startsWith('/social') || location.startsWith('/groups')) return 3;
+    // if (location.startsWith('/profile')) return 4;
+    if (location.startsWith('/profile')) return 3;
     return 0;
   }
 
@@ -251,7 +252,7 @@ class MainNavigationShell extends StatelessWidget {
     '/',
     '/search',
     '/watchlist',
-    '/social',
+    // '/social',
     '/profile',
   ];
 
@@ -300,11 +301,11 @@ class MainNavigationShell extends StatelessWidget {
               selectedIcon: Icon(Icons.bookmark),
               label: 'Watchlist',
             ),
-            NavigationDestination(
-              icon: Icon(Icons.people_outline),
-              selectedIcon: Icon(Icons.people),
-              label: 'Social',
-            ),
+            // NavigationDestination(
+            //   icon: Icon(Icons.people_outline),
+            //   selectedIcon: Icon(Icons.people),
+            //   label: 'Social',
+            // ),
             NavigationDestination(
               icon: Icon(Icons.person_outline),
               selectedIcon: Icon(Icons.person),

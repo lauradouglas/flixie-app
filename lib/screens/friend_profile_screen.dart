@@ -578,8 +578,7 @@ class _MiniStats extends StatelessWidget {
   }
 
   String get _runtimeLabel {
-    final mins =
-        _movies.fold<int>(0, (s, m) => s + (m.runtime ?? 0));
+    final mins = _movies.fold<int>(0, (s, m) => s + (m.runtime ?? 0));
     if (mins == 0) return '—';
     final d = mins ~/ (60 * 24);
     final h = (mins % (60 * 24)) ~/ 60;
@@ -637,16 +636,20 @@ class _MiniStats extends StatelessWidget {
         // runtime chip
         Row(
           children: [
-            _Chip(
-              icon: Icons.schedule_outlined,
-              label: _runtimeLabel,
-              sublabel: 'total runtime',
+            Expanded(
+              child: _Chip(
+                icon: Icons.schedule_outlined,
+                label: _runtimeLabel,
+                sublabel: 'total runtime',
+              ),
             ),
             const SizedBox(width: 10),
-            _Chip(
-              icon: Icons.movie_outlined,
-              label: movies.isNotEmpty ? '${movies.length}' : '—',
-              sublabel: 'movies watched',
+            Expanded(
+              child: _Chip(
+                icon: Icons.movie_outlined,
+                label: movies.isNotEmpty ? '${movies.length}' : '—',
+                sublabel: 'movies watched',
+              ),
             ),
           ],
         ),
@@ -656,20 +659,7 @@ class _MiniStats extends StatelessWidget {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: topGenres
-                .map((e) => Chip(
-                      label: Text(e.key,
-                          style: const TextStyle(
-                              fontSize: 12, color: Colors.white)),
-                      backgroundColor:
-                          FlixieColors.primary.withValues(alpha: 0.15),
-                      side: BorderSide(
-                          color:
-                              FlixieColors.primary.withValues(alpha: 0.4)),
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                    ))
-                .toList(),
+            children: topGenres.map((e) => _GenreTag(name: e.key)).toList(),
           ),
         ],
       ],
@@ -686,32 +676,51 @@ class _Chip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: FlixieColors.tabBarBackgroundFocused,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: FlixieColors.primary, size: 18),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14)),
-                Text(sublabel,
-                    style: const TextStyle(
-                        color: FlixieColors.medium, fontSize: 11)),
-              ],
-            ),
-          ],
-        ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: FlixieColors.tabBarBackgroundFocused,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: FlixieColors.primary, size: 18),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14)),
+              Text(sublabel,
+                  style: const TextStyle(
+                      color: FlixieColors.medium, fontSize: 11)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GenreTag extends StatelessWidget {
+  const _GenreTag({required this.name});
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: FlixieColors.primary.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: FlixieColors.primary.withValues(alpha: 0.4)),
+      ),
+      child: Text(
+        name,
+        style: const TextStyle(fontSize: 12, color: Colors.white),
       ),
     );
   }

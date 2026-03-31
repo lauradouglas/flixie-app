@@ -32,7 +32,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     _loadGroup();
   }
 
@@ -84,15 +84,14 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
     }
     return group.name.isEmpty
         ? '?'
-        : group.name
-            .substring(0, group.name.length.clamp(1, 2))
-            .toUpperCase();
+        : group.name.substring(0, group.name.length.clamp(1, 2)).toUpperCase();
   }
 
   @override
   Widget build(BuildContext context) {
     final groupName = _group?.name ?? '';
-    final color = groupName.isNotEmpty ? _groupColor(groupName) : FlixieColors.primary;
+    final color =
+        groupName.isNotEmpty ? _groupColor(groupName) : FlixieColors.primary;
 
     return Scaffold(
       backgroundColor: FlixieColors.background,
@@ -137,7 +136,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
           unselectedLabelColor: FlixieColors.medium,
           indicatorColor: FlixieColors.primary,
           tabs: const [
-            Tab(text: 'Chat'),
+            // Tab(text: 'Chat'),
             Tab(text: 'Activity'),
             Tab(text: 'Requests'),
           ],
@@ -146,7 +145,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _ChatTab(groupId: widget.groupId),
+          // _ChatTab(groupId: widget.groupId),
           _ActivityTab(
             group: _group,
             memberCount: _memberCount,
@@ -181,8 +180,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
             ),
             const SizedBox(height: 8),
             ListTile(
-              leading: const Icon(Icons.info_outline,
-                  color: FlixieColors.light),
+              leading:
+                  const Icon(Icons.info_outline, color: FlixieColors.light),
               title: const Text('Group Info',
                   style: TextStyle(color: FlixieColors.light)),
               onTap: () => Navigator.pop(context),
@@ -232,9 +231,7 @@ class _ChatTabState extends State<_ChatTab> {
       final raw = await GroupService.getGroupMessages(widget.groupId);
       if (mounted) {
         setState(() {
-          _messages = raw
-              .whereType<Map<String, dynamic>>()
-              .toList();
+          _messages = raw.whereType<Map<String, dynamic>>().toList();
           _loading = false;
         });
         _scrollToBottom();
@@ -308,13 +305,11 @@ class _ChatTabState extends State<_ChatTab> {
                       itemCount: _messages.length,
                       itemBuilder: (_, i) {
                         final msg = _messages[i];
-                        final senderId =
-                            msg['userId']?.toString() ?? '';
+                        final senderId = msg['userId']?.toString() ?? '';
                         final isMe = senderId == currentUserId;
                         return _ChatBubble(
                           message: msg['message']?.toString() ?? '',
-                          senderUsername:
-                              msg['username']?.toString() ?? 'User',
+                          senderUsername: msg['username']?.toString() ?? 'User',
                           isMe: isMe,
                         );
                       },
@@ -354,16 +349,15 @@ class _ChatBubble extends StatelessWidget {
               padding: const EdgeInsets.only(left: 4, bottom: 2),
               child: Text(
                 senderUsername,
-                style: const TextStyle(
-                    color: FlixieColors.medium, fontSize: 11),
+                style:
+                    const TextStyle(color: FlixieColors.medium, fontSize: 11),
               ),
             ),
           Container(
             constraints: BoxConstraints(
               maxWidth: MediaQuery.of(context).size.width * 0.72,
             ),
-            padding: const EdgeInsets.symmetric(
-                horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: isMe
                   ? FlixieColors.primary.withValues(alpha: 0.85)
@@ -371,10 +365,8 @@ class _ChatBubble extends StatelessWidget {
               borderRadius: BorderRadius.only(
                 topLeft: const Radius.circular(16),
                 topRight: const Radius.circular(16),
-                bottomLeft:
-                    Radius.circular(isMe ? 16 : 4),
-                bottomRight:
-                    Radius.circular(isMe ? 4 : 16),
+                bottomLeft: Radius.circular(isMe ? 16 : 4),
+                bottomRight: Radius.circular(isMe ? 4 : 16),
               ),
             ),
             child: Text(
@@ -426,16 +418,15 @@ class _ChatInput extends StatelessWidget {
                 onSubmitted: (_) => onSend(),
                 decoration: InputDecoration(
                   hintText: 'Type a message…',
-                  hintStyle:
-                      const TextStyle(color: FlixieColors.medium),
+                  hintStyle: const TextStyle(color: FlixieColors.medium),
                   filled: true,
                   fillColor: FlixieColors.tabBarBackground,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(22),
                     borderSide: BorderSide.none,
                   ),
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 10),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 ),
               ),
             ),
@@ -445,8 +436,7 @@ class _ChatInput extends StatelessWidget {
                     width: 36,
                     height: 36,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: FlixieColors.primary),
+                        strokeWidth: 2, color: FlixieColors.primary),
                   )
                 : IconButton(
                     onPressed: onSend,
@@ -564,7 +554,8 @@ class _ActivityTabState extends State<_ActivityTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ---- Hero banner ------------------------------------------------
-            if (group != null) _GroupHeroBanner(group: group, memberCount: widget.memberCount),
+            if (group != null)
+              _GroupHeroBanner(group: group, memberCount: widget.memberCount),
 
             const SizedBox(height: 16),
 
@@ -591,8 +582,8 @@ class _ActivityTabState extends State<_ActivityTab> {
                   ),
                   const Spacer(),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                     decoration: BoxDecoration(
                       color: FlixieColors.success.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
@@ -615,12 +606,12 @@ class _ActivityTabState extends State<_ActivityTab> {
             const SizedBox(height: 10),
             if (_activity.isEmpty)
               Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Text(
                   'No recent activity.',
-                  style: textTheme.bodySmall
-                      ?.copyWith(color: FlixieColors.medium),
+                  style:
+                      textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
                 ),
               )
             else
@@ -696,11 +687,9 @@ class _ActivityTabState extends State<_ActivityTab> {
                   children: previewMessages.map((msg) {
                     final senderId = msg['userId']?.toString() ?? '';
                     final isMe = senderId == currentUserId;
-                    final username =
-                        msg['username']?.toString() ?? 'User';
-                    final initial = username.isNotEmpty
-                        ? username[0].toUpperCase()
-                        : '?';
+                    final username = msg['username']?.toString() ?? 'User';
+                    final initial =
+                        username.isNotEmpty ? username[0].toUpperCase() : '?';
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Row(
@@ -712,8 +701,8 @@ class _ActivityTabState extends State<_ActivityTab> {
                           if (!isMe) ...[
                             CircleAvatar(
                               radius: 14,
-                              backgroundColor: FlixieColors.primary
-                                  .withValues(alpha: 0.3),
+                              backgroundColor:
+                                  FlixieColors.primary.withValues(alpha: 0.3),
                               child: Text(
                                 initial,
                                 style: const TextStyle(
@@ -737,18 +726,15 @@ class _ActivityTabState extends State<_ActivityTab> {
                                 borderRadius: BorderRadius.only(
                                   topLeft: const Radius.circular(14),
                                   topRight: const Radius.circular(14),
-                                  bottomLeft:
-                                      Radius.circular(isMe ? 14 : 4),
-                                  bottomRight:
-                                      Radius.circular(isMe ? 4 : 14),
+                                  bottomLeft: Radius.circular(isMe ? 14 : 4),
+                                  bottomRight: Radius.circular(isMe ? 4 : 14),
                                 ),
                               ),
                               child: Text(
                                 msg['message']?.toString() ?? '',
                                 style: TextStyle(
-                                  color: isMe
-                                      ? Colors.black
-                                      : FlixieColors.light,
+                                  color:
+                                      isMe ? Colors.black : FlixieColors.light,
                                   fontSize: 13,
                                 ),
                               ),
@@ -758,8 +744,8 @@ class _ActivityTabState extends State<_ActivityTab> {
                             const SizedBox(width: 8),
                             CircleAvatar(
                               radius: 14,
-                              backgroundColor: FlixieColors.secondary
-                                  .withValues(alpha: 0.3),
+                              backgroundColor:
+                                  FlixieColors.secondary.withValues(alpha: 0.3),
                               child: Text(
                                 initial,
                                 style: const TextStyle(
@@ -809,8 +795,7 @@ class _ActivityTabState extends State<_ActivityTab> {
                     (req) => _PendingRequestPreviewTile(
                       request: req,
                       onRespond: (status) async {
-                        final userId =
-                            context.read<AuthProvider>().dbUser?.id;
+                        final userId = context.read<AuthProvider>().dbUser?.id;
                         if (userId == null) return;
                         try {
                           await GroupService.updateWatchRequestForMember(
@@ -897,8 +882,8 @@ class _GroupHeroBanner extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 7, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(
                       color: FlixieColors.tertiary.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4),
@@ -1040,8 +1025,7 @@ class _PendingRequestPreviewTile extends StatelessWidget {
           ),
           IconButton(
             onPressed: () => onRespond('DECLINED'),
-            icon: const Icon(Icons.close, color: FlixieColors.danger,
-                size: 20),
+            icon: const Icon(Icons.close, color: FlixieColors.danger, size: 20),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
           ),
@@ -1093,8 +1077,7 @@ class _RequestsTabState extends State<_RequestsTab> {
 
   Future<void> _load() async {
     try {
-      final requests =
-          await GroupService.getGroupWatchRequests(widget.groupId);
+      final requests = await GroupService.getGroupWatchRequests(widget.groupId);
       if (mounted) {
         setState(() {
           _requests = requests;
@@ -1136,10 +1119,21 @@ class _RequestsTabState extends State<_RequestsTab> {
       if (diff.inMinutes < 1) return 'just now';
       if (diff.inHours < 1) return '${diff.inMinutes}m ago';
       if (diff.inHours < 24) return '${diff.inHours}h ago';
-      if (diff.inDays < 7) return '${diff.inDays} day${diff.inDays == 1 ? '' : 's'} ago';
+      if (diff.inDays < 7)
+        return '${diff.inDays} day${diff.inDays == 1 ? '' : 's'} ago';
       const months = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
       ];
       return '${dt.day} ${months[dt.month - 1]}';
     } catch (_) {
@@ -1213,8 +1207,8 @@ class _RequestsTabState extends State<_RequestsTab> {
                 const SizedBox(height: 4),
                 Text(
                   'By ${req.requesterUsername ?? 'Unknown'}',
-                  style: const TextStyle(
-                      color: FlixieColors.medium, fontSize: 12),
+                  style:
+                      const TextStyle(color: FlixieColors.medium, fontSize: 12),
                 ),
                 if (req.message != null && req.message!.isNotEmpty) ...[
                   const SizedBox(height: 6),
@@ -1226,29 +1220,33 @@ class _RequestsTabState extends State<_RequestsTab> {
                 ],
                 const SizedBox(height: 10),
                 if (myStatus == 'ACCEPTED')
-                  const Align(
+                  Align(
                     alignment: Alignment.centerRight,
-                    child: Chip(
-                      label: Text('Accepted',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: FlixieColors.success),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text('Accepted',
                           style: TextStyle(
-                              color: FlixieColors.success,
-                              fontSize: 12)),
-                      backgroundColor: Colors.transparent,
-                      side: BorderSide(color: FlixieColors.success),
-                      padding: EdgeInsets.zero,
+                              color: FlixieColors.success, fontSize: 12)),
                     ),
                   )
                 else if (myStatus == 'DECLINED')
-                  const Align(
+                  Align(
                     alignment: Alignment.centerRight,
-                    child: Chip(
-                      label: Text('Declined',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: FlixieColors.danger),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text('Declined',
                           style: TextStyle(
-                              color: FlixieColors.danger,
-                              fontSize: 12)),
-                      backgroundColor: Colors.transparent,
-                      side: BorderSide(color: FlixieColors.danger),
-                      padding: EdgeInsets.zero,
+                              color: FlixieColors.danger, fontSize: 12)),
                     ),
                   )
                 else
@@ -1260,13 +1258,11 @@ class _RequestsTabState extends State<_RequestsTab> {
                           width: 24,
                           height: 24,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: FlixieColors.primary),
+                              strokeWidth: 2, color: FlixieColors.primary),
                         )
                       else ...[
                         TextButton(
-                          onPressed: () =>
-                              _respond(req, 'DECLINED'),
+                          onPressed: () => _respond(req, 'DECLINED'),
                           style: TextButton.styleFrom(
                             foregroundColor: FlixieColors.danger,
                             padding: const EdgeInsets.symmetric(
@@ -1277,16 +1273,14 @@ class _RequestsTabState extends State<_RequestsTab> {
                         ),
                         const SizedBox(width: 8),
                         ElevatedButton(
-                          onPressed: () =>
-                              _respond(req, 'ACCEPTED'),
+                          onPressed: () => _respond(req, 'ACCEPTED'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: FlixieColors.primary,
                             foregroundColor: Colors.black,
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 8),
                             minimumSize: Size.zero,
-                            textStyle:
-                                const TextStyle(fontSize: 13),
+                            textStyle: const TextStyle(fontSize: 13),
                           ),
                           child: const Text('Accept'),
                         ),

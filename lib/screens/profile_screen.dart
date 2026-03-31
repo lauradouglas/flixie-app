@@ -40,26 +40,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   static const int _initialActivityCount = 5;
   bool _showAllActivity = false;
+  AuthProvider? _authProvider;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _authProvider ??= context.read<AuthProvider>();
+  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AuthProvider>().addListener(_onAuthChanged);
+      _authProvider?.addListener(_onAuthChanged);
       _loadAll();
     });
   }
 
   @override
   void dispose() {
-    context.read<AuthProvider>().removeListener(_onAuthChanged);
+    _authProvider?.removeListener(_onAuthChanged);
     super.dispose();
   }
 
   void _onAuthChanged() {
-    final auth = context.read<AuthProvider>();
-    final userId = auth.dbUser?.id;
-    final version = auth.activityVersion;
+    final auth = _authProvider;
+    final userId = auth?.dbUser?.id;
+    final version = auth?.activityVersion ?? -1;
     if (userId != null &&
         (userId != _loadedForUserId || version != _lastActivityVersion)) {
       _loadAll();
