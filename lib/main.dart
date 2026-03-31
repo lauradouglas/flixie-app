@@ -25,6 +25,8 @@ import 'screens/settings_screen.dart';
 import 'screens/stats_screen.dart';
 import 'screens/watch_history_screen.dart';
 import 'screens/watch_requests_screen.dart';
+import 'screens/social_screen.dart';
+import 'screens/group_detail_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/signup_screen.dart';
 import 'screens/auth/forgot_password_screen.dart';
@@ -121,6 +123,16 @@ GoRouter _buildRouter(AuthProvider authProvider) {
           GoRoute(
             path: '/watchlist',
             builder: (context, state) => const WatchlistScreen(),
+          ),
+          GoRoute(
+            path: '/social',
+            builder: (context, state) => const SocialScreen(),
+          ),
+          GoRoute(
+            path: '/groups/:id',
+            builder: (context, state) => GroupDetailScreen(
+              groupId: state.pathParameters['id'] ?? '',
+            ),
           ),
           GoRoute(
             path: '/profile',
@@ -230,6 +242,8 @@ class MainNavigationShell extends StatelessWidget {
   static int _indexFromLocation(String location) {
     if (location.startsWith('/search')) return 1;
     if (location.startsWith('/watchlist')) return 2;
+    // if (location.startsWith('/social') || location.startsWith('/groups')) return 3;
+    // if (location.startsWith('/profile')) return 4;
     if (location.startsWith('/profile')) return 3;
     return 0;
   }
@@ -238,7 +252,8 @@ class MainNavigationShell extends StatelessWidget {
     '/',
     '/search',
     '/watchlist',
-    '/profile'
+    // '/social',
+    '/profile',
   ];
 
   @override
@@ -286,6 +301,11 @@ class MainNavigationShell extends StatelessWidget {
               selectedIcon: Icon(Icons.bookmark),
               label: 'Watchlist',
             ),
+            // NavigationDestination(
+            //   icon: Icon(Icons.people_outline),
+            //   selectedIcon: Icon(Icons.people),
+            //   label: 'Social',
+            // ),
             NavigationDestination(
               icon: Icon(Icons.person_outline),
               selectedIcon: Icon(Icons.person),
