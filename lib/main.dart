@@ -22,6 +22,7 @@ import 'screens/my_reviews_screen.dart';
 import 'screens/notification_screen.dart';
 import 'screens/help_support_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/stats_screen.dart';
 import 'screens/watch_history_screen.dart';
 import 'screens/watch_requests_screen.dart';
 import 'screens/auth/login_screen.dart';
@@ -154,6 +155,10 @@ GoRouter _buildRouter(AuthProvider authProvider) {
           GoRoute(
             path: '/watch-history',
             builder: (context, state) => const WatchHistoryScreen(),
+          ),
+          GoRoute(
+            path: '/stats',
+            builder: (context, state) => const StatsScreen(),
           ),
           GoRoute(
             path: '/watch-requests',

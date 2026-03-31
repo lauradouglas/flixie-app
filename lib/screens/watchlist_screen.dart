@@ -27,6 +27,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
   String? _filterGenre; // null = all genres
   double? _filterMinRating; // null = no min
   int? _filterYear; // null = all years
+  int? _filterMaxRuntime; // null = any length, value in minutes
 
   @override
   void initState() {
@@ -88,6 +89,10 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
           final year = int.tryParse(m.releaseDate?.split('-').first ?? '');
           if (year != _filterYear) return false;
         }
+        // Max runtime filter
+        if (_filterMaxRuntime != null &&
+            (m.runtime == null || m.runtime! > _filterMaxRuntime!))
+          return false;
         return true;
       }).toList();
 
@@ -154,7 +159,10 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
   }
 
   bool get _hasActiveFilters =>
-      _filterGenre != null || _filterMinRating != null || _filterYear != null;
+      _filterGenre != null ||
+      _filterMinRating != null ||
+      _filterYear != null ||
+      _filterMaxRuntime != null;
 
   void _openFilterSheet() {
     showModalBottomSheet(
@@ -167,12 +175,14 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         currentGenre: _filterGenre,
         currentMinRating: _filterMinRating,
         currentYear: _filterYear,
+        currentMaxRuntime: _filterMaxRuntime,
         currentSort: _sortBy,
-        onApply: (genre, minRating, year, sort) {
+        onApply: (genre, minRating, year, maxRuntime, sort) {
           setState(() {
             _filterGenre = genre;
             _filterMinRating = minRating;
             _filterYear = year;
+            _filterMaxRuntime = maxRuntime;
             _sortBy = sort;
           });
           _filterWatchlist();
@@ -653,6 +663,7 @@ class _FilterSheet extends StatefulWidget {
     required this.currentGenre,
     required this.currentMinRating,
     required this.currentYear,
+    required this.currentMaxRuntime,
     required this.currentSort,
     required this.onApply,
   });
@@ -662,9 +673,10 @@ class _FilterSheet extends StatefulWidget {
   final String? currentGenre;
   final double? currentMinRating;
   final int? currentYear;
+  final int? currentMaxRuntime;
   final String currentSort;
-  final void Function(String? genre, double? minRating, int? year, String sort)
-      onApply;
+  final void Function(String? genre, double? minRating, int? year,
+      int? maxRuntime, String sort) onApply;
 
   @override
   State<_FilterSheet> createState() => _FilterSheetState();
@@ -675,6 +687,14 @@ class _FilterSheetState extends State<_FilterSheet> {
   String? _genre;
   double? _minRating;
   int? _year;
+  int? _maxRuntime;
+
+  static const _runtimeOptions = [
+    (null, 'Any'),
+    (90, '< 1h 30m'),
+    (120, '< 2h'),
+    (150, '< 2h 30m'),
+  ];
 
   static const _sortOptions = [
     ('recent', 'Recently Added'),
@@ -700,6 +720,7 @@ class _FilterSheetState extends State<_FilterSheet> {
     _genre = widget.currentGenre;
     _minRating = widget.currentMinRating;
     _year = widget.currentYear;
+    _maxRuntime = widget.currentMaxRuntime;
   }
 
   Widget _sectionLabel(String text) => Padding(
@@ -753,6 +774,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                       _genre = null;
                       _minRating = null;
                       _year = null;
+                      _maxRuntime = null;
                     }),
                     child: const Text('Reset',
                         style: TextStyle(color: FlixieColors.primary)),
@@ -771,6 +793,27 @@ class _FilterSheetState extends State<_FilterSheet> {
                     label: Text(opt.$2),
                     selected: selected,
                     onSelected: (_) => setState(() => _sort = opt.$1),
+                    selectedColor: FlixieColors.primary,
+                    backgroundColor: FlixieColors.tabBarBackgroundFocused,
+                    labelStyle: TextStyle(
+                        color: selected ? Colors.white : Colors.grey,
+                        fontSize: 13),
+                    side: BorderSide.none,
+                  );
+                }).toList(),
+              ),
+
+              // Runtime
+              _sectionLabel('Max Runtime'),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _runtimeOptions.map((opt) {
+                  final selected = _maxRuntime == opt.$1;
+                  return ChoiceChip(
+                    label: Text(opt.$2),
+                    selected: selected,
+                    onSelected: (_) => setState(() => _maxRuntime = opt.$1),
                     selectedColor: FlixieColors.primary,
                     backgroundColor: FlixieColors.tabBarBackgroundFocused,
                     labelStyle: TextStyle(
@@ -880,7 +923,8 @@ class _FilterSheetState extends State<_FilterSheet> {
                 child: FilledButton(
                   onPressed: () {
                     Navigator.pop(context);
-                    widget.onApply(_genre, _minRating, _year, _sort);
+                    widget.onApply(
+                        _genre, _minRating, _year, _maxRuntime, _sort);
                   },
                   style: FilledButton.styleFrom(
                       backgroundColor: FlixieColors.primary),

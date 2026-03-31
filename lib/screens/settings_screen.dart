@@ -856,7 +856,8 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
 
       // Only send changed fields — API takes one field at a time
       if (username != widget.user.username) {
-        updated = await UserService.updateUserField(userId, 'username', username);
+        updated =
+            await UserService.updateUserField(userId, 'username', username);
       }
       if (bio != (widget.user.bio ?? '')) {
         updated = await UserService.updateUserField(userId, 'bio', bio);
@@ -947,8 +948,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                         ),
                       )
                     : (_usernameError == null &&
-                            _usernameCtrl.text.trim() !=
-                                widget.user.username &&
+                            _usernameCtrl.text.trim() != widget.user.username &&
                             _usernameCtrl.text.trim().length >= 3)
                         ? const Icon(Icons.check_circle_outline,
                             color: FlixieColors.success)
