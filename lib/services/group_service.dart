@@ -89,7 +89,7 @@ class GroupService {
   static Future<void> updateMemberInviteStatus(
       String groupId, String memberId, String inviteStatus) async {
     await ApiClient.put(
-      '/groups/$groupId/members/$memberId/invite',
+      '/groups/$groupId/members/$memberId/inviteStatus',
       body: {'inviteStatus': inviteStatus},
     );
   }
@@ -102,7 +102,7 @@ class GroupService {
     int mediaId,
   ) async {
     final data = await ApiClient.post(
-      '/groups/$groupId/requests',
+      '/groups/$groupId/send-request',
       body: {
         'userId': userId,
         'message': message,
@@ -120,8 +120,8 @@ class GroupService {
     String status,
   ) async {
     await ApiClient.put(
-      '/groups/requests/$requestId/members/$memberId',
-      body: {'response': response, 'status': status},
+      '/groups/request/$requestId/response',
+      body: {'memberId': memberId, 'response': response, 'status': status},
     );
   }
 
@@ -131,7 +131,7 @@ class GroupService {
     String message,
   ) async {
     final data = await ApiClient.post(
-      '/groups/requests/$requestId/messages',
+      '/groups/request/$requestId/message',
       body: {'userId': userId, 'message': message},
     );
     return GroupRequestMessage.fromJson(data as Map<String, dynamic>);
@@ -143,7 +143,7 @@ class GroupService {
     String message,
   ) async {
     await ApiClient.post(
-      '/groups/$groupId/friend-requests',
+      '/groups/$groupId/send-friend-requests',
       body: {'userId': userId, 'message': message},
     );
   }
@@ -162,7 +162,7 @@ class GroupService {
     bool downVote,
   ) async {
     await ApiClient.put(
-      '/groups/requests/messages/$messageId/votes',
+      '/groups/request/message/$messageId/votes',
       body: {'upVote': upVote, 'downVote': downVote},
     );
   }
