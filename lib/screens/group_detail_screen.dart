@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../models/activity_list_item.dart';
 import '../models/group.dart';
+import '../models/group_member.dart';
 import '../models/group_watch_request.dart';
 import '../providers/auth_provider.dart';
 import '../screens/profile/activity_tile.dart';
@@ -26,6 +27,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
 
   Group? _group;
   bool _loadingGroup = true;
+  int _memberCount = 0;
 
   @override
   void initState() {
@@ -42,11 +44,17 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
 
   Future<void> _loadGroup() async {
     try {
-      final group = await GroupService.getGroup(widget.groupId);
-      if (mounted) setState(() {
-        _group = group;
-        _loadingGroup = false;
-      });
+      final results = await Future.wait([
+        GroupService.getGroup(widget.groupId),
+        GroupService.getGroupMembers(widget.groupId),
+      ]);
+      if (mounted) {
+        setState(() {
+          _group = results[0] as Group;
+          _memberCount = (results[1] as List<GroupMember>).length;
+          _loadingGroup = false;
+        });
+      }
     } catch (e) {
       logger.e('GroupDetail load group error: $e');
       if (mounted) setState(() => _loadingGroup = false);
@@ -139,7 +147,12 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
         controller: _tabController,
         children: [
           _ChatTab(groupId: widget.groupId),
-          _ActivityTab(),
+          _ActivityTab(
+            group: _group,
+            memberCount: _memberCount,
+            groupId: widget.groupId,
+            onViewAllChat: () => _tabController.animateTo(0),
+          ),
           _RequestsTab(groupId: widget.groupId),
         ],
       ),
@@ -448,11 +461,21 @@ class _ChatInput extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Activity tab
+// Activity tab  — Group Dashboard
 // ---------------------------------------------------------------------------
 
 class _ActivityTab extends StatefulWidget {
-  const _ActivityTab();
+  const _ActivityTab({
+    required this.group,
+    required this.memberCount,
+    required this.groupId,
+    required this.onViewAllChat,
+  });
+
+  final Group? group;
+  final int memberCount;
+  final String groupId;
+  final VoidCallback onViewAllChat;
 
   @override
   State<_ActivityTab> createState() => _ActivityTabState();
@@ -460,7 +483,11 @@ class _ActivityTab extends StatefulWidget {
 
 class _ActivityTabState extends State<_ActivityTab> {
   List<ActivityListItem> _activity = [];
+  List<Map<String, dynamic>> _messages = [];
+  List<GroupWatchRequest> _requests = [];
   bool _loading = true;
+
+  static const int _kChatPreviewCount = 3;
 
   @override
   void initState() {
@@ -475,10 +502,18 @@ class _ActivityTabState extends State<_ActivityTab> {
       return;
     }
     try {
-      final items = await FriendService.getFriendsActivityLists(userId);
+      final results = await Future.wait([
+        FriendService.getFriendsActivityLists(userId),
+        GroupService.getGroupMessages(widget.groupId),
+        GroupService.getGroupWatchRequests(widget.groupId),
+      ]);
       if (mounted) {
         setState(() {
-          _activity = items;
+          _activity = results[0] as List<ActivityListItem>;
+          _messages = (results[1] as List<dynamic>)
+              .whereType<Map<String, dynamic>>()
+              .toList();
+          _requests = results[2] as List<GroupWatchRequest>;
           _loading = false;
         });
       }
@@ -488,24 +523,544 @@ class _ActivityTabState extends State<_ActivityTab> {
     }
   }
 
+  String _formatCount(int n) {
+    if (n >= 1000) {
+      final k = n / 1000;
+      return '${k.toStringAsFixed(k.truncateToDouble() == k ? 0 : 1)}k';
+    }
+    return '$n';
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (_activity.isEmpty) {
-      return const Center(
-        child: Text('No activity yet.',
-            style: TextStyle(color: FlixieColors.medium)),
-      );
-    }
+
+    final group = widget.group;
+    final textTheme = Theme.of(context).textTheme;
+    final currentUserId = context.read<AuthProvider>().dbUser?.id;
+
+    // Take at most _kChatPreviewCount recent messages for the chat preview
+    final previewMessages = _messages.length > _kChatPreviewCount
+        ? _messages.sublist(_messages.length - _kChatPreviewCount)
+        : _messages;
+
+    // Pending requests only (no response from current user yet)
+    final pendingRequests = _requests.where((r) {
+      final myStatus = r.memberStatuses
+          .where((s) => s.memberId == currentUserId)
+          .map((s) => s.status)
+          .firstOrNull;
+      return myStatus == null || myStatus == 'PENDING';
+    }).toList();
+
     return RefreshIndicator(
       onRefresh: _load,
       color: FlixieColors.primary,
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        itemCount: _activity.length,
-        itemBuilder: (_, i) => ActivityTile(item: _activity[i]),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ---- Hero banner ------------------------------------------------
+            if (group != null) _GroupHeroBanner(group: group, memberCount: widget.memberCount),
+
+            const SizedBox(height: 16),
+
+            // ---- Recent Activity --------------------------------------------
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 4,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: FlixieColors.tertiary,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'RECENT ACTIVITY',
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: FlixieColors.success.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                          color: FlixieColors.success.withValues(alpha: 0.4)),
+                    ),
+                    child: const Text(
+                      'LIVE',
+                      style: TextStyle(
+                        color: FlixieColors.success,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            if (_activity.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 12),
+                child: Text(
+                  'No recent activity.',
+                  style: textTheme.bodySmall
+                      ?.copyWith(color: FlixieColors.medium),
+                ),
+              )
+            else
+              ...(_activity.take(5).map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 4),
+                      child: ActivityTile(item: item),
+                    ),
+                  )),
+
+            const SizedBox(height: 20),
+
+            // ---- Chat preview -----------------------------------------------
+            if (previewMessages.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 4,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        color: FlixieColors.secondary,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'CHAT PREVIEW',
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: widget.onViewAllChat,
+                      style: TextButton.styleFrom(
+                        foregroundColor: FlixieColors.tertiary,
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'VIEW ALL',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          SizedBox(width: 2),
+                          Icon(Icons.arrow_forward, size: 14),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: FlixieColors.tabBarBackgroundFocused,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: FlixieColors.tabBarBorder),
+                ),
+                child: Column(
+                  children: previewMessages.map((msg) {
+                    final senderId = msg['userId']?.toString() ?? '';
+                    final isMe = senderId == currentUserId;
+                    final username =
+                        msg['username']?.toString() ?? 'User';
+                    final initial = username.isNotEmpty
+                        ? username[0].toUpperCase()
+                        : '?';
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: isMe
+                            ? MainAxisAlignment.end
+                            : MainAxisAlignment.start,
+                        children: [
+                          if (!isMe) ...[
+                            CircleAvatar(
+                              radius: 14,
+                              backgroundColor: FlixieColors.primary
+                                  .withValues(alpha: 0.3),
+                              child: Text(
+                                initial,
+                                style: const TextStyle(
+                                  color: FlixieColors.primary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          Flexible(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: isMe
+                                    ? FlixieColors.primary
+                                        .withValues(alpha: 0.85)
+                                    : FlixieColors.tabBarBackground,
+                                borderRadius: BorderRadius.only(
+                                  topLeft: const Radius.circular(14),
+                                  topRight: const Radius.circular(14),
+                                  bottomLeft:
+                                      Radius.circular(isMe ? 14 : 4),
+                                  bottomRight:
+                                      Radius.circular(isMe ? 4 : 14),
+                                ),
+                              ),
+                              child: Text(
+                                msg['message']?.toString() ?? '',
+                                style: TextStyle(
+                                  color: isMe
+                                      ? Colors.black
+                                      : FlixieColors.light,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (isMe) ...[
+                            const SizedBox(width: 8),
+                            CircleAvatar(
+                              radius: 14,
+                              backgroundColor: FlixieColors.secondary
+                                  .withValues(alpha: 0.3),
+                              child: Text(
+                                initial,
+                                style: const TextStyle(
+                                  color: FlixieColors.secondary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+
+            // ---- Pending Requests -------------------------------------------
+            if (pendingRequests.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 4,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        color: FlixieColors.warning,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'PENDING REQUESTS (${pendingRequests.length})',
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...pendingRequests.take(3).map(
+                    (req) => _PendingRequestPreviewTile(
+                      request: req,
+                      onRespond: (status) async {
+                        final userId =
+                            context.read<AuthProvider>().dbUser?.id;
+                        if (userId == null) return;
+                        try {
+                          await GroupService.updateWatchRequestForMember(
+                              req.id, userId, '', status);
+                          await _load();
+                        } catch (e) {
+                          logger.e('Respond to request error: $e');
+                        }
+                      },
+                    ),
+                  ),
+            ],
+
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Group hero banner
+// ---------------------------------------------------------------------------
+
+class _GroupHeroBanner extends StatelessWidget {
+  const _GroupHeroBanner({required this.group, required this.memberCount});
+
+  final Group group;
+  final int memberCount;
+
+  static const List<Color> _palette = [
+    FlixieColors.primary,
+    FlixieColors.secondary,
+    FlixieColors.tertiary,
+    FlixieColors.success,
+    FlixieColors.warning,
+  ];
+
+  Color get _color {
+    final hash = group.name.codeUnits.fold(0, (a, b) => a + b);
+    return _palette[hash % _palette.length];
+  }
+
+  String _formatCount(int n) {
+    if (n >= 1000) {
+      final k = n / 1000;
+      return '${k.toStringAsFixed(k.truncateToDouble() == k ? 0 : 1)}k';
+    }
+    return '$n';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _color;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Left: group identity card
+          Expanded(
+            flex: 3,
+            child: Container(
+              height: 110,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    color.withValues(alpha: 0.35),
+                    FlixieColors.tabBarBackgroundFocused,
+                  ],
+                ),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  bottomLeft: Radius.circular(12),
+                ),
+                border: Border.all(color: FlixieColors.tabBarBorder),
+              ),
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: FlixieColors.tertiary.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'ACTIVE COMMUNITY',
+                      style: TextStyle(
+                        color: FlixieColors.tertiary,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    group.name.toUpperCase(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Right: member count card
+          Container(
+            width: 90,
+            height: 110,
+            decoration: BoxDecoration(
+              color: FlixieColors.tabBarBackgroundFocused,
+              borderRadius: const BorderRadius.only(
+                topRight: Radius.circular(12),
+                bottomRight: Radius.circular(12),
+              ),
+              border: Border(
+                top: BorderSide(color: FlixieColors.tabBarBorder),
+                right: BorderSide(color: FlixieColors.tabBarBorder),
+                bottom: BorderSide(color: FlixieColors.tabBarBorder),
+              ),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  _formatCount(memberCount),
+                  style: const TextStyle(
+                    color: FlixieColors.primary,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Text(
+                  'MEMBERS',
+                  style: TextStyle(
+                    color: FlixieColors.medium,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Pending request preview tile (used in Activity dashboard)
+// ---------------------------------------------------------------------------
+
+class _PendingRequestPreviewTile extends StatelessWidget {
+  const _PendingRequestPreviewTile({
+    required this.request,
+    required this.onRespond,
+  });
+
+  final GroupWatchRequest request;
+  final void Function(String status) onRespond;
+
+  @override
+  Widget build(BuildContext context) {
+    final abbr = (request.requesterUsername?.isNotEmpty == true)
+        ? request.requesterUsername![0].toUpperCase()
+        : 'R';
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: FlixieColors.tabBarBackgroundFocused,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: FlixieColors.tabBarBorder),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: FlixieColors.primary.withValues(alpha: 0.2),
+            child: Text(
+              abbr,
+              style: const TextStyle(
+                color: FlixieColors.primary,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  request.requesterUsername ?? 'Unknown',
+                  style: const TextStyle(
+                    color: FlixieColors.light,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+                if (request.movieTitle != null)
+                  Text(
+                    request.movieTitle!,
+                    style: const TextStyle(
+                        color: FlixieColors.medium, fontSize: 12),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: () => onRespond('DECLINED'),
+            icon: const Icon(Icons.close, color: FlixieColors.danger,
+                size: 20),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            onPressed: () => onRespond('ACCEPTED'),
+            icon: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: FlixieColors.primary.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Icon(Icons.check,
+                  color: FlixieColors.primary, size: 18),
+            ),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+        ],
       ),
     );
   }

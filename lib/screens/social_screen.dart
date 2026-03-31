@@ -403,6 +403,8 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
   List<Group> _groups = [];
   // groupId -> members with pending invite for current user
   final Map<String, GroupMember> _pendingInvites = {};
+  // groupId -> actual member count fetched from API
+  final Map<String, int> _memberCounts = {};
   String? _error;
 
   @override
@@ -422,10 +424,12 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
 
       // Check for pending invites in each group
       final pendingInvites = <String, GroupMember>{};
+      final memberCounts = <String, int>{};
       for (final group in groups) {
         if (group.id == null) continue;
         try {
           final members = await GroupService.getGroupMembers(group.id!);
+          memberCounts[group.id!] = members.length;
           final myMembership = members.firstWhere(
             (m) => m.memberId == userId,
             orElse: () => GroupMember(
@@ -447,6 +451,9 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
           _pendingInvites
             ..clear()
             ..addAll(pendingInvites);
+          _memberCounts
+            ..clear()
+            ..addAll(memberCounts);
           _loading = false;
           _error = null;
         });
@@ -596,7 +603,10 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
                 ),
               )
             else
-              ...myGroups.map((g) => _GroupCard(group: g)),
+              ...myGroups.map((g) => _GroupCard(
+                  group: g,
+                  memberCount: _memberCounts[g.id],
+                )),
             const SizedBox(height: 24),
           ],
         ),
@@ -678,12 +688,14 @@ class _InvitationCard extends StatelessWidget {
 }
 
 class _GroupCard extends StatelessWidget {
-  const _GroupCard({required this.group});
+  const _GroupCard({required this.group, this.memberCount});
 
   final Group group;
+  final int? memberCount;
 
   @override
   Widget build(BuildContext context) {
+    final count = memberCount ?? group.memberCount;
     return GestureDetector(
       onTap: () => context.push('/groups/${group.id}'),
       child: Container(
@@ -710,9 +722,9 @@ class _GroupCard extends StatelessWidget {
                       fontSize: 15,
                     ),
                   ),
-                  if (group.memberCount != null)
+                  if (count != null)
                     Text(
-                      '${group.memberCount} member${group.memberCount == 1 ? '' : 's'}',
+                      '$count member${count == 1 ? '' : 's'}',
                       style: const TextStyle(
                           color: FlixieColors.medium, fontSize: 12),
                     ),
