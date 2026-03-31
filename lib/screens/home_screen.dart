@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -30,6 +32,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   bool _isLoading = true;
   bool _showGreeting = true;
   String? _loadedForUserId;
+  Timer? _greetingTimer;
 
   static final RouteObserver<ModalRoute<void>> _routeObserver =
       RouteObserver<ModalRoute<void>>();
@@ -41,6 +44,9 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AuthProvider>().addListener(_onAuthChanged);
       _loadAll();
+      _greetingTimer = Timer(const Duration(seconds: 10), () {
+        if (mounted && _showGreeting) setState(() => _showGreeting = false);
+      });
       // Subscribe to route events to dismiss greeting on navigate-away
       final route = ModalRoute.of(context);
       if (route != null) _routeObserver.subscribe(this, route);
@@ -55,6 +61,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
 
   @override
   void dispose() {
+    _greetingTimer?.cancel();
     _routeObserver.unsubscribe(this);
     context.read<AuthProvider>().removeListener(_onAuthChanged);
     super.dispose();
