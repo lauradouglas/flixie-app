@@ -51,10 +51,16 @@ jobs:
       run: flutter pub get
 
     - name: Build APK (Release)
-      run: flutter build apk --release --dart-define-from-file=.env
+      run: flutter build apk --release
 
     - name: Build App Bundle (Release)
-      run: flutter build appbundle --release --dart-define-from-file=.env
+      run: flutter build appbundle --release
+
+    # - name: Build APK (Release)
+    #   run: flutter build apk --release --dart-define-from-file=.env
+
+    # - name: Build App Bundle (Release)
+    #   run: flutter build appbundle --release --dart-define-from-file=.env
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
