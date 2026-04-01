@@ -52,6 +52,7 @@ class WatchlistMovieDetails {
   final String? releaseDate;
   final double? voteAverage;
   final int? runtime;
+  final List<String> genres;
 
   const WatchlistMovieDetails({
     required this.id,
@@ -60,6 +61,7 @@ class WatchlistMovieDetails {
     this.releaseDate,
     this.voteAverage,
     this.runtime,
+    this.genres = const [],
   });
 
   factory WatchlistMovieDetails.fromJson(Map<String, dynamic> json) {
@@ -70,6 +72,14 @@ class WatchlistMovieDetails {
       releaseDate: json['releaseDate'] as String?,
       voteAverage: _parseDouble(json['voteAverage']),
       runtime: _parseInt(json['runtime']),
+      genres: json['genres'] != null
+          ? (json['genres'] as List<dynamic>)
+              .map((g) => g is Map<String, dynamic>
+                  ? (g['name'] as String? ?? '')
+                  : g.toString())
+              .where((s) => s.isNotEmpty)
+              .toList()
+          : const [],
     );
   }
 
@@ -81,6 +91,7 @@ class WatchlistMovieDetails {
       'releaseDate': releaseDate,
       'voteAverage': voteAverage,
       'runtime': runtime,
+      'genres': genres,
     };
   }
 }

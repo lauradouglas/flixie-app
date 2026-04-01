@@ -78,7 +78,7 @@ class _SplashScreenState extends State<SplashScreen>
 
               const SizedBox(height: 8),
 
-              Text(
+              const Text(
                 'Your movie world',
                 style: TextStyle(
                   color: FlixieColors.medium,

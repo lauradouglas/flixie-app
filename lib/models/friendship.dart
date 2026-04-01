@@ -28,9 +28,6 @@ class FriendshipUser {
   }
 
   String get displayName {
-    if (firstName != null && lastName != null) {
-      return '${firstName!} ${lastName!}';
-    }
     return username;
   }
 

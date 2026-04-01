@@ -1,8 +1,10 @@
 import '../models/movie.dart';
 import '../models/movie_credits.dart';
+import '../models/movie_friend_activity.dart';
 import '../models/review.dart';
 import '../models/similar_movie.dart';
 import '../models/movie_short.dart';
+import '../models/top_rated_movie.dart';
 import '../models/watch_provider.dart';
 import '../utils/app_logger.dart';
 import 'api_client.dart';
@@ -24,7 +26,7 @@ class MovieService {
     }
 
     // Fetch from API
-    apiLogger.d('Fetching movie $id from API');
+    apiLogger.d('Fetching movie $id.');
     final queryParams = userId != null ? {'userId': userId} : null;
     final data =
         await ApiClient.get('/movies/id/$id', queryParams: queryParams);
@@ -98,7 +100,7 @@ class MovieService {
     }
 
     // Fetch from API
-    apiLogger.d('Fetching recommendations for movie $movieId from API');
+    apiLogger.d('Fetching recommendations for movie $movieId.');
     final data = await ApiClient.get('/movies/$movieId/recommendations');
     final recommendations = (data as List<dynamic>)
         .map((e) => SimilarMovie.fromJson(e as Map<String, dynamic>))
@@ -118,7 +120,7 @@ class MovieService {
     }
 
     // Fetch from API
-    apiLogger.d('Fetching credits for movie $movieId from API');
+    apiLogger.d('Fetching credits for movie $movieId.');
     final data = await ApiClient.get('/movies/$movieId/credits');
     final credits = MovieCredits.fromJson(data as Map<String, dynamic>);
 
@@ -130,8 +132,8 @@ class MovieService {
 
   static Future<List<WatchProvider>> getMovieWatchProviders(
       int movieId, String region) async {
-    apiLogger.d(
-        'Fetching watch providers for movie $movieId in region $region from API');
+    apiLogger
+        .d('Fetching watch providers for movie $movieId in region $region.');
     final data =
         await ApiClient.get('/movies/$movieId/$region/watch/providers');
     final allProviders = (data as List<dynamic>)
@@ -143,17 +145,36 @@ class MovieService {
         .where((provider) => provider.displayPriority <= 50)
         .toList();
 
-    apiLogger.d(
-        'Filtered ${filteredProviders.length} providers from ${allProviders.length} total (displayPriority <= 50)');
-
     return filteredProviders;
   }
 
-  static Future<List<Review>> getMovieReviews(int movieId) async {
+  static Future<List<Review>> getMovieReviews(int movieId,
+      {String? userId}) async {
     apiLogger.d('Fetching reviews for movie $movieId from API');
-    final data = await ApiClient.get('/users/MOVIE/$movieId/reviews');
+    final data = await ApiClient.get('/users/MOVIE/$movieId/reviews',
+        queryParams: userId != null ? {'userId': userId} : null);
     return (data as List<dynamic>)
         .map((e) => Review.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  static Future<List<TopRatedMovie>> getTopRatedThisWeek(
+      {int limit = 10}) async {
+    apiLogger.d('Fetching top rated movies this week');
+    final data = await ApiClient.get('/movies/top_rated/this_week',
+        queryParams: {'limit': '$limit'});
+    return (data as List<dynamic>)
+        .map((e) => TopRatedMovie.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  static Future<List<MovieFriendActivity>> getFriendsMovieActivity(
+      int movieId, String userId) async {
+    apiLogger.d('Fetching friends activity for movie $movieId');
+    final data = await ApiClient.get('/movies/id/$movieId/friends-activity',
+        queryParams: {'userId': userId});
+    return (data as List<dynamic>)
+        .map((e) => MovieFriendActivity.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
@@ -172,15 +193,17 @@ class MovieService {
     apiLogger.d('Fetching now playing movies for region $region');
     final data = await ApiClient.get('/movies/now_playing',
         queryParams: {'region': region});
-    apiLogger.d('now_playing raw response type: ${data.runtimeType}');
-    apiLogger.d('now_playing response: $data');
     final movies = (data as List<dynamic>)
         .map((e) => MovieShort.fromJson(e as Map<String, dynamic>))
         .toList();
-    apiLogger.d('now_playing parsed ${movies.length} movies');
     return movies;
   }
   // ---- Cache management methods ----
+
+  /// Evict a single movie from cache so the next fetch hits the API.
+  static void evictMovie(int movieId) {
+    _cache.evictMovie(movieId);
+  }
 
   /// Clear all cached movies
   static void clearCache() {

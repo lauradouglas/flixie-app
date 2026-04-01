@@ -1,4 +1,6 @@
 import '../models/group.dart';
+import '../models/group_member.dart';
+import '../models/group_watch_request.dart';
 import 'api_client.dart';
 
 class GroupService {
@@ -51,5 +53,125 @@ class GroupService {
   static Future<List<dynamic>> getGroupMessages(String groupId) async {
     final data = await ApiClient.get('/groups/$groupId/messages');
     return data as List<dynamic>;
+  }
+
+  static Future<List<GroupMember>> getGroupMembers(String groupId) async {
+    final data = await ApiClient.get('/groups/$groupId/members');
+    return (data as List<dynamic>)
+        .map((e) => GroupMember.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  static Future<void> addMembersToGroup(
+      String groupId, List<Map<String, dynamic>> members) async {
+    await ApiClient.post(
+      '/groups/$groupId/members/batch',
+      body: {'members': members},
+    );
+  }
+
+  static Future<void> removeMembersFromGroup(
+      String groupId, List<String> memberIds) async {
+    await ApiClient.delete(
+      '/groups/$groupId/members/batch',
+      body: {'memberIds': memberIds},
+    );
+  }
+
+  static Future<void> updateRoleOfMemberInGroup(
+      String groupId, String memberId, String roleId) async {
+    await ApiClient.put(
+      '/groups/$groupId/members/$memberId/role',
+      body: {'roleId': roleId},
+    );
+  }
+
+  static Future<void> updateMemberInviteStatus(
+      String groupId, String memberId, String inviteStatus) async {
+    await ApiClient.put(
+      '/groups/$groupId/members/$memberId/inviteStatus',
+      body: {'inviteStatus': inviteStatus},
+    );
+  }
+
+  static Future<GroupWatchRequest> sendWatchRequest(
+    String groupId,
+    String userId,
+    String message,
+    String mediaType,
+    int mediaId,
+  ) async {
+    final data = await ApiClient.post(
+      '/groups/$groupId/send-request',
+      body: {
+        'userId': userId,
+        'message': message,
+        'mediaType': mediaType,
+        'mediaId': mediaId,
+      },
+    );
+    return GroupWatchRequest.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<void> updateWatchRequestForMember(
+    String requestId,
+    String memberId,
+    String response,
+    String status,
+  ) async {
+    await ApiClient.put(
+      '/groups/request/$requestId/response',
+      body: {'memberId': memberId, 'response': response, 'status': status},
+    );
+  }
+
+  static Future<GroupRequestMessage> addMessageToRequest(
+    String requestId,
+    String userId,
+    String message,
+  ) async {
+    final data = await ApiClient.post(
+      '/groups/request/$requestId/message',
+      body: {'userId': userId, 'message': message},
+    );
+    return GroupRequestMessage.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<void> sendFriendRequestsToGroupMembers(
+    String groupId,
+    String userId,
+    String message,
+  ) async {
+    await ApiClient.post(
+      '/groups/$groupId/send-friend-requests',
+      body: {'userId': userId, 'message': message},
+    );
+  }
+
+  static Future<void> updateGroupVisibility(
+      String groupId, String visibility) async {
+    await ApiClient.put(
+      '/groups/$groupId/visibility',
+      body: {'visibility': visibility},
+    );
+  }
+
+  static Future<void> updateGroupRequestMessageVotes(
+    String messageId,
+    bool upVote,
+    bool downVote,
+  ) async {
+    await ApiClient.put(
+      '/groups/request/message/$messageId/votes',
+      body: {'upVote': upVote, 'downVote': downVote},
+    );
+  }
+
+  static Future<List<GroupWatchRequest>> getGroupWatchRequests(
+      String groupId) async {
+    final data = await ApiClient.get('/groups/$groupId/requests');
+    return (data as List<dynamic>)
+        .map((e) => GroupWatchRequest.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 }

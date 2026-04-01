@@ -1,5 +1,6 @@
 import 'genre.dart';
 import 'movie_video.dart';
+import 'review.dart';
 
 class Movie {
   final int id;
@@ -22,6 +23,7 @@ class Movie {
   final String? instagramId;
   final String? twitterId;
   final Map<String, dynamic>? collection;
+  final List<Review>? reviews;
 
   const Movie({
     required this.id,
@@ -44,6 +46,7 @@ class Movie {
     this.instagramId,
     this.twitterId,
     this.collection,
+    this.reviews,
   });
 
   factory Movie.fromJson(Map<String, dynamic> json) {
@@ -76,6 +79,11 @@ class Movie {
       instagramId: json['instagramId'] as String?,
       twitterId: json['twitterId'] as String?,
       collection: json['collection'] as Map<String, dynamic>?,
+      reviews: json['reviews'] != null
+          ? (json['reviews'] as List<dynamic>)
+              .map((e) => Review.fromJson(e as Map<String, dynamic>))
+              .toList()
+          : null,
     );
   }
 
@@ -116,6 +124,7 @@ class Movie {
     String? instagramId,
     String? twitterId,
     Map<String, dynamic>? collection,
+    List<Review>? reviews,
   }) {
     return Movie(
       id: id ?? this.id,
@@ -138,6 +147,7 @@ class Movie {
       instagramId: instagramId ?? this.instagramId,
       twitterId: twitterId ?? this.twitterId,
       collection: collection ?? this.collection,
+      reviews: reviews ?? this.reviews,
     );
   }
 

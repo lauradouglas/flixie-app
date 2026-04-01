@@ -374,42 +374,39 @@ class ReviewCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            // Footer with votes and spoiler warning
+            // Footer with reactions and spoiler warning
             Row(
               children: [
-                // Upvotes
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.arrow_upward,
-                        color: FlixieColors.success, size: 14),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${review.upvotes}',
-                      style: const TextStyle(
-                        color: Colors.grey,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 16),
-                // Downvotes
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.arrow_downward,
-                        color: FlixieColors.danger, size: 14),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${review.downvotes}',
-                      style: const TextStyle(
-                        color: Colors.grey,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
+                // Reactions preview
+                if (review.reactions.isNotEmpty) ...[
+                  ...(() {
+                    const emojiMap = {
+                      'agree': '\u{1F44D}',
+                      'hot_take': '\u{1F525}',
+                      'love': '\u{2764}\u{FE0F}',
+                      'funny': '\u{1F602}',
+                      'hmm': '\u{1F914}',
+                    };
+                    final sorted = review.reactions.entries.toList()
+                      ..sort((a, b) => b.value.compareTo(a.value));
+                    return sorted.take(3).map((e) => Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(emojiMap[e.key] ?? e.key,
+                                  style: const TextStyle(fontSize: 13)),
+                              const SizedBox(width: 2),
+                              Text(
+                                '${e.value}',
+                                style: const TextStyle(
+                                    color: Colors.grey, fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ));
+                  })(),
+                ],
                 const Spacer(),
                 // Spoiler warning
                 if (review.containsSpoilers)

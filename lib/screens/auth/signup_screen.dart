@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/country.dart';
+import '../../models/genre.dart';
 import '../../models/language.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/reference_data_service.dart';
@@ -44,6 +45,10 @@ class _SignupScreenState extends State<SignupScreen> {
   Language? _selectedLanguage;
   Country? _selectedCountry;
 
+  // Genre multi-select
+  List<Genre> _genres = [];
+  final Set<int> _selectedGenreIds = {};
+
   @override
   void initState() {
     super.initState();
@@ -62,11 +67,13 @@ class _SignupScreenState extends State<SignupScreen> {
       final results = await Future.wait([
         ReferenceDataService.getLanguages(),
         ReferenceDataService.getCountries(),
+        ReferenceDataService.getGenres(),
       ]);
       if (mounted) {
         setState(() {
           _languages = results[0] as List<Language>;
           _countries = results[1] as List<Country>;
+          _genres = results[2] as List<Genre>;
           _loadingRefData = false;
         });
       }
@@ -150,6 +157,7 @@ class _SignupScreenState extends State<SignupScreen> {
       username: _usernameController.text,
       languageId: _selectedLanguage!.id,
       countryId: _selectedCountry!.id,
+      genreIds: _selectedGenreIds.toList(),
     );
 
     if (!mounted) return;
@@ -394,6 +402,12 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                 const SizedBox(height: 16),
 
+                // Favourite genres (optional)
+                if (!_loadingRefData && !_refDataError && _genres.isNotEmpty)
+                  ..._buildGenrePicker(textTheme),
+
+                const SizedBox(height: 16),
+
                 // Password
                 TextFormField(
                   controller: _passwordController,
@@ -511,6 +525,74 @@ class _SignupScreenState extends State<SignupScreen> {
         ),
       ],
     );
+  }
+
+  List<Widget> _buildGenrePicker(TextTheme textTheme) {
+    return [
+      Row(
+        children: [
+          Text('Favourite Genres', style: textTheme.titleSmall),
+          const SizedBox(width: 6),
+          Text(
+            '(optional)',
+            style: textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
+          ),
+        ],
+      ),
+      const SizedBox(height: 10),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: _genres.map((genre) {
+          final selected = _selectedGenreIds.contains(genre.id);
+          return GestureDetector(
+            onTap: () => setState(() {
+              if (selected) {
+                _selectedGenreIds.remove(genre.id);
+              } else {
+                _selectedGenreIds.add(genre.id);
+              }
+            }),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: selected
+                    ? FlixieColors.primary.withValues(alpha: 0.2)
+                    : FlixieColors.tabBarBackgroundFocused,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: selected
+                      ? FlixieColors.primary
+                      : FlixieColors.tabBarBorder,
+                  width: selected ? 1.5 : 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (selected) ...[
+                    const Icon(Icons.check_rounded,
+                        size: 14, color: FlixieColors.primary),
+                    const SizedBox(width: 4),
+                  ],
+                  Text(
+                    genre.name,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color:
+                          selected ? FlixieColors.primary : FlixieColors.light,
+                      fontWeight:
+                          selected ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    ];
   }
 
   Widget? _buildUsernameSuffix() {

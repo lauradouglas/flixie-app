@@ -53,6 +53,16 @@ class UserService {
     return data as bool;
   }
 
+  /// Updates a single field on the user via POST /users/:userId
+  static Future<User> updateUserField(
+      String userId, String field, dynamic value) async {
+    final data = await ApiClient.post(
+      '/users/$userId',
+      body: {field: value},
+    );
+    return User.fromJson(data as Map<String, dynamic>);
+  }
+
   static Future<User> updateUser(Map<String, dynamic> body) async {
     final data = await ApiClient.put('/users/update', body: body);
     return User.fromJson(data as Map<String, dynamic>);
@@ -69,32 +79,29 @@ class UserService {
 
   static Future<List<ActivityListItem>> getUserActivity(String userId) async {
     final data = await ApiClient.get('/users/$userId/activity');
-    apiLogger.d('[Activity] raw response type: ${data.runtimeType}');
-    apiLogger.d('[Activity] raw response: $data');
     return (data as List<dynamic>)
         .map((e) => ActivityListItem.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
-  static Future<User> toggleDarkMode(String userId, bool darkMode) async {
-    final data = await ApiClient.patch(
-      '/users/$userId/dark-mode',
-      body: {'darkMode': darkMode},
+  static Future<User> updateIconColor(String userId, int iconColorId) async {
+    final data = await ApiClient.post(
+      '/users/$userId/icon-color',
+      body: {'colorId': iconColorId},
     );
     return User.fromJson(data as Map<String, dynamic>);
   }
 
-  static Future<User> updateIconColor(String userId, int iconColorId) async {
-    final data = await ApiClient.patch(
-      '/users/$userId/icon-color',
-      body: {'iconColorId': iconColorId},
+  static Future<void> addFavoriteGenres(
+      String userId, List<int> genreIds) async {
+    await ApiClient.post(
+      '/users/$userId/genres/favorites',
+      body: {'genreIds': genreIds},
     );
-    return User.fromJson(data as Map<String, dynamic>);
   }
 
   static Future<List<Review>> getMovieReviews(int movieId) async {
     final data = await ApiClient.get('/users/movie/$movieId/reviews');
-    // final data = await ApiClient.get('/users/movie/11/reviews');
     return (data as List<dynamic>)
         .map((e) => Review.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -202,6 +209,27 @@ class UserService {
     return Review.fromJson(data as Map<String, dynamic>);
   }
 
+  /// Adds or removes an emoji reaction on a review.
+  /// Pass [reactionType] as null to remove the current reaction.
+  /// Returns the updated reactions map and the user's current reaction.
+  static Future<({Map<String, int> reactions, String? myReaction})>
+      reactToReview({
+    required String mediaType,
+    required String mediaId,
+    required String reviewId,
+    required String userId,
+    required String? reactionType,
+  }) async {
+    final data = await ApiClient.post(
+      '/users/$mediaType/$mediaId/review/$reviewId/react',
+      body: {'userId': userId, 'reactionType': reactionType},
+    ) as Map<String, dynamic>;
+    final reactions = (data['reactions'] as Map<String, dynamic>?)
+            ?.map((k, v) => MapEntry(k, (v as num).toInt())) ??
+        {};
+    return (reactions: reactions, myReaction: data['myReaction'] as String?);
+  }
+
   static Future<Review> addMovieReview(Review review) async {
     apiLogger.d('POST /users/add/MOVIE/review');
     final data = await ApiClient.post(
@@ -231,8 +259,6 @@ class UserService {
     apiLogger.d('GET /users/$userId/movies/ratings');
     try {
       final data = await ApiClient.get('/users/$userId/movies/ratings');
-      apiLogger.d('[Ratings] Raw response type: ${data.runtimeType}');
-      apiLogger.d('[Ratings] Raw response: $data');
       final ratings = (data as List<dynamic>)
           .map((e) => MovieRating.fromJson(e as Map<String, dynamic>))
           .toList();
@@ -250,8 +276,6 @@ class UserService {
     apiLogger.d('GET /users/$userId/movies/watchlist');
     try {
       final data = await ApiClient.get('/users/$userId/movies/watchlist');
-      apiLogger.d('[Watchlist] Raw response type: ${data.runtimeType}');
-      apiLogger.d('[Watchlist] Raw response: $data');
       final watchlist = (data as List<dynamic>)
           .map((e) => WatchlistMovie.fromJson(e as Map<String, dynamic>))
           .toList();

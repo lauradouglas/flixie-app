@@ -6,6 +6,7 @@ enum ActivityListType {
   favoriteMovie('favorite-movie'),
   favoriteShow('favorite-show'),
   favoritePerson('favorite-person'),
+  movieRating('movie-rating'),
   watchRequestSent('watch-request-sent'),
   watchRequestAccepted('watch-request-accepted'),
   unknown('unknown');
@@ -74,14 +75,14 @@ class ActivityListItem {
       createdAt: json['createdAt'] as String? ?? '',
       updatedAt: json['updatedAt'] as String? ?? '',
       type: ActivityListType.fromString(json['type'] as String?),
-      mediaTitle: movie?['title'] as String?
-          ?? show?['title'] as String?
-          ?? person?['name'] as String?,
-      mediaPosterPath: movie?['posterPath'] as String?
-          ?? show?['posterPath'] as String?
-          ?? person?['profileImgUrl'] as String?,
-      mediaRating: (json['rating'] as num?)?.toDouble()
-          ?? (review?['rating'] as num?)?.toDouble(),
+      mediaTitle: movie?['title'] as String? ??
+          show?['title'] as String? ??
+          person?['name'] as String?,
+      mediaPosterPath: movie?['posterPath'] as String? ??
+          show?['posterPath'] as String? ??
+          person?['profileImgUrl'] as String?,
+      mediaRating: (json['rating'] as num?)?.toDouble() ??
+          (review?['rating'] as num?)?.toDouble(),
     );
   }
 }
