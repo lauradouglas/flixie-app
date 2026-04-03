@@ -2,8 +2,13 @@ import '../models/watch_request.dart';
 import 'api_client.dart';
 
 class RequestService {
-  static Future<void> sendRequest(Map<String, dynamic> body) async {
-    await ApiClient.post('/requests', body: body);
+  static Future<Map<String, dynamic>?> sendRequest(
+      Map<String, dynamic> body) async {
+    final data = await ApiClient.post('/requests', body: body);
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+    return null;
   }
 
   static Future<void> updateRequest(String requestId, String status,

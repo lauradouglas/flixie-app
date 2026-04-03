@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
-import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/widgets.dart';
 
 import '../models/activity_list_item.dart';
 import '../models/friendship.dart';
@@ -15,6 +15,7 @@ import '../services/auth_service.dart';
 import '../services/friend_service.dart';
 import '../services/movie_service.dart';
 import '../services/notification_service.dart';
+import '../services/push_notification_service.dart';
 import '../services/trending_service.dart';
 import '../services/user_service.dart';
 import '../utils/app_logger.dart';
@@ -55,6 +56,14 @@ class AuthProvider extends ChangeNotifier {
 
   int _unreadNotificationCount = 0;
   Timer? _notifPollTimer;
+
+  /// Navigator key set by the app root so push notifications can navigate.
+  GlobalKey<NavigatorState>? _navigatorKey;
+
+  /// Call once the root navigator is ready (e.g. in [FlixieApp.initState]).
+  void setNavigatorKey(GlobalKey<NavigatorState> key) {
+    _navigatorKey = key;
+  }
 
   AuthStatus get status => _status;
   firebase_auth.User? get firebaseUser => _firebaseUser;
@@ -159,6 +168,14 @@ class AuthProvider extends ChangeNotifier {
       }
     } else {
       logger.i('User signed out, clearing database user');
+      // Remove FCM token from backend before clearing the auth token so the
+      // API request can still be authenticated. Fire-and-forget is intentional:
+      // we do not want to block the sign-out flow on a network call, and any
+      // failure is tolerable because the token will be re-registered on next
+      // login.
+      if (_dbUser?.id != null) {
+        unawaited(PushNotificationService.removeToken(_dbUser!.externalId));
+      }
       ApiClient.setToken(null);
       _dbUser = null;
       _status = AuthStatus.unauthenticated;
@@ -230,6 +247,20 @@ class AuthProvider extends ChangeNotifier {
         const Duration(seconds: 30),
         (_) => refreshNotificationCount(),
       );
+
+      // Initialise push notifications now that we have a valid user and the
+      // widget tree is about to be ready. We do this inside a post-frame
+      // callback to ensure the navigator key has been attached.
+      final key = _navigatorKey;
+      if (key != null) {
+        SchedulerBinding.instance.addPostFrameCallback((_) {
+          PushNotificationService.initialize(
+            userId: _dbUser?.externalId ?? userId,
+            navigatorKey: key,
+          );
+        });
+      }
+
       // Defer navigation trigger to avoid mid-frame widget tree mutations
       // (same pattern used in _onAuthStateChanged).
       SchedulerBinding.instance.addPostFrameCallback((_) {
