@@ -1995,13 +1995,16 @@ class _WatchRequestSheetState extends State<_WatchRequestSheet> {
     if (_selectedFriendId == null || _isSending) return;
     setState(() => _isSending = true);
     try {
-      await RequestService.sendRequest({
+      final result = await RequestService.sendRequest({
         'requesterId': widget.requesterId,
         'recipientId': _selectedFriendId,
         'movieId': widget.movieId,
         'message': _messageController.text.trim(),
         'type': 'MOVIE_WATCH_REQUEST',
       });
+      final notification = result?['notification'] as Map<String, dynamic>?;
+      logger.d('[WatchRequest] notification created: $notification');
+
       if (mounted) Navigator.pop(context);
       widget.onSuccess();
     } catch (e) {

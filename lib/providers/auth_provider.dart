@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
-import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 
@@ -175,7 +174,7 @@ class AuthProvider extends ChangeNotifier {
       // failure is tolerable because the token will be re-registered on next
       // login.
       if (_dbUser?.id != null) {
-        unawaited(PushNotificationService.removeToken(_dbUser!.id));
+        unawaited(PushNotificationService.removeToken(_dbUser!.externalId));
       }
       ApiClient.setToken(null);
       _dbUser = null;
@@ -256,7 +255,7 @@ class AuthProvider extends ChangeNotifier {
       if (key != null) {
         SchedulerBinding.instance.addPostFrameCallback((_) {
           PushNotificationService.initialize(
-            userId: userId,
+            userId: _dbUser?.externalId ?? userId,
             navigatorKey: key,
           );
         });

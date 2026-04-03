@@ -27,6 +27,10 @@ class PushNotificationService {
   static final _messaging = FirebaseMessaging.instance;
   static final _localNotifications = FlutterLocalNotificationsPlugin();
 
+  /// The userId of the currently logged-in user. Used to suppress
+  /// notifications intended for a different user (e.g. the sender).
+  static String? _currentUserId;
+
   /// High-importance notification channel used for Android.
   static const _androidChannel = AndroidNotificationChannel(
     'flixie_notifications',
@@ -53,6 +57,7 @@ class PushNotificationService {
     required String userId,
     required GlobalKey<NavigatorState> navigatorKey,
   }) async {
+    _currentUserId = userId;
     final settings = await _messaging.requestPermission(
       alert: true,
       badge: true,
@@ -71,6 +76,16 @@ class PushNotificationService {
     // banner when a message arrives while the app is in the foreground.
     await _initLocalNotifications(navigatorKey);
 
+    // iOS: allow FCM to show alert/badge/sound when the app is in the foreground.
+    // Without this iOS silently suppresses foreground FCM messages.
+    if (Platform.isIOS) {
+      await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+    }
+
     // Get the FCM token and register it with the backend.
     await _registerToken(userId);
 
@@ -82,8 +97,20 @@ class PushNotificationService {
 
     // Foreground messages: FCM does NOT show a system notification by default,
     // so we display one manually via flutter_local_notifications.
+    // Only show if we still have a logged-in user (guards against post-logout delivery).
     FirebaseMessaging.onMessage.listen((message) {
       logger.d('[FCM] Foreground message: ${message.notification?.title}');
+      if (_currentUserId == null) {
+        logger.d('[FCM] Suppressing foreground message — no user logged in');
+        return;
+      }
+      // If the backend puts the recipient userId in data, skip if it
+      // doesn't match (prevents sender seeing their own notification).
+      final recipientId = message.data['recipientId'] as String?;
+      if (recipientId != null && recipientId != _currentUserId) {
+        logger.d('[FCM] Suppressing foreground message — not for current user');
+        return;
+      }
       _showLocalNotification(message);
     });
 
@@ -106,13 +133,21 @@ class PushNotificationService {
     }
   }
 
-  /// Removes the stored FCM token from the backend when the user signs out.
+  /// Removes the stored FCM token from the backend and deregisters the device
+  /// from FCM so no further messages are delivered after sign-out.
   static Future<void> removeToken(String userId) async {
+    _currentUserId = null;
     try {
       await UserService.removeFcmToken(userId);
       logger.i('[FCM] Token removed from backend');
     } catch (e) {
       logger.w('[FCM] Failed to remove FCM token from backend: $e');
+    }
+    try {
+      await _messaging.deleteToken();
+      logger.i('[FCM] FCM token deleted from Firebase — device unsubscribed');
+    } catch (e) {
+      logger.w('[FCM] Failed to delete FCM token from Firebase: $e');
     }
   }
 
@@ -145,10 +180,28 @@ class PushNotificationService {
 
   static Future<void> _registerToken(String userId) async {
     try {
-      // On iOS the APNs token must be available before requesting the FCM token.
+      // On iOS: get the APNs token first (it must exist before we can get
+      // or delete an FCM token). Only then delete the old FCM token.
       if (Platform.isIOS) {
-        await _messaging.getAPNSToken();
+        String? apnsToken;
+        for (var i = 0; i < 5; i++) {
+          apnsToken = await _messaging.getAPNSToken();
+          if (apnsToken != null) break;
+          await Future<void>.delayed(const Duration(seconds: 2));
+        }
+        if (apnsToken == null) {
+          logger.w(
+              '[FCM] APNs token unavailable after retries – skipping FCM registration');
+          return;
+        }
+        logger.d('[FCM] APNs token obtained');
       }
+
+      // Delete the existing FCM token so Firebase issues a brand-new one,
+      // breaking any stale association with a previous user on this device.
+      await _messaging.deleteToken();
+      // Brief pause after delete to let Firebase settle, especially on iOS.
+      await Future<void>.delayed(const Duration(milliseconds: 500));
 
       final token = await _messaging.getToken();
       if (token != null) {
