@@ -27,9 +27,14 @@ class ActivityTile extends StatelessWidget {
       case ActivityListType.favoritePerson:
         return Colors.redAccent;
       case ActivityListType.movieRating:
+      case ActivityListType.showRating:
         return FlixieColors.tertiary;
+      case ActivityListType.movieReview:
+      case ActivityListType.showReview:
+        return FlixieColors.secondary;
       case ActivityListType.watchRequestSent:
       case ActivityListType.watchRequestAccepted:
+      case ActivityListType.watchRequest:
         return FlixieColors.primary;
       case ActivityListType.unknown:
         return FlixieColors.medium;
@@ -49,11 +54,17 @@ class ActivityTile extends StatelessWidget {
       case ActivityListType.favoritePerson:
         return Icons.favorite_outline;
       case ActivityListType.movieRating:
+      case ActivityListType.showRating:
         return Icons.star_rounded;
+      case ActivityListType.movieReview:
+      case ActivityListType.showReview:
+        return Icons.rate_review_outlined;
       case ActivityListType.watchRequestSent:
         return Icons.send_outlined;
       case ActivityListType.watchRequestAccepted:
         return Icons.people_outline;
+      case ActivityListType.watchRequest:
+        return Icons.movie_filter_outlined;
       case ActivityListType.unknown:
         return Icons.history;
     }
@@ -79,10 +90,27 @@ class ActivityTile extends StatelessWidget {
         return r != null
             ? 'Rated ${r.toStringAsFixed(0)}/10'
             : 'Rated this movie';
+      case ActivityListType.showRating:
+        final sr = item.mediaRating;
+        return sr != null
+            ? 'Rated ${sr.toStringAsFixed(0)}/10'
+            : 'Rated this show';
+      case ActivityListType.movieReview:
+        final mr = item.mediaRating;
+        return mr != null
+            ? 'Reviewed · ${mr.toStringAsFixed(0)}/10'
+            : 'Reviewed this movie';
+      case ActivityListType.showReview:
+        final srev = item.mediaRating;
+        return srev != null
+            ? 'Reviewed · ${srev.toStringAsFixed(0)}/10'
+            : 'Reviewed this show';
       case ActivityListType.watchRequestSent:
         return 'Sent a watch request';
       case ActivityListType.watchRequestAccepted:
         return 'Accepted a watch request';
+      case ActivityListType.watchRequest:
+        return 'Requested a group watch';
       case ActivityListType.unknown:
         return 'Activity';
     }

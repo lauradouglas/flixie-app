@@ -22,16 +22,18 @@ class GroupMember {
   });
 
   factory GroupMember.fromJson(Map<String, dynamic> json) {
+    final user = json['user'] as Map<String, dynamic>?;
     return GroupMember(
       groupId: json['groupId'] as String? ?? '',
       memberId: json['memberId'] as String? ?? '',
       role: json['role'] as String? ?? 'MEMBER',
       inviteStatus: json['inviteStatus'] as String?,
-      username: json['username'] as String?,
-      firstName: json['firstName'] as String?,
-      lastName: json['lastName'] as String?,
-      iconColor: json['iconColor'] as Map<String, dynamic>?,
-      initials: json['initials'] as String?,
+      username: (user?['username'] ?? json['username']) as String?,
+      firstName: (user?['firstName'] ?? json['firstName']) as String?,
+      lastName: (user?['lastName'] ?? json['lastName']) as String?,
+      iconColor:
+          (user?['iconColor'] ?? json['iconColor']) as Map<String, dynamic>?,
+      initials: (user?['initials'] ?? json['initials']) as String?,
     );
   }
 

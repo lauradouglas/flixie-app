@@ -85,7 +85,8 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     if (myId == null) return;
 
     try {
-      final data = auth.cachedFriends ?? await FriendService.getFriends(myId);
+      // Always fetch fresh data — the cache may be stale after sending a request.
+      final data = await FriendService.getFriends(myId);
 
       if (!mounted) return;
 
@@ -98,6 +99,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
           return;
         }
       }
+      // pending = requests sent TO the logged-in user (they are the recipient).
       for (final f in data.pendingFriends) {
         if (f.friendUser?.id == widget.userId) {
           setState(() {
@@ -107,6 +109,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
           return;
         }
       }
+      // requested = requests sent BY the logged-in user (they are the requester).
       for (final f in data.requestedFriends) {
         if (f.friendUser?.id == widget.userId) {
           setState(() {

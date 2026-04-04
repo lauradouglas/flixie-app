@@ -676,7 +676,7 @@ class _ReactionChipState extends State<_ReactionChip>
 
   @override
   Widget build(BuildContext context) {
-    final activeColor = FlixieColors.primary;
+    const activeColor = FlixieColors.primary;
     final bg = widget.isActive
         ? activeColor.withValues(alpha: 0.18)
         : const Color(0xFF1E2D40);
@@ -697,7 +697,7 @@ class _ReactionChipState extends State<_ReactionChip>
           mainAxisSize: MainAxisSize.min,
           children: [
             widget.isLoading
-                ? SizedBox(
+                ? const SizedBox(
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(
