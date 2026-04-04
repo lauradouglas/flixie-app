@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +9,7 @@ import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
 import 'services/auth_service.dart';
 import 'services/movie_cache_service.dart';
+import 'services/push_notification_service.dart';
 import 'theme/app_theme.dart';
 import 'utils/app_logger.dart';
 import 'screens/home_screen.dart';
@@ -53,6 +55,9 @@ void main() async {
     }
   }
 
+  // Register FCM background message handler (must be called before runApp).
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
   // Clear stale movie cache from previous days
   MovieCacheService().clearStaleCache();
 
@@ -82,9 +87,15 @@ void main() async {
   );
 }
 
+/// Global navigator key shared between [_buildRouter] and
+/// [PushNotificationService] so the service can navigate without a BuildContext.
+final GlobalKey<NavigatorState> rootNavigatorKey =
+    GlobalKey<NavigatorState>(debugLabel: 'root');
+
 /// Builds the GoRouter, refreshing only when auth status changes (not user data).
 GoRouter _buildRouter(AuthProvider authProvider) {
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
     refreshListenable: authProvider.authStatusListenable,
     redirect: (context, state) {
       final status = authProvider.status;
@@ -222,6 +233,8 @@ class _FlixieAppState extends State<FlixieApp> {
     // Create router once - it will refresh via authStatusListenable, not by rebuilding this widget
     final authProvider = context.read<AuthProvider>();
     _router = _buildRouter(authProvider);
+    // Give the navigator key to AuthProvider so push notifications can navigate.
+    authProvider.setNavigatorKey(rootNavigatorKey);
   }
 
   @override

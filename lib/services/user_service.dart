@@ -253,6 +253,21 @@ class UserService {
     return Review.fromJson(data as Map<String, dynamic>);
   }
 
+  // ---- FCM Token Management ------------------------------------------------
+
+  /// Saves (or updates) the FCM device token for push notifications.
+  static Future<void> saveFcmToken(String userId, String token) async {
+    await ApiClient.post(
+      '/users/$userId/fcm-token',
+      body: {'token': token},
+    );
+  }
+
+  /// Removes the stored FCM device token (call on sign-out).
+  static Future<void> removeFcmToken(String userId) async {
+    await ApiClient.delete('/users/$userId/fcm-token');
+  }
+
   // ---- Ratings -------------------------------------------------------------
 
   static Future<List<MovieRating>> getUserMovieRatings(String userId) async {
