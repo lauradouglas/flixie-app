@@ -221,7 +221,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
                       child: ListView.separated(
                         padding: const EdgeInsets.all(16),
                         itemCount: _filtered.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
                         itemBuilder: (_, i) => _WatchRequestCard(
                           request: _filtered[i],
                           myUserId:

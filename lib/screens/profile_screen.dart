@@ -351,6 +351,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             'RECENT ACTIVITY',
                             style: textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
+                              color: Colors.white,
                               letterSpacing: 1.5,
                             ),
                           ),

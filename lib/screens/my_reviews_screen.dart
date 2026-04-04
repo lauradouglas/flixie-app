@@ -227,7 +227,7 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: _filteredReviews.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
+      separatorBuilder: (context, index) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         return ReviewCard(
           review: _filteredReviews[index],

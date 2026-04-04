@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -415,7 +416,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (context, i) => _buildCard(items[i]),
     );
   }
@@ -434,27 +435,27 @@ class _NotificationScreenState extends State<NotificationScreen> {
       children: [
         if (pending.isNotEmpty) ...[
           _buildSectionHeader('REQUESTS'),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           ...pending.map((n) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.only(bottom: 10),
                 child: _buildCard(n),
               )),
           const SizedBox(height: 16),
         ],
         if (newItems.isNotEmpty) ...[
           _buildSectionHeader('NEW'),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           ...newItems.map((n) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.only(bottom: 10),
                 child: _buildCard(n),
               )),
           const SizedBox(height: 16),
         ],
         if (earlier.isNotEmpty) ...[
           _buildSectionHeader('EARLIER'),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           ...earlier.map((n) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.only(bottom: 10),
                 child: _buildCard(n),
               )),
         ],
@@ -801,128 +802,226 @@ class _RequestCard extends StatelessWidget {
     }
   }
 
+  Color get _accentColor {
+    switch (notification.type) {
+      case FlixieNotification.groupInvite:
+      case FlixieNotification.groupRequest:
+        return FlixieColors.tertiary;
+      case FlixieNotification.movieWatchRequest:
+        // case FlixieNotification.showWatchRequest:
+        return FlixieColors.primary;
+      case FlixieNotification.friendRequest:
+      default:
+        return FlixieColors.secondary;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final name = notification.senderName;
     final initials = notification.senderInitials ?? '';
     final avatarBg = _avatarColorFromIconColor(notification.senderIconColor);
+    final accent = _accentColor;
+    final posterPath = notification.watchMediaPosterPath;
+    final posterUrl = posterPath != null && posterPath.isNotEmpty
+        ? 'https://image.tmdb.org/t/p/w185$posterPath'
+        : null;
+    final msg = notification.watchRequestMessage;
+    final hasMessage = msg.isNotEmpty && notification.action == null;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: FlixieColors.tabBarBackgroundFocused,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              // Avatar
-              CircleAvatar(
-                radius: 28,
-                backgroundColor: avatarBg.withValues(alpha: 0.2),
-                child: initials.isNotEmpty
-                    ? Text(
-                        initials,
-                        style: TextStyle(
-                          color: avatarBg,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      )
-                    : Icon(_typeIcon, color: avatarBg, size: 28),
-              ),
-              const SizedBox(width: 12),
-              // Name and subtitle
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (name.isNotEmpty)
-                      Text(
-                        name,
-                        style: const TextStyle(
-                          color: FlixieColors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                    const SizedBox(height: 2),
-                    _buildSubtitleWidget(context),
-                    if (notification.type ==
-                            FlixieNotification.movieWatchRequest &&
-                        notification.watchRequestMessage.isNotEmpty &&
-                        notification.action == null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        notification.watchRequestMessage,
-                        style: const TextStyle(
-                          color: FlixieColors.medium,
-                          fontSize: 12,
-                          fontStyle: FontStyle.normal,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              // Close icon
-              IconButton(
-                icon: const Icon(Icons.close,
-                    size: 20, color: FlixieColors.medium),
-                tooltip: 'Close',
-                onPressed: onClose,
-              ),
-            ],
+    return Stack(
+      children: [
+        Container(
+          clipBehavior: Clip.hardEdge,
+          decoration: BoxDecoration(
+            color: FlixieColors.tabBarBackgroundFocused,
+            borderRadius: BorderRadius.circular(12),
+            border: Border(left: BorderSide(color: accent, width: 3)),
           ),
-          const SizedBox(height: 12),
-          if (isProcessing)
-            const Center(
-              child: SizedBox(
-                height: 36,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            )
-          else if (!_isResolved)
-            Row(
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Left: content
                 Expanded(
-                  child: OutlinedButton(
-                    onPressed: onDecline,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: FlixieColors.danger,
-                      side: BorderSide(
-                          color: FlixieColors.danger.withValues(alpha: 0.45)),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                  child: Padding(
+                    // Extra right padding so content doesn't sit under the close button
+                    padding: const EdgeInsets.fromLTRB(12, 12, 36, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 20,
+                              backgroundColor: avatarBg.withValues(alpha: 0.2),
+                              child: initials.isNotEmpty
+                                  ? Text(
+                                      initials,
+                                      style: TextStyle(
+                                        color: avatarBg,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                      ),
+                                    )
+                                  : Icon(_typeIcon, color: avatarBg, size: 20),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (name.isNotEmpty)
+                                    Text(
+                                      name,
+                                      style: const TextStyle(
+                                        color: FlixieColors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  const SizedBox(height: 2),
+                                  _buildSubtitleWidget(context),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (hasMessage) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: accent.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                  color: accent.withValues(alpha: 0.25)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.chat_bubble_outline,
+                                    size: 12, color: accent),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    msg,
+                                    style: const TextStyle(
+                                      color: FlixieColors.light,
+                                      fontSize: 12,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 10),
+                        if (isProcessing)
+                          const Center(
+                            child: SizedBox(
+                              height: 32,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        else if (!_isResolved)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: onDecline,
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: FlixieColors.danger,
+                                    side: BorderSide(
+                                        color: FlixieColors.danger
+                                            .withValues(alpha: 0.45)),
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 8),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8)),
+                                    minimumSize: Size.zero,
+                                    textStyle: const TextStyle(fontSize: 13),
+                                  ),
+                                  child: const Text('Decline',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.w600)),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: onAccept,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: FlixieColors.primary,
+                                    foregroundColor: Colors.black,
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 8),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8)),
+                                    minimumSize: Size.zero,
+                                    textStyle: const TextStyle(fontSize: 13),
+                                  ),
+                                  child: const Text('Accept',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.w600)),
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
                     ),
-                    child: const Text('Decline',
-                        style: TextStyle(fontWeight: FontWeight.w600)),
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: onAccept,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: FlixieColors.primary,
-                      foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                // Right: poster (only when available — not for friend/group invites)
+                if (posterUrl != null)
+                  SizedBox(
+                    width: 90,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        CachedNetworkImage(
+                          imageUrl: posterUrl,
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) => Container(
+                            color: FlixieColors.tabBarBorder,
+                            child: Icon(_typeIcon,
+                                color: FlixieColors.medium, size: 28),
+                          ),
+                        ),
+                        Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                              colors: [
+                                FlixieColors.tabBarBackgroundFocused,
+                                Colors.transparent,
+                              ],
+                              stops: const [0.0, 0.25],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    child: const Text('Accept',
-                        style: TextStyle(fontWeight: FontWeight.w600)),
                   ),
-                ),
               ],
             ),
-        ],
-      ),
+          ),
+        ),
+        // Close button always top-right of the card
+        Positioned(
+          top: 4,
+          right: 4,
+          child: IconButton(
+            icon: const Icon(Icons.close, size: 18, color: FlixieColors.medium),
+            tooltip: 'Close',
+            onPressed: onClose,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -166,6 +166,7 @@ class MovieTasteBadge extends StatelessWidget {
                 'MOVIE TASTE',
                 style: textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
+                  color: Colors.white,
                   letterSpacing: 1.5,
                 ),
               ),
