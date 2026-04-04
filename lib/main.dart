@@ -29,6 +29,7 @@ import 'screens/watch_history_screen.dart';
 import 'screens/watch_requests_screen.dart';
 import 'screens/social_screen.dart';
 import 'screens/group_detail_screen.dart';
+import 'screens/group_members_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/signup_screen.dart';
 import 'screens/auth/forgot_password_screen.dart';
@@ -146,6 +147,13 @@ GoRouter _buildRouter(AuthProvider authProvider) {
             ),
           ),
           GoRoute(
+            path: '/groups/:id/members',
+            builder: (context, state) => GroupMembersScreen(
+              groupId: state.pathParameters['id'] ?? '',
+              groupName: state.extra as String? ?? 'Group',
+            ),
+          ),
+          GoRoute(
             path: '/profile',
             builder: (context, state) => const ProfileScreen(),
           ),
@@ -255,9 +263,10 @@ class MainNavigationShell extends StatelessWidget {
   static int _indexFromLocation(String location) {
     if (location.startsWith('/search')) return 1;
     if (location.startsWith('/watchlist')) return 2;
-    // if (location.startsWith('/social') || location.startsWith('/groups')) return 3;
-    // if (location.startsWith('/profile')) return 4;
-    if (location.startsWith('/profile')) return 3;
+    if (location.startsWith('/social') || location.startsWith('/groups')) {
+      return 3;
+    }
+    if (location.startsWith('/profile')) return 4;
     return 0;
   }
 
@@ -265,7 +274,7 @@ class MainNavigationShell extends StatelessWidget {
     '/',
     '/search',
     '/watchlist',
-    // '/social',
+    '/social',
     '/profile',
   ];
 
@@ -314,11 +323,11 @@ class MainNavigationShell extends StatelessWidget {
               selectedIcon: Icon(Icons.bookmark),
               label: 'Watchlist',
             ),
-            // NavigationDestination(
-            //   icon: Icon(Icons.people_outline),
-            //   selectedIcon: Icon(Icons.people),
-            //   label: 'Social',
-            // ),
+            NavigationDestination(
+              icon: Icon(Icons.people_outline),
+              selectedIcon: Icon(Icons.people),
+              label: 'Social',
+            ),
             NavigationDestination(
               icon: Icon(Icons.person_outline),
               selectedIcon: Icon(Icons.person),

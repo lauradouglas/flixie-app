@@ -85,28 +85,36 @@ class GroupWatchRequest {
   });
 
   factory GroupWatchRequest.fromJson(Map<String, dynamic> json) {
-    final statusesRaw = json['memberStatuses'] as List<dynamic>? ?? [];
+    // API returns nested `responses` and `messages` arrays
+    final statusesRaw = json['responses'] as List<dynamic>? ??
+        json['memberStatuses'] as List<dynamic>? ??
+        [];
     final messagesRaw = json['messages'] as List<dynamic>? ?? [];
+
+    // Movie and requester are nested objects in the API response
+    final movie = json['movie'] as Map<String, dynamic>?;
+    final requester = json['requester'] as Map<String, dynamic>?;
 
     return GroupWatchRequest(
       id: json['id']?.toString() ?? '',
       groupId: json['groupId']?.toString() ?? '',
-      userId: json['userId']?.toString() ?? '',
+      userId: (json['requesterId'] ?? json['userId'])?.toString() ?? '',
       message: json['message'] as String?,
       mediaType: json['mediaType'] as String?,
-      mediaId: json['mediaId'] as int?,
+      mediaId: (json['movieId'] ?? json['mediaId']) as int?,
       createdAt: json['createdAt'] as String?,
       updatedAt: json['updatedAt'] as String?,
-      movieTitle: json['movieTitle'] as String?,
-      moviePosterPath: json['moviePosterPath'] as String?,
-      requesterUsername: json['requesterUsername'] as String?,
+      movieTitle: movie?['title'] as String? ?? json['movieTitle'] as String?,
+      moviePosterPath:
+          movie?['posterPath'] as String? ?? json['moviePosterPath'] as String?,
+      requesterUsername: requester?['username'] as String? ??
+          json['requesterUsername'] as String?,
       memberStatuses: statusesRaw
           .map((e) =>
               GroupRequestMemberStatus.fromJson(e as Map<String, dynamic>))
           .toList(),
       messages: messagesRaw
-          .map((e) =>
-              GroupRequestMessage.fromJson(e as Map<String, dynamic>))
+          .map((e) => GroupRequestMessage.fromJson(e as Map<String, dynamic>))
           .toList(),
     );
   }

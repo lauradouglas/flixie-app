@@ -127,6 +127,76 @@ class FlixieNotification {
     return null;
   }
 
+  /// The movie title embedded in a group watch request link.
+  String? get groupWatchMovieTitle {
+    final l = link;
+    if (l == null) return null;
+    final gr = l['groupRequest'] as Map<String, dynamic>?;
+    if (gr == null) return null;
+    // Direct field from backend GroupWatchRequest shape
+    final direct = gr['movieTitle'] as String?;
+    if (direct != null && direct.isNotEmpty) return direct;
+    // Fallback: embedded movie object
+    final movie = gr['movie'] as Map<String, dynamic>?;
+    return movie?['title'] as String?;
+  }
+
+  /// The TMDB movie id embedded in a group watch request link.
+  int? get groupWatchMovieId {
+    final l = link;
+    if (l == null) return null;
+    final gr = l['groupRequest'] as Map<String, dynamic>?;
+    if (gr == null) return null;
+    // Backend stores as 'movieId'; also check 'mediaId' for compatibility
+    final raw = gr['movieId'] ?? gr['mediaId'];
+    if (raw is int) return raw;
+    if (raw is String) return int.tryParse(raw);
+    return null;
+  }
+
+  /// The group name embedded in a group watch request link.
+  String? get groupWatchGroupName {
+    final l = link;
+    if (l == null) return null;
+    final gr = l['groupRequest'] as Map<String, dynamic>?;
+    if (gr == null) return null;
+    final group = gr['group'] as Map<String, dynamic>?;
+    return group?['name'] as String?;
+  }
+
+  /// The message stored on the embedded group invite request (includes group name).
+  String get groupInviteMessage {
+    final l = link;
+    if (l == null) return message;
+    final request =
+        (l['groupRequest'] ?? l['request']) as Map<String, dynamic>?;
+    if (request == null) return message;
+    final req = request['message'] as String?;
+    return (req != null && req.isNotEmpty) ? req : message;
+  }
+
+  /// The group id embedded in a GROUP_INVITE notification link.
+  String? get groupInviteGroupId {
+    final l = link;
+    if (l == null) return linkId;
+    final req = (l['groupRequest'] ?? l['request']) as Map<String, dynamic>?;
+    if (req == null) return linkId;
+    final direct = req['groupId'] as String?;
+    if (direct != null) return direct;
+    final group = req['group'] as Map<String, dynamic>?;
+    return (group?['id'] as String?) ?? linkId;
+  }
+
+  /// The group name embedded in a GROUP_INVITE notification link.
+  String? get groupInviteGroupName {
+    final l = link;
+    if (l == null) return null;
+    final req = (l['groupRequest'] ?? l['request']) as Map<String, dynamic>?;
+    if (req == null) return null;
+    final group = req['group'] as Map<String, dynamic>?;
+    return group?['name'] as String?;
+  }
+
   /// The message stored on the embedded request (preferred over top-level message).
   String get watchRequestMessage {
     final l = link;

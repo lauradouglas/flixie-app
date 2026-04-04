@@ -410,11 +410,12 @@ class _FavoriteGenresSheetState extends State<_FavoriteGenresSheet> {
   Future<void> _loadGenres() async {
     try {
       final genres = await ReferenceDataService.getGenres();
-      if (mounted)
+      if (mounted) {
         setState(() {
           _allGenres = genres;
           _loading = false;
         });
+      }
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
@@ -615,11 +616,12 @@ class _IconColorSheetState extends State<_IconColorSheet> {
   Future<void> _loadColors() async {
     try {
       final colors = await ReferenceDataService.getColors();
-      if (mounted)
+      if (mounted) {
         setState(() {
           _colors = colors;
           _loading = false;
         });
+      }
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }

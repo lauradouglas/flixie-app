@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../models/group.dart';
 import '../models/movie.dart';
 import '../models/movie_credits.dart';
 import '../models/movie_friend_activity.dart';
@@ -15,6 +16,7 @@ import '../models/review.dart';
 import '../models/similar_movie.dart';
 import '../models/watch_provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/group_service.dart';
 import '../services/movie_service.dart';
 import '../services/request_service.dart';
 import '../services/user_service.dart';
@@ -175,7 +177,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     setState(() => _currentlyUpdating = ListUpdateType.watchlist);
 
     try {
-      await (_inWatchlist
+      final result = await (_inWatchlist
           ? UserService.removeFromWatchlist(user.id, movieId)
           : UserService.addToWatchlist(user.id, movieId));
 
@@ -188,35 +190,30 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           _watchlistBounceKey++;
         });
 
-        final currentWatchlist = user.movieWatchlist ?? [];
-        final updatedWatchlist = <int>[];
-
-        try {
-          for (var item in currentWatchlist) {
-            if (item is int) {
-              updatedWatchlist.add(item);
-            } else if (item is Map<String, dynamic>) {
-              final id = item['movieId'] ?? item['id'];
-              if (id is int) {
-                updatedWatchlist.add(id);
-              }
-            }
-          }
-        } catch (e) {
-          logger.w('Error processing watchlist: $e');
-          logger.d('currentWatchlist type: ${currentWatchlist.runtimeType}');
-          logger.d('currentWatchlist: $currentWatchlist');
-        }
+        // Keep all existing Map entries (so WatchlistScreen can parse them),
+        // then append or remove the affected entry.
+        final currentWatchlist = List<dynamic>.from(user.movieWatchlist ?? []);
 
         if (_inWatchlist) {
-          if (!updatedWatchlist.contains(movieId)) {
-            updatedWatchlist.add(movieId);
-          }
+          // Added — append the full Map returned by the API
+          currentWatchlist.removeWhere((item) {
+            if (item is Map<String, dynamic>) {
+              return (item['movieId'] ?? item['id']) == movieId;
+            }
+            return item == movieId;
+          });
+          currentWatchlist.add(result.toJson());
           authProvider.markActivityChanged();
         } else {
-          updatedWatchlist.remove(movieId);
+          // Removed — strip out the entry
+          currentWatchlist.removeWhere((item) {
+            if (item is Map<String, dynamic>) {
+              return (item['movieId'] ?? item['id']) == movieId;
+            }
+            return item == movieId;
+          });
         }
-        authProvider.updateUserList(movieWatchlist: updatedWatchlist);
+        authProvider.updateUserList(movieWatchlist: currentWatchlist);
       }
     } catch (e) {
       logger.e('Error toggling watchlist: $e');
@@ -832,10 +829,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             SizedBox(height: 8),
             Text(
               '🔥 8.1+ · Loved\n'
-              '👍 7.0-8.1 · Liked\n'
-              '😐 6.0-7.0 · Mixed\n'
-              '😕 5.0-6.0 · Meh\n'
-              '👎 Below 5.0 · Disliked\n'
+              '😀 7.0-8.1 · Liked\n'
+              '🙂 6.0-7.0 · Okay\n'
+              '😐 5.0-6.0 · Meh\n'
+              '😕 Below 5.0 · Disliked\n'
               'N/A · No ratings yet.',
               style: TextStyle(
                 color: FlixieColors.light,
@@ -1022,14 +1019,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   void _showWatchRequestSheet() {
     final auth = context.read<AuthProvider>();
     final friends = auth.cachedFriends?.friendships ?? [];
+    final userId = auth.dbUser?.id;
 
-    if (friends.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Add some friends to invite them to watch')),
-      );
-      return;
-    }
+    if (userId == null) return;
 
     showModalBottomSheet<void>(
       context: context,
@@ -1041,7 +1033,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       builder: (_) => _WatchRequestSheet(
         movieId: int.tryParse(widget.movieId),
         movieTitle: _movie?.title,
-        requesterId: auth.dbUser?.id,
+        requesterId: userId,
         friends: friends,
         onSuccess: () {
           if (mounted) {
@@ -1971,7 +1963,7 @@ class _WatchRequestSheet extends StatefulWidget {
 
   final int? movieId;
   final String? movieTitle;
-  final String? requesterId;
+  final String requesterId;
   final List<Friendship> friends;
   final VoidCallback onSuccess;
   final VoidCallback onError;
@@ -1982,8 +1974,30 @@ class _WatchRequestSheet extends StatefulWidget {
 
 class _WatchRequestSheetState extends State<_WatchRequestSheet> {
   final _messageController = TextEditingController();
+  bool _isGroupMode = false;
   String? _selectedFriendId;
+  String? _selectedGroupId;
   bool _isSending = false;
+
+  List<Group> _groups = [];
+  bool _loadingGroups = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchGroups();
+  }
+
+  Future<void> _fetchGroups() async {
+    setState(() => _loadingGroups = true);
+    try {
+      final groups = await GroupService.getUserGroups(widget.requesterId);
+      if (mounted) setState(() => _groups = groups);
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _loadingGroups = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -1992,19 +2006,30 @@ class _WatchRequestSheetState extends State<_WatchRequestSheet> {
   }
 
   Future<void> _send() async {
-    if (_selectedFriendId == null || _isSending) return;
+    final canSend =
+        _isGroupMode ? _selectedGroupId != null : _selectedFriendId != null;
+    if (!canSend || _isSending) return;
     setState(() => _isSending = true);
     try {
-      final result = await RequestService.sendRequest({
-        'requesterId': widget.requesterId,
-        'recipientId': _selectedFriendId,
-        'movieId': widget.movieId,
-        'message': _messageController.text.trim(),
-        'type': 'MOVIE_WATCH_REQUEST',
-      });
-      final notification = result?['notification'] as Map<String, dynamic>?;
-      logger.d('[WatchRequest] notification created: $notification');
-
+      if (_isGroupMode) {
+        await GroupService.sendWatchRequest(
+          _selectedGroupId!,
+          widget.requesterId,
+          _messageController.text.trim(),
+          'MOVIE',
+          widget.movieId!,
+        );
+      } else {
+        final result = await RequestService.sendRequest({
+          'requesterId': widget.requesterId,
+          'recipientId': _selectedFriendId,
+          'movieId': widget.movieId,
+          'message': _messageController.text.trim(),
+          'type': 'MOVIE_WATCH_REQUEST',
+        });
+        final notification = result?['notification'] as Map<String, dynamic>?;
+        logger.d('[WatchRequest] notification created: $notification');
+      }
       if (mounted) Navigator.pop(context);
       widget.onSuccess();
     } catch (e) {
@@ -2016,6 +2041,9 @@ class _WatchRequestSheetState extends State<_WatchRequestSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final hasFriends = widget.friends.isNotEmpty;
+    final hasGroups = _groups.isNotEmpty;
+
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
@@ -2043,65 +2071,171 @@ class _WatchRequestSheetState extends State<_WatchRequestSheet> {
               ),
             ],
             const SizedBox(height: 20),
-            const Text(
-              'SELECT A FRIEND',
-              style: TextStyle(
-                color: FlixieColors.medium,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 1.1,
+            // Friend / Group toggle
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F2033),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  _ModeTab(
+                    label: 'A Friend',
+                    selected: !_isGroupMode,
+                    onTap: () => setState(() {
+                      _isGroupMode = false;
+                      _selectedGroupId = null;
+                    }),
+                  ),
+                  _ModeTab(
+                    label: 'A Group',
+                    selected: _isGroupMode,
+                    onTap: () => setState(() {
+                      _isGroupMode = true;
+                      _selectedFriendId = null;
+                    }),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 44,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: widget.friends.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (_, i) {
-                  final friend = widget.friends[i].friendUser;
-                  if (friend == null) return const SizedBox.shrink();
-                  final isSelected = _selectedFriendId == friend.id;
-                  final iconColor = friend.iconColor;
-                  final hex = ((iconColor?['hexCode'] ?? iconColor?['hex'])
-                              as String? ??
-                          '')
-                      .replaceAll('#', '');
-                  final pillColor = hex.isNotEmpty
-                      ? Color(int.tryParse('0xFF$hex') ??
-                          FlixieColors.primary.toARGB32())
-                      : FlixieColors.primary;
-                  return GestureDetector(
-                    onTap: () => setState(() => _selectedFriendId = friend.id),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? pillColor
-                            : pillColor.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(22),
-                        border: Border.all(
-                          color: isSelected
-                              ? pillColor
-                              : pillColor.withValues(alpha: 0.4),
-                        ),
-                      ),
-                      child: Text(
-                        friend.displayName,
-                        style: TextStyle(
-                          color: isSelected ? Colors.white : FlixieColors.light,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  );
-                },
+            const SizedBox(height: 20),
+            if (!_isGroupMode) ...[
+              const Text(
+                'SELECT A FRIEND',
+                style: TextStyle(
+                  color: FlixieColors.medium,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.1,
+                ),
               ),
-            ),
+              const SizedBox(height: 10),
+              if (!hasFriends)
+                const Text(
+                  'Add some friends to invite them to watch',
+                  style: TextStyle(color: FlixieColors.medium, fontSize: 13),
+                )
+              else
+                SizedBox(
+                  height: 44,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: widget.friends.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (_, i) {
+                      final friend = widget.friends[i].friendUser;
+                      if (friend == null) return const SizedBox.shrink();
+                      final isSelected = _selectedFriendId == friend.id;
+                      final iconColor = friend.iconColor;
+                      final hex = ((iconColor?['hexCode'] ?? iconColor?['hex'])
+                                  as String? ??
+                              '')
+                          .replaceAll('#', '');
+                      final pillColor = hex.isNotEmpty
+                          ? Color(int.tryParse('0xFF$hex') ??
+                              FlixieColors.primary.toARGB32())
+                          : FlixieColors.primary;
+                      return GestureDetector(
+                        onTap: () =>
+                            setState(() => _selectedFriendId = friend.id),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? pillColor
+                                : pillColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(
+                              color: isSelected
+                                  ? pillColor
+                                  : pillColor.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: Text(
+                            friend.displayName,
+                            style: TextStyle(
+                              color: isSelected
+                                  ? Colors.white
+                                  : FlixieColors.light,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ] else ...[
+              const Text(
+                'SELECT A GROUP',
+                style: TextStyle(
+                  color: FlixieColors.medium,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.1,
+                ),
+              ),
+              const SizedBox(height: 10),
+              if (_loadingGroups)
+                const SizedBox(
+                  height: 44,
+                  child:
+                      Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                )
+              else if (!hasGroups)
+                const Text(
+                  "You're not in any groups yet",
+                  style: TextStyle(color: FlixieColors.medium, fontSize: 13),
+                )
+              else
+                SizedBox(
+                  height: 44,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _groups.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (_, i) {
+                      final group = _groups[i];
+                      final isSelected = _selectedGroupId == group.id;
+                      return GestureDetector(
+                        onTap: () =>
+                            setState(() => _selectedGroupId = group.id),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? FlixieColors.primary
+                                : FlixieColors.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(
+                              color: isSelected
+                                  ? FlixieColors.primary
+                                  : FlixieColors.primary.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: Text(
+                            group.abbreviation?.isNotEmpty == true
+                                ? group.abbreviation!
+                                : group.name,
+                            style: TextStyle(
+                              color: isSelected
+                                  ? Colors.white
+                                  : FlixieColors.light,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ],
             const SizedBox(height: 20),
             const Text(
               'MESSAGE (OPTIONAL)',
@@ -2141,8 +2275,12 @@ class _WatchRequestSheetState extends State<_WatchRequestSheet> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed:
-                    _isSending || _selectedFriendId == null ? null : _send,
+                onPressed: _isSending ||
+                        (_isGroupMode
+                            ? _selectedGroupId == null
+                            : _selectedFriendId == null)
+                    ? null
+                    : _send,
                 child: _isSending
                     ? const SizedBox(
                         height: 18,
@@ -2157,6 +2295,44 @@ class _WatchRequestSheetState extends State<_WatchRequestSheet> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ModeTab extends StatelessWidget {
+  const _ModeTab({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: selected ? FlixieColors.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: selected ? Colors.black : FlixieColors.medium,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
         ),
       ),
     );
