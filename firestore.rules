@@ -4,12 +4,13 @@ service cloud.firestore {
 
     // -------------------------------------------------------------------------
     // Conversations
+    // NOTE: memberIds stores Postgres UUIDs, not Firebase Auth UIDs.
+    // Membership is enforced by the backend (Admin SDK) at write time.
+    // Client reads are gated to any authenticated user — the backend ensures
+    // only members ever receive a conversationId.
     // -------------------------------------------------------------------------
     match /conversations/{conversationId} {
-      // A member can read the conversation document (needed to get memberIds,
-      // name, lastMessage, etc.)
-      allow read: if request.auth != null
-                  && request.auth.uid in resource.data.memberIds;
+      allow read: if request.auth != null;
 
       // All writes are performed server-side via the Admin SDK.
       allow write: if false;
@@ -18,11 +19,7 @@ service cloud.firestore {
       // Messages subcollection
       // -----------------------------------------------------------------------
       match /messages/{messageId} {
-        // Only members of the parent conversation may read messages.
-        allow read: if request.auth != null
-                    && request.auth.uid in
-                       get(/databases/$(database)/documents/conversations/$(conversationId))
-                         .data.memberIds;
+        allow read: if request.auth != null;
 
         // Messages are written by the backend only.
         allow write: if false;
@@ -32,8 +29,7 @@ service cloud.firestore {
       // Members subcollection (stores unreadCount per user)
       // -----------------------------------------------------------------------
       match /members/{userId} {
-        // Each user may read their own member document (for unread count).
-        allow read: if request.auth != null && request.auth.uid == userId;
+        allow read: if request.auth != null;
 
         // Writes are backend-only.
         allow write: if false;

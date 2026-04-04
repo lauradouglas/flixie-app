@@ -336,15 +336,36 @@ class _ChatTabState extends State<_ChatTab> {
   bool _initLoading = true;
   bool _sending = false;
   String? _initError;
+  AuthProvider? _authProvider;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_authProvider == null) {
+      _authProvider = context.read<AuthProvider>();
+      _authProvider!.addListener(_onAuthChanged);
+    }
+  }
+
+  void _onAuthChanged() {
+    // Retry init if we were waiting for the user to load
+    if (_initLoading && _authProvider?.dbUser != null) {
+      _initConversation();
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    _initConversation();
+    // Use addPostFrameCallback so context is fully ready
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _initConversation();
+    });
   }
 
   @override
   void dispose() {
+    _authProvider?.removeListener(_onAuthChanged);
     _messageController.dispose();
     super.dispose();
   }
@@ -352,14 +373,10 @@ class _ChatTabState extends State<_ChatTab> {
   Future<void> _initConversation() async {
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (userId == null) {
-      if (mounted) {
-        setState(() {
-          _initLoading = false;
-          _initError = 'Not signed in';
-        });
-      }
+      // dbUser not ready yet — listener will retry once it loads
       return;
     }
+    if (!_initLoading) return; // already resolved
     try {
       final results = await Future.wait([
         GroupService.getGroup(widget.groupId),
