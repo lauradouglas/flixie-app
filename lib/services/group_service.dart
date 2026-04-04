@@ -1,6 +1,7 @@
 import '../models/group.dart';
 import '../models/group_member.dart';
 import '../models/group_watch_request.dart';
+import '../utils/app_logger.dart';
 import 'api_client.dart';
 
 class GroupService {
@@ -57,24 +58,28 @@ class GroupService {
 
   static Future<List<GroupMember>> getGroupMembers(String groupId) async {
     final data = await ApiClient.get('/groups/$groupId/members');
+    logger.d('[getGroupMembers] raw response: $data');
     return (data as List<dynamic>)
         .map((e) => GroupMember.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
   static Future<void> addMembersToGroup(
-      String groupId, List<Map<String, dynamic>> members) async {
+      String groupId, List<Map<String, dynamic>> members,
+      {String? inviterId}) async {
     await ApiClient.post(
-      '/groups/$groupId/members/batch',
-      body: {'members': members},
+      '/groups/$groupId/members',
+      body: inviterId != null
+          ? members.map((m) => {...m, 'inviterId': inviterId}).toList()
+          : members,
     );
   }
 
   static Future<void> removeMembersFromGroup(
       String groupId, List<String> memberIds) async {
     await ApiClient.delete(
-      '/groups/$groupId/members/batch',
-      body: {'memberIds': memberIds},
+      '/groups/$groupId/members',
+      body: memberIds,
     );
   }
 

@@ -127,6 +127,17 @@ class FlixieNotification {
     return null;
   }
 
+  /// The message stored on the embedded group invite request (includes group name).
+  String get groupInviteMessage {
+    final l = link;
+    if (l == null) return message;
+    final request =
+        (l['groupRequest'] ?? l['request']) as Map<String, dynamic>?;
+    if (request == null) return message;
+    final req = request['message'] as String?;
+    return (req != null && req.isNotEmpty) ? req : message;
+  }
+
   /// The message stored on the embedded request (preferred over top-level message).
   String get watchRequestMessage {
     final l = link;

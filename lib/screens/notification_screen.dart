@@ -182,6 +182,18 @@ class _NotificationScreenState extends State<NotificationScreen> {
         }
       }
 
+      // For group invites and group requests, also update the underlying request record.
+      if (notification.type == FlixieNotification.groupInvite ||
+          notification.type == FlixieNotification.groupRequest) {
+        final requestId = notification.linkedRequestId;
+        if (requestId != null) {
+          final status = action == FlixieNotification.actionAccepted
+              ? 'ACCEPTED'
+              : 'DECLINED';
+          await RequestService.updateRequest(requestId, status);
+        }
+      }
+
       await NotificationService.updateNotification(
         id,
         action: action,
@@ -190,16 +202,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
       if (mounted) {
         setState(() {
-          // Remove on accept; update in-place on decline so the resolved state shows.
-          if (action == FlixieNotification.actionAccepted) {
-            _notifications.removeWhere((n) => n.id == id);
-          } else {
-            final idx = _notifications.indexWhere((n) => n.id == id);
-            if (idx != -1) {
-              _notifications[idx] =
-                  _notifications[idx].copyWith(action: action, read: true);
-            }
-          }
+          _notifications.removeWhere((n) => n.id == id);
         });
         // Show success toast
         ScaffoldMessenger.of(context).showSnackBar(
@@ -547,7 +550,8 @@ class _RequestCard extends StatelessWidget {
   String get _subtitle {
     switch (notification.type) {
       case FlixieNotification.groupInvite:
-        return 'Invited you';
+        final msg = notification.groupInviteMessage;
+        return msg.isNotEmpty ? msg : 'Invited you to join a group';
       case FlixieNotification.groupRequest:
         return 'Requested to join your group';
       case FlixieNotification.movieWatchRequest:
@@ -642,9 +646,37 @@ class _RequestCard extends StatelessWidget {
         ),
       );
     }
-    return Text(
-      _subtitle,
-      style: const TextStyle(color: FlixieColors.light, fontSize: 13),
+    return _buildGroupInviteSubtitle() ??
+        Text(
+          _subtitle,
+          style: const TextStyle(color: FlixieColors.light, fontSize: 13),
+        );
+  }
+
+  Widget? _buildGroupInviteSubtitle() {
+    if (notification.type != FlixieNotification.groupInvite || _isResolved) {
+      return null;
+    }
+    const joinPrefix = 'to join ';
+    final msg = _subtitle;
+    final idx = msg.indexOf(joinPrefix);
+    if (idx == -1) {
+      return Text(msg,
+          style: const TextStyle(color: FlixieColors.light, fontSize: 13));
+    }
+    final before = msg.substring(0, idx + joinPrefix.length);
+    final groupName = msg.substring(idx + joinPrefix.length);
+    return RichText(
+      text: TextSpan(
+        style: const TextStyle(color: FlixieColors.light, fontSize: 13),
+        children: [
+          TextSpan(text: before),
+          TextSpan(
+            text: groupName,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
     );
   }
 

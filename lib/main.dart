@@ -263,8 +263,9 @@ class MainNavigationShell extends StatelessWidget {
   static int _indexFromLocation(String location) {
     if (location.startsWith('/search')) return 1;
     if (location.startsWith('/watchlist')) return 2;
-    if (location.startsWith('/social') || location.startsWith('/groups'))
+    if (location.startsWith('/social') || location.startsWith('/groups')) {
       return 3;
+    }
     if (location.startsWith('/profile')) return 4;
     return 0;
   }

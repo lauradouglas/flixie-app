@@ -697,7 +697,7 @@ class _ReactionChipState extends State<_ReactionChip>
           mainAxisSize: MainAxisSize.min,
           children: [
             widget.isLoading
-                ? SizedBox(
+                ? const SizedBox(
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(
