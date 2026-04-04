@@ -170,7 +170,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                         name: context.read<AuthProvider>().dbUser?.username,
                         onDismiss: () => setState(() => _showGreeting = false),
                       ),
-                    _SectionHeader(title: 'Featured'),
+                    const _SectionHeader(title: 'Featured'),
                     const SizedBox(height: 12),
                     SizedBox(
                       height: 220,
@@ -188,7 +188,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                     ),
                     const SizedBox(height: 24),
                     // Popular section
-                    _SectionHeader(title: 'In Theatres Now'),
+                    const _SectionHeader(title: 'In Theatres Now'),
                     const SizedBox(height: 12),
                     ListView.separated(
                       shrinkWrap: true,
@@ -206,7 +206,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                     ),
                     const SizedBox(height: 24),
                     // Top Rated This Week section
-                    _SectionHeader(title: 'Top Rated This Week'),
+                    const _SectionHeader(title: 'Top Rated This Week'),
                     const SizedBox(height: 12),
                     if (_topRatedThisWeek.isEmpty)
                       Padding(
@@ -237,7 +237,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                     const SizedBox(height: 24),
 
                     // Friends Activity section
-                    _SectionHeader(title: 'Friends Activity'),
+                    const _SectionHeader(title: 'Friends Activity'),
                     const SizedBox(height: 12),
                     if (_friendsActivity.isEmpty)
                       Padding(

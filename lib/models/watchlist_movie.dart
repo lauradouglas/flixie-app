@@ -21,7 +21,7 @@ class WatchlistMovie {
     return WatchlistMovie(
       id: json['id'] as String,
       userId: json['userId'] as String,
-      movieId: _parseInt(json['movieId']),
+      movieId: _parseInt(json['movieId']) ?? 0,
       removed: json['removed'] as bool?,
       createdAt: json['createdAt'] as String?,
       updatedAt: json['updatedAt'] as String?,
@@ -66,7 +66,7 @@ class WatchlistMovieDetails {
 
   factory WatchlistMovieDetails.fromJson(Map<String, dynamic> json) {
     return WatchlistMovieDetails(
-      id: _parseInt(json['id']),
+      id: _parseInt(json['id']) ?? 0,
       title: json['title'] as String,
       posterPath: json['posterPath'] as String?,
       releaseDate: json['releaseDate'] as String?,
@@ -97,11 +97,12 @@ class WatchlistMovieDetails {
 }
 
 // Helper functions
-int _parseInt(dynamic value) {
+int? _parseInt(dynamic value) {
+  if (value == null) return null;
   if (value is int) return value;
   if (value is num) return value.toInt();
-  if (value is String) return int.parse(value);
-  throw FormatException('Cannot parse int from $value');
+  if (value is String) return int.tryParse(value);
+  return null;
 }
 
 double? _parseDouble(dynamic value) {

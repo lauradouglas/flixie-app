@@ -79,11 +79,14 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         // Text search
         if (!m.title.toLowerCase().contains(query)) return false;
         // Genre filter
-        if (_filterGenre != null && !m.genres.contains(_filterGenre))
+        if (_filterGenre != null && !m.genres.contains(_filterGenre)) {
           return false;
+        }
         // Min rating filter
         if (_filterMinRating != null &&
-            (m.voteAverage ?? 0) < _filterMinRating!) return false;
+            (m.voteAverage ?? 0) < _filterMinRating!) {
+          return false;
+        }
         // Year filter
         if (_filterYear != null) {
           final year = int.tryParse(m.releaseDate?.split('-').first ?? '');
@@ -91,8 +94,9 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         }
         // Max runtime filter
         if (_filterMaxRuntime != null &&
-            (m.runtime == null || m.runtime! > _filterMaxRuntime!))
+            (m.runtime == null || m.runtime! > _filterMaxRuntime!)) {
           return false;
+        }
         return true;
       }).toList();
 
@@ -438,24 +442,44 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       );
     }
 
-    return GridView.builder(
+    final items = _filteredWatchlist;
+    return ListView.builder(
       padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 0.50,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-      ),
-      itemCount: _filteredWatchlist.length,
-      itemBuilder: (context, index) {
-        return WatchlistMovieCard(
-          watchlistItem: _filteredWatchlist[index],
-          onTap: () {
-            final movieId = _filteredWatchlist[index].movieId;
-            context.push('/movies/$movieId');
-          },
-          onMarkAsWatched: () => _markAsWatched(_filteredWatchlist[index]),
-          onRemove: () => _removeFromWatchlist(_filteredWatchlist[index]),
+      itemCount: (items.length / 2).ceil(),
+      itemBuilder: (context, rowIndex) {
+        final leftIndex = rowIndex * 2;
+        final rightIndex = leftIndex + 1;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: WatchlistMovieCard(
+                    watchlistItem: items[leftIndex],
+                    onTap: () =>
+                        context.push('/movies/${items[leftIndex].movieId}'),
+                    onMarkAsWatched: () => _markAsWatched(items[leftIndex]),
+                    onRemove: () => _removeFromWatchlist(items[leftIndex]),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                if (rightIndex < items.length)
+                  Expanded(
+                    child: WatchlistMovieCard(
+                      watchlistItem: items[rightIndex],
+                      onTap: () =>
+                          context.push('/movies/${items[rightIndex].movieId}'),
+                      onMarkAsWatched: () => _markAsWatched(items[rightIndex]),
+                      onRemove: () => _removeFromWatchlist(items[rightIndex]),
+                    ),
+                  )
+                else
+                  const Expanded(child: SizedBox()),
+              ],
+            ),
+          ),
         );
       },
     );
@@ -481,8 +505,10 @@ class WatchlistMovieCard extends StatelessWidget {
     final movie = watchlistItem.movie;
     if (movie == null) return const SizedBox();
 
-    final year = movie.releaseDate?.split('-').first ?? 'N/A';
-    final rating = movie.voteAverage?.toStringAsFixed(1) ?? 'N/A';
+    final yearRaw = movie.releaseDate?.split('-').first;
+    final year = (yearRaw != null && yearRaw.isNotEmpty) ? yearRaw : 'N/A';
+    final avg = movie.voteAverage;
+    final rating = (avg == null || avg == 0.0) ? 'N/A' : avg.toStringAsFixed(1);
     final posterUrl = movie.posterPath != null
         ? 'https://image.tmdb.org/t/p/w500${movie.posterPath}'
         : null;
@@ -592,57 +618,59 @@ class WatchlistMovieCard extends StatelessWidget {
                 ),
               ],
             ),
-            // Movie info
-            Padding(
-              padding: const EdgeInsets.all(10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title
-                  Text(
-                    movie.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: FlixieColors.warning,
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  // Year and Rating
-                  Row(
-                    children: [
-                      Text(
-                        year,
-                        style: const TextStyle(
-                          color: Colors.grey,
-                          fontSize: 11,
-                        ),
+            // Movie info — Expanded so both cards in a row reach the same height
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title
+                    Text(
+                      movie.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: FlixieColors.warning,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
                       ),
-                      const SizedBox(width: 6),
-                      const Icon(Icons.star, color: Colors.amber, size: 11),
-                      const SizedBox(width: 2),
-                      Text(
-                        rating,
-                        style: const TextStyle(
-                          color: Colors.grey,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  // Added date
-                  Text(
-                    'ADDED ON $addedDate',
-                    style: const TextStyle(
-                      color: Colors.grey,
-                      fontSize: 9,
-                      letterSpacing: 0.5,
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    // Year and Rating
+                    Row(
+                      children: [
+                        Text(
+                          year,
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 11,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Icon(Icons.star, color: Colors.amber, size: 11),
+                        const SizedBox(width: 2),
+                        Text(
+                          rating,
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    // Added date
+                    Text(
+                      'ADDED ON $addedDate',
+                      style: const TextStyle(
+                        color: Colors.grey,
+                        fontSize: 9,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],

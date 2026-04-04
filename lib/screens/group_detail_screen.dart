@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../models/activity_list_item.dart';
+import '../models/conversation.dart';
 import '../models/group.dart';
 import '../models/group_member.dart';
 import '../models/group_watch_request.dart';
 import '../providers/auth_provider.dart';
 import '../screens/profile/activity_tile.dart';
+import '../services/chat_service.dart';
 import '../services/friend_service.dart';
 import '../services/group_service.dart';
 import '../theme/app_theme.dart';
@@ -32,7 +35,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadGroup();
   }
 
@@ -136,7 +139,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
           unselectedLabelColor: FlixieColors.medium,
           indicatorColor: FlixieColors.primary,
           tabs: const [
-            // Tab(text: 'Chat'),
+            Tab(text: 'Chat'),
             Tab(text: 'Activity'),
             Tab(text: 'Requests'),
           ],
@@ -145,7 +148,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          // _ChatTab(groupId: widget.groupId),
+          _ChatTab(groupId: widget.groupId),
           _ActivityTab(
             group: _group,
             memberCount: _memberCount,
@@ -159,6 +162,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
   }
 
   void _showGroupOptions(BuildContext context) {
+    final currentUserId = context.read<AuthProvider>().dbUser?.id;
+    final isOwner = _group?.ownerId == currentUserId;
     showModalBottomSheet(
       context: context,
       backgroundColor: FlixieColors.tabBarBackgroundFocused,
@@ -180,12 +185,80 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
             ),
             const SizedBox(height: 8),
             ListTile(
-              leading:
-                  const Icon(Icons.info_outline, color: FlixieColors.light),
+              leading: const Icon(Icons.people_outline,
+                  color: FlixieColors.light),
+              title: const Text('Members',
+                  style: TextStyle(color: FlixieColors.light)),
+              onTap: () {
+                Navigator.pop(context);
+                context.push(
+                  '/groups/${widget.groupId}/members',
+                  extra: _group?.name ?? 'Group',
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.info_outline,
+                  color: FlixieColors.light),
               title: const Text('Group Info',
                   style: TextStyle(color: FlixieColors.light)),
               onTap: () => Navigator.pop(context),
             ),
+            if (isOwner)
+              ListTile(
+                leading: const Icon(Icons.delete_outline,
+                    color: FlixieColors.danger),
+                title: const Text('Delete Group',
+                    style: TextStyle(color: FlixieColors.danger)),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      backgroundColor:
+                          FlixieColors.tabBarBackgroundFocused,
+                      title: const Text('Delete Group',
+                          style:
+                              TextStyle(color: FlixieColors.light)),
+                      content: const Text(
+                        'Delete this group? This cannot be undone.',
+                        style:
+                            TextStyle(color: FlixieColors.medium),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () =>
+                              Navigator.pop(context, false),
+                          child: const Text('Cancel'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () =>
+                              Navigator.pop(context, true),
+                          style: ElevatedButton.styleFrom(
+                              backgroundColor: FlixieColors.danger,
+                              foregroundColor: Colors.white),
+                          child: const Text('Delete'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirm == true && mounted) {
+                    try {
+                      await GroupService.deleteGroup(widget.groupId);
+                      if (mounted) context.pop();
+                    } catch (e) {
+                      logger.e('Delete group error: $e');
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content:
+                                  Text('Failed to delete group')),
+                        );
+                      }
+                    }
+                  }
+                },
+              ),
           ],
         ),
       ),
@@ -207,68 +280,84 @@ class _ChatTab extends StatefulWidget {
 }
 
 class _ChatTabState extends State<_ChatTab> {
-  final ScrollController _scrollController = ScrollController();
   final TextEditingController _messageController = TextEditingController();
-  List<Map<String, dynamic>> _messages = [];
-  bool _loading = true;
+  String? _conversationId;
+  bool _initLoading = true;
   bool _sending = false;
+  String? _initError;
 
   @override
   void initState() {
     super.initState();
-    _loadMessages();
+    _initConversation();
   }
 
   @override
   void dispose() {
-    _scrollController.dispose();
     _messageController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadMessages() async {
-    try {
-      final raw = await GroupService.getGroupMessages(widget.groupId);
+  Future<void> _initConversation() async {
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (userId == null) {
       if (mounted) {
         setState(() {
-          _messages = raw.whereType<Map<String, dynamic>>().toList();
-          _loading = false;
+          _initLoading = false;
+          _initError = 'Not signed in';
         });
-        _scrollToBottom();
+      }
+      return;
+    }
+    try {
+      final results = await Future.wait([
+        GroupService.getGroup(widget.groupId),
+        GroupService.getGroupMembers(widget.groupId),
+      ]);
+      final group = results[0] as Group;
+      final members = results[1] as List<GroupMember>;
+      final memberIds = members.map((m) => m.memberId).toList();
+      if (!memberIds.contains(userId)) memberIds.add(userId);
+
+      final conversation = await ChatService.getOrCreateGroupConversation(
+        creatorId: userId,
+        pgGroupId: widget.groupId,
+        name: group.name,
+        memberIds: memberIds,
+      );
+
+      if (mounted) {
+        setState(() {
+          _conversationId = conversation.id;
+          _initLoading = false;
+        });
+        ChatService.markRead(conversation.id, userId).catchError((_) {});
       }
     } catch (e) {
-      logger.e('Load messages error: $e');
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
+      logger.e('Chat init error: $e');
+      if (mounted) {
+        setState(() {
+          _initLoading = false;
+          _initError = 'Could not load chat';
+        });
       }
-    });
+    }
   }
 
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
-    if (text.isEmpty) return;
+    final conversationId = _conversationId;
     final userId = context.read<AuthProvider>().dbUser?.id;
-    if (userId == null) return;
+    if (text.isEmpty || conversationId == null || userId == null) return;
 
     setState(() => _sending = true);
     _messageController.clear();
-
     try {
-      await GroupService.sendGroupMessage(
-        widget.groupId,
-        {'userId': userId, 'message': text},
+      await ChatService.sendMessage(
+        conversationId: conversationId,
+        senderId: userId,
+        text: text,
       );
-      await _loadMessages();
     } catch (e) {
       logger.e('Send message error: $e');
       if (mounted) {
@@ -283,37 +372,61 @@ class _ChatTabState extends State<_ChatTab> {
 
   @override
   Widget build(BuildContext context) {
+    if (_initLoading) {
+      return const Center(
+          child:
+              CircularProgressIndicator(color: FlixieColors.primary));
+    }
+    if (_initError != null) {
+      return Center(
+          child: Text(_initError!,
+              style: const TextStyle(color: FlixieColors.medium)));
+    }
+
+    final conversationId = _conversationId!;
     final currentUserId = context.read<AuthProvider>().dbUser?.id;
 
     return Column(
       children: [
         Expanded(
-          child: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : _messages.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'No messages yet. Start the conversation!',
-                        style: TextStyle(color: FlixieColors.medium),
-                        textAlign: TextAlign.center,
-                      ),
-                    )
-                  : ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      itemCount: _messages.length,
-                      itemBuilder: (_, i) {
-                        final msg = _messages[i];
-                        final senderId = msg['userId']?.toString() ?? '';
-                        final isMe = senderId == currentUserId;
-                        return _ChatBubble(
-                          message: msg['message']?.toString() ?? '',
-                          senderUsername: msg['username']?.toString() ?? 'User',
-                          isMe: isMe,
-                        );
-                      },
-                    ),
+          child: StreamBuilder<List<ChatMessage>>(
+            stream: ChatService.messagesStream(conversationId),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting &&
+                  !snapshot.hasData) {
+                return const Center(
+                    child: CircularProgressIndicator(
+                        color: FlixieColors.primary));
+              }
+              final messages = snapshot.data ?? [];
+              if (messages.isEmpty) {
+                return const Center(
+                  child: Text(
+                    'No messages yet. Say hello!',
+                    style: TextStyle(color: FlixieColors.medium),
+                    textAlign: TextAlign.center,
+                  ),
+                );
+              }
+              // Firestore returns newest-first (descending); reverse: true renders
+              // newest at bottom like a standard chat layout.
+              return ListView.builder(
+                reverse: true,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 8),
+                itemCount: messages.length,
+                itemBuilder: (_, i) {
+                  final msg = messages[i];
+                  final isMe = msg.senderId == currentUserId;
+                  return _ChatBubble(
+                    message: msg.text,
+                    senderUsername: msg.senderUsername ?? 'User',
+                    isMe: isMe,
+                  );
+                },
+              );
+            },
+          ),
         ),
         _ChatInput(
           controller: _messageController,
@@ -500,9 +613,7 @@ class _ActivityTabState extends State<_ActivityTab> {
       if (mounted) {
         setState(() {
           _activity = results[0] as List<ActivityListItem>;
-          _messages = (results[1] as List<dynamic>)
-              .whereType<Map<String, dynamic>>()
-              .toList();
+          _messages = (results[1]).whereType<Map<String, dynamic>>().toList();
           _requests = results[2] as List<GroupWatchRequest>;
           _loading = false;
         });
@@ -511,14 +622,6 @@ class _ActivityTabState extends State<_ActivityTab> {
       logger.e('ActivityTab load error: $e');
       if (mounted) setState(() => _loading = false);
     }
-  }
-
-  String _formatCount(int n) {
-    if (n >= 1000) {
-      final k = n / 1000;
-      return '${k.toStringAsFixed(k.truncateToDouble() == k ? 0 : 1)}k';
-    }
-    return '$n';
   }
 
   @override
@@ -918,9 +1021,9 @@ class _GroupHeroBanner extends StatelessWidget {
           Container(
             width: 90,
             height: 110,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: FlixieColors.tabBarBackgroundFocused,
-              borderRadius: const BorderRadius.only(
+              borderRadius: BorderRadius.only(
                 topRight: Radius.circular(12),
                 bottomRight: Radius.circular(12),
               ),
@@ -1119,8 +1222,9 @@ class _RequestsTabState extends State<_RequestsTab> {
       if (diff.inMinutes < 1) return 'just now';
       if (diff.inHours < 1) return '${diff.inMinutes}m ago';
       if (diff.inHours < 24) return '${diff.inHours}h ago';
-      if (diff.inDays < 7)
+      if (diff.inDays < 7) {
         return '${diff.inDays} day${diff.inDays == 1 ? '' : 's'} ago';
+      }
       const months = [
         'Jan',
         'Feb',

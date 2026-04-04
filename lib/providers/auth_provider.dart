@@ -352,6 +352,14 @@ class AuthProvider extends ChangeNotifier {
       _errorMessage = AuthService.messageFromAuthException(e);
       _setLoading(false);
       return false;
+    } on TimeoutException {
+      _errorMessage = 'Connection timed out. Check your network and try again.';
+      _setLoading(false);
+      return false;
+    } catch (e) {
+      _errorMessage = 'An unexpected error occurred. Please try again.';
+      _setLoading(false);
+      return false;
     }
   }
 

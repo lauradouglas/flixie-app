@@ -95,12 +95,15 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     setState(() {
       _filtered = _all.where((r) {
         // Status filter
-        if (_statusFilter == _StatusFilter.pending && !r.isPending)
+        if (_statusFilter == _StatusFilter.pending && !r.isPending) {
           return false;
-        if (_statusFilter == _StatusFilter.accepted && !r.isAccepted)
+        }
+        if (_statusFilter == _StatusFilter.accepted && !r.isAccepted) {
           return false;
-        if (_statusFilter == _StatusFilter.declined && !r.isDeclined)
+        }
+        if (_statusFilter == _StatusFilter.declined && !r.isDeclined) {
           return false;
+        }
 
         if (q.isEmpty) return true;
         // Search by movie title or other user's username

@@ -93,9 +93,7 @@ class _SegmentedToggle extends StatelessWidget {
                   duration: const Duration(milliseconds: 200),
                   margin: const EdgeInsets.all(3),
                   decoration: BoxDecoration(
-                    color: selected
-                        ? FlixieColors.primary
-                        : Colors.transparent,
+                    color: selected ? FlixieColors.primary : Colors.transparent,
                     borderRadius: BorderRadius.circular(27),
                   ),
                   alignment: Alignment.center,
@@ -194,6 +192,13 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
               content: Text(
                   'Now friends with ${friendship.friendUser?.username ?? 'user'}')),
         );
+        // Repoll friends activity now that we have a new friend.
+        final userId = context.read<AuthProvider>().dbUser?.id;
+        if (userId != null) {
+          FriendService.getFriendsActivityLists(userId).then((activity) {
+            if (mounted) setState(() => _activity = activity);
+          }).catchError((_) {});
+        }
       }
     } catch (e) {
       logger.e('Accept request error: $e');
@@ -235,8 +240,8 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
 
     if (_error != null) {
       return Center(
-        child: Text(_error!,
-            style: const TextStyle(color: FlixieColors.medium)),
+        child:
+            Text(_error!, style: const TextStyle(color: FlixieColors.medium)),
       );
     }
 
@@ -264,6 +269,10 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
                   friendship: f,
                   onAccept: () => _acceptRequest(f),
                   onDecline: () => _declineRequest(f),
+                  onTap: () {
+                    final userId = f.friendUser?.id;
+                    if (userId != null) context.push('/friends/$userId');
+                  },
                 ),
               ),
               const SizedBox(height: 16),
@@ -280,19 +289,25 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
             ],
 
             // Activity section
-            _SectionHeader(title: 'FRIENDS ACTIVITY'),
+            const _SectionHeader(title: 'FRIENDS ACTIVITY'),
             const SizedBox(height: 8),
             if (_activity.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 child: Text(
                   'No recent activity.',
-                  style: textTheme.bodySmall
-                      ?.copyWith(color: FlixieColors.medium),
+                  style:
+                      textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
                 ),
               )
             else
-              ...(_activity.map((item) => ActivityTile(item: item))),
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _activity.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (_, i) => ActivityTile(item: _activity[i]),
+              ),
             const SizedBox(height: 24),
           ],
         ),
@@ -306,15 +321,16 @@ class _PendingFriendCard extends StatelessWidget {
     required this.friendship,
     required this.onAccept,
     required this.onDecline,
+    this.onTap,
   });
 
   final Friendship friendship;
   final VoidCallback onAccept;
   final VoidCallback onDecline;
+  final VoidCallback? onTap;
 
   Color _avatarColor() {
-    final hex =
-        friendship.friendUser?.iconColor?['hexCode'] as String?;
+    final hex = friendship.friendUser?.iconColor?['hexCode'] as String?;
     if (hex != null) {
       try {
         return Color(int.parse(hex.replaceFirst('#', 'FF'), radix: 16));
@@ -328,7 +344,9 @@ class _PendingFriendCard extends StatelessWidget {
     final user = friendship.friendUser;
     final color = _avatarColor();
 
-    return Container(
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
@@ -346,8 +364,7 @@ class _PendingFriendCard extends StatelessWidget {
                   (user?.username.isNotEmpty == true
                       ? user!.username[0].toUpperCase()
                       : '?'),
-              style: TextStyle(
-                  color: color, fontWeight: FontWeight.bold),
+              style: TextStyle(color: color, fontWeight: FontWeight.bold),
             ),
           ),
           const SizedBox(width: 12),
@@ -362,8 +379,7 @@ class _PendingFriendCard extends StatelessWidget {
             onPressed: onDecline,
             style: TextButton.styleFrom(
               foregroundColor: FlixieColors.danger,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               minimumSize: Size.zero,
             ),
             child: const Text('Decline'),
@@ -374,14 +390,14 @@ class _PendingFriendCard extends StatelessWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: FlixieColors.primary,
               foregroundColor: Colors.black,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               minimumSize: Size.zero,
               textStyle: const TextStyle(fontSize: 13),
             ),
             child: const Text('Accept'),
           ),
         ],
+      ),
       ),
     );
   }
@@ -473,8 +489,7 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (userId == null || group.id == null) return;
     try {
-      await GroupService.updateMemberInviteStatus(
-          group.id!, userId, status);
+      await GroupService.updateMemberInviteStatus(group.id!, userId, status);
       if (mounted) {
         setState(() {
           _pendingInvites.remove(group.id);
@@ -517,8 +532,8 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
 
     if (_error != null) {
       return Center(
-        child: Text(_error!,
-            style: const TextStyle(color: FlixieColors.medium)),
+        child:
+            Text(_error!, style: const TextStyle(color: FlixieColors.medium)),
       );
     }
 
@@ -578,14 +593,13 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
                   onPressed: _showCreateGroupSheet,
                   style: TextButton.styleFrom(
                     foregroundColor: FlixieColors.primary,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     minimumSize: Size.zero,
                   ),
                   child: const Text(
                     'CREATE NEW +',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 13),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                   ),
                 ),
               ],
@@ -604,9 +618,9 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
               )
             else
               ...myGroups.map((g) => _GroupCard(
-                  group: g,
-                  memberCount: _memberCounts[g.id],
-                )),
+                    group: g,
+                    memberCount: _memberCounts[g.id],
+                  )),
             const SizedBox(height: 24),
           ],
         ),
@@ -647,13 +661,11 @@ class _InvitationCard extends StatelessWidget {
                 Text(
                   group.name,
                   style: const TextStyle(
-                      color: FlixieColors.light,
-                      fontWeight: FontWeight.w600),
+                      color: FlixieColors.light, fontWeight: FontWeight.w600),
                 ),
-                Text(
+                const Text(
                   'You have been invited',
-                  style: const TextStyle(
-                      color: FlixieColors.medium, fontSize: 12),
+                  style: TextStyle(color: FlixieColors.medium, fontSize: 12),
                 ),
               ],
             ),
@@ -662,8 +674,7 @@ class _InvitationCard extends StatelessWidget {
             onPressed: onDecline,
             style: TextButton.styleFrom(
               foregroundColor: FlixieColors.danger,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               minimumSize: Size.zero,
             ),
             child: const Text('Decline'),
@@ -674,8 +685,7 @@ class _InvitationCard extends StatelessWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: FlixieColors.primary,
               foregroundColor: Colors.black,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               minimumSize: Size.zero,
               textStyle: const TextStyle(fontSize: 13),
             ),
@@ -813,11 +823,21 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
   bool _isPublic = true;
   bool _submitting = false;
 
+  // Step 2 — invite members after creation
+  int _step = 0;
+  Group? _createdGroup;
+  List<FriendshipUser> _friends = [];
+  final List<String> _selectedFriendIds = [];
+  bool _loadingFriends = false;
+  bool _inviting = false;
+  final TextEditingController _searchController = TextEditingController();
+
   @override
   void dispose() {
     _nameController.dispose();
     _abbrController.dispose();
     _descController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -838,7 +858,15 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
         'ownerId': userId,
       });
       widget.onCreated?.call(group);
-      if (mounted) Navigator.of(context).pop();
+      // Move to invite step
+      _loadFriendsForInvite(userId);
+      if (mounted) {
+        setState(() {
+          _createdGroup = group;
+          _step = 1;
+          _submitting = false;
+        });
+      }
     } catch (e) {
       logger.e('Create group error: $e');
       if (mounted) {
@@ -850,6 +878,48 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
     }
   }
 
+  Future<void> _loadFriendsForInvite(String userId) async {
+    if (mounted) setState(() => _loadingFriends = true);
+    try {
+      final data = await FriendService.getFriends(userId);
+      if (mounted) {
+        setState(() {
+          _friends = data.friendships
+              .map((f) => f.friendUser)
+              .whereType<FriendshipUser>()
+              .toList();
+          _loadingFriends = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingFriends = false);
+    }
+  }
+
+  Future<void> _sendInvites() async {
+    final group = _createdGroup;
+    if (group?.id == null || _selectedFriendIds.isEmpty) {
+      if (mounted) Navigator.of(context).pop();
+      return;
+    }
+    setState(() => _inviting = true);
+    try {
+      await GroupService.addMembersToGroup(
+        group!.id!,
+        _selectedFriendIds
+            .map((id) => {
+                  'memberId': id,
+                  'role': 'MEMBER',
+                  'inviteStatus': 'PENDING',
+                })
+            .toList(),
+      );
+    } catch (e) {
+      logger.e('Invite members error: $e');
+    }
+    if (mounted) Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -859,15 +929,23 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
       minChildSize: 0.5,
       maxChildSize: 0.95,
       expand: false,
-      builder: (_, scrollController) => SingleChildScrollView(
-        controller: scrollController,
-        padding: EdgeInsets.fromLTRB(
-          20,
-          20,
-          20,
-          MediaQuery.of(context).viewInsets.bottom + 24,
-        ),
-        child: Form(
+      builder: (_, scrollController) => _step == 0
+          ? _buildFormStep(scrollController, textTheme)
+          : _buildInviteStep(scrollController),
+    );
+  }
+
+  Widget _buildFormStep(
+      ScrollController scrollController, TextTheme textTheme) {
+    return SingleChildScrollView(
+      controller: scrollController,
+      padding: EdgeInsets.fromLTRB(
+        20,
+        20,
+        20,
+        MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -956,7 +1034,170 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
             ],
           ),
         ),
-      ),
+      );
+  }
+
+  Widget _buildInviteStep(ScrollController scrollController) {
+    final query = _searchController.text.toLowerCase();
+    final filtered = _friends.where((f) {
+      return f.username.toLowerCase().contains(query) ||
+          (f.firstName?.toLowerCase().contains(query) ?? false);
+    }).toList();
+
+    return Column(
+      children: [
+        const SizedBox(height: 12),
+        Container(
+          width: 40,
+          height: 4,
+          decoration: BoxDecoration(
+            color: FlixieColors.medium.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Invite Friends',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      'to "${_createdGroup?.name}"',
+                      style: const TextStyle(
+                          color: FlixieColors.medium, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Skip',
+                    style: TextStyle(color: FlixieColors.medium)),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: TextField(
+            controller: _searchController,
+            onChanged: (_) => setState(() {}),
+            style: const TextStyle(color: FlixieColors.light),
+            decoration: InputDecoration(
+              hintText: 'Search friends…',
+              hintStyle: const TextStyle(color: FlixieColors.medium),
+              prefixIcon:
+                  const Icon(Icons.search, color: FlixieColors.medium),
+              filled: true,
+              fillColor: FlixieColors.tabBarBackground,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 10),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Expanded(
+          child: _loadingFriends
+              ? const Center(child: CircularProgressIndicator())
+              : filtered.isEmpty
+                  ? Center(
+                      child: Text(
+                        _friends.isEmpty
+                            ? 'No friends to invite yet'
+                            : 'No matches',
+                        style: const TextStyle(
+                            color: FlixieColors.medium),
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: scrollController,
+                      itemCount: filtered.length,
+                      itemBuilder: (_, i) {
+                        final friend = filtered[i];
+                        final selected =
+                            _selectedFriendIds.contains(friend.id);
+                        return CheckboxListTile(
+                          value: selected,
+                          onChanged: (val) => setState(() {
+                            if (val == true) {
+                              _selectedFriendIds.add(friend.id);
+                            } else {
+                              _selectedFriendIds.remove(friend.id);
+                            }
+                          }),
+                          title: Text(friend.username,
+                              style: const TextStyle(
+                                  color: FlixieColors.light)),
+                          subtitle: friend.firstName != null
+                              ? Text(friend.firstName!,
+                                  style: const TextStyle(
+                                      color: FlixieColors.medium,
+                                      fontSize: 12))
+                              : null,
+                          activeColor: FlixieColors.primary,
+                          checkColor: Colors.black,
+                          secondary: CircleAvatar(
+                            backgroundColor: FlixieColors.primary
+                                .withValues(alpha: 0.2),
+                            child: Text(
+                              friend.username[0].toUpperCase(),
+                              style: const TextStyle(
+                                color: FlixieColors.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+        ),
+        Padding(
+          padding: EdgeInsets.fromLTRB(
+              20, 8, 20, MediaQuery.of(context).viewInsets.bottom + 16),
+          child: SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _inviting ? null : _sendInvites,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: FlixieColors.primary,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              child: _inviting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.black),
+                    )
+                  : Text(
+                      _selectedFriendIds.isEmpty
+                          ? 'Done'
+                          : 'Send ${_selectedFriendIds.length} Invite${_selectedFriendIds.length == 1 ? '' : 's'}',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -981,18 +1222,15 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
         fillColor: FlixieColors.tabBarBackground,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide:
-              const BorderSide(color: FlixieColors.tabBarBorder),
+          borderSide: const BorderSide(color: FlixieColors.tabBarBorder),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide:
-              const BorderSide(color: FlixieColors.tabBarBorder),
+          borderSide: const BorderSide(color: FlixieColors.tabBarBorder),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide:
-              const BorderSide(color: FlixieColors.primary),
+          borderSide: const BorderSide(color: FlixieColors.primary),
         ),
       ),
     );
@@ -1016,17 +1254,13 @@ class _VisibilityChip extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         decoration: BoxDecoration(
-          color: selected
-              ? FlixieColors.primary
-              : FlixieColors.tabBarBackground,
+          color:
+              selected ? FlixieColors.primary : FlixieColors.tabBarBackground,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected
-                ? FlixieColors.primary
-                : FlixieColors.tabBarBorder,
+            color: selected ? FlixieColors.primary : FlixieColors.tabBarBorder,
           ),
         ),
         child: Text(
@@ -1076,8 +1310,7 @@ class _SectionHeader extends StatelessWidget {
         if (badge != null) ...[
           const SizedBox(width: 8),
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
             decoration: BoxDecoration(
               color: FlixieColors.primary.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(10),

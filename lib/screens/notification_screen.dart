@@ -70,8 +70,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
       logger.e('[NotificationScreen] close error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Failed to close notification.'),
+          const SnackBar(
+            content: Text('Failed to close notification.'),
             backgroundColor: FlixieColors.danger,
           ),
         );

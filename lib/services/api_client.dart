@@ -17,6 +17,8 @@ class ApiClient {
   // Change back to 'http://localhost:3000' when using simulator
   static const String baseUrl = 'http://192.168.1.203:3000';
 
+  static const Duration _timeout = Duration(seconds: 15);
+
   // static const String baseUrl =
   //     'https://flixibe.graysea-314b1b40.northeurope.azurecontainerapps.io';
   // static const String baseUrl = 'http://192.168.68.111:3000';
@@ -79,7 +81,7 @@ class ApiClient {
     }
     apiLogger.d('Headers: $headersForLog');
 
-    final response = await http.get(uri, headers: _headers());
+    final response = await http.get(uri, headers: _headers()).timeout(_timeout);
 
     apiLogger.d('Response ${response.statusCode}');
 
@@ -92,10 +94,12 @@ class ApiClient {
     if (body is Map && body.containsKey('password')) {
       logBody = Map.of(body);
       logBody['password'] = '[REDACTED]';
-      if (logBody.containsKey('newPassword'))
+      if (logBody.containsKey('newPassword')) {
         logBody['newPassword'] = '[REDACTED]';
-      if (logBody.containsKey('currentPassword'))
+      }
+      if (logBody.containsKey('currentPassword')) {
         logBody['currentPassword'] = '[REDACTED]';
+      }
     }
     apiLogger.d('POST $path');
     apiLogger.d(
@@ -105,7 +109,7 @@ class ApiClient {
       _buildUri(path),
       headers: _headers(),
       body: body != null ? jsonEncode(body) : null,
-    );
+    ).timeout(_timeout);
     return _parseResponse(response);
   }
 
@@ -114,7 +118,7 @@ class ApiClient {
       _buildUri(path),
       headers: _headers(),
       body: body != null ? jsonEncode(body) : null,
-    );
+    ).timeout(_timeout);
     return _parseResponse(response);
   }
 
@@ -123,7 +127,7 @@ class ApiClient {
       _buildUri(path),
       headers: _headers(),
       body: body != null ? jsonEncode(body) : null,
-    );
+    ).timeout(_timeout);
     return _parseResponse(response);
   }
 
@@ -133,7 +137,7 @@ class ApiClient {
     if (body != null) {
       request.body = jsonEncode(body);
     }
-    final streamedResponse = await request.send();
+    final streamedResponse = await request.send().timeout(_timeout);
     final response = await http.Response.fromStream(streamedResponse);
     return _parseResponse(response);
   }

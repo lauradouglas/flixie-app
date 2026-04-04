@@ -175,7 +175,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     setState(() => _currentlyUpdating = ListUpdateType.watchlist);
 
     try {
-      await (_inWatchlist
+      final result = await (_inWatchlist
           ? UserService.removeFromWatchlist(user.id, movieId)
           : UserService.addToWatchlist(user.id, movieId));
 
@@ -188,35 +188,30 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           _watchlistBounceKey++;
         });
 
-        final currentWatchlist = user.movieWatchlist ?? [];
-        final updatedWatchlist = <int>[];
-
-        try {
-          for (var item in currentWatchlist) {
-            if (item is int) {
-              updatedWatchlist.add(item);
-            } else if (item is Map<String, dynamic>) {
-              final id = item['movieId'] ?? item['id'];
-              if (id is int) {
-                updatedWatchlist.add(id);
-              }
-            }
-          }
-        } catch (e) {
-          logger.w('Error processing watchlist: $e');
-          logger.d('currentWatchlist type: ${currentWatchlist.runtimeType}');
-          logger.d('currentWatchlist: $currentWatchlist');
-        }
+        // Keep all existing Map entries (so WatchlistScreen can parse them),
+        // then append or remove the affected entry.
+        final currentWatchlist = List<dynamic>.from(user.movieWatchlist ?? []);
 
         if (_inWatchlist) {
-          if (!updatedWatchlist.contains(movieId)) {
-            updatedWatchlist.add(movieId);
-          }
+          // Added — append the full Map returned by the API
+          currentWatchlist.removeWhere((item) {
+            if (item is Map<String, dynamic>) {
+              return (item['movieId'] ?? item['id']) == movieId;
+            }
+            return item == movieId;
+          });
+          currentWatchlist.add(result.toJson());
           authProvider.markActivityChanged();
         } else {
-          updatedWatchlist.remove(movieId);
+          // Removed — strip out the entry
+          currentWatchlist.removeWhere((item) {
+            if (item is Map<String, dynamic>) {
+              return (item['movieId'] ?? item['id']) == movieId;
+            }
+            return item == movieId;
+          });
         }
-        authProvider.updateUserList(movieWatchlist: updatedWatchlist);
+        authProvider.updateUserList(movieWatchlist: currentWatchlist);
       }
     } catch (e) {
       logger.e('Error toggling watchlist: $e');
