@@ -196,7 +196,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                       physics: const NeverScrollableScrollPhysics(),
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       itemCount: _nowPlayingMovies.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
                       itemBuilder: (context, index) {
                         final movie = _nowPlayingMovies[index];
                         return _ListCard(

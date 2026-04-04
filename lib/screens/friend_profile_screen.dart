@@ -598,7 +598,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: visibleReviews.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
                       itemBuilder: (_, i) => ReviewCard(
                         review: visibleReviews[i],
                         onTap: () {

@@ -416,7 +416,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (context, i) => _buildCard(items[i]),
     );
   }
@@ -435,27 +435,27 @@ class _NotificationScreenState extends State<NotificationScreen> {
       children: [
         if (pending.isNotEmpty) ...[
           _buildSectionHeader('REQUESTS'),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           ...pending.map((n) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.only(bottom: 10),
                 child: _buildCard(n),
               )),
           const SizedBox(height: 16),
         ],
         if (newItems.isNotEmpty) ...[
           _buildSectionHeader('NEW'),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           ...newItems.map((n) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.only(bottom: 10),
                 child: _buildCard(n),
               )),
           const SizedBox(height: 16),
         ],
         if (earlier.isNotEmpty) ...[
           _buildSectionHeader('EARLIER'),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           ...earlier.map((n) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.only(bottom: 10),
                 child: _buildCard(n),
               )),
         ],
