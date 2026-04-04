@@ -12,7 +12,7 @@ class ActivityTile extends StatelessWidget {
 
   final ActivityListItem item;
 
-  static const String _imgBase = 'https://image.tmdb.org/t/p/w92';
+  static const String _posterBase = 'https://image.tmdb.org/t/p/w185';
 
   Color get _accentColor {
     switch (item.type) {
@@ -146,38 +146,6 @@ class ActivityTile extends StatelessWidget {
     }
   }
 
-  Widget _buildThumbnail() {
-    final path = item.mediaPosterPath;
-    final bool isPerson = item.type == ActivityListType.favoritePerson;
-    final url = path != null ? '$_imgBase$path' : null;
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: SizedBox(
-        width: 60,
-        height: 80,
-        child: url != null
-            ? CachedNetworkImage(
-                imageUrl: url,
-                fit: BoxFit.cover,
-                errorWidget: (_, __, ___) => _fallbackThumb(isPerson),
-              )
-            : _fallbackThumb(isPerson),
-      ),
-    );
-  }
-
-  Widget _fallbackThumb(bool isPerson) {
-    return Container(
-      color: FlixieColors.tabBarBorder,
-      child: Icon(
-        isPerson ? Icons.person : Icons.movie_outlined,
-        color: FlixieColors.medium,
-        size: 28,
-      ),
-    );
-  }
-
   Widget _buildTitle(BuildContext context) {
     final title = item.mediaTitle;
     final bool isPerson = item.type == ActivityListType.favoritePerson;
@@ -215,8 +183,12 @@ class ActivityTile extends StatelessWidget {
     final dateStr = _formatDate(item.createdAt).toUpperCase();
     final currentUserId = context.read<AuthProvider>().dbUser?.id;
     final isCurrentUser = item.userId == currentUserId;
+    final path = item.mediaPosterPath;
+    final bool isPerson = item.type == ActivityListType.favoritePerson;
+    final posterUrl = path != null ? '$_posterBase$path' : null;
 
     return Container(
+      clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
         color: FlixieColors.tabBarBackgroundFocused,
         borderRadius: BorderRadius.circular(12),
@@ -224,61 +196,43 @@ class ActivityTile extends StatelessWidget {
           left: BorderSide(color: _accentColor, width: 3),
         ),
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      child: IntrinsicHeight(
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildThumbnail(),
-            const SizedBox(width: 12),
+            // Left: text content
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (!isCurrentUser) // Only show for friends' activities
-                    Row(
-                      children: [
-                        Text(
-                          item.username,
-                          style: const TextStyle(
-                            color: FlixieColors.primary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
-                        ),
-                        if (item.firstName.isNotEmpty ||
-                            item.lastName.isNotEmpty) ...[
-                          const SizedBox(width: 6),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (!isCurrentUser)
+                      Row(
+                        children: [
                           Text(
-                            '(${item.firstName})',
+                            item.username,
                             style: const TextStyle(
-                              color: FlixieColors.medium,
-                              fontWeight: FontWeight.w400,
-                              fontSize: 12,
+                              color: FlixieColors.primary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
                             ),
                           ),
-                        ],
-                        const Spacer(),
-                        Text(
-                          dateStr,
-                          style: const TextStyle(
-                            color: FlixieColors.medium,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  if (!isCurrentUser) const SizedBox(height: 4),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(child: _buildTitle(context)),
-                      if (isCurrentUser)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 8.0),
-                          child: Text(
+                          if (item.firstName.isNotEmpty ||
+                              item.lastName.isNotEmpty) ...[
+                            const SizedBox(width: 6),
+                            Text(
+                              '(${item.firstName})',
+                              style: const TextStyle(
+                                color: FlixieColors.medium,
+                                fontWeight: FontWeight.w400,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                          const Spacer(),
+                          Text(
                             dateStr,
                             style: const TextStyle(
                               color: FlixieColors.medium,
@@ -287,23 +241,88 @@ class ActivityTile extends StatelessWidget {
                               letterSpacing: 0.5,
                             ),
                           ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Icon(_icon, color: _accentColor, size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        _actionLabel,
-                        style: TextStyle(
-                          color: _accentColor,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        ],
                       ),
-                    ],
+                    if (!isCurrentUser) const SizedBox(height: 4),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: _buildTitle(context)),
+                        if (isCurrentUser)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8.0),
+                            child: Text(
+                              dateStr,
+                              style: const TextStyle(
+                                color: FlixieColors.medium,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(_icon, color: _accentColor, size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          _actionLabel,
+                          style: TextStyle(
+                            color: _accentColor,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Right: poster full height, flush to edge
+            SizedBox(
+              width: 90,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  posterUrl != null
+                      ? CachedNetworkImage(
+                          imageUrl: posterUrl,
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) => Container(
+                            color: FlixieColors.tabBarBorder,
+                            child: Icon(
+                              isPerson ? Icons.person : Icons.movie_outlined,
+                              color: FlixieColors.medium,
+                              size: 28,
+                            ),
+                          ),
+                        )
+                      : Container(
+                          color: FlixieColors.tabBarBorder,
+                          child: Icon(
+                            isPerson ? Icons.person : Icons.movie_outlined,
+                            color: FlixieColors.medium,
+                            size: 28,
+                          ),
+                        ),
+                  // Fade from card background into poster
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [
+                          FlixieColors.tabBarBackgroundFocused,
+                          FlixieColors.tabBarBackgroundFocused
+                              .withValues(alpha: 0.0),
+                        ],
+                        stops: const [0.0, 0.25],
+                      ),
+                    ),
                   ),
                 ],
               ),
