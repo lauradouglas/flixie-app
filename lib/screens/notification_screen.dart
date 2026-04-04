@@ -553,7 +553,16 @@ class _RequestCard extends StatelessWidget {
         final msg = notification.groupInviteMessage;
         return msg.isNotEmpty ? msg : 'Invited you to join a group';
       case FlixieNotification.groupRequest:
-        return 'Requested to join your group';
+        final movieTitle = notification.groupWatchMovieTitle;
+        final groupName = notification.groupWatchGroupName;
+        logger.d(
+            'Building group request subtitle, movieTitle="$movieTitle", groupName="$groupName"');
+        if (movieTitle != null && movieTitle.isNotEmpty) {
+          final suffix =
+              groupName != null && groupName.isNotEmpty ? ' ($groupName)' : '';
+          return 'wants to watch $movieTitle$suffix';
+        }
+        return 'sent a group watch request';
       case FlixieNotification.movieWatchRequest:
         return 'sent you a watch request for';
       case FlixieNotification.friendRequest:
@@ -587,6 +596,53 @@ class _RequestCard extends StatelessWidget {
             style: const TextStyle(color: FlixieColors.light, fontSize: 13),
           );
         }
+      } else if (notification.type == FlixieNotification.groupRequest) {
+        final movieTitle = notification.groupWatchMovieTitle;
+        final movieId = notification.groupWatchMovieId;
+        final groupName = notification.groupWatchGroupName;
+        final verb = notification.action == FlixieNotification.actionAccepted
+            ? 'accepted'
+            : 'declined';
+        return RichText(
+          text: TextSpan(
+            style: const TextStyle(color: FlixieColors.light, fontSize: 13),
+            children: [
+              TextSpan(text: '$sender $verb your watch request'),
+              if (movieTitle != null && movieTitle.isNotEmpty) ...[
+                const TextSpan(text: ' for '),
+                WidgetSpan(
+                  alignment: PlaceholderAlignment.baseline,
+                  baseline: TextBaseline.alphabetic,
+                  child: GestureDetector(
+                    onTap: movieId != null
+                        ? () => context.push('/movies/$movieId')
+                        : null,
+                    child: Text(
+                      movieTitle,
+                      style: TextStyle(
+                        color: movieId != null
+                            ? FlixieColors.primary
+                            : FlixieColors.light,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              if (groupName != null && groupName.isNotEmpty)
+                TextSpan(
+                  text: ' in ',
+                  children: [
+                    TextSpan(
+                      text: groupName,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        );
       } else {
         final target = () {
           switch (notification.type) {
@@ -594,8 +650,6 @@ class _RequestCard extends StatelessWidget {
               return 'your friend request';
             case FlixieNotification.groupInvite:
               return 'your group invite';
-            case FlixieNotification.groupRequest:
-              return 'your group request';
             default:
               return 'your request';
           }
@@ -647,18 +701,71 @@ class _RequestCard extends StatelessWidget {
       );
     }
     return _buildGroupInviteSubtitle() ??
+        _buildGroupRequestSubtitle(context) ??
         Text(
           _subtitle,
           style: const TextStyle(color: FlixieColors.light, fontSize: 13),
         );
   }
 
+  Widget? _buildGroupRequestSubtitle(BuildContext context) {
+    if (notification.type != FlixieNotification.groupRequest || _isResolved) {
+      return null;
+    }
+    final movieTitle = notification.groupWatchMovieTitle;
+    final movieId = notification.groupWatchMovieId;
+    final groupName = notification.groupWatchGroupName;
+    if (movieTitle == null || movieTitle.isEmpty) {
+      return Text(
+        'sent a group watch request',
+        style: const TextStyle(color: FlixieColors.light, fontSize: 13),
+      );
+    }
+    return RichText(
+      text: TextSpan(
+        style: const TextStyle(color: FlixieColors.light, fontSize: 13),
+        children: [
+          const TextSpan(text: 'wants to watch '),
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: GestureDetector(
+              onTap: movieId != null
+                  ? () => context.push('/movies/$movieId')
+                  : null,
+              child: Text(
+                movieTitle,
+                style: TextStyle(
+                  color: movieId != null
+                      ? FlixieColors.primary
+                      : FlixieColors.light,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+          if (groupName != null && groupName.isNotEmpty)
+            TextSpan(
+              text: ' in ',
+              children: [
+                TextSpan(
+                  text: groupName,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget? _buildGroupInviteSubtitle() {
     if (notification.type != FlixieNotification.groupInvite || _isResolved) {
       return null;
     }
-    const joinPrefix = 'to join ';
     final msg = _subtitle;
+    const joinPrefix = 'to join ';
     final idx = msg.indexOf(joinPrefix);
     if (idx == -1) {
       return Text(msg,
@@ -781,6 +888,23 @@ class _RequestCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
+                  child: OutlinedButton(
+                    onPressed: onDecline,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: FlixieColors.danger,
+                      side: BorderSide(
+                          color: FlixieColors.danger.withValues(alpha: 0.45)),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text('Decline',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
                   child: ElevatedButton(
                     onPressed: onAccept,
                     style: ElevatedButton.styleFrom(
@@ -792,23 +916,6 @@ class _RequestCard extends StatelessWidget {
                       ),
                     ),
                     child: const Text('Accept',
-                        style: TextStyle(fontWeight: FontWeight.w600)),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: onDecline,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: FlixieColors.light,
-                      side: BorderSide(
-                          color: FlixieColors.medium.withValues(alpha: 0.5)),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text('Decline',
                         style: TextStyle(fontWeight: FontWeight.w600)),
                   ),
                 ),

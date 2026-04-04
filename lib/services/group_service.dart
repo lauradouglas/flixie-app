@@ -1,3 +1,4 @@
+import '../models/activity_list_item.dart';
 import '../models/group.dart';
 import '../models/group_member.dart';
 import '../models/group_watch_request.dart';
@@ -99,14 +100,14 @@ class GroupService {
     );
   }
 
-  static Future<GroupWatchRequest> sendWatchRequest(
+  static Future<void> sendWatchRequest(
     String groupId,
     String userId,
     String message,
     String mediaType,
     int mediaId,
   ) async {
-    final data = await ApiClient.post(
+    await ApiClient.post(
       '/groups/$groupId/send-request',
       body: {
         'userId': userId,
@@ -115,7 +116,6 @@ class GroupService {
         'mediaId': mediaId,
       },
     );
-    return GroupWatchRequest.fromJson(data as Map<String, dynamic>);
   }
 
   static Future<void> updateWatchRequestForMember(
@@ -177,6 +177,13 @@ class GroupService {
     final data = await ApiClient.get('/groups/$groupId/requests');
     return (data as List<dynamic>)
         .map((e) => GroupWatchRequest.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  static Future<List<ActivityListItem>> getGroupActivity(String groupId) async {
+    final data = await ApiClient.get('/groups/$groupId/activity');
+    return (data as List<dynamic>)
+        .map((e) => ActivityListItem.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 }

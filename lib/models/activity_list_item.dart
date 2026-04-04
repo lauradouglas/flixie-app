@@ -7,16 +7,22 @@ enum ActivityListType {
   favoriteShow('favorite-show'),
   favoritePerson('favorite-person'),
   movieRating('movie-rating'),
+  showRating('show-rating'),
+  movieReview('movie-review'),
+  showReview('show-review'),
   watchRequestSent('watch-request-sent'),
   watchRequestAccepted('watch-request-accepted'),
+  watchRequest('watch-request'),
   unknown('unknown');
 
   const ActivityListType(this.value);
   final String value;
 
   static ActivityListType fromString(String? raw) {
+    // Normalize underscore variants used by the group activity API
+    final normalized = raw?.replaceAll('_', '-');
     for (final t in values) {
-      if (t.value == raw) return t;
+      if (t.value == normalized) return t;
     }
     return unknown;
   }
@@ -58,16 +64,25 @@ class ActivityListItem {
   });
 
   factory ActivityListItem.fromJson(Map<String, dynamic> json) {
+    // Group activity API nests user info; friends API uses top-level fields
+    final user = json['user'] as Map<String, dynamic>? ??
+        json['requester'] as Map<String, dynamic>?;
     final movie = json['movie'] as Map<String, dynamic>?;
     final show = json['show'] as Map<String, dynamic>?;
     final person = json['person'] as Map<String, dynamic>?;
     final review = json['review'] as Map<String, dynamic>?;
     return ActivityListItem(
-      id: json['id'] as String,
-      userId: json['userId'] as String,
-      username: json['username'] as String? ?? '',
-      firstName: json['firstName'] as String? ?? '',
-      lastName: json['lastName'] as String? ?? '',
+      id: json['id']?.toString() ?? '',
+      userId: user?['id'] as String? ??
+          json['userId'] as String? ??
+          json['requesterId'] as String? ??
+          '',
+      username:
+          user?['username'] as String? ?? json['username'] as String? ?? '',
+      firstName:
+          user?['firstName'] as String? ?? json['firstName'] as String? ?? '',
+      lastName:
+          user?['lastName'] as String? ?? json['lastName'] as String? ?? '',
       movieId: json['movieId'] as int?,
       showId: json['showId'] as int?,
       personId: json['personId'] as int?,

@@ -6,7 +6,8 @@ class NotificationService {
   static Future<List<FlixieNotification>> getNotifications(
       String userId) async {
     final data = await ApiClient.get('/notifications/user/$userId');
-    return (data as List<dynamic>)
+    final list = data as List<dynamic>;
+    return list
         .map((e) => FlixieNotification.fromJson(e as Map<String, dynamic>))
         .toList();
   }

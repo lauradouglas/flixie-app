@@ -10,7 +10,9 @@ import '../providers/auth_provider.dart';
 import '../screens/profile/activity_tile.dart';
 import '../screens/profile/friends_row.dart';
 import '../services/friend_service.dart';
+import '../models/notification.dart';
 import '../services/group_service.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_logger.dart';
 
@@ -375,28 +377,37 @@ class _PendingFriendCard extends StatelessWidget {
                     color: FlixieColors.light, fontWeight: FontWeight.w500),
               ),
             ),
-            TextButton(
-              onPressed: onDecline,
-              style: TextButton.styleFrom(
-                foregroundColor: FlixieColors.danger,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                minimumSize: Size.zero,
+            SizedBox(
+              height: 34,
+              child: OutlinedButton(
+                onPressed: onDecline,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: FlixieColors.danger,
+                  side: const BorderSide(color: FlixieColors.danger),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text('Decline'),
               ),
-              child: const Text('Decline'),
             ),
             const SizedBox(width: 4),
-            ElevatedButton(
-              onPressed: onAccept,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: FlixieColors.primary,
-                foregroundColor: Colors.black,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                minimumSize: Size.zero,
-                textStyle: const TextStyle(fontSize: 13),
+            SizedBox(
+              height: 34,
+              child: ElevatedButton(
+                onPressed: onAccept,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: FlixieColors.primary,
+                  foregroundColor: Colors.black,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  textStyle: const TextStyle(fontSize: 13),
+                ),
+                child: const Text('Accept'),
               ),
-              child: const Text('Accept'),
             ),
           ],
         ),
@@ -419,10 +430,10 @@ class _GroupsSubView extends StatefulWidget {
 class _GroupsSubViewState extends State<_GroupsSubView> {
   bool _loading = true;
   List<Group> _groups = [];
-  // groupId -> members with pending invite for current user
   final Map<String, GroupMember> _pendingInvites = {};
-  // groupId -> actual member count fetched from API
   final Map<String, int> _memberCounts = {};
+  final Map<String, FlixieNotification> _inviteNotifications = {};
+  int _innerTab = 0;
   String? _error;
 
   @override
@@ -438,40 +449,82 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
       return;
     }
     try {
-      final groups = await GroupService.getUserGroups(userId);
+      // Fetch groups and notifications in parallel
+      final topResults = await Future.wait<Object>([
+        GroupService.getUserGroups(userId),
+        NotificationService.getNotifications(userId)
+            .catchError((_) => <FlixieNotification>[]),
+      ]);
+      final groups = topResults[0] as List<Group>;
+      final allNotifications = topResults[1] as List<FlixieNotification>;
 
-      // Check for pending invites in each group
-      final pendingInvites = <String, GroupMember>{};
-      final memberCounts = <String, int>{};
-      for (final group in groups) {
-        if (group.id == null) continue;
-        try {
-          final members = await GroupService.getGroupMembers(group.id!);
-          memberCounts[group.id!] = members.length;
-          final myMembership = members.firstWhere(
-            (m) => m.memberId == userId,
-            orElse: () => GroupMember(
-              groupId: group.id!,
-              memberId: userId,
-              role: 'MEMBER',
-              inviteStatus: null,
-            ),
-          );
-          if (myMembership.isPending) {
-            pendingInvites[group.id!] = myMembership;
+      // Build map of groupId -> pending GROUP_INVITE notification.
+      final inviteNotifs = <String, FlixieNotification>{};
+      final notifOnlyGroups = <Group>[];
+      for (final notif in allNotifications) {
+        if (notif.type == FlixieNotification.groupInvite &&
+            notif.action != FlixieNotification.actionAccepted &&
+            notif.action != FlixieNotification.actionDeclined) {
+          final groupId = notif.groupInviteGroupId;
+          if (groupId == null) continue;
+          inviteNotifs[groupId] = notif;
+          if (!groups.any((g) => g.id == groupId)) {
+            final name = notif.groupInviteGroupName ?? 'Invited Group';
+            notifOnlyGroups.add(Group(id: groupId, name: name, ownerId: ''));
           }
-        } catch (_) {}
+        }
+      }
+
+      // Combine confirmed groups with notification-only invited groups.
+      final allGroups = [...groups, ...notifOnlyGroups];
+
+      final pendingInvites = <String, GroupMember>{
+        for (final g in notifOnlyGroups)
+          g.id!: GroupMember(
+            groupId: g.id!,
+            memberId: userId,
+            role: 'MEMBER',
+            inviteStatus: 'PENDING',
+          ),
+      };
+      final memberCounts = <String, int>{};
+      final groupsWithId = groups.where((g) => g.id != null).toList();
+      final memberResults = await Future.wait(
+        groupsWithId.map(
+          (g) => GroupService.getGroupMembers(g.id!)
+              .catchError((_) => <GroupMember>[]),
+        ),
+      );
+      for (var i = 0; i < groupsWithId.length; i++) {
+        final group = groupsWithId[i];
+        final members = memberResults[i];
+        memberCounts[group.id!] = members.length;
+        final myMembership = members.firstWhere(
+          (m) => m.memberId == userId,
+          orElse: () => GroupMember(
+            groupId: group.id!,
+            memberId: userId,
+            role: 'MEMBER',
+            inviteStatus: null,
+          ),
+        );
+        if (myMembership.isPending) {
+          pendingInvites[group.id!] = myMembership;
+        }
       }
 
       if (mounted) {
         setState(() {
-          _groups = groups;
+          _groups = allGroups;
           _pendingInvites
             ..clear()
             ..addAll(pendingInvites);
           _memberCounts
             ..clear()
             ..addAll(memberCounts);
+          _inviteNotifications
+            ..clear()
+            ..addAll(inviteNotifs);
           _loading = false;
           _error = null;
         });
@@ -492,9 +545,26 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
     if (userId == null || group.id == null) return;
     try {
       await GroupService.updateMemberInviteStatus(group.id!, userId, status);
+      // Also update the associated GROUP_INVITE notification so it reflects
+      // the accept/decline on the notifications screen.
+      final notif = _inviteNotifications[group.id];
+      if (notif?.id != null) {
+        final action = status == 'ACCEPTED'
+            ? FlixieNotification.actionAccepted
+            : FlixieNotification.actionDeclined;
+        NotificationService.updateNotification(
+          notif!.id!,
+          action: action,
+          read: true,
+        ).catchError((e) {
+          logger.w('Failed to update GROUP_INVITE notification: $e');
+          return FlixieNotification(userId: '', type: '', message: '');
+        });
+      }
       if (mounted) {
         setState(() {
           _pendingInvites.remove(group.id);
+          _inviteNotifications.remove(group.id);
           if (status == 'DECLINED') {
             _groups.removeWhere((g) => g.id == group.id);
           }
@@ -539,93 +609,133 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
       );
     }
 
-    final textTheme = Theme.of(context).textTheme;
     final pendingGroups =
         _groups.where((g) => _pendingInvites.containsKey(g.id)).toList();
     final myGroups =
         _groups.where((g) => !_pendingInvites.containsKey(g.id)).toList();
 
-    return RefreshIndicator(
-      onRefresh: _load,
-      color: FlixieColors.primary,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Pending invitations
-            if (pendingGroups.isNotEmpty) ...[
-              _SectionHeader(
-                title: 'PENDING INVITATIONS',
-                badge: pendingGroups.length,
-              ),
-              const SizedBox(height: 8),
-              ...pendingGroups.map(
-                (g) => _InvitationCard(
+    return Column(
+      children: [
+        _GroupsTabBar(
+          selectedIndex: _innerTab,
+          pendingCount: pendingGroups.length,
+          onChanged: (i) => setState(() => _innerTab = i),
+        ),
+        Expanded(
+          child: _innerTab == 1
+              ? _buildDiscoverTab()
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  color: FlixieColors.primary,
+                  child: _innerTab == 2
+                      ? _buildRequestsTab(pendingGroups)
+                      : _buildMyGroupsTab(pendingGroups, myGroups),
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMyGroupsTab(List<Group> pendingGroups, List<Group> myGroups) {
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (pendingGroups.isNotEmpty) ...[
+            _SectionHeader(
+              title: 'PENDING INVITATIONS',
+              rightLabel: '${pendingGroups.length} REQUESTS',
+            ),
+            const SizedBox(height: 10),
+            ...pendingGroups.map((g) => _InvitationCard(
                   group: g,
+                  invitedByUsername: _inviteNotifications[g.id]?.senderName,
                   onAccept: () => _respondToInvite(g, 'ACCEPTED'),
                   onDecline: () => _respondToInvite(g, 'DECLINED'),
+                )),
+            const SizedBox(height: 20),
+          ],
+          Row(
+            children: [
+              Expanded(
+                child: _SectionHeader(title: 'MY COMMUNITIES'),
+              ),
+              TextButton(
+                onPressed: _showCreateGroupSheet,
+                style: TextButton.styleFrom(
+                  foregroundColor: FlixieColors.primary,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
+                ),
+                child: const Text(
+                  'CREATE NEW +',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
               ),
-              const SizedBox(height: 16),
             ],
+          ),
+          const SizedBox(height: 8),
+          if (myGroups.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text(
+                  "You're not in any groups yet.",
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(color: FlixieColors.medium),
+                ),
+              ),
+            )
+          else
+            ...myGroups.map((g) => _GroupCard(
+                  group: g,
+                  memberCount: _memberCounts[g.id],
+                )),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
 
-            // My groups
-            Row(
-              children: [
-                Container(
-                  width: 4,
-                  height: 22,
-                  decoration: BoxDecoration(
-                    color: FlixieColors.primary,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  'MY GROUPS',
-                  style: textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-                const Spacer(),
-                TextButton(
-                  onPressed: _showCreateGroupSheet,
-                  style: TextButton.styleFrom(
-                    foregroundColor: FlixieColors.primary,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    minimumSize: Size.zero,
-                  ),
-                  child: const Text(
-                    'CREATE NEW +',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            if (myGroups.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 24),
-                child: Center(
-                  child: Text(
-                    "You're not in any groups yet.",
-                    style: textTheme.bodyMedium
-                        ?.copyWith(color: FlixieColors.medium),
-                  ),
-                ),
-              )
-            else
-              ...myGroups.map((g) => _GroupCard(
-                    group: g,
-                    memberCount: _memberCounts[g.id],
-                  )),
-            const SizedBox(height: 24),
-          ],
+  Widget _buildDiscoverTab() {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(32),
+        child: Text(
+          'Discover groups\ncoming soon',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: FlixieColors.medium, fontSize: 15),
         ),
+      ),
+    );
+  }
+
+  Widget _buildRequestsTab(List<Group> pendingGroups) {
+    if (pendingGroups.isEmpty) {
+      return const Center(
+        child: Text(
+          'No pending invitations',
+          style: TextStyle(color: FlixieColors.medium),
+        ),
+      );
+    }
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        children: pendingGroups
+            .map((g) => _InvitationCard(
+                  group: g,
+                  invitedByUsername: _inviteNotifications[g.id]?.senderName,
+                  onAccept: () => _respondToInvite(g, 'ACCEPTED'),
+                  onDecline: () => _respondToInvite(g, 'DECLINED'),
+                ))
+            .toList(),
       ),
     );
   }
@@ -636,62 +746,102 @@ class _InvitationCard extends StatelessWidget {
     required this.group,
     required this.onAccept,
     required this.onDecline,
+    this.invitedByUsername,
   });
 
   final Group group;
   final VoidCallback onAccept;
   final VoidCallback onDecline;
+  final String? invitedByUsername;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: FlixieColors.tabBarBackgroundFocused,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: FlixieColors.tabBarBorder),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _GroupAvatar(group: group, radius: 22),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  group.name,
-                  style: const TextStyle(
-                      color: FlixieColors.light, fontWeight: FontWeight.w600),
+          Row(
+            children: [
+              _GroupAvatar(group: group, radius: 26),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      group.name,
+                      style: const TextStyle(
+                        color: FlixieColors.light,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text.rich(
+                      TextSpan(
+                        text: 'Invited by ',
+                        style: const TextStyle(
+                            color: FlixieColors.medium, fontSize: 12),
+                        children: [
+                          TextSpan(
+                            text: invitedByUsername != null
+                                ? '@$invitedByUsername'
+                                : 'group owner',
+                            style: const TextStyle(
+                              color: FlixieColors.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                const Text(
-                  'You have been invited',
-                  style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: onAccept,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: FlixieColors.success,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    elevation: 0,
+                  ),
+                  child: const Text('Accept',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
                 ),
-              ],
-            ),
-          ),
-          TextButton(
-            onPressed: onDecline,
-            style: TextButton.styleFrom(
-              foregroundColor: FlixieColors.danger,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              minimumSize: Size.zero,
-            ),
-            child: const Text('Decline'),
-          ),
-          const SizedBox(width: 4),
-          ElevatedButton(
-            onPressed: onAccept,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: FlixieColors.primary,
-              foregroundColor: Colors.black,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              minimumSize: Size.zero,
-              textStyle: const TextStyle(fontSize: 13),
-            ),
-            child: const Text('Accept'),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: onDecline,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: FlixieColors.danger,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    side: BorderSide(
+                        color: FlixieColors.danger.withValues(alpha: 0.45)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text('Decline',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -704,6 +854,14 @@ class _GroupCard extends StatelessWidget {
 
   final Group group;
   final int? memberCount;
+
+  static String _formatCount(int count) {
+    if (count >= 1000000) return '${(count / 1000000).toStringAsFixed(1)}M';
+    if (count >= 1000) {
+      return '${(count / 1000).toStringAsFixed(count >= 10000 ? 0 : 1)}K';
+    }
+    return '$count';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -720,7 +878,26 @@ class _GroupCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            _GroupAvatar(group: group, radius: 24),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                _GroupAvatar(group: group, radius: 26),
+                Positioned(
+                  bottom: 1,
+                  right: 1,
+                  child: Container(
+                    width: 11,
+                    height: 11,
+                    decoration: BoxDecoration(
+                      color: FlixieColors.success,
+                      shape: BoxShape.circle,
+                      border:
+                          Border.all(color: FlixieColors.background, width: 2),
+                    ),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -736,14 +913,111 @@ class _GroupCard extends StatelessWidget {
                   ),
                   if (count != null)
                     Text(
-                      '$count member${count == 1 ? '' : 's'}',
+                      '${_formatCount(count)} MEMBER${count == 1 ? '' : 'S'}',
+                      style: const TextStyle(
+                        color: FlixieColors.primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  if (group.description != null &&
+                      group.description!.isNotEmpty)
+                    Text(
+                      group.description!,
                       style: const TextStyle(
                           color: FlixieColors.medium, fontSize: 12),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                 ],
               ),
             ),
             const Icon(Icons.chevron_right, color: FlixieColors.medium),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Groups inner tab bar
+// ---------------------------------------------------------------------------
+
+class _GroupsTabBar extends StatelessWidget {
+  const _GroupsTabBar({
+    required this.selectedIndex,
+    required this.pendingCount,
+    required this.onChanged,
+  });
+
+  final int selectedIndex;
+  final int pendingCount;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: Row(
+        children: [
+          _tab(0, 'My Groups'),
+          const SizedBox(width: 8),
+          _tab(1, 'Discover'),
+          const SizedBox(width: 8),
+          _tab(2, 'Requests'),
+        ],
+      ),
+    );
+  }
+
+  Widget _tab(int index, String label) {
+    final selected = index == selectedIndex;
+    final showBadge = index == 2 && pendingCount > 0;
+    return GestureDetector(
+      onTap: () => onChanged(index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected
+              ? FlixieColors.primary
+              : FlixieColors.tabBarBackgroundFocused,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? FlixieColors.primary : FlixieColors.tabBarBorder,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? Colors.black : FlixieColors.medium,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+            if (showBadge) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: FlixieColors.success,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$pendingCount',
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -904,8 +1178,6 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
     }
   }
 
-
-
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -1006,8 +1278,8 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
                       borderRadius: BorderRadius.circular(12)),
                 ),
                 child: const Text('Next',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 15)),
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               ),
             ),
           ],
@@ -1256,10 +1528,11 @@ class _VisibilityChip extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, this.badge});
+  const _SectionHeader({required this.title, this.badge, this.rightLabel});
 
   final String title;
   final int? badge;
+  final String? rightLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -1296,6 +1569,17 @@ class _SectionHeader extends StatelessWidget {
                   color: FlixieColors.primary,
                   fontSize: 11,
                   fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+        if (rightLabel != null) ...[
+          const Spacer(),
+          Text(
+            rightLabel!,
+            style: textTheme.bodySmall?.copyWith(
+              color: FlixieColors.medium,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
             ),
           ),
         ],
