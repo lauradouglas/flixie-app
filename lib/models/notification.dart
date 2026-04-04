@@ -96,6 +96,19 @@ class FlixieNotification {
       (_linkOtherUser)?['iconColor'] as Map<String, dynamic>?;
 
   /// The movie/show title embedded in a watch request link, if present.
+  /// The poster path for the movie/show embedded in any request link.
+  String? get watchMediaPosterPath {
+    final l = link;
+    if (l == null) return null;
+    final request =
+        (l['request'] ?? l['groupRequest']) as Map<String, dynamic>?;
+    if (request == null) return null;
+    final movie = request['movie'] as Map<String, dynamic>?;
+    if (movie != null) return movie['posterPath'] as String?;
+    final show = request['show'] as Map<String, dynamic>?;
+    return show?['posterPath'] as String?;
+  }
+
   String? get watchMediaTitle {
     final l = link;
     if (l == null) return null;

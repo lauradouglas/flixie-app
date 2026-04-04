@@ -1,0 +1,43 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // -------------------------------------------------------------------------
+    // Conversations
+    // -------------------------------------------------------------------------
+    match /conversations/{conversationId} {
+      // A member can read the conversation document (needed to get memberIds,
+      // name, lastMessage, etc.)
+      allow read: if request.auth != null
+                  && request.auth.uid in resource.data.memberIds;
+
+      // All writes are performed server-side via the Admin SDK.
+      allow write: if false;
+
+      // -----------------------------------------------------------------------
+      // Messages subcollection
+      // -----------------------------------------------------------------------
+      match /messages/{messageId} {
+        // Only members of the parent conversation may read messages.
+        allow read: if request.auth != null
+                    && request.auth.uid in
+                       get(/databases/$(database)/documents/conversations/$(conversationId))
+                         .data.memberIds;
+
+        // Messages are written by the backend only.
+        allow write: if false;
+      }
+
+      // -----------------------------------------------------------------------
+      // Members subcollection (stores unreadCount per user)
+      // -----------------------------------------------------------------------
+      match /members/{userId} {
+        // Each user may read their own member document (for unread count).
+        allow read: if request.auth != null && request.auth.uid == userId;
+
+        // Writes are backend-only.
+        allow write: if false;
+      }
+    }
+  }
+}
