@@ -337,6 +337,8 @@ class _ChatTabState extends State<_ChatTab> {
   bool _sending = false;
   String? _initError;
   AuthProvider? _authProvider;
+  // userId → username, populated from the members subcollection
+  Map<String, String> _memberUsernames = {};
 
   @override
   void didChangeDependencies() {
@@ -395,10 +397,16 @@ class _ChatTabState extends State<_ChatTab> {
       );
 
       if (mounted) {
-        setState(() {
-          _conversationId = conversation.id;
-          _initLoading = false;
-        });
+        // Fetch member usernames from Firestore members subcollection
+        final usernames = await ChatService.fetchMemberUsernames(conversation.id)
+            .catchError((_) => <String, String>{});
+        if (mounted) {
+          setState(() {
+            _conversationId = conversation.id;
+            _memberUsernames = usernames;
+            _initLoading = false;
+          });
+        }
         ChatService.markRead(conversation.id, userId).catchError((_) {});
       }
     } catch (e) {
@@ -485,9 +493,14 @@ class _ChatTabState extends State<_ChatTab> {
                 itemBuilder: (_, i) {
                   final msg = messages[i];
                   final isMe = msg.senderId == currentUserId;
+                  // Prefer the username embedded in the message doc; fall back
+                  // to the members subcollection map we fetched at init.
+                  final username = msg.senderUsername
+                      ?? _memberUsernames[msg.senderId]
+                      ?? msg.senderId.substring(0, 6);
                   return _ChatBubble(
                     message: msg.text,
-                    senderUsername: msg.senderUsername ?? 'User',
+                    senderUsername: username,
                     isMe: isMe,
                   );
                 },
@@ -524,15 +537,23 @@ class _ChatBubble extends StatelessWidget {
         crossAxisAlignment:
             isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
-          if (!isMe)
-            Padding(
-              padding: const EdgeInsets.only(left: 4, bottom: 2),
-              child: Text(
-                senderUsername,
-                style:
-                    const TextStyle(color: FlixieColors.medium, fontSize: 11),
+          Padding(
+            padding: EdgeInsets.only(
+              left: isMe ? 0 : 4,
+              right: isMe ? 4 : 0,
+              bottom: 3,
+            ),
+            child: Text(
+              isMe ? 'You' : senderUsername,
+              style: TextStyle(
+                color: isMe
+                    ? FlixieColors.primary.withValues(alpha: 0.8)
+                    : FlixieColors.medium,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
               ),
             ),
+          ),
           Container(
             constraints: BoxConstraints(
               maxWidth: MediaQuery.of(context).size.width * 0.72,
