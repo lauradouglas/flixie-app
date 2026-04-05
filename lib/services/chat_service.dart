@@ -42,8 +42,7 @@ class ChatService {
   }
 
   /// Mark a conversation as read for the given user.
-  static Future<void> markRead(
-      String conversationId, String userId) async {
+  static Future<void> markRead(String conversationId, String userId) async {
     await ApiClient.patch(
       '/conversations/$conversationId/read',
       body: {'userId': userId},
@@ -66,7 +65,8 @@ class ChatService {
         .map((snap) {
       logger.d('[ChatService] messagesStream got ${snap.docs.length} docs');
       if (snap.docs.isNotEmpty) {
-        logger.d('[ChatService] first message raw data: ${snap.docs.first.data()}');
+        logger.d(
+            '[ChatService] first message raw data: ${snap.docs.first.data()}');
       }
       return snap.docs.map((d) => ChatMessage.fromFirestore(d)).toList();
     });
@@ -88,9 +88,9 @@ class ChatService {
     for (final doc in snap.docs) {
       final data = doc.data();
       final userId = data['userId'] as String? ?? doc.id;
-      final username = data['username'] as String?
-          ?? data['firstName'] as String?
-          ?? data['displayName'] as String?;
+      final username = data['username'] as String? ??
+          data['firstName'] as String? ??
+          data['displayName'] as String?;
       if (username != null) map[userId] = username;
     }
     logger.d('[ChatService] userId→username map: $map');
@@ -98,8 +98,7 @@ class ChatService {
   }
 
   /// Real-time unread count for a user in a conversation.
-  static Stream<int> unreadCountStream(
-      String conversationId, String userId) {
+  static Stream<int> unreadCountStream(String conversationId, String userId) {
     return _db
         .collection('conversations')
         .doc(conversationId)

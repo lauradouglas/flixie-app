@@ -398,8 +398,9 @@ class _ChatTabState extends State<_ChatTab> {
 
       if (mounted) {
         // Fetch member usernames from Firestore members subcollection
-        final usernames = await ChatService.fetchMemberUsernames(conversation.id)
-            .catchError((_) => <String, String>{});
+        final usernames =
+            await ChatService.fetchMemberUsernames(conversation.id)
+                .catchError((_) => <String, String>{});
         if (mounted) {
           setState(() {
             _conversationId = conversation.id;
@@ -495,9 +496,9 @@ class _ChatTabState extends State<_ChatTab> {
                   final isMe = msg.senderId == currentUserId;
                   // Prefer the username embedded in the message doc; fall back
                   // to the members subcollection map we fetched at init.
-                  final username = msg.senderUsername
-                      ?? _memberUsernames[msg.senderId]
-                      ?? msg.senderId.substring(0, 6);
+                  final username = msg.senderUsername ??
+                      _memberUsernames[msg.senderId] ??
+                      msg.senderId.substring(0, 6);
                   return _ChatBubble(
                     message: msg.text,
                     senderUsername: username,
