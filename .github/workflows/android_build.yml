@@ -2,7 +2,8 @@ name: Android Build
 
 on:
   push:
-    branches: [ "main", "AndroidBuild" ]
+    branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -55,12 +56,6 @@ jobs:
 
     - name: Build App Bundle (Release)
       run: flutter build appbundle --release
-
-    # - name: Build APK (Release)
-    #   run: flutter build apk --release --dart-define-from-file=.env
-
-    # - name: Build App Bundle (Release)
-    #   run: flutter build appbundle --release --dart-define-from-file=.env
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4

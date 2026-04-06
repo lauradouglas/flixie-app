@@ -42,6 +42,29 @@ flutter build apk --release
 flutter build ios --release
 ```
 
+## GitHub Actions
+
+The project includes automated workflows for building and validating the application on every push to the `main` branch.
+
+### Android Build (`android_build.yml`)
+- Triggered on pushes to `main` and `AndroidBuild`.
+- Builds both the **APK** and **App Bundle (AAB)** in release mode.
+- Artifacts are uploaded and available for download from the action run summary.
+
+### iOS Build (`build.yml`)
+- Triggered on pushes and pull requests to `main`.
+- Validates the iOS build (using `--no-codesign`) on a `macos-latest` runner.
+
+### Required Repository Secrets
+To enable these workflows, the following GitHub Secrets must be configured in the repository:
+
+| Secret Name | Description |
+|---|---|
+| `API_BASE_URL` | The base URL for the backend API |
+| `FIREBASE_*` | All Firebase configuration keys (see `.firebase.json.example`) |
+| `GOOGLE_SERVICES_JSON_BASE64` | Base64 encoded content of `google-services.json` |
+| `GOOGLE_SERVICE_INFO_PLIST_BASE64` | Base64 encoded content of `GoogleService-Info.plist` |
+
 ### Testing
 
 ```bash
