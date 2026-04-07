@@ -45,7 +45,7 @@ class GroupRequestMemberStatus {
 
   factory GroupRequestMemberStatus.fromJson(Map<String, dynamic> json) {
     return GroupRequestMemberStatus(
-      memberId: json['memberId']?.toString() ?? '',
+      memberId: (json['responderId'] ?? json['memberId'])?.toString() ?? '',
       status: json['status'] as String? ?? '',
       response: json['response'] as String?,
       username: json['username'] as String?,

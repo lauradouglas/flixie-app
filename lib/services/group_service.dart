@@ -180,6 +180,11 @@ class GroupService {
         .toList();
   }
 
+  static Future<void> deleteWatchRequest(
+      String groupId, String requestId) async {
+    await ApiClient.delete('/groups/$groupId/requests/$requestId');
+  }
+
   static Future<List<ActivityListItem>> getGroupActivity(String groupId) async {
     final data = await ApiClient.get('/groups/$groupId/activity');
     return (data as List<dynamic>)

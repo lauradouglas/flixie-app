@@ -263,7 +263,7 @@ class AppTheme {
           fontWeight: FontWeight.bold,
         ),
         headlineMedium: TextStyle(
-          color: FlixieColors.light,
+          color: FlixieColors.white,
           fontWeight: FontWeight.w600,
         ),
         headlineSmall: TextStyle(

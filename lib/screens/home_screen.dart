@@ -460,8 +460,10 @@ class _ListCard extends StatelessWidget {
                         movie.name,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: textTheme.bodyLarge
-                            ?.copyWith(fontWeight: FontWeight.w600),
+                        style: textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: FlixieColors.white,
+                        ),
                       ),
                       if (movie.releaseDate != null &&
                           movie.releaseDate!.length >= 4) ...[
@@ -469,7 +471,7 @@ class _ListCard extends StatelessWidget {
                         Text(
                           'Released: ${movie.releaseDate!}',
                           style: textTheme.bodySmall
-                              ?.copyWith(color: FlixieColors.medium),
+                              ?.copyWith(color: FlixieColors.light),
                         ),
                       ],
                       const SizedBox(height: 8),
@@ -716,7 +718,7 @@ class _TrendingAmongFriendsSection extends StatelessWidget {
     }
 
     final entries = usersByMovie.entries
-        .where((e) => e.value.length >= 1)
+        .where((e) => e.value.isNotEmpty)
         .map((e) => _TrendingEntry(
               movieId: e.key,
               title: titleByMovie[e.key]!,
