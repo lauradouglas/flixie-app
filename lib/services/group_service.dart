@@ -5,6 +5,9 @@ import '../models/group_watch_request.dart';
 import '../utils/app_logger.dart';
 import 'api_client.dart';
 
+export '../models/group_watch_request.dart'
+    show WatchRequestFilter, WatchRequestStatus, WatchResponseDecision;
+
 class GroupService {
   static Future<Group> createGroup(Map<String, dynamic> body) async {
     final data = await ApiClient.post('/groups', body: body);
@@ -178,6 +181,54 @@ class GroupService {
     return (data as List<dynamic>)
         .map((e) => GroupWatchRequest.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  /// Fetch watch requests for a conversation (group or direct) with an
+  /// optional [filter].  Falls back to the legacy group endpoint when
+  /// [conversationId] is null.
+  static Future<List<GroupWatchRequest>> getConversationWatchRequests(
+    String conversationId, {
+    WatchRequestFilter filter = WatchRequestFilter.active,
+  }) async {
+    final data = await ApiClient.get(
+      '/conversations/$conversationId/watch-requests',
+      queryParams: {'filter': filter.apiValue},
+    );
+    return (data as List<dynamic>)
+        .map((e) => GroupWatchRequest.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// POST /watch-requests/:id/respond
+  static Future<void> respondToWatchRequest(
+    String requestId,
+    WatchResponseDecision decision,
+  ) async {
+    await ApiClient.post(
+      '/watch-requests/$requestId/respond',
+      body: {'decision': decision.apiValue},
+    );
+  }
+
+  /// POST /watch-requests/:id/complete
+  static Future<void> completeWatchRequest(String requestId) async {
+    await ApiClient.post('/watch-requests/$requestId/complete', body: {});
+  }
+
+  /// POST /watch-requests/:id/cancel
+  static Future<void> cancelWatchRequest(String requestId) async {
+    await ApiClient.post('/watch-requests/$requestId/cancel', body: {});
+  }
+
+  /// POST /watch-requests/:id/schedule
+  static Future<void> scheduleWatchRequest(
+    String requestId, {
+    required String scheduledFor,
+  }) async {
+    await ApiClient.post(
+      '/watch-requests/$requestId/schedule',
+      body: {'scheduledFor': scheduledFor},
+    );
   }
 
   static Future<void> deleteWatchRequest(
