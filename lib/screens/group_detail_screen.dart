@@ -34,6 +34,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
   List<GroupMember> _groupMembers = [];
   List<GroupWatchRequest> _watchRequests = [];
   List<ActivityListItem> _memberActivity = [];
+  String? _conversationId;
 
   int get _pendingRequestCount {
     return _watchRequests.where((r) => r.isActive).length;
@@ -76,10 +77,35 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
           _memberActivity = secondaryResults[1] as List<ActivityListItem>;
           _loadingGroup = false;
         });
+        // Resolve the Firestore conversationId once group + members are known.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _loadConversationId();
+        });
       }
     } catch (e) {
       logger.e('GroupDetail load group error: $e');
       if (mounted) setState(() => _loadingGroup = false);
+    }
+  }
+
+  /// Resolve (or create) the Firestore conversation for this group so that
+  /// conversation-scoped watch-request endpoints can be used.
+  Future<void> _loadConversationId() async {
+    if (_conversationId != null) return;
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (userId == null || _group == null || _groupMembers.isEmpty) return;
+    try {
+      final memberIds = _groupMembers.map((m) => m.memberId).toList();
+      if (!memberIds.contains(userId)) memberIds.add(userId);
+      final conv = await ChatService.getOrCreateGroupConversation(
+        creatorId: userId,
+        pgGroupId: widget.groupId,
+        name: _group!.name,
+        memberIds: memberIds,
+      );
+      if (mounted) setState(() => _conversationId = conv.id);
+    } catch (e) {
+      logger.e('Failed to resolve conversationId for watch requests: $e');
     }
   }
 
@@ -198,12 +224,14 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
             group: _group,
             memberCount: _memberCount,
             groupId: widget.groupId,
+            conversationId: _conversationId,
             initialRequests: _watchRequests,
             initialActivity: _memberActivity,
             onRefresh: _loadGroup,
           ),
           _RequestsTab(
             groupId: widget.groupId,
+            conversationId: _conversationId,
             initialRequests: _watchRequests,
             currentUserId: context.read<AuthProvider>().dbUser?.id ?? '',
             isAdmin: () {
@@ -666,6 +694,7 @@ class _ActivityTab extends StatefulWidget {
     required this.group,
     required this.memberCount,
     required this.groupId,
+    this.conversationId,
     required this.initialRequests,
     required this.initialActivity,
     required this.onRefresh,
@@ -674,6 +703,7 @@ class _ActivityTab extends StatefulWidget {
   final Group? group;
   final int memberCount;
   final String groupId;
+  final String? conversationId;
   final List<GroupWatchRequest> initialRequests;
   final List<ActivityListItem> initialActivity;
   final Future<void> Function() onRefresh;
@@ -854,9 +884,21 @@ class _ActivityTabState extends State<_ActivityTab> {
                       onRespond: (status) async {
                         final userId = context.read<AuthProvider>().dbUser?.id;
                         if (userId == null) return;
+                        // Use conversation-scoped endpoint when possible;
+                        // fall back to legacy PUT endpoint.
+                        final convId = widget.conversationId ?? req.groupId;
                         try {
-                          await GroupService.updateWatchRequestForMember(
-                              req.id, userId, '', status);
+                          try {
+                            final decision =
+                                WatchResponseDecision.fromString(status);
+                            await GroupService.respondToWatchRequest(
+                                convId, req.id, userId, decision);
+                          } catch (e) {
+                            logger.d(
+                                'New respond endpoint failed, using legacy: $e');
+                            await GroupService.updateWatchRequestForMember(
+                                req.id, userId, '', status);
+                          }
                           await _refresh();
                         } catch (e) {
                           logger.e('Respond to request error: $e');
@@ -1210,6 +1252,7 @@ enum _RequestFilter { all, needsResponse, active, completed, byMe }
 class _RequestsTab extends StatefulWidget {
   const _RequestsTab({
     required this.groupId,
+    this.conversationId,
     this.initialRequests = const [],
     required this.currentUserId,
     this.isAdmin = false,
@@ -1217,6 +1260,7 @@ class _RequestsTab extends StatefulWidget {
   });
 
   final String groupId;
+  final String? conversationId;
   final List<GroupWatchRequest> initialRequests;
   final String currentUserId;
   final bool isAdmin;
@@ -1270,12 +1314,26 @@ class _RequestsTabState extends State<_RequestsTab> {
         widget.initialRequests.isNotEmpty) {
       setState(() => _requests = widget.initialRequests);
     }
+    // Reload via the new endpoint as soon as a conversationId becomes available.
+    if (widget.conversationId != null &&
+        oldWidget.conversationId == null) {
+      _load();
+    }
   }
 
   Future<void> _load() async {
     if (mounted) setState(() => _loading = true);
     try {
-      final requests = await GroupService.getGroupWatchRequests(widget.groupId);
+      final List<GroupWatchRequest> requests;
+      final conversationId = widget.conversationId;
+      if (conversationId != null) {
+        requests = await GroupService.getConversationWatchRequests(
+          conversationId,
+          userId: widget.currentUserId,
+        );
+      } else {
+        requests = await GroupService.getGroupWatchRequests(widget.groupId);
+      }
       if (mounted) {
         setState(() {
           _requests = requests;
@@ -1342,14 +1400,18 @@ class _RequestsTabState extends State<_RequestsTab> {
     final userId = widget.currentUserId;
     if (userId.isEmpty) return;
 
+    // Prefer the widget-level conversationId; fall back to the one embedded
+    // in the request (set when loaded via getConversationWatchRequests).
+    final convId = widget.conversationId ?? req.groupId;
+
     setState(() => _processing[req.id] = true);
     try {
-      // Try new lifecycle endpoint first; fall back to legacy endpoint
+      final decision = WatchResponseDecision.fromString(status);
       try {
-        final decision = WatchResponseDecision.fromString(status);
-        await GroupService.respondToWatchRequest(req.id, decision);
+        await GroupService.respondToWatchRequest(
+            convId, req.id, userId, decision);
       } catch (e) {
-        logger.d('New respond endpoint unavailable, using legacy: $e');
+        logger.d('New respond endpoint failed, using legacy: $e');
         await GroupService.updateWatchRequestForMember(
             req.id, userId, '', status);
       }
@@ -1368,9 +1430,11 @@ class _RequestsTabState extends State<_RequestsTab> {
   }
 
   Future<void> _markWatched(GroupWatchRequest req) async {
+    final userId = widget.currentUserId;
+    final convId = widget.conversationId ?? req.groupId;
     setState(() => _processing[req.id] = true);
     try {
-      await GroupService.completeWatchRequest(req.id);
+      await GroupService.completeWatchRequest(convId, req.id, userId);
       await _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1419,9 +1483,11 @@ class _RequestsTabState extends State<_RequestsTab> {
       ),
     );
     if (confirmed != true) return;
+    final userId = widget.currentUserId;
+    final convId = widget.conversationId ?? req.groupId;
     setState(() => _processing[req.id] = true);
     try {
-      await GroupService.cancelWatchRequest(req.id);
+      await GroupService.cancelWatchRequest(convId, req.id, userId);
       await _load();
     } catch (e) {
       logger.e('Cancel watch request error: $e');
