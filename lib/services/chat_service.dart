@@ -107,4 +107,27 @@ class ChatService {
         .snapshots()
         .map((s) => (s.data()?['unreadCount'] as int?) ?? 0);
   }
+
+  /// Fetch watch request documents from Firestore's watchRequests subcollection.
+  /// Returns a map of firestoreDocId → raw data (including movieTitle,
+  /// moviePosterUrl, expiresAt, pgGroupRequestId, createdBy, status, etc.)
+  static Future<Map<String, Map<String, dynamic>>> fetchWatchRequestDocs(
+      String conversationId) async {
+    final snap = await _db
+        .collection('conversations')
+        .doc(conversationId)
+        .collection('watchRequests')
+        .get();
+    final result = <String, Map<String, dynamic>>{};
+    for (final doc in snap.docs) {
+      result[doc.id] = {'id': doc.id, ...doc.data()};
+    }
+    logger.d(
+        '[ChatService] fetchWatchRequestDocs: ${result.length} docs, keys=${result.keys.toList()}');
+    for (final entry in result.entries) {
+      logger.d(
+          '  [WR doc] ${entry.key}: movieTitle=${entry.value['movieTitle']}, pgGroupRequestId=${entry.value['pgGroupRequestId']}, linkedMessageId=${entry.value['linkedMessageId']}');
+    }
+    return result;
+  }
 }
