@@ -261,7 +261,8 @@ void main() {
     });
 
     test('emptyMessage for active', () {
-      expect(WatchRequestFilter.active.emptyMessage, 'No active watch requests');
+      expect(
+          WatchRequestFilter.active.emptyMessage, 'No active watch requests');
     });
 
     test('emptyMessage for needsResponse', () {
@@ -270,8 +271,8 @@ void main() {
     });
 
     test('emptyMessage for completed', () {
-      expect(
-          WatchRequestFilter.completed.emptyMessage, 'No completed watches yet');
+      expect(WatchRequestFilter.completed.emptyMessage,
+          'No completed watches yet');
     });
 
     test('emptyMessage for byMe', () {
@@ -296,8 +297,8 @@ void main() {
     });
 
     test('fromString parses maybe', () {
-      expect(
-          WatchResponseDecision.fromString('maybe'), WatchResponseDecision.maybe);
+      expect(WatchResponseDecision.fromString('maybe'),
+          WatchResponseDecision.maybe);
     });
 
     test('fromString returns maybe for unknown value', () {
@@ -322,7 +323,7 @@ void main() {
   // GroupWatchRequest helper getters
   // ---------------------------------------------------------------------------
 
-  GroupWatchRequest _makeRequest({
+  GroupWatchRequest makeRequest({
     WatchRequestStatus status = WatchRequestStatus.open,
     String? expiresAt,
   }) {
@@ -337,96 +338,91 @@ void main() {
 
   group('GroupWatchRequest.isActive', () {
     test('open request is active', () {
-      expect(_makeRequest(status: WatchRequestStatus.open).isActive, isTrue);
+      expect(makeRequest(status: WatchRequestStatus.open).isActive, isTrue);
     });
 
     test('scheduled request is active', () {
       expect(
-          _makeRequest(status: WatchRequestStatus.scheduled).isActive, isTrue);
+          makeRequest(status: WatchRequestStatus.scheduled).isActive, isTrue);
     });
 
     test('completed request is not active', () {
       expect(
-          _makeRequest(status: WatchRequestStatus.completed).isActive, isFalse);
+          makeRequest(status: WatchRequestStatus.completed).isActive, isFalse);
     });
 
     test('expired request is not active', () {
-      expect(
-          _makeRequest(status: WatchRequestStatus.expired).isActive, isFalse);
+      expect(makeRequest(status: WatchRequestStatus.expired).isActive, isFalse);
     });
 
     test('cancelled request is not active', () {
       expect(
-          _makeRequest(status: WatchRequestStatus.cancelled).isActive, isFalse);
+          makeRequest(status: WatchRequestStatus.cancelled).isActive, isFalse);
     });
   });
 
   group('GroupWatchRequest.isArchived', () {
     test('open request is not archived', () {
-      expect(_makeRequest(status: WatchRequestStatus.open).isArchived, isFalse);
+      expect(makeRequest(status: WatchRequestStatus.open).isArchived, isFalse);
     });
 
     test('completed request is archived', () {
       expect(
-          _makeRequest(status: WatchRequestStatus.completed).isArchived, isTrue);
+          makeRequest(status: WatchRequestStatus.completed).isArchived, isTrue);
     });
 
     test('expired request is archived', () {
       expect(
-          _makeRequest(status: WatchRequestStatus.expired).isArchived, isTrue);
+          makeRequest(status: WatchRequestStatus.expired).isArchived, isTrue);
     });
 
     test('cancelled request is archived', () {
       expect(
-          _makeRequest(status: WatchRequestStatus.cancelled).isArchived, isTrue);
+          makeRequest(status: WatchRequestStatus.cancelled).isArchived, isTrue);
     });
   });
 
   group('GroupWatchRequest.hasExpired', () {
     test('expired status returns true immediately', () {
       expect(
-          _makeRequest(status: WatchRequestStatus.expired).hasExpired, isTrue);
+          makeRequest(status: WatchRequestStatus.expired).hasExpired, isTrue);
     });
 
     test('open with past expiresAt returns true', () {
-      final pastDate = DateTime.now()
-          .subtract(const Duration(days: 1))
-          .toIso8601String();
+      final pastDate =
+          DateTime.now().subtract(const Duration(days: 1)).toIso8601String();
       expect(
-          _makeRequest(
-                  status: WatchRequestStatus.open, expiresAt: pastDate)
+          makeRequest(status: WatchRequestStatus.open, expiresAt: pastDate)
               .hasExpired,
           isTrue);
     });
 
     test('open with future expiresAt returns false', () {
-      final futureDate = DateTime.now()
-          .add(const Duration(days: 7))
-          .toIso8601String();
+      final futureDate =
+          DateTime.now().add(const Duration(days: 7)).toIso8601String();
       expect(
-          _makeRequest(
-                  status: WatchRequestStatus.open, expiresAt: futureDate)
+          makeRequest(status: WatchRequestStatus.open, expiresAt: futureDate)
               .hasExpired,
           isFalse);
     });
 
     test('open without expiresAt returns false', () {
-      expect(_makeRequest(status: WatchRequestStatus.open).hasExpired, isFalse);
+      expect(makeRequest(status: WatchRequestStatus.open).hasExpired, isFalse);
     });
   });
 
   group('GroupWatchRequest.canRespond', () {
     test('active open request can be responded to', () {
-      expect(_makeRequest(status: WatchRequestStatus.open).canRespond, isTrue);
+      expect(makeRequest(status: WatchRequestStatus.open).canRespond, isTrue);
     });
 
     test('expired-status request cannot be responded to', () {
       expect(
-          _makeRequest(status: WatchRequestStatus.expired).canRespond, isFalse);
+          makeRequest(status: WatchRequestStatus.expired).canRespond, isFalse);
     });
 
     test('completed request cannot be responded to', () {
-      expect(_makeRequest(status: WatchRequestStatus.completed).canRespond,
+      expect(makeRequest(status: WatchRequestStatus.completed).canRespond,
           isFalse);
     });
   });
@@ -528,5 +524,4 @@ void main() {
       expect(req.userId, 'creator-1');
     });
   });
-
 }

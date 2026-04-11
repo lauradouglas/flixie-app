@@ -10,8 +10,10 @@ import '../models/group_member.dart';
 import '../models/group_watch_request.dart';
 import '../providers/auth_provider.dart';
 import '../screens/profile/activity_tile.dart';
+import '../models/notification.dart';
 import '../services/chat_service.dart';
 import '../services/group_service.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_logger.dart';
 
@@ -35,9 +37,26 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
   List<GroupWatchRequest> _watchRequests = [];
   List<ActivityListItem> _memberActivity = [];
   String? _conversationId;
+  // Set by _RequestsTab when it refreshes — overrides the initial computed count.
+  int? _pendingCountOverride;
 
   int get _pendingRequestCount {
-    return _watchRequests.where((r) => r.isActive).length;
+    if (_pendingCountOverride != null) return _pendingCountOverride!;
+    final userId = _group != null
+        ? context.read<AuthProvider>().dbUser?.id
+        : null;
+    return _watchRequests.where((r) {
+      if (!r.canRespond) return false;
+      if (r.userId == userId) return false;
+      if (r.currentUserResponse != null) return false;
+      if (userId != null &&
+          r.memberStatuses.any((s) =>
+              s.memberId == userId &&
+              (s.status == 'ACCEPTED' ||
+                  s.status == 'DECLINED' ||
+                  s.status == 'MAYBE'))) return false;
+      return true;
+    }).length;
   }
 
   @override
@@ -242,7 +261,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                   .any((m) => m.memberId == uid && (m.isAdmin || m.isOwner));
             }(),
             onCountChanged: (count) {
-              if (mounted) setState(() => _watchRequests = _watchRequests);
+              if (mounted) setState(() => _pendingCountOverride = count);
             },
           ),
         ],
@@ -372,6 +391,20 @@ class _ChatTabState extends State<_ChatTab> {
   // userId → username, populated from the members subcollection
   Map<String, String> _memberUsernames = {};
 
+  // Watch-request card state: postgres UUID → full GroupWatchRequest from API
+  final Map<String, GroupWatchRequest> _requestCache = {};
+  // Backward-compat: Firestore message doc ID → postgres UUID.
+  // Only needed for legacy messages that don't carry pgGroupRequestId directly.
+  // After the BE writes pgGroupRequestId on the message doc this becomes unused.
+  final Map<String, String> _msgIdToReqId = {};
+  final Set<String> _respondingIds = {};
+  final Map<String, String> _respondMap =
+      {}; // pgUUID → 'ACCEPTED'|'DECLINED'|'MAYBE'
+  // True once the first successful API fetch has completed.
+  // Prevents the itemBuilder from repeatedly triggering fetches on every rebuild.
+  bool _requestsLoaded = false;
+  bool _fetchingRequests = false;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -439,6 +472,8 @@ class _ChatTabState extends State<_ChatTab> {
             _memberUsernames = usernames;
             _initLoading = false;
           });
+          // Preload all watch requests from the API so cards render immediately.
+          _ensureRequests();
         }
         ChatService.markRead(conversation.id, userId).catchError((_) {});
       }
@@ -479,6 +514,504 @@ class _ChatTabState extends State<_ChatTab> {
     }
   }
 
+  /// Loads all watch requests from the API and caches them by postgres UUID.
+  /// Also builds a legacy messageId→pgUUID map from the Firestore watchRequests
+  /// subcollection for messages that don't carry pgGroupRequestId directly.
+  Future<void> _ensureRequests() async {
+    if (_fetchingRequests) return;
+    final conversationId = _conversationId;
+    if (conversationId == null) return;
+    final userId = _authProvider?.dbUser?.id;
+    _fetchingRequests = true;
+    try {
+      // Primary: fetch all data from postgres via the API.
+      final requests = await GroupService.getConversationWatchRequests(
+        conversationId,
+        filter: WatchRequestFilter.all,
+        userId: userId,
+      );
+
+      // Backward-compat: scan the Firestore watchRequests subcollection ONLY
+      // to build the messageId → pgGroupRequestId mapping for legacy messages.
+      // Once the BE writes pgGroupRequestId on the message doc itself, this
+      // fetch is unnecessary and can be removed.
+      // Wrapped in its own try/catch — permission errors here must not abort
+      // the API results already fetched above.
+      final newMsgMap = <String, String>{};
+      try {
+        final wrDocs = await ChatService.fetchWatchRequestDocs(conversationId);
+        for (final doc in wrDocs.values) {
+          final pgId = doc['pgGroupRequestId'] as String?;
+          final linkedMsgId = doc['linkedMessageId'] as String?;
+          if (pgId != null &&
+              pgId.isNotEmpty &&
+              linkedMsgId != null &&
+              linkedMsgId.isNotEmpty) {
+            newMsgMap[linkedMsgId] = pgId;
+          }
+        }
+      } catch (e) {
+        logger.w('[WR] Firestore watchRequests fetch failed (non-fatal): $e');
+      }
+
+      if (!mounted) return;
+      if (!mounted) return;
+      setState(() {
+        for (final r in requests) {
+          _requestCache[r.id] = r;
+        }
+        _msgIdToReqId.addAll(newMsgMap);
+        _requestsLoaded = true;
+        logger.d('[WR] requestCache: ${_requestCache.keys.toList()}');
+        logger.d('[WR] msgIdToReqId: $_msgIdToReqId');
+      });
+      _fetchingRequests = false;
+    } catch (e) {
+      _fetchingRequests = false;
+      logger.e('[WR] _ensureRequests error: $e');
+    }
+  }
+
+  Future<void> _respondInChat(
+      String pgId, WatchResponseDecision decision) async {
+    final conversationId = _conversationId;
+    final userId = _authProvider?.dbUser?.id;
+    if (conversationId == null || userId == null) return;
+    setState(() {
+      _respondingIds.add(pgId);
+      _respondMap[pgId] = decision.apiValue.toUpperCase();
+    });
+    try {
+      await GroupService.respondToWatchRequest(
+          conversationId, pgId, userId, decision);
+      // Dismiss any watch-request notifications linked to this request.
+      NotificationService.getNotifications(userId).then((notifs) {
+        for (final n in notifs) {
+          if ((n.type == FlixieNotification.movieWatchRequest ||
+                  n.type == FlixieNotification.showWatchRequest) &&
+              n.linkedRequestId == pgId &&
+              n.closed != true) {
+            NotificationService.updateNotification(n.id!, closed: true)
+                .catchError((_) => FlixieNotification(
+                    userId: userId,
+                    type: n.type,
+                    message: n.message));
+          }
+        }
+      }).catchError((_) {});
+      _requestsLoaded = false;
+      await _ensureRequests();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _respondMap.remove(pgId));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Failed to respond'),
+              backgroundColor: FlixieColors.danger),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _respondingIds.remove(pgId));
+    }
+  }
+
+  Widget _modalCountPill(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.4), width: 0.8),
+      ),
+      child: Text(label,
+          style: TextStyle(
+              color: color, fontSize: 11, fontWeight: FontWeight.w700)),
+    );
+  }
+
+  void _showWatchRequestDetail(
+    BuildContext context,
+    ChatMessage msg,
+    List<ChatMessage> allMessages,
+    GroupWatchRequest? req,
+    String? currentUserId,
+  ) {
+    final payload = msg.watchRequestPayload;
+    final movieTitle =
+        req?.movieTitle ?? payload?['movieTitle'] as String? ?? 'Watch Request';
+    final posterPath = req?.moviePosterPath ??
+        payload?['moviePosterPath'] as String? ??
+        payload?['posterPath'] as String?;
+    final requestMessage = req?.message ?? payload?['message'] as String?;
+    final requesterUsername = req?.requesterUsername ??
+        payload?['requesterUsername'] as String? ??
+        msg.senderUsername;
+    final posterUrl = posterPath != null
+        ? 'https://image.tmdb.org/t/p/w500$posterPath'
+        : null;
+    final memberStatuses = req?.memberStatuses ?? <GroupRequestMemberStatus>[];
+
+    // Collect thread replies (messages whose replyToMessageId = this message)
+    final replies = allMessages
+        .where((m) => m.replyToMessageId == msg.id)
+        .toList()
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+    final replyController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: FlixieColors.tabBarBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.82,
+        maxChildSize: 0.95,
+        builder: (_, scrollCtrl) {
+          bool isSendingReply = false;
+          return StatefulBuilder(
+            builder: (_, setSheetState) {
+              return Column(
+                children: [
+                  // Drag handle
+                  Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(top: 12, bottom: 8),
+                    decoration: BoxDecoration(
+                      color: FlixieColors.medium.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView(
+                      controller: scrollCtrl,
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      children: [
+                        // Poster + title row
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: SizedBox(
+                                width: 80,
+                                height: 120,
+                                child: posterUrl != null
+                                    ? CachedNetworkImage(
+                                        imageUrl: posterUrl,
+                                        fit: BoxFit.cover,
+                                        placeholder: (_, __) => Container(
+                                            color: FlixieColors
+                                                .tabBarBackgroundFocused),
+                                        errorWidget: (_, __, ___) => Container(
+                                          color: FlixieColors
+                                              .tabBarBackgroundFocused,
+                                          child: const Center(
+                                              child: Icon(Icons.movie_outlined,
+                                                  color: FlixieColors.medium,
+                                                  size: 28)),
+                                        ),
+                                      )
+                                    : Container(
+                                        decoration: BoxDecoration(
+                                          color: FlixieColors
+                                              .tabBarBackgroundFocused,
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                        ),
+                                        child: const Center(
+                                            child: Icon(Icons.movie_outlined,
+                                                color: FlixieColors.medium,
+                                                size: 28)),
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(movieTitle,
+                                      style: const TextStyle(
+                                          color: FlixieColors.white,
+                                          fontSize: 17,
+                                          fontWeight: FontWeight.w700)),
+                                  if (requesterUsername != null) ...[
+                                    const SizedBox(height: 4),
+                                    Text('Requested by @$requesterUsername',
+                                        style: const TextStyle(
+                                            color: FlixieColors.medium,
+                                            fontSize: 12)),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (requestMessage != null &&
+                            requestMessage.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color:
+                                  FlixieColors.primary.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                  color: FlixieColors.primary
+                                      .withValues(alpha: 0.25)),
+                            ),
+                            child: Text(requestMessage,
+                                style: const TextStyle(
+                                    color: FlixieColors.light,
+                                    fontSize: 13,
+                                    fontStyle: FontStyle.italic)),
+                          ),
+                        ],
+                        // Responses — grouped by status
+                        if (memberStatuses.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              const Text('RESPONSES',
+                                  style: TextStyle(
+                                      color: FlixieColors.medium,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0.8)),
+                              const Spacer(),
+                              if (req?.acceptedCount != null &&
+                                  req!.acceptedCount > 0)
+                                _modalCountPill(
+                                    '✓ ${req.acceptedCount}',
+                                    FlixieColors.success),
+                              if (req?.maybeCount != null &&
+                                  req!.maybeCount > 0) ...[
+                                const SizedBox(width: 4),
+                                _modalCountPill(
+                                    '~ ${req.maybeCount}',
+                                    FlixieColors.warning),
+                              ],
+                              if (req?.declinedCount != null &&
+                                  req!.declinedCount > 0) ...[
+                                const SizedBox(width: 4),
+                                _modalCountPill(
+                                    '✗ ${req.declinedCount}',
+                                    FlixieColors.danger),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          for (final group in [
+                            ('ACCEPTED', FlixieColors.success,
+                                Icons.check_circle_outline),
+                            ('MAYBE', FlixieColors.warning,
+                                Icons.help_outline),
+                            ('DECLINED', FlixieColors.danger,
+                                Icons.cancel_outlined),
+                          ]) ...[
+                            ...memberStatuses
+                                .where((s) => s.status == group.$1)
+                                .map((s) {
+                              final name = s.username?.isNotEmpty == true
+                                  ? s.username!
+                                  : s.memberId
+                                      .substring(
+                                          0,
+                                          s.memberId.length.clamp(0, 6));
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 14,
+                                      backgroundColor: group.$2
+                                          .withValues(alpha: 0.15),
+                                      child: Text(
+                                          name.isNotEmpty
+                                              ? name[0].toUpperCase()
+                                              : '?',
+                                          style: TextStyle(
+                                              color: group.$2,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700)),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text('@$name',
+                                          style: const TextStyle(
+                                              color: FlixieColors.light,
+                                              fontSize: 13)),
+                                    ),
+                                    Icon(group.$3, size: 14, color: group.$2),
+                                  ],
+                                ),
+                              );
+                            }),
+                          ],
+                        ],
+                        // Thread replies
+                        const SizedBox(height: 16),
+                        Text(
+                            replies.isEmpty
+                                ? 'No replies yet'
+                                : 'REPLIES (${replies.length})',
+                            style: const TextStyle(
+                                color: FlixieColors.medium,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.8)),
+                        const SizedBox(height: 8),
+                        if (replies.isEmpty)
+                          const Text('Be the first to comment!',
+                              style: TextStyle(
+                                  color: FlixieColors.medium, fontSize: 13))
+                        else
+                          ...replies.map((r) {
+                            final rUsername = r.senderUsername ??
+                                _memberUsernames[r.senderId] ??
+                                r.senderId.substring(
+                                    0, r.senderId.length.clamp(0, 6));
+                            final isMe = r.senderId == currentUserId;
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  CircleAvatar(
+                                    radius: 14,
+                                    backgroundColor:
+                                        FlixieColors.tabBarBackgroundFocused,
+                                    child: Text(
+                                        rUsername.isNotEmpty
+                                            ? rUsername[0].toUpperCase()
+                                            : '?',
+                                        style: const TextStyle(
+                                            color: FlixieColors.light,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700)),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(isMe ? 'You' : '@$rUsername',
+                                            style: const TextStyle(
+                                                color: FlixieColors.medium,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600)),
+                                        const SizedBox(height: 2),
+                                        Text(r.text,
+                                            style: const TextStyle(
+                                                color: FlixieColors.light,
+                                                fontSize: 13)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                      ],
+                    ),
+                  ),
+                  // Reply input
+                  Container(
+                    padding: EdgeInsets.fromLTRB(12, 8, 12,
+                        MediaQuery.of(sheetCtx).viewInsets.bottom + 8),
+                    decoration: const BoxDecoration(
+                      color: FlixieColors.tabBarBackgroundFocused,
+                      border: Border(
+                          top: BorderSide(color: FlixieColors.tabBarBorder)),
+                    ),
+                    child: SafeArea(
+                      top: false,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: replyController,
+                              style: const TextStyle(color: FlixieColors.light),
+                              textInputAction: TextInputAction.send,
+                              decoration: InputDecoration(
+                                hintText: 'Reply to this request…',
+                                hintStyle:
+                                    const TextStyle(color: FlixieColors.medium),
+                                filled: true,
+                                fillColor: FlixieColors.tabBarBackground,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                  borderSide: BorderSide.none,
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 8),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (isSendingReply)
+                            const SizedBox(
+                              width: 32,
+                              height: 32,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: FlixieColors.primary),
+                            )
+                          else
+                            IconButton(
+                              onPressed: () async {
+                                final text = replyController.text.trim();
+                                if (text.isEmpty) return;
+                                final cId = _conversationId;
+                                final uid = _authProvider?.dbUser?.id;
+                                if (cId == null || uid == null) return;
+                                setSheetState(() => isSendingReply = true);
+                                replyController.clear();
+                                try {
+                                  await ChatService.sendMessage(
+                                    conversationId: cId,
+                                    senderId: uid,
+                                    text: text,
+                                    replyToMessageId: msg.id,
+                                  );
+                                  if (sheetCtx.mounted) {
+                                    Navigator.pop(sheetCtx);
+                                  }
+                                } catch (_) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                          content: Text('Failed to send reply'),
+                                          backgroundColor: FlixieColors.danger),
+                                    );
+                                  }
+                                } finally {
+                                  if (mounted) {
+                                    setSheetState(() => isSendingReply = false);
+                                  }
+                                }
+                              },
+                              icon: const Icon(Icons.send_rounded,
+                                  color: FlixieColors.primary),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_initLoading) {
@@ -516,26 +1049,69 @@ class _ChatTabState extends State<_ChatTab> {
                   ),
                 );
               }
-              // Firestore returns newest-first (descending); reverse: true renders
-              // newest at bottom like a standard chat layout.
               return ListView.builder(
                 reverse: true,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
                 itemCount: messages.length,
                 itemBuilder: (_, i) {
                   final msg = messages[i];
                   final isMe = msg.senderId == currentUserId;
-                  // Prefer the username embedded in the message doc; fall back
-                  // to the members subcollection map we fetched at init.
-                  final _sid = msg.senderId;
+
+                  if (msg.type == 'watch_request') {
+                    // Resolve to a postgres UUID.
+                    // After the BE sets pgGroupRequestId on the message doc,
+                    // msg.watchRequestId IS the postgres UUID. Until then,
+                    // fall back to the _msgIdToReqId map built from the
+                    // Firestore watchRequests subcollection.
+                    final pgId = msg.watchRequestId ?? _msgIdToReqId[msg.id];
+                    if (!_requestsLoaded) {
+                      _ensureRequests();
+                    }
+                    final cachedReq = pgId != null ? _requestCache[pgId] : null;
+                    final respondKey = pgId ?? msg.id;
+                    final optimisticStatus = _respondMap[respondKey];
+                    String? myStatus = optimisticStatus;
+                    if (myStatus == null &&
+                        cachedReq != null &&
+                        currentUserId != null) {
+                      myStatus = cachedReq.memberStatuses
+                              .where((s) => s.memberId == currentUserId)
+                              .map((s) => s.status)
+                              .where((s) =>
+                                  s == 'ACCEPTED' ||
+                                  s == 'DECLINED' ||
+                                  s == 'MAYBE')
+                              .firstOrNull ??
+                          cachedReq.currentUserResponse?.apiValue;
+                    }
+                    return _WatchRequestChatCard(
+                      msg: msg,
+                      cachedRequest: cachedReq,
+                      currentUserId: currentUserId,
+                      myStatus: myStatus,
+                      memberUsernames: _memberUsernames,
+                      isResponding: _respondingIds.contains(respondKey),
+                      onAccept: () => _respondInChat(
+                          respondKey, WatchResponseDecision.accepted),
+                      onDecline: () => _respondInChat(
+                          respondKey, WatchResponseDecision.declined),
+                      onMaybe: () => _respondInChat(
+                          respondKey, WatchResponseDecision.maybe),
+                      onTap: () => _showWatchRequestDetail(
+                          context, msg, messages, cachedReq, currentUserId),
+                    );
+                  }
+
+                  // Regular text bubble
+                  final sid = msg.senderId;
                   final username = msg.senderUsername ??
-                      _memberUsernames[_sid] ??
-                      _sid.substring(0, _sid.length.clamp(0, 6));
+                      _memberUsernames[sid] ??
+                      sid.substring(0, sid.length.clamp(0, 6));
                   return _ChatBubble(
                     message: msg.text,
                     senderUsername: username,
                     isMe: isMe,
+                    replyTo: msg.replyToMessageId != null ? '↩ replied' : null,
                   );
                 },
               );
@@ -557,20 +1133,32 @@ class _ChatBubble extends StatelessWidget {
     required this.message,
     required this.senderUsername,
     required this.isMe,
+    this.replyTo,
   });
 
   final String message;
   final String senderUsername;
   final bool isMe;
+  final String? replyTo;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
       child: Column(
         crossAxisAlignment:
             isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
+          if (replyTo != null)
+            Padding(
+              padding: EdgeInsets.only(
+                  left: isMe ? 0 : 4, right: isMe ? 4 : 0, bottom: 2),
+              child: Text(replyTo!,
+                  style: const TextStyle(
+                      color: FlixieColors.medium,
+                      fontSize: 10,
+                      fontStyle: FontStyle.italic)),
+            ),
           Padding(
             padding: EdgeInsets.only(
               left: isMe ? 0 : 4,
@@ -680,6 +1268,439 @@ class _ChatInput extends StatelessWidget {
                   ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Watch request chat card
+// ---------------------------------------------------------------------------
+
+class _WatchRequestChatCard extends StatelessWidget {
+  const _WatchRequestChatCard({
+    required this.msg,
+    this.cachedRequest,
+    this.currentUserId,
+    this.myStatus,
+    required this.isResponding,
+    this.onAccept,
+    this.onDecline,
+    this.onMaybe,
+    required this.onTap,
+    this.memberUsernames = const {},
+  });
+
+  final ChatMessage msg;
+  final GroupWatchRequest? cachedRequest;
+  final String? currentUserId;
+  final String? myStatus;
+  final bool isResponding;
+  final VoidCallback? onAccept;
+  final VoidCallback? onDecline;
+  final VoidCallback? onMaybe;
+  final VoidCallback onTap;
+  final Map<String, String> memberUsernames;
+
+  @override
+  Widget build(BuildContext context) {
+    final payload = msg.watchRequestPayload;
+
+    final movieTitle = cachedRequest?.movieTitle ??
+        payload?['movieTitle'] as String? ??
+        payload?['title'] as String? ??
+        'Watch Request';
+    final posterPath = cachedRequest?.moviePosterPath ??
+        payload?['moviePosterUrl'] as String? ??
+        payload?['posterPath'] as String?;
+    final requestMessage =
+        cachedRequest?.message ?? payload?['message'] as String?;
+    final requesterUsername = cachedRequest?.requesterUsername ??
+        memberUsernames[msg.senderId] ??
+        msg.senderUsername;
+
+    final expiresAt = cachedRequest?.expiresAt;
+    String? expiresLabel;
+    if (expiresAt != null) {
+      final exp = DateTime.tryParse(expiresAt);
+      if (exp != null) {
+        final diff = exp.difference(DateTime.now());
+        if (diff.isNegative) {
+          expiresLabel = 'Expired';
+        } else if (diff.inDays > 0) {
+          expiresLabel = 'Expires in ${diff.inDays}d';
+        } else if (diff.inHours > 0) {
+          expiresLabel = 'Expires in ${diff.inHours}h';
+        } else {
+          expiresLabel = 'Expires soon';
+        }
+      }
+    }
+    final posterUrl = posterPath != null
+        ? 'https://image.tmdb.org/t/p/w185$posterPath'
+        : null;
+    final isMyRequest = msg.senderId == currentUserId;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: FlixieColors.tabBarBackgroundFocused,
+          borderRadius: BorderRadius.circular(14),
+          border:
+              Border.all(color: FlixieColors.primary.withValues(alpha: 0.35)),
+        ),
+        clipBehavior: Clip.hardEdge,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header — tappable
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+                child: Row(
+                  children: [
+                    const Icon(Icons.movie_filter_outlined,
+                        size: 13, color: FlixieColors.primary),
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: Text(
+                        isMyRequest
+                            ? 'Your watch request'
+                            : '@${requesterUsername ?? 'Unknown'} wants to watch',
+                        style: const TextStyle(
+                            color: FlixieColors.primary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const Divider(height: 1, color: FlixieColors.tabBarBorder),
+            // Poster + details — tappable
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onTap,
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(10, 10, 0, 10),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: SizedBox(
+                          width: 64,
+                          child: posterUrl != null
+                              ? CachedNetworkImage(
+                                  imageUrl: posterUrl,
+                                  fit: BoxFit.cover,
+                                  placeholder: (_, __) => Container(
+                                      color: FlixieColors.tabBarBackground,
+                                      child: const Center(
+                                          child: Icon(Icons.movie_outlined,
+                                              color: FlixieColors.medium,
+                                              size: 22))),
+                                  errorWidget: (_, __, ___) => Container(
+                                      color: FlixieColors.tabBarBackground,
+                                      child: const Center(
+                                          child: Icon(Icons.movie_outlined,
+                                              color: FlixieColors.medium,
+                                              size: 22))),
+                                )
+                              : Container(
+                                  color: FlixieColors.tabBarBackground,
+                                  child: const Center(
+                                      child: Icon(Icons.movie_outlined,
+                                          color: FlixieColors.medium,
+                                          size: 22))),
+                        ),
+                      ),
+                    ),
+                    // Details
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              movieTitle,
+                              style: const TextStyle(
+                                  color: FlixieColors.light,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 3),
+                            _RequestStatusBadge(
+                              status: cachedRequest?.status,
+                            ),
+                            if (requestMessage != null &&
+                                requestMessage.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                '"$requestMessage"',
+                                style: const TextStyle(
+                                    color: FlixieColors.medium,
+                                    fontSize: 12,
+                                    fontStyle: FontStyle.italic),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                            if (expiresLabel != null) ...[
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Icon(
+                                    expiresLabel == 'Expired'
+                                        ? Icons.timer_off_outlined
+                                        : Icons.timer_outlined,
+                                    size: 11,
+                                    color: expiresLabel == 'Expired'
+                                        ? FlixieColors.danger
+                                        : FlixieColors.warning,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    expiresLabel,
+                                    style: TextStyle(
+                                        color: expiresLabel == 'Expired'
+                                            ? FlixieColors.danger
+                                            : FlixieColors.warning,
+                                        fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                            ],
+                            if (cachedRequest != null &&
+                                (cachedRequest!.acceptedCount > 0 ||
+                                    cachedRequest!.maybeCount > 0 ||
+                                    cachedRequest!.declinedCount > 0)) ...[
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  if (cachedRequest!.acceptedCount > 0) ...[
+                                    const Icon(Icons.check,
+                                        size: 11, color: FlixieColors.success),
+                                    const SizedBox(width: 2),
+                                    Text('${cachedRequest!.acceptedCount}',
+                                        style: const TextStyle(
+                                            color: FlixieColors.success,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700)),
+                                    const SizedBox(width: 10),
+                                  ],
+                                  if (cachedRequest!.maybeCount > 0) ...[
+                                    const Icon(Icons.help_outline,
+                                        size: 11, color: FlixieColors.warning),
+                                    const SizedBox(width: 2),
+                                    Text('${cachedRequest!.maybeCount}',
+                                        style: const TextStyle(
+                                            color: FlixieColors.warning,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700)),
+                                    const SizedBox(width: 10),
+                                  ],
+                                  if (cachedRequest!.declinedCount > 0) ...[
+                                    const Icon(Icons.close,
+                                        size: 11, color: FlixieColors.danger),
+                                    const SizedBox(width: 2),
+                                    Text('${cachedRequest!.declinedCount}',
+                                        style: const TextStyle(
+                                            color: FlixieColors.danger,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700)),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Action row — only for members who aren't the requester
+            if (!isMyRequest) ...[
+              const Divider(height: 1, color: FlixieColors.tabBarBorder),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: myStatus == 'ACCEPTED'
+                    ? _chatStatusChip('You accepted ✓', FlixieColors.success)
+                    : myStatus == 'DECLINED'
+                        ? _chatStatusChip('You declined ✗', FlixieColors.danger)
+                        : myStatus == 'MAYBE'
+                            ? _chatStatusChip(
+                                'You said maybe', FlixieColors.warning)
+                            : isResponding
+                                ? const Center(
+                                    child: SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: FlixieColors.primary),
+                                    ),
+                                  )
+                                : Row(
+                                    children: [
+                                      Expanded(
+                                        child: ElevatedButton(
+                                          onPressed: onDecline,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: FlixieColors.danger
+                                                .withValues(alpha: 0.85),
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 8),
+                                            shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(8)),
+                                            minimumSize: Size.zero,
+                                            textStyle: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600),
+                                          ),
+                                          child: const Text('Decline'),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: ElevatedButton(
+                                          onPressed: onMaybe,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: FlixieColors
+                                                .warning
+                                                .withValues(alpha: 0.85),
+                                            foregroundColor: Colors.black,
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 8),
+                                            shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(8)),
+                                            minimumSize: Size.zero,
+                                            textStyle: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600),
+                                          ),
+                                          child: const Text('Maybe'),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: ElevatedButton(
+                                          onPressed: onAccept,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: FlixieColors
+                                                .success
+                                                .withValues(alpha: 0.85),
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 8),
+                                            shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(8)),
+                                            minimumSize: Size.zero,
+                                            textStyle: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600),
+                                          ),
+                                          child: const Text('Accept'),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+              ),
+            ],
+            // Footer — tappable to open detail
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onTap,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                color: FlixieColors.tabBarBackground.withValues(alpha: 0.6),
+                child: const Row(
+                  children: [
+                    Icon(Icons.chat_bubble_outline,
+                        size: 11, color: FlixieColors.medium),
+                    SizedBox(width: 4),
+                    Text('View details & reply',
+                        style: TextStyle(
+                            color: FlixieColors.medium, fontSize: 11)),
+                    Spacer(),
+                    Icon(Icons.chevron_right,
+                        size: 14, color: FlixieColors.medium),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _chatStatusChip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Text(label,
+          style: TextStyle(
+              color: color, fontSize: 12, fontWeight: FontWeight.w600)),
+    );
+  }
+}
+
+class _RequestStatusBadge extends StatelessWidget {
+  const _RequestStatusBadge({this.status});
+
+  final WatchRequestStatus? status;
+
+  @override
+  Widget build(BuildContext context) {
+    final resolved = status ?? WatchRequestStatus.open;
+    final Color color;
+    switch (resolved) {
+      case WatchRequestStatus.expired:
+      case WatchRequestStatus.cancelled:
+        color = FlixieColors.danger;
+      case WatchRequestStatus.completed:
+        color = FlixieColors.success;
+      case WatchRequestStatus.scheduled:
+        color = FlixieColors.secondary;
+      case WatchRequestStatus.open:
+        color = FlixieColors.primary;
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.5), width: 0.8),
+      ),
+      child: Text(
+        resolved.statusLabel.toUpperCase(),
+        style: TextStyle(
+            color: color,
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.5),
       ),
     );
   }
@@ -1315,8 +2336,7 @@ class _RequestsTabState extends State<_RequestsTab> {
       setState(() => _requests = widget.initialRequests);
     }
     // Reload via the new endpoint as soon as a conversationId becomes available.
-    if (widget.conversationId != null &&
-        oldWidget.conversationId == null) {
+    if (widget.conversationId != null && oldWidget.conversationId == null) {
       _load();
     }
   }
@@ -1339,7 +2359,18 @@ class _RequestsTabState extends State<_RequestsTab> {
           _requests = requests;
           _loading = false;
         });
-        widget.onCountChanged?.call(requests.length);
+        final currentUserId = widget.currentUserId;
+        final needsResponseCount = requests.where((r) {
+          if (!r.canRespond) return false;
+          if (r.userId == currentUserId) return false;
+          if (r.currentUserResponse != null) return false;
+          return !r.memberStatuses.any((s) =>
+              s.memberId == currentUserId &&
+              (s.status == 'ACCEPTED' ||
+                  s.status == 'DECLINED' ||
+                  s.status == 'MAYBE'));
+        }).length;
+        widget.onCountChanged?.call(needsResponseCount);
       }
     } catch (e) {
       logger.e('RequestsTab load error: $e');
@@ -1471,8 +2502,8 @@ class _RequestsTabState extends State<_RequestsTab> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('No',
-                style: TextStyle(color: FlixieColors.medium)),
+            child:
+                const Text('No', style: TextStyle(color: FlixieColors.medium)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
@@ -1644,7 +2675,7 @@ class _RequestsTabState extends State<_RequestsTab> {
     return Row(
       children: [
         if (acceptedCount > 0) ...[
-          Icon(Icons.check_circle_outline,
+          const Icon(Icons.check_circle_outline,
               size: 13, color: FlixieColors.success),
           const SizedBox(width: 3),
           Text('$acceptedCount',
@@ -1653,7 +2684,8 @@ class _RequestsTabState extends State<_RequestsTab> {
           const SizedBox(width: 10),
         ],
         if (declinedCount > 0) ...[
-          Icon(Icons.cancel_outlined, size: 13, color: FlixieColors.danger),
+          const Icon(Icons.cancel_outlined,
+              size: 13, color: FlixieColors.danger),
           const SizedBox(width: 3),
           Text('$declinedCount',
               style: const TextStyle(color: FlixieColors.danger, fontSize: 12)),
@@ -1662,7 +2694,8 @@ class _RequestsTabState extends State<_RequestsTab> {
         if (maybeCount > 0) ...[
           Semantics(
             label: 'Maybe responses',
-            child: Icon(Icons.help_outline, size: 13, color: FlixieColors.warning),
+            child: const Icon(Icons.help_outline,
+                size: 13, color: FlixieColors.warning),
           ),
           const SizedBox(width: 3),
           Text('$maybeCount',
@@ -1671,7 +2704,7 @@ class _RequestsTabState extends State<_RequestsTab> {
           const SizedBox(width: 10),
         ],
         if (pendingCount > 0) ...[
-          Icon(Icons.schedule, size: 13, color: FlixieColors.medium),
+          const Icon(Icons.schedule, size: 13, color: FlixieColors.medium),
           const SizedBox(width: 3),
           Text('$pendingCount',
               style: const TextStyle(color: FlixieColors.medium, fontSize: 12)),
@@ -1689,7 +2722,7 @@ class _RequestsTabState extends State<_RequestsTab> {
       }
     }
 
-    String _name(GroupRequestMemberStatus s) {
+    String name(GroupRequestMemberStatus s) {
       if (s.username != null && s.username!.isNotEmpty) return s.username!;
       if (knownNames.containsKey(s.memberId)) return knownNames[s.memberId]!;
       return s.memberId.substring(0, s.memberId.length.clamp(0, 6));
@@ -1738,7 +2771,7 @@ class _RequestsTabState extends State<_RequestsTab> {
                         radius: 14,
                         backgroundColor: color.withValues(alpha: 0.15),
                         child: Text(
-                          _name(s).isNotEmpty ? _name(s)[0].toUpperCase() : '?',
+                          name(s).isNotEmpty ? name(s)[0].toUpperCase() : '?',
                           style: TextStyle(
                               color: color,
                               fontSize: 11,
@@ -1746,7 +2779,7 @@ class _RequestsTabState extends State<_RequestsTab> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text('@${_name(s)}',
+                      Text('@${name(s)}',
                           style: const TextStyle(
                               color: FlixieColors.light, fontSize: 13)),
                     ]),
@@ -1783,9 +2816,8 @@ class _RequestsTabState extends State<_RequestsTab> {
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 4),
-              Text('Member responses',
-                  style: const TextStyle(
-                      color: FlixieColors.medium, fontSize: 12)),
+              const Text('Member responses',
+                  style: TextStyle(color: FlixieColors.medium, fontSize: 12)),
               const SizedBox(height: 16),
               section('Accepted', accepted, FlixieColors.success,
                   Icons.check_circle_outline),
@@ -2192,8 +3224,8 @@ class _RequestsTabState extends State<_RequestsTab> {
                                                               const TextStyle(
                                                                   fontSize: 12),
                                                         ),
-                                                        child: const Text(
-                                                            'Maybe'),
+                                                        child:
+                                                            const Text('Maybe'),
                                                       ),
                                                     ),
                                                     const SizedBox(width: 6),
@@ -2255,7 +3287,8 @@ class _RequestsTabState extends State<_RequestsTab> {
                                                     onPressed: () =>
                                                         _markWatched(req),
                                                     icon: const Icon(
-                                                        Icons.check_circle_outline,
+                                                        Icons
+                                                            .check_circle_outline,
                                                         size: 14),
                                                     label: const Text(
                                                         'Mark Watched'),
@@ -2263,10 +3296,9 @@ class _RequestsTabState extends State<_RequestsTab> {
                                                         .styleFrom(
                                                       foregroundColor:
                                                           FlixieColors.success,
-                                                      padding:
-                                                          const EdgeInsets
-                                                              .symmetric(
-                                                              vertical: 7),
+                                                      padding: const EdgeInsets
+                                                          .symmetric(
+                                                          vertical: 7),
                                                       side: BorderSide(
                                                           color: FlixieColors
                                                               .success
@@ -2293,16 +3325,14 @@ class _RequestsTabState extends State<_RequestsTab> {
                                                     icon: const Icon(
                                                         Icons.cancel_outlined,
                                                         size: 14),
-                                                    label: const Text(
-                                                        'Cancel'),
+                                                    label: const Text('Cancel'),
                                                     style: OutlinedButton
                                                         .styleFrom(
                                                       foregroundColor:
                                                           FlixieColors.danger,
-                                                      padding:
-                                                          const EdgeInsets
-                                                              .symmetric(
-                                                              vertical: 7),
+                                                      padding: const EdgeInsets
+                                                          .symmetric(
+                                                          vertical: 7),
                                                       side: BorderSide(
                                                           color: FlixieColors
                                                               .danger

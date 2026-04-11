@@ -293,9 +293,9 @@ class GroupWatchRequest {
     final rawResponse =
         json['responseCount'] as int? ?? statusList.length;
 
-    // Parse current user response
-    final currentUserResponseRaw =
-        json['currentUserResponse'] as String?;
+    // Parse current user response — new API returns `userResponse: { decision: "accepted" }`
+    final currentUserResponseRaw = json['currentUserResponse'] as String? ??
+        (json['userResponse'] as Map<String, dynamic>?)?['decision'] as String?;
     final currentUserResponseDecision = currentUserResponseRaw != null
         ? WatchResponseDecision.fromString(currentUserResponseRaw)
         : null;
