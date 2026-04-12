@@ -17,11 +17,15 @@ import '../services/group_service.dart';
 import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_logger.dart';
+import '../utils/skeleton.dart';
 
 class GroupDetailScreen extends StatefulWidget {
-  const GroupDetailScreen({super.key, required this.groupId});
+  const GroupDetailScreen({super.key, required this.groupId, this.initialTab});
 
   final String groupId;
+
+  /// 0=Chat, 1=Activity, 2=Requests. Defaults to 1 (Activity).
+  final int? initialTab;
 
   @override
   State<GroupDetailScreen> createState() => _GroupDetailScreenState();
@@ -33,6 +37,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
 
   Group? _group;
   bool _loadingGroup = true;
+  String? _loadError;
   int _memberCount = 0;
   List<GroupMember> _groupMembers = [];
   List<GroupWatchRequest> _watchRequests = [];
@@ -62,7 +67,11 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this, initialIndex: 1);
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: widget.initialTab ?? 1,
+    );
     _loadGroup();
   }
 
@@ -73,6 +82,10 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
   }
 
   Future<void> _loadGroup() async {
+    setState(() {
+      _loadingGroup = true;
+      _loadError = null;
+    });
     try {
       final coreResults = await Future.wait([
         GroupService.getGroup(widget.groupId),
@@ -103,7 +116,11 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
       }
     } catch (e) {
       logger.e('GroupDetail load group error: $e');
-      if (mounted) setState(() => _loadingGroup = false);
+      if (mounted)
+        setState(() {
+          _loadingGroup = false;
+          _loadError = 'Couldn\'t load group. Check your connection.';
+        });
     }
   }
 
@@ -240,37 +257,44 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
       body: _loadingGroup
           ? const Center(
               child: CircularProgressIndicator(color: FlixieColors.primary))
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                _ChatTab(groupId: widget.groupId),
-                _ActivityTab(
-                  group: _group,
-                  memberCount: _memberCount,
-                  groupId: widget.groupId,
-                  conversationId: _conversationId,
-                  initialRequests: _watchRequests,
-                  initialActivity: _memberActivity,
-                  onRefresh: _loadGroup,
+          : _loadError != null
+              ? ErrorRetryWidget(
+                  message: _loadError!,
+                  onRetry: _loadGroup,
+                )
+              : TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _ChatTab(groupId: widget.groupId),
+                    _ActivityTab(
+                      group: _group,
+                      memberCount: _memberCount,
+                      groupId: widget.groupId,
+                      conversationId: _conversationId,
+                      initialRequests: _watchRequests,
+                      initialActivity: _memberActivity,
+                      onRefresh: _loadGroup,
+                    ),
+                    _RequestsTab(
+                      groupId: widget.groupId,
+                      conversationId: _conversationId,
+                      initialRequests: _watchRequests,
+                      currentUserId:
+                          context.read<AuthProvider>().dbUser?.id ?? '',
+                      isAdmin: () {
+                        final uid = context.read<AuthProvider>().dbUser?.id;
+                        if (uid == null) return false;
+                        if (_group?.ownerId == uid) return true;
+                        return _groupMembers.any((m) =>
+                            m.memberId == uid && (m.isAdmin || m.isOwner));
+                      }(),
+                      onCountChanged: (count) {
+                        if (mounted)
+                          setState(() => _pendingCountOverride = count);
+                      },
+                    ),
+                  ],
                 ),
-                _RequestsTab(
-                  groupId: widget.groupId,
-                  conversationId: _conversationId,
-                  initialRequests: _watchRequests,
-                  currentUserId: context.read<AuthProvider>().dbUser?.id ?? '',
-                  isAdmin: () {
-                    final uid = context.read<AuthProvider>().dbUser?.id;
-                    if (uid == null) return false;
-                    if (_group?.ownerId == uid) return true;
-                    return _groupMembers.any(
-                        (m) => m.memberId == uid && (m.isAdmin || m.isOwner));
-                  }(),
-                  onCountChanged: (count) {
-                    if (mounted) setState(() => _pendingCountOverride = count);
-                  },
-                ),
-              ],
-            ),
     );
   }
 
@@ -1752,6 +1776,8 @@ class _ActivityTabState extends State<_ActivityTab> {
   late List<ActivityListItem> _activity;
   late List<GroupWatchRequest> _requests;
   bool _loading = false;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -1782,6 +1808,21 @@ class _ActivityTabState extends State<_ActivityTab> {
         _loading = false;
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<ActivityListItem> get _filteredActivity {
+    final q = _searchQuery.trim().toLowerCase();
+    if (q.isEmpty) return _activity;
+    return _activity.where((item) {
+      return (item.mediaTitle ?? '').toLowerCase().contains(q) ||
+          item.username.toLowerCase().contains(q);
+    }).toList();
   }
 
   @override
@@ -1817,7 +1858,54 @@ class _ActivityTabState extends State<_ActivityTab> {
 
             const SizedBox(height: 16),
 
-            // ---- Recent Activity --------------------------------------------
+            // ---- Search bar -------------------------------------------------
+            if (_activity.isNotEmpty || _searchQuery.isNotEmpty)
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: TextField(
+                  controller: _searchController,
+                  style:
+                      const TextStyle(color: FlixieColors.light, fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: 'Search activity & requests…',
+                    hintStyle: const TextStyle(
+                        color: FlixieColors.medium, fontSize: 14),
+                    prefixIcon: const Icon(Icons.search,
+                        color: FlixieColors.medium, size: 20),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear,
+                                color: FlixieColors.medium, size: 18),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: FlixieColors.tabBarBackgroundFocused,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide:
+                          const BorderSide(color: FlixieColors.tabBarBorder),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide:
+                          const BorderSide(color: FlixieColors.tabBarBorder),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: FlixieColors.primary),
+                    ),
+                  ),
+                  onChanged: (v) => setState(() => _searchQuery = v),
+                ),
+              ),
+
+            const SizedBox(height: 16),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
@@ -1863,18 +1951,20 @@ class _ActivityTabState extends State<_ActivityTab> {
               ),
             ),
             const SizedBox(height: 10),
-            if (_activity.isEmpty)
+            if (_filteredActivity.isEmpty)
               Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Text(
-                  'No recent activity.',
+                  _searchQuery.isNotEmpty
+                      ? 'No activity matches your search.'
+                      : 'No recent activity.',
                   style:
                       textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
                 ),
               )
             else
-              ...(_activity.take(5).map(
+              ...(_filteredActivity.take(_searchQuery.isNotEmpty ? 50 : 5).map(
                     (item) => Padding(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 4),

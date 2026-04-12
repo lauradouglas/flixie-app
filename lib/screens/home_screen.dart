@@ -16,6 +16,7 @@ import '../services/movie_service.dart';
 import '../services/trending_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_logger.dart';
+import '../utils/skeleton.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -30,6 +31,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   List<TopRatedMovie> _topRatedThisWeek = [];
   List<ActivityListItem> _friendsActivity = [];
   bool _isLoading = true;
+  String? _error;
   bool _showGreeting = true;
   String? _loadedForUserId;
   Timer? _greetingTimer;
@@ -84,6 +86,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   Future<void> _loadAll() async {
     setState(() {
       _isLoading = true;
+      _error = null;
     });
     final auth = context.read<AuthProvider>();
     // Re-fetch user + all cached data (notifications, friends, reviews, etc.)
@@ -119,6 +122,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _error = 'Couldn\'t load content. Check your connection.';
         });
       }
     }
@@ -153,120 +157,131 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         ],
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: FlixieColors.primary))
-          : RefreshIndicator(
-              color: FlixieColors.primary,
-              onRefresh: _loadAll,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Greeting
-                    if (_showGreeting)
-                      _GreetingHeader(
-                        name: context.read<AuthProvider>().dbUser?.username,
-                        onDismiss: () => setState(() => _showGreeting = false),
-                      ),
-                    const _SectionHeader(title: 'Featured'),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 220,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: _featuredMovies.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 12),
-                        itemBuilder: (context, index) => _FeaturedCard(
-                          movie: _featuredMovies[index],
-                          onTap: () => context
-                              .push('/movies/${_featuredMovies[index].id}'),
+          ? const HomeScreenSkeleton()
+          : _error != null
+              ? ErrorRetryWidget(
+                  message: _error!,
+                  onRetry: _loadAll,
+                )
+              : RefreshIndicator(
+                  color: FlixieColors.primary,
+                  onRefresh: _loadAll,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Greeting
+                        if (_showGreeting)
+                          _GreetingHeader(
+                            name: context.read<AuthProvider>().dbUser?.username,
+                            onDismiss: () =>
+                                setState(() => _showGreeting = false),
+                          ),
+                        const _SectionHeader(title: 'Featured'),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 220,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            itemCount: _featuredMovies.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(width: 12),
+                            itemBuilder: (context, index) => _FeaturedCard(
+                              movie: _featuredMovies[index],
+                              onTap: () => context
+                                  .push('/movies/${_featuredMovies[index].id}'),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    // Popular section
-                    const _SectionHeader(title: 'In Theatres Now'),
-                    const SizedBox(height: 12),
-                    ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: _nowPlayingMovies.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemBuilder: (context, index) {
-                        final movie = _nowPlayingMovies[index];
-                        return _ListCard(
-                          movie: movie,
-                          onTap: () => context.push('/movies/${movie.id}'),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 24),
-                    // Top Rated This Week section
-                    const _SectionHeader(title: 'Top Rated This Week'),
-                    const SizedBox(height: 12),
-                    if (_topRatedThisWeek.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        child: Text('No top rated movies this week.',
-                            style: textTheme.bodySmall
-                                ?.copyWith(color: FlixieColors.medium)),
-                      )
-                    else
-                      SizedBox(
-                        height: 220,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
+                        const SizedBox(height: 24),
+                        // Popular section
+                        const _SectionHeader(title: 'In Theatres Now'),
+                        const SizedBox(height: 12),
+                        ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
                           padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: _topRatedThisWeek.length,
+                          itemCount: _nowPlayingMovies.length,
                           separatorBuilder: (_, __) =>
-                              const SizedBox(width: 12),
+                              const SizedBox(height: 10),
                           itemBuilder: (context, index) {
-                            final movie = _topRatedThisWeek[index];
-                            return _TopRatedCard(
+                            final movie = _nowPlayingMovies[index];
+                            return _ListCard(
                               movie: movie,
                               onTap: () => context.push('/movies/${movie.id}'),
                             );
                           },
                         ),
-                      ),
-                    const SizedBox(height: 24),
+                        const SizedBox(height: 24),
+                        // Top Rated This Week section
+                        const _SectionHeader(title: 'Top Rated This Week'),
+                        const SizedBox(height: 12),
+                        if (_topRatedThisWeek.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
+                            child: Text('No top rated movies this week.',
+                                style: textTheme.bodySmall
+                                    ?.copyWith(color: FlixieColors.medium)),
+                          )
+                        else
+                          SizedBox(
+                            height: 220,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
+                              itemCount: _topRatedThisWeek.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 12),
+                              itemBuilder: (context, index) {
+                                final movie = _topRatedThisWeek[index];
+                                return _TopRatedCard(
+                                  movie: movie,
+                                  onTap: () =>
+                                      context.push('/movies/${movie.id}'),
+                                );
+                              },
+                            ),
+                          ),
+                        const SizedBox(height: 24),
 
-                    // Trending Among Friends section
-                    if (_friendsActivity.isNotEmpty)
-                      _TrendingAmongFriendsSection(activity: _friendsActivity),
+                        // Trending Among Friends section
+                        if (_friendsActivity.isNotEmpty)
+                          _TrendingAmongFriendsSection(
+                              activity: _friendsActivity),
 
-                    // Friends Activity section
-                    const _SectionHeader(title: 'Friends Activity'),
-                    const SizedBox(height: 12),
-                    if (_friendsActivity.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        child: Text('No recent activity from friends.',
-                            style: textTheme.bodySmall
-                                ?.copyWith(color: FlixieColors.medium)),
-                      )
-                    else
-                      ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: _friendsActivity.length > 10
-                            ? 10
-                            : _friendsActivity.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (_, i) =>
-                            ActivityTile(item: _friendsActivity[i]),
-                      ),
-                  ],
+                        // Friends Activity section
+                        const _SectionHeader(title: 'Friends Activity'),
+                        const SizedBox(height: 12),
+                        if (_friendsActivity.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
+                            child: Text('No recent activity from friends.',
+                                style: textTheme.bodySmall
+                                    ?.copyWith(color: FlixieColors.medium)),
+                          )
+                        else
+                          ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            itemCount: _friendsActivity.length > 10
+                                ? 10
+                                : _friendsActivity.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 10),
+                            itemBuilder: (_, i) =>
+                                ActivityTile(item: _friendsActivity[i]),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
     );
   }
 }

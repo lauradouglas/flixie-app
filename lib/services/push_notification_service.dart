@@ -79,7 +79,8 @@ class PushNotificationService {
     // iOS: allow FCM to show alert/badge/sound when the app is in the foreground.
     // Without this iOS silently suppresses foreground FCM messages.
     if (Platform.isIOS) {
-      await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+      await FirebaseMessaging.instance
+          .setForegroundNotificationPresentationOptions(
         alert: true,
         badge: true,
         sound: true,
@@ -118,7 +119,7 @@ class PushNotificationService {
     FirebaseMessaging.onMessageOpenedApp.listen((message) {
       logger.d(
           '[FCM] Notification tapped (background): ${message.notification?.title}');
-      _navigateToNotifications(navigatorKey);
+      _navigateFromMessage(message, navigatorKey);
     });
 
     // Notification tap from terminated state.
@@ -128,7 +129,7 @@ class PushNotificationService {
           '[FCM] App launched via notification: ${initialMessage.notification?.title}');
       // Give the widget tree time to fully mount before navigating.
       Future<void>.delayed(_launchNavigationDelay, () {
-        _navigateToNotifications(navigatorKey);
+        _navigateFromMessage(initialMessage, navigatorKey);
       });
     }
   }
@@ -166,8 +167,15 @@ class PushNotificationService {
         android: androidSettings,
         iOS: iosSettings,
       ),
-      onDidReceiveNotificationResponse: (_) {
-        _navigateToNotifications(navigatorKey);
+      onDidReceiveNotificationResponse: (response) {
+        final path = response.payload;
+        final context = navigatorKey.currentContext;
+        if (context == null) return;
+        if (path != null && path.isNotEmpty) {
+          GoRouter.of(context).go(path);
+        } else {
+          _navigateToNotifications(navigatorKey);
+        }
       },
     );
 
@@ -242,7 +250,58 @@ class PushNotificationService {
         ),
         iOS: const DarwinNotificationDetails(),
       ),
+      // Attach the raw data so the local notification tap can also deep-link.
+      payload: _buildDeepLinkPath(message.data),
     );
+  }
+
+  /// Determines the destination route for a notification based on its data
+  /// payload, and navigates there.
+  ///
+  /// Supported data keys (sent by the backend):
+  ///   type        — notification type string (matches FlixieNotification consts)
+  ///   groupId     — UUID of the group (for group/watch-request notifications)
+  ///   movieId     — TMDB movie id (for movie watch-request notifications)
+  ///   friendId    — userId of the sender (for friend-request notifications)
+  static void _navigateFromMessage(
+    RemoteMessage message,
+    GlobalKey<NavigatorState> navigatorKey,
+  ) {
+    final path = _buildDeepLinkPath(message.data);
+    logger.d('[FCM] Deep-link → $path');
+    final context = navigatorKey.currentContext;
+    if (context == null) return;
+    GoRouter.of(context).go(path);
+  }
+
+  /// Converts a notification data map into a GoRouter path.
+  static String _buildDeepLinkPath(Map<String, dynamic> data) {
+    final type = (data['type'] as String? ?? '').toUpperCase();
+    final groupId = data['groupId'] as String?;
+    final friendId = data['friendId'] as String?;
+
+    // Group watch-request → open the group on the Requests tab.
+    // The GroupDetailScreen reads an optional `tab` query param for this.
+    if ((type == 'MOVIE_WATCH_REQUEST' ||
+            type == 'SHOW_WATCH_REQUEST' ||
+            type == 'GROUP_REQUEST') &&
+        groupId != null &&
+        groupId.isNotEmpty) {
+      return '/groups/$groupId?tab=requests';
+    }
+
+    // Group invite → open the group detail.
+    if (type == 'GROUP_INVITE' && groupId != null && groupId.isNotEmpty) {
+      return '/groups/$groupId';
+    }
+
+    // Friend request → open friend profile if we have their id.
+    if (type == 'FRIEND_REQUEST' && friendId != null && friendId.isNotEmpty) {
+      return '/friends/$friendId';
+    }
+
+    // Default fallback.
+    return '/notifications';
   }
 
   static void _navigateToNotifications(GlobalKey<NavigatorState> navigatorKey) {

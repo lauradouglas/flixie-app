@@ -380,6 +380,8 @@ class ActivityTile extends StatelessWidget {
                         ? CachedNetworkImage(
                             imageUrl: posterUrl,
                             fit: BoxFit.cover,
+                            fadeInDuration: Duration.zero,
+                            fadeOutDuration: Duration.zero,
                             errorWidget: (_, __, ___) => Container(
                               color: FlixieColors.tabBarBorder,
                               child: Icon(
@@ -404,11 +406,12 @@ class ActivityTile extends StatelessWidget {
                           begin: Alignment.centerLeft,
                           end: Alignment.centerRight,
                           colors: [
-                            FlixieColors.tabBarBackgroundFocused,
+                            FlixieColors.tabBarBackgroundFocused
+                                .withValues(alpha: 0.6),
                             FlixieColors.tabBarBackgroundFocused
                                 .withValues(alpha: 0.0),
                           ],
-                          stops: const [0.0, 0.25],
+                          stops: const [0.0, 0.15],
                         ),
                       ),
                     ),
