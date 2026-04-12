@@ -149,8 +149,8 @@ class _SkeletonSectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16),
       child: SkeletonBox(width: 140, height: 18, borderRadius: 6),
     );
   }
@@ -165,13 +165,13 @@ class _SkeletonListCard extends StatelessWidget {
         color: FlixieColors.tabBarBackgroundFocused,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
+      child: const Row(
         children: [
-          const SkeletonBox(width: 54, height: 80, borderRadius: 12),
-          const SizedBox(width: 12),
+          SkeletonBox(width: 54, height: 80, borderRadius: 12),
+          SizedBox(width: 12),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+              padding: EdgeInsets.symmetric(vertical: 14, horizontal: 4),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -184,7 +184,7 @@ class _SkeletonListCard extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
         ],
       ),
     );
@@ -200,12 +200,12 @@ class _SkeletonActivityTile extends StatelessWidget {
         color: FlixieColors.tabBarBackgroundFocused,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
+      child: const Padding(
+        padding: EdgeInsets.all(12),
         child: Row(
           children: [
             SkeletonBox(width: 44, height: 44, borderRadius: 22),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -213,12 +213,12 @@ class _SkeletonActivityTile extends StatelessWidget {
                 children: [
                   SkeletonBox(
                       width: double.infinity, height: 13, borderRadius: 4),
-                  const SizedBox(height: 6),
+                  SizedBox(height: 6),
                   SkeletonBox(width: 120, height: 11, borderRadius: 4),
                 ],
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             SkeletonBox(width: 44, height: 60, borderRadius: 6),
           ],
         ),
