@@ -18,6 +18,12 @@ import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_logger.dart';
 import '../utils/skeleton.dart';
+import 'group_detail/chat_bubble.dart';
+import 'group_detail/chat_input.dart';
+import 'group_detail/group_hero_banner.dart';
+import 'group_detail/pending_request_preview_tile.dart';
+import 'group_detail/request_poster_placeholder.dart';
+import 'group_detail/request_status_badge.dart';
 
 class GroupDetailScreen extends StatefulWidget {
   const GroupDetailScreen({super.key, required this.groupId, this.initialTab});
@@ -1146,7 +1152,7 @@ class _ChatTabState extends State<_ChatTab> {
                   final username = msg.senderUsername ??
                       _memberUsernames[sid] ??
                       sid.substring(0, sid.length.clamp(0, 6));
-                  return _ChatBubble(
+                  return ChatBubble(
                     message: msg.text,
                     senderUsername: username,
                     isMe: isMe,
@@ -1157,157 +1163,12 @@ class _ChatTabState extends State<_ChatTab> {
             },
           ),
         ),
-        _ChatInput(
+        ChatInput(
           controller: _messageController,
           sending: _sending,
           onSend: _sendMessage,
         ),
       ],
-    );
-  }
-}
-
-class _ChatBubble extends StatelessWidget {
-  const _ChatBubble({
-    required this.message,
-    required this.senderUsername,
-    required this.isMe,
-    this.replyTo,
-  });
-
-  final String message;
-  final String senderUsername;
-  final bool isMe;
-  final String? replyTo;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
-      child: Column(
-        crossAxisAlignment:
-            isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-        children: [
-          if (replyTo != null)
-            Padding(
-              padding: EdgeInsets.only(
-                  left: isMe ? 0 : 4, right: isMe ? 4 : 0, bottom: 2),
-              child: Text(replyTo!,
-                  style: const TextStyle(
-                      color: FlixieColors.medium,
-                      fontSize: 10,
-                      fontStyle: FontStyle.italic)),
-            ),
-          Padding(
-            padding: EdgeInsets.only(
-              left: isMe ? 0 : 4,
-              right: isMe ? 4 : 0,
-              bottom: 3,
-            ),
-            child: Text(
-              isMe ? 'You' : senderUsername,
-              style: TextStyle(
-                color: isMe
-                    ? FlixieColors.primary.withValues(alpha: 0.8)
-                    : FlixieColors.medium,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Container(
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.72,
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: isMe
-                  ? FlixieColors.primary.withValues(alpha: 0.85)
-                  : FlixieColors.tabBarBackgroundFocused,
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(16),
-                topRight: const Radius.circular(16),
-                bottomLeft: Radius.circular(isMe ? 16 : 4),
-                bottomRight: Radius.circular(isMe ? 4 : 16),
-              ),
-            ),
-            child: Text(
-              message,
-              style: TextStyle(
-                color: isMe ? Colors.black : FlixieColors.light,
-                fontSize: 14,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ChatInput extends StatelessWidget {
-  const _ChatInput({
-    required this.controller,
-    required this.sending,
-    required this.onSend,
-  });
-
-  final TextEditingController controller;
-  final bool sending;
-  final VoidCallback onSend;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-          12, 8, 12, MediaQuery.of(context).viewInsets.bottom + 8),
-      decoration: const BoxDecoration(
-        color: FlixieColors.tabBarBackgroundFocused,
-        border: Border(
-          top: BorderSide(color: FlixieColors.tabBarBorder),
-        ),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: controller,
-                style: const TextStyle(color: FlixieColors.light),
-                maxLines: null,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => onSend(),
-                decoration: InputDecoration(
-                  hintText: 'Type a message…',
-                  hintStyle: const TextStyle(color: FlixieColors.medium),
-                  filled: true,
-                  fillColor: FlixieColors.tabBarBackground,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(22),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            sending
-                ? const SizedBox(
-                    width: 36,
-                    height: 36,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: FlixieColors.primary),
-                  )
-                : IconButton(
-                    onPressed: onSend,
-                    icon: const Icon(Icons.send_rounded,
-                        color: FlixieColors.primary),
-                  ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -1478,7 +1339,7 @@ class _WatchRequestChatCard extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 3),
-                            _RequestStatusBadge(
+                            RequestStatusBadge(
                               status: cachedRequest?.status,
                             ),
                             if (requestMessage != null &&
@@ -1706,45 +1567,6 @@ class _WatchRequestChatCard extends StatelessWidget {
   }
 }
 
-class _RequestStatusBadge extends StatelessWidget {
-  const _RequestStatusBadge({this.status});
-
-  final WatchRequestStatus? status;
-
-  @override
-  Widget build(BuildContext context) {
-    final resolved = status ?? WatchRequestStatus.open;
-    final Color color;
-    switch (resolved) {
-      case WatchRequestStatus.expired:
-      case WatchRequestStatus.cancelled:
-        color = FlixieColors.danger;
-      case WatchRequestStatus.completed:
-        color = FlixieColors.success;
-      case WatchRequestStatus.scheduled:
-        color = FlixieColors.secondary;
-      case WatchRequestStatus.open:
-        color = FlixieColors.primary;
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.5), width: 0.8),
-      ),
-      child: Text(
-        resolved.statusLabel.toUpperCase(),
-        style: TextStyle(
-            color: color,
-            fontSize: 9,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.5),
-      ),
-    );
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Activity tab  — Group Dashboard
 // ---------------------------------------------------------------------------
@@ -1854,7 +1676,7 @@ class _ActivityTabState extends State<_ActivityTab> {
           children: [
             // ---- Hero banner ------------------------------------------------
             if (group != null)
-              _GroupHeroBanner(group: group, memberCount: widget.memberCount),
+              GroupHeroBanner(group: group, memberCount: widget.memberCount),
 
             const SizedBox(height: 16),
 
@@ -2004,7 +1826,7 @@ class _ActivityTabState extends State<_ActivityTab> {
               ),
               const SizedBox(height: 8),
               ...pendingRequests.take(3).map(
-                    (req) => _PendingRequestPreviewTile(
+                    (req) => PendingRequestPreviewTile(
                       request: req,
                       canRespond: req.userId != currentUserId,
                       onRespond: (status) async {
@@ -2035,337 +1857,6 @@ class _ActivityTabState extends State<_ActivityTab> {
             ],
 
             const SizedBox(height: 24),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Group hero banner
-// ---------------------------------------------------------------------------
-
-class _GroupHeroBanner extends StatelessWidget {
-  const _GroupHeroBanner({required this.group, required this.memberCount});
-
-  final Group group;
-  final int memberCount;
-
-  static const List<Color> _palette = [
-    FlixieColors.primary,
-    FlixieColors.secondary,
-    FlixieColors.tertiary,
-    FlixieColors.success,
-    FlixieColors.warning,
-  ];
-
-  Color get _color {
-    final hash = group.name.codeUnits.fold(0, (a, b) => a + b);
-    return _palette[hash % _palette.length];
-  }
-
-  String _formatCount(int n) {
-    if (n >= 1000) {
-      final k = n / 1000;
-      return '${k.toStringAsFixed(k.truncateToDouble() == k ? 0 : 1)}k';
-    }
-    return '$n';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _color;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Left: group identity card
-          Expanded(
-            flex: 3,
-            child: Container(
-              height: 110,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    color.withValues(alpha: 0.35),
-                    FlixieColors.tabBarBackgroundFocused,
-                  ],
-                ),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(12),
-                  bottomLeft: Radius.circular(12),
-                ),
-                border: Border.all(color: FlixieColors.tabBarBorder),
-              ),
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: FlixieColors.tertiary.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text(
-                      'ACTIVE COMMUNITY',
-                      style: TextStyle(
-                        color: FlixieColors.tertiary,
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    group.name.toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // Right: member count card
-          Container(
-            width: 90,
-            height: 110,
-            decoration: const BoxDecoration(
-              color: FlixieColors.tabBarBackgroundFocused,
-              borderRadius: BorderRadius.only(
-                topRight: Radius.circular(12),
-                bottomRight: Radius.circular(12),
-              ),
-              border: Border(
-                top: BorderSide(color: FlixieColors.tabBarBorder),
-                right: BorderSide(color: FlixieColors.tabBarBorder),
-                bottom: BorderSide(color: FlixieColors.tabBarBorder),
-              ),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  _formatCount(memberCount),
-                  style: const TextStyle(
-                    color: FlixieColors.primary,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Text(
-                  'MEMBERS',
-                  style: TextStyle(
-                    color: FlixieColors.medium,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Pending request preview tile (used in Activity dashboard)
-// ---------------------------------------------------------------------------
-
-class _PendingRequestPreviewTile extends StatelessWidget {
-  const _PendingRequestPreviewTile({
-    required this.request,
-    required this.canRespond,
-    required this.onRespond,
-  });
-
-  final GroupWatchRequest request;
-  final bool canRespond;
-  final void Function(String status) onRespond;
-
-  @override
-  Widget build(BuildContext context) {
-    final abbr = (request.requesterUsername?.isNotEmpty == true)
-        ? request.requesterUsername![0].toUpperCase()
-        : 'R';
-    final posterUrl = request.moviePosterPath != null
-        ? 'https://image.tmdb.org/t/p/w185${request.moviePosterPath}'
-        : null;
-    return Container(
-      clipBehavior: Clip.hardEdge,
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      decoration: BoxDecoration(
-        color: FlixieColors.tabBarBackgroundFocused,
-        borderRadius: BorderRadius.circular(12),
-        border: const Border(
-          left: BorderSide(color: FlixieColors.primary, width: 3),
-        ),
-      ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Text content
-            Expanded(
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 18,
-                      backgroundColor:
-                          FlixieColors.primary.withValues(alpha: 0.2),
-                      child: Text(
-                        abbr,
-                        style: const TextStyle(
-                          color: FlixieColors.primary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            request.requesterUsername ?? 'Unknown',
-                            style: const TextStyle(
-                              color: FlixieColors.light,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
-                          ),
-                          if (request.movieTitle != null)
-                            Text(
-                              request.movieTitle!,
-                              style: const TextStyle(
-                                  color: FlixieColors.medium, fontSize: 12),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          if (request.message != null &&
-                              request.message!.isNotEmpty) ...[
-                            const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: FlixieColors.primary
-                                    .withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                    color: FlixieColors.primary
-                                        .withValues(alpha: 0.25)),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.chat_bubble_outline,
-                                      size: 11, color: FlixieColors.primary),
-                                  const SizedBox(width: 5),
-                                  Expanded(
-                                    child: Text(
-                                      request.message!,
-                                      style: const TextStyle(
-                                        color: FlixieColors.light,
-                                        fontSize: 11,
-                                        fontStyle: FontStyle.italic,
-                                      ),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    if (canRespond) ...[
-                      IconButton(
-                        onPressed: () => onRespond('DECLINED'),
-                        icon: const Icon(Icons.close,
-                            color: FlixieColors.danger, size: 20),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        onPressed: () => onRespond('ACCEPTED'),
-                        icon: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: FlixieColors.primary.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Icon(Icons.check,
-                              color: FlixieColors.primary, size: 18),
-                        ),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-            // Poster flush to right
-            SizedBox(
-              width: 80,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  posterUrl != null
-                      ? CachedNetworkImage(
-                          imageUrl: posterUrl,
-                          fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) => Container(
-                            color: FlixieColors.tabBarBorder,
-                            child: const Icon(Icons.movie_outlined,
-                                color: FlixieColors.medium),
-                          ),
-                        )
-                      : Container(
-                          color: FlixieColors.tabBarBorder,
-                          child: const Icon(Icons.movie_outlined,
-                              color: FlixieColors.medium),
-                        ),
-                  Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                        colors: [
-                          FlixieColors.tabBarBackgroundFocused,
-                          Colors.transparent,
-                        ],
-                        stops: [0.0, 0.25],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ],
         ),
       ),
@@ -3476,11 +2967,11 @@ class _RequestsTabState extends State<_RequestsTab> {
                                             imageUrl: posterUrl,
                                             fit: BoxFit.cover,
                                             placeholder: (_, __) =>
-                                                const _RequestPosterPlaceholder(),
+                                                const RequestPosterPlaceholder(),
                                             errorWidget: (_, __, ___) =>
-                                                const _RequestPosterPlaceholder(),
+                                                const RequestPosterPlaceholder(),
                                           )
-                                        : const _RequestPosterPlaceholder(),
+                                        : const RequestPosterPlaceholder(),
                                     Container(
                                       decoration: const BoxDecoration(
                                         gradient: LinearGradient(
@@ -3530,20 +3021,6 @@ class _RequestsTabState extends State<_RequestsTab> {
                   ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _RequestPosterPlaceholder extends StatelessWidget {
-  const _RequestPosterPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: FlixieColors.tabBarBackground,
-      child: const Center(
-        child: Icon(Icons.movie_outlined, color: FlixieColors.medium, size: 28),
       ),
     );
   }
