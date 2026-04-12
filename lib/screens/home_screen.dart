@@ -107,7 +107,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         setState(() {
           _featuredMovies = results[0] as List<MovieShort>;
           _nowPlayingMovies =
-              (results[1] as List<MovieShort>).take(8).toList() ?? [];
+              (results[1] as List<MovieShort>).take(8).toList();
           _friendsActivity =
               results.length > 2 ? results[2] as List<ActivityListItem> : [];
           _topRatedThisWeek = results[3] as List<TopRatedMovie>;

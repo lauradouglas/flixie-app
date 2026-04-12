@@ -2114,13 +2114,18 @@ class _WatchRequestSheetState extends State<_WatchRequestSheet> {
     setState(() => _isSending = true);
     try {
       if (_isGroupMode) {
-        await GroupService.sendWatchRequest(
+        // Legacy fallback: POST /groups/:groupId/send-request
+        // The response may now include a conversationId from the updated backend.
+        final result = await GroupService.sendWatchRequest(
           _selectedGroupId!,
           widget.requesterId,
           _messageController.text.trim(),
           'MOVIE',
           widget.movieId!,
         );
+        final conversationId = result?['conversationId'] as String?;
+        logger.d('[WatchRequest] group send result: $result, '
+            'conversationId: $conversationId');
       } else {
         final result = await RequestService.sendRequest({
           'requesterId': widget.requesterId,

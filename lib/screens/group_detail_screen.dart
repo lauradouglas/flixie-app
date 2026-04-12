@@ -10,8 +10,10 @@ import '../models/group_member.dart';
 import '../models/group_watch_request.dart';
 import '../providers/auth_provider.dart';
 import '../screens/profile/activity_tile.dart';
+import '../models/notification.dart';
 import '../services/chat_service.dart';
 import '../services/group_service.dart';
+import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_logger.dart';
 
@@ -34,6 +36,9 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
   List<GroupMember> _groupMembers = [];
   List<GroupWatchRequest> _watchRequests = [];
   List<ActivityListItem> _memberActivity = [];
+  String? _conversationId;
+  // Set by _RequestsTab when it refreshes — overrides the initial computed count.
+  int? _pendingCountOverride;
 
   int get _pendingRequestCount {
     if (_pendingCountOverride != null) return _pendingCountOverride!;
@@ -90,10 +95,35 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
           _memberActivity = secondaryResults[1] as List<ActivityListItem>;
           _loadingGroup = false;
         });
+        // Resolve the Firestore conversationId once group + members are known.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _loadConversationId();
+        });
       }
     } catch (e) {
       logger.e('GroupDetail load group error: $e');
       if (mounted) setState(() => _loadingGroup = false);
+    }
+  }
+
+  /// Resolve (or create) the Firestore conversation for this group so that
+  /// conversation-scoped watch-request endpoints can be used.
+  Future<void> _loadConversationId() async {
+    if (_conversationId != null) return;
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (userId == null || _group == null || _groupMembers.isEmpty) return;
+    try {
+      final memberIds = _groupMembers.map((m) => m.memberId).toList();
+      if (!memberIds.contains(userId)) memberIds.add(userId);
+      final conv = await ChatService.getOrCreateGroupConversation(
+        creatorId: userId,
+        pgGroupId: widget.groupId,
+        name: _group!.name,
+        memberIds: memberIds,
+      );
+      if (mounted) setState(() => _conversationId = conv.id);
+    } catch (e) {
+      logger.e('Failed to resolve conversationId for watch requests: $e');
     }
   }
 
@@ -212,12 +242,14 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
             group: _group,
             memberCount: _memberCount,
             groupId: widget.groupId,
+            conversationId: _conversationId,
             initialRequests: _watchRequests,
             initialActivity: _memberActivity,
             onRefresh: _loadGroup,
           ),
           _RequestsTab(
             groupId: widget.groupId,
+            conversationId: _conversationId,
             initialRequests: _watchRequests,
             currentUserId: context.read<AuthProvider>().dbUser?.id ?? '',
             isAdmin: () {
@@ -228,7 +260,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                   .any((m) => m.memberId == uid && (m.isAdmin || m.isOwner));
             }(),
             onCountChanged: (count) {
-              if (mounted) setState(() => _watchRequests = _watchRequests);
+              if (mounted) setState(() => _pendingCountOverride = count);
             },
           ),
         ],
@@ -358,6 +390,20 @@ class _ChatTabState extends State<_ChatTab> {
   // userId → username, populated from the members subcollection
   Map<String, String> _memberUsernames = {};
 
+  // Watch-request card state: postgres UUID → full GroupWatchRequest from API
+  final Map<String, GroupWatchRequest> _requestCache = {};
+  // Backward-compat: Firestore message doc ID → postgres UUID.
+  // Only needed for legacy messages that don't carry pgGroupRequestId directly.
+  // After the BE writes pgGroupRequestId on the message doc this becomes unused.
+  final Map<String, String> _msgIdToReqId = {};
+  final Set<String> _respondingIds = {};
+  final Map<String, String> _respondMap =
+      {}; // pgUUID → 'ACCEPTED'|'DECLINED'|'MAYBE'
+  // True once the first successful API fetch has completed.
+  // Prevents the itemBuilder from repeatedly triggering fetches on every rebuild.
+  bool _requestsLoaded = false;
+  bool _fetchingRequests = false;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -425,6 +471,8 @@ class _ChatTabState extends State<_ChatTab> {
             _memberUsernames = usernames;
             _initLoading = false;
           });
+          // Preload all watch requests from the API so cards render immediately.
+          _ensureRequests();
         }
         ChatService.markRead(conversation.id, userId).catchError((_) {});
       }
@@ -998,26 +1046,69 @@ class _ChatTabState extends State<_ChatTab> {
                   ),
                 );
               }
-              // Firestore returns newest-first (descending); reverse: true renders
-              // newest at bottom like a standard chat layout.
               return ListView.builder(
                 reverse: true,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
                 itemCount: messages.length,
                 itemBuilder: (_, i) {
                   final msg = messages[i];
                   final isMe = msg.senderId == currentUserId;
-                  // Prefer the username embedded in the message doc; fall back
-                  // to the members subcollection map we fetched at init.
-                  final _sid = msg.senderId;
+
+                  if (msg.type == 'watch_request') {
+                    // Resolve to a postgres UUID.
+                    // After the BE sets pgGroupRequestId on the message doc,
+                    // msg.watchRequestId IS the postgres UUID. Until then,
+                    // fall back to the _msgIdToReqId map built from the
+                    // Firestore watchRequests subcollection.
+                    final pgId = msg.watchRequestId ?? _msgIdToReqId[msg.id];
+                    if (!_requestsLoaded) {
+                      _ensureRequests();
+                    }
+                    final cachedReq = pgId != null ? _requestCache[pgId] : null;
+                    final respondKey = pgId ?? msg.id;
+                    final optimisticStatus = _respondMap[respondKey];
+                    String? myStatus = optimisticStatus;
+                    if (myStatus == null &&
+                        cachedReq != null &&
+                        currentUserId != null) {
+                      myStatus = cachedReq.memberStatuses
+                              .where((s) => s.memberId == currentUserId)
+                              .map((s) => s.status)
+                              .where((s) =>
+                                  s == 'ACCEPTED' ||
+                                  s == 'DECLINED' ||
+                                  s == 'MAYBE')
+                              .firstOrNull ??
+                          cachedReq.currentUserResponse?.apiValue;
+                    }
+                    return _WatchRequestChatCard(
+                      msg: msg,
+                      cachedRequest: cachedReq,
+                      currentUserId: currentUserId,
+                      myStatus: myStatus,
+                      memberUsernames: _memberUsernames,
+                      isResponding: _respondingIds.contains(respondKey),
+                      onAccept: () => _respondInChat(
+                          respondKey, WatchResponseDecision.accepted),
+                      onDecline: () => _respondInChat(
+                          respondKey, WatchResponseDecision.declined),
+                      onMaybe: () => _respondInChat(
+                          respondKey, WatchResponseDecision.maybe),
+                      onTap: () => _showWatchRequestDetail(
+                          context, msg, messages, cachedReq, currentUserId),
+                    );
+                  }
+
+                  // Regular text bubble
+                  final sid = msg.senderId;
                   final username = msg.senderUsername ??
-                      _memberUsernames[_sid] ??
-                      _sid.substring(0, _sid.length.clamp(0, 6));
+                      _memberUsernames[sid] ??
+                      sid.substring(0, sid.length.clamp(0, 6));
                   return _ChatBubble(
                     message: msg.text,
                     senderUsername: username,
                     isMe: isMe,
+                    replyTo: msg.replyToMessageId != null ? '↩ replied' : null,
                   );
                 },
               );
@@ -1039,20 +1130,32 @@ class _ChatBubble extends StatelessWidget {
     required this.message,
     required this.senderUsername,
     required this.isMe,
+    this.replyTo,
   });
 
   final String message;
   final String senderUsername;
   final bool isMe;
+  final String? replyTo;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
       child: Column(
         crossAxisAlignment:
             isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
+          if (replyTo != null)
+            Padding(
+              padding: EdgeInsets.only(
+                  left: isMe ? 0 : 4, right: isMe ? 4 : 0, bottom: 2),
+              child: Text(replyTo!,
+                  style: const TextStyle(
+                      color: FlixieColors.medium,
+                      fontSize: 10,
+                      fontStyle: FontStyle.italic)),
+            ),
           Padding(
             padding: EdgeInsets.only(
               left: isMe ? 0 : 4,
@@ -1168,6 +1271,439 @@ class _ChatInput extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
+// Watch request chat card
+// ---------------------------------------------------------------------------
+
+class _WatchRequestChatCard extends StatelessWidget {
+  const _WatchRequestChatCard({
+    required this.msg,
+    this.cachedRequest,
+    this.currentUserId,
+    this.myStatus,
+    required this.isResponding,
+    this.onAccept,
+    this.onDecline,
+    this.onMaybe,
+    required this.onTap,
+    this.memberUsernames = const {},
+  });
+
+  final ChatMessage msg;
+  final GroupWatchRequest? cachedRequest;
+  final String? currentUserId;
+  final String? myStatus;
+  final bool isResponding;
+  final VoidCallback? onAccept;
+  final VoidCallback? onDecline;
+  final VoidCallback? onMaybe;
+  final VoidCallback onTap;
+  final Map<String, String> memberUsernames;
+
+  @override
+  Widget build(BuildContext context) {
+    final payload = msg.watchRequestPayload;
+
+    final movieTitle = cachedRequest?.movieTitle ??
+        payload?['movieTitle'] as String? ??
+        payload?['title'] as String? ??
+        'Watch Request';
+    final posterPath = cachedRequest?.moviePosterPath ??
+        payload?['moviePosterUrl'] as String? ??
+        payload?['posterPath'] as String?;
+    final requestMessage =
+        cachedRequest?.message ?? payload?['message'] as String?;
+    final requesterUsername = cachedRequest?.requesterUsername ??
+        memberUsernames[msg.senderId] ??
+        msg.senderUsername;
+
+    final expiresAt = cachedRequest?.expiresAt;
+    String? expiresLabel;
+    if (expiresAt != null) {
+      final exp = DateTime.tryParse(expiresAt);
+      if (exp != null) {
+        final diff = exp.difference(DateTime.now());
+        if (diff.isNegative) {
+          expiresLabel = 'Expired';
+        } else if (diff.inDays > 0) {
+          expiresLabel = 'Expires in ${diff.inDays}d';
+        } else if (diff.inHours > 0) {
+          expiresLabel = 'Expires in ${diff.inHours}h';
+        } else {
+          expiresLabel = 'Expires soon';
+        }
+      }
+    }
+    final posterUrl = posterPath != null
+        ? 'https://image.tmdb.org/t/p/w185$posterPath'
+        : null;
+    final isMyRequest = msg.senderId == currentUserId;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: FlixieColors.tabBarBackgroundFocused,
+          borderRadius: BorderRadius.circular(14),
+          border:
+              Border.all(color: FlixieColors.primary.withValues(alpha: 0.35)),
+        ),
+        clipBehavior: Clip.hardEdge,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header — tappable
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+                child: Row(
+                  children: [
+                    const Icon(Icons.movie_filter_outlined,
+                        size: 13, color: FlixieColors.primary),
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: Text(
+                        isMyRequest
+                            ? 'Your watch request'
+                            : '@${requesterUsername ?? 'Unknown'} wants to watch',
+                        style: const TextStyle(
+                            color: FlixieColors.primary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const Divider(height: 1, color: FlixieColors.tabBarBorder),
+            // Poster + details — tappable
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onTap,
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(10, 10, 0, 10),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: SizedBox(
+                          width: 64,
+                          child: posterUrl != null
+                              ? CachedNetworkImage(
+                                  imageUrl: posterUrl,
+                                  fit: BoxFit.cover,
+                                  placeholder: (_, __) => Container(
+                                      color: FlixieColors.tabBarBackground,
+                                      child: const Center(
+                                          child: Icon(Icons.movie_outlined,
+                                              color: FlixieColors.medium,
+                                              size: 22))),
+                                  errorWidget: (_, __, ___) => Container(
+                                      color: FlixieColors.tabBarBackground,
+                                      child: const Center(
+                                          child: Icon(Icons.movie_outlined,
+                                              color: FlixieColors.medium,
+                                              size: 22))),
+                                )
+                              : Container(
+                                  color: FlixieColors.tabBarBackground,
+                                  child: const Center(
+                                      child: Icon(Icons.movie_outlined,
+                                          color: FlixieColors.medium,
+                                          size: 22))),
+                        ),
+                      ),
+                    ),
+                    // Details
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              movieTitle,
+                              style: const TextStyle(
+                                  color: FlixieColors.light,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 3),
+                            _RequestStatusBadge(
+                              status: cachedRequest?.status,
+                            ),
+                            if (requestMessage != null &&
+                                requestMessage.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                '"$requestMessage"',
+                                style: const TextStyle(
+                                    color: FlixieColors.medium,
+                                    fontSize: 12,
+                                    fontStyle: FontStyle.italic),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                            if (expiresLabel != null) ...[
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Icon(
+                                    expiresLabel == 'Expired'
+                                        ? Icons.timer_off_outlined
+                                        : Icons.timer_outlined,
+                                    size: 11,
+                                    color: expiresLabel == 'Expired'
+                                        ? FlixieColors.danger
+                                        : FlixieColors.warning,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    expiresLabel,
+                                    style: TextStyle(
+                                        color: expiresLabel == 'Expired'
+                                            ? FlixieColors.danger
+                                            : FlixieColors.warning,
+                                        fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                            ],
+                            if (cachedRequest != null &&
+                                (cachedRequest!.acceptedCount > 0 ||
+                                    cachedRequest!.maybeCount > 0 ||
+                                    cachedRequest!.declinedCount > 0)) ...[
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  if (cachedRequest!.acceptedCount > 0) ...[
+                                    const Icon(Icons.check,
+                                        size: 11, color: FlixieColors.success),
+                                    const SizedBox(width: 2),
+                                    Text('${cachedRequest!.acceptedCount}',
+                                        style: const TextStyle(
+                                            color: FlixieColors.success,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700)),
+                                    const SizedBox(width: 10),
+                                  ],
+                                  if (cachedRequest!.maybeCount > 0) ...[
+                                    const Icon(Icons.help_outline,
+                                        size: 11, color: FlixieColors.warning),
+                                    const SizedBox(width: 2),
+                                    Text('${cachedRequest!.maybeCount}',
+                                        style: const TextStyle(
+                                            color: FlixieColors.warning,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700)),
+                                    const SizedBox(width: 10),
+                                  ],
+                                  if (cachedRequest!.declinedCount > 0) ...[
+                                    const Icon(Icons.close,
+                                        size: 11, color: FlixieColors.danger),
+                                    const SizedBox(width: 2),
+                                    Text('${cachedRequest!.declinedCount}',
+                                        style: const TextStyle(
+                                            color: FlixieColors.danger,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700)),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Action row — only for members who aren't the requester
+            if (!isMyRequest) ...[
+              const Divider(height: 1, color: FlixieColors.tabBarBorder),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: myStatus == 'ACCEPTED'
+                    ? _chatStatusChip('You accepted ✓', FlixieColors.success)
+                    : myStatus == 'DECLINED'
+                        ? _chatStatusChip('You declined ✗', FlixieColors.danger)
+                        : myStatus == 'MAYBE'
+                            ? _chatStatusChip(
+                                'You said maybe', FlixieColors.warning)
+                            : isResponding
+                                ? const Center(
+                                    child: SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: FlixieColors.primary),
+                                    ),
+                                  )
+                                : Row(
+                                    children: [
+                                      Expanded(
+                                        child: ElevatedButton(
+                                          onPressed: onDecline,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: FlixieColors.danger
+                                                .withValues(alpha: 0.85),
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 8),
+                                            shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(8)),
+                                            minimumSize: Size.zero,
+                                            textStyle: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600),
+                                          ),
+                                          child: const Text('Decline'),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: ElevatedButton(
+                                          onPressed: onMaybe,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: FlixieColors
+                                                .warning
+                                                .withValues(alpha: 0.85),
+                                            foregroundColor: Colors.black,
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 8),
+                                            shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(8)),
+                                            minimumSize: Size.zero,
+                                            textStyle: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600),
+                                          ),
+                                          child: const Text('Maybe'),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: ElevatedButton(
+                                          onPressed: onAccept,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: FlixieColors
+                                                .success
+                                                .withValues(alpha: 0.85),
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 8),
+                                            shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(8)),
+                                            minimumSize: Size.zero,
+                                            textStyle: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600),
+                                          ),
+                                          child: const Text('Accept'),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+              ),
+            ],
+            // Footer — tappable to open detail
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onTap,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                color: FlixieColors.tabBarBackground.withValues(alpha: 0.6),
+                child: const Row(
+                  children: [
+                    Icon(Icons.chat_bubble_outline,
+                        size: 11, color: FlixieColors.medium),
+                    SizedBox(width: 4),
+                    Text('View details & reply',
+                        style: TextStyle(
+                            color: FlixieColors.medium, fontSize: 11)),
+                    Spacer(),
+                    Icon(Icons.chevron_right,
+                        size: 14, color: FlixieColors.medium),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _chatStatusChip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Text(label,
+          style: TextStyle(
+              color: color, fontSize: 12, fontWeight: FontWeight.w600)),
+    );
+  }
+}
+
+class _RequestStatusBadge extends StatelessWidget {
+  const _RequestStatusBadge({this.status});
+
+  final WatchRequestStatus? status;
+
+  @override
+  Widget build(BuildContext context) {
+    final resolved = status ?? WatchRequestStatus.open;
+    final Color color;
+    switch (resolved) {
+      case WatchRequestStatus.expired:
+      case WatchRequestStatus.cancelled:
+        color = FlixieColors.danger;
+      case WatchRequestStatus.completed:
+        color = FlixieColors.success;
+      case WatchRequestStatus.scheduled:
+        color = FlixieColors.secondary;
+      case WatchRequestStatus.open:
+        color = FlixieColors.primary;
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.5), width: 0.8),
+      ),
+      child: Text(
+        resolved.statusLabel.toUpperCase(),
+        style: TextStyle(
+            color: color,
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.5),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Activity tab  — Group Dashboard
 // ---------------------------------------------------------------------------
 
@@ -1176,6 +1712,7 @@ class _ActivityTab extends StatefulWidget {
     required this.group,
     required this.memberCount,
     required this.groupId,
+    this.conversationId,
     required this.initialRequests,
     required this.initialActivity,
     required this.onRefresh,
@@ -1184,6 +1721,7 @@ class _ActivityTab extends StatefulWidget {
   final Group? group;
   final int memberCount;
   final String groupId;
+  final String? conversationId;
   final List<GroupWatchRequest> initialRequests;
   final List<ActivityListItem> initialActivity;
   final Future<void> Function() onRefresh;
@@ -1364,9 +1902,21 @@ class _ActivityTabState extends State<_ActivityTab> {
                       onRespond: (status) async {
                         final userId = context.read<AuthProvider>().dbUser?.id;
                         if (userId == null) return;
+                        // Use conversation-scoped endpoint when possible;
+                        // fall back to legacy PUT endpoint.
+                        final convId = widget.conversationId ?? req.groupId;
                         try {
-                          await GroupService.updateWatchRequestForMember(
-                              req.id, userId, '', status);
+                          try {
+                            final decision =
+                                WatchResponseDecision.fromString(status);
+                            await GroupService.respondToWatchRequest(
+                                convId, req.id, userId, decision);
+                          } catch (e) {
+                            logger.d(
+                                'New respond endpoint failed, using legacy: $e');
+                            await GroupService.updateWatchRequestForMember(
+                                req.id, userId, '', status);
+                          }
                           await _refresh();
                         } catch (e) {
                           logger.e('Respond to request error: $e');
@@ -1715,11 +2265,12 @@ class _PendingRequestPreviewTile extends StatelessWidget {
   }
 }
 
-enum _RequestFilter { all, needsResponse, accepted, byMe }
+enum _RequestFilter { all, needsResponse, active, completed, byMe }
 
 class _RequestsTab extends StatefulWidget {
   const _RequestsTab({
     required this.groupId,
+    this.conversationId,
     this.initialRequests = const [],
     required this.currentUserId,
     this.isAdmin = false,
@@ -1727,6 +2278,7 @@ class _RequestsTab extends StatefulWidget {
   });
 
   final String groupId;
+  final String? conversationId;
   final List<GroupWatchRequest> initialRequests;
   final String currentUserId;
   final bool isAdmin;
@@ -1743,7 +2295,22 @@ class _RequestsTabState extends State<_RequestsTab> {
   final Map<String, String> _myResponses = {};
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  _RequestFilter _filter = _RequestFilter.all;
+  _RequestFilter _filter = _RequestFilter.active;
+
+  String get _emptyMessage {
+    switch (_filter) {
+      case _RequestFilter.active:
+        return 'No active watch requests';
+      case _RequestFilter.needsResponse:
+        return 'No requests need your response';
+      case _RequestFilter.completed:
+        return 'No completed watches yet';
+      case _RequestFilter.byMe:
+        return "You haven't created any requests yet";
+      case _RequestFilter.all:
+        return 'No watch requests yet.';
+    }
+  }
 
   @override
   void dispose() {
@@ -1765,18 +2332,42 @@ class _RequestsTabState extends State<_RequestsTab> {
         widget.initialRequests.isNotEmpty) {
       setState(() => _requests = widget.initialRequests);
     }
+    // Reload via the new endpoint as soon as a conversationId becomes available.
+    if (widget.conversationId != null && oldWidget.conversationId == null) {
+      _load();
+    }
   }
 
   Future<void> _load() async {
     if (mounted) setState(() => _loading = true);
     try {
-      final requests = await GroupService.getGroupWatchRequests(widget.groupId);
+      final List<GroupWatchRequest> requests;
+      final conversationId = widget.conversationId;
+      if (conversationId != null) {
+        requests = await GroupService.getConversationWatchRequests(
+          conversationId,
+          userId: widget.currentUserId,
+        );
+      } else {
+        requests = await GroupService.getGroupWatchRequests(widget.groupId);
+      }
       if (mounted) {
         setState(() {
           _requests = requests;
           _loading = false;
         });
-        widget.onCountChanged?.call(requests.length);
+        final currentUserId = widget.currentUserId;
+        final needsResponseCount = requests.where((r) {
+          if (!r.canRespond) return false;
+          if (r.userId == currentUserId) return false;
+          if (r.currentUserResponse != null) return false;
+          return !r.memberStatuses.any((s) =>
+              s.memberId == currentUserId &&
+              (s.status == 'ACCEPTED' ||
+                  s.status == 'DECLINED' ||
+                  s.status == 'MAYBE'));
+        }).length;
+        widget.onCountChanged?.call(needsResponseCount);
       }
     } catch (e) {
       logger.e('RequestsTab load error: $e');
@@ -1790,24 +2381,33 @@ class _RequestsTabState extends State<_RequestsTab> {
 
     // Apply filter chip
     switch (_filter) {
+      case _RequestFilter.active:
+        // Active = open + scheduled; hide expired/cancelled by default
+        list = list.where((r) => r.isActive).toList();
       case _RequestFilter.needsResponse:
         list = list.where((r) {
-          final responded = _myResponses.containsKey(r.id) ||
-              r.memberStatuses.any((s) =>
-                  s.memberId == currentUserId &&
-                  (s.status == 'ACCEPTED' || s.status == 'DECLINED'));
-          return !responded && r.userId != currentUserId;
+          if (!r.canRespond) return false;
+          if (r.userId == currentUserId) return false;
+          // Check local optimistic response first
+          final localResponse = _myResponses[r.id];
+          if (localResponse != null) return false;
+          // Check server-side current user response
+          if (r.currentUserResponse != null) return false;
+          // Check memberStatuses
+          return !r.memberStatuses.any((s) =>
+              s.memberId == currentUserId &&
+              (s.status == 'ACCEPTED' ||
+                  s.status == 'DECLINED' ||
+                  s.status == 'MAYBE'));
         }).toList();
-      case _RequestFilter.accepted:
-        list = list.where((r) {
-          final local = _myResponses[r.id];
-          if (local != null) return local == 'ACCEPTED';
-          return r.memberStatuses.any(
-              (s) => s.memberId == currentUserId && s.status == 'ACCEPTED');
-        }).toList();
+      case _RequestFilter.completed:
+        list = list
+            .where((r) => r.status == WatchRequestStatus.completed)
+            .toList();
       case _RequestFilter.byMe:
         list = list.where((r) => r.userId == currentUserId).toList();
       case _RequestFilter.all:
+        // Show everything, including expired and cancelled
         break;
     }
 
@@ -1828,10 +2428,21 @@ class _RequestsTabState extends State<_RequestsTab> {
     final userId = widget.currentUserId;
     if (userId.isEmpty) return;
 
+    // Prefer the widget-level conversationId; fall back to the one embedded
+    // in the request (set when loaded via getConversationWatchRequests).
+    final convId = widget.conversationId ?? req.groupId;
+
     setState(() => _processing[req.id] = true);
     try {
-      await GroupService.updateWatchRequestForMember(
-          req.id, userId, '', status);
+      final decision = WatchResponseDecision.fromString(status);
+      try {
+        await GroupService.respondToWatchRequest(
+            convId, req.id, userId, decision);
+      } catch (e) {
+        logger.d('New respond endpoint failed, using legacy: $e');
+        await GroupService.updateWatchRequestForMember(
+            req.id, userId, '', status);
+      }
       if (mounted) setState(() => _myResponses[req.id] = status);
       await _load();
     } catch (e) {
@@ -1839,6 +2450,78 @@ class _RequestsTabState extends State<_RequestsTab> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to update request')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _processing.remove(req.id));
+    }
+  }
+
+  Future<void> _markWatched(GroupWatchRequest req) async {
+    final userId = widget.currentUserId;
+    final convId = widget.conversationId ?? req.groupId;
+    setState(() => _processing[req.id] = true);
+    try {
+      await GroupService.completeWatchRequest(convId, req.id, userId);
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                '"${req.movieTitle ?? 'Watch request'}" marked as watched!'),
+            backgroundColor: FlixieColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      logger.e('Mark watched error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to mark as watched')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _processing.remove(req.id));
+    }
+  }
+
+  Future<void> _cancelRequest(GroupWatchRequest req) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: FlixieColors.tabBarBackground,
+        title: const Text('Cancel request?',
+            style: TextStyle(color: FlixieColors.white)),
+        content: Text(
+          'Cancel the watch request for "${req.movieTitle ?? 'this movie'}"?',
+          style: const TextStyle(color: FlixieColors.light),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child:
+                const Text('No', style: TextStyle(color: FlixieColors.medium)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Cancel Request',
+                style: TextStyle(color: FlixieColors.danger)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final userId = widget.currentUserId;
+    final convId = widget.conversationId ?? req.groupId;
+    setState(() => _processing[req.id] = true);
+    try {
+      await GroupService.cancelWatchRequest(convId, req.id, userId);
+      await _load();
+    } catch (e) {
+      logger.e('Cancel watch request error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to cancel request')),
         );
       }
     } finally {
@@ -1917,6 +2600,42 @@ class _RequestsTabState extends State<_RequestsTab> {
     );
   }
 
+  Color _statusBorderColor(WatchRequestStatus status) {
+    switch (status) {
+      case WatchRequestStatus.open:
+        return FlixieColors.primary;
+      case WatchRequestStatus.scheduled:
+        return FlixieColors.secondary;
+      case WatchRequestStatus.completed:
+        return FlixieColors.success;
+      case WatchRequestStatus.expired:
+        return FlixieColors.medium;
+      case WatchRequestStatus.cancelled:
+        return FlixieColors.danger;
+    }
+  }
+
+  Widget _statusPill(WatchRequestStatus status) {
+    final color = _statusBorderColor(status);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Text(
+        status.statusLabel,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+
   Widget _filterChip(_RequestFilter f, String label) {
     final selected = _filter == f;
     return Padding(
@@ -1942,14 +2661,18 @@ class _RequestsTabState extends State<_RequestsTab> {
     if (statuses.isEmpty) return const SizedBox.shrink();
     final acceptedCount = statuses.where((s) => s.status == 'ACCEPTED').length;
     final declinedCount = statuses.where((s) => s.status == 'DECLINED').length;
+    final maybeCount = statuses.where((s) => s.status == 'MAYBE').length;
     final pendingCount = statuses
-        .where((s) => s.status != 'ACCEPTED' && s.status != 'DECLINED')
+        .where((s) =>
+            s.status != 'ACCEPTED' &&
+            s.status != 'DECLINED' &&
+            s.status != 'MAYBE')
         .length;
 
     return Row(
       children: [
         if (acceptedCount > 0) ...[
-          Icon(Icons.check_circle_outline,
+          const Icon(Icons.check_circle_outline,
               size: 13, color: FlixieColors.success),
           const SizedBox(width: 3),
           Text('$acceptedCount',
@@ -1958,14 +2681,27 @@ class _RequestsTabState extends State<_RequestsTab> {
           const SizedBox(width: 10),
         ],
         if (declinedCount > 0) ...[
-          Icon(Icons.cancel_outlined, size: 13, color: FlixieColors.danger),
+          const Icon(Icons.cancel_outlined,
+              size: 13, color: FlixieColors.danger),
           const SizedBox(width: 3),
           Text('$declinedCount',
               style: const TextStyle(color: FlixieColors.danger, fontSize: 12)),
           const SizedBox(width: 10),
         ],
+        if (maybeCount > 0) ...[
+          Semantics(
+            label: 'Maybe responses',
+            child: const Icon(Icons.help_outline,
+                size: 13, color: FlixieColors.warning),
+          ),
+          const SizedBox(width: 3),
+          Text('$maybeCount',
+              style:
+                  const TextStyle(color: FlixieColors.warning, fontSize: 12)),
+          const SizedBox(width: 10),
+        ],
         if (pendingCount > 0) ...[
-          Icon(Icons.schedule, size: 13, color: FlixieColors.medium),
+          const Icon(Icons.schedule, size: 13, color: FlixieColors.medium),
           const SizedBox(width: 3),
           Text('$pendingCount',
               style: const TextStyle(color: FlixieColors.medium, fontSize: 12)),
@@ -1983,7 +2719,7 @@ class _RequestsTabState extends State<_RequestsTab> {
       }
     }
 
-    String _name(GroupRequestMemberStatus s) {
+    String name(GroupRequestMemberStatus s) {
       if (s.username != null && s.username!.isNotEmpty) return s.username!;
       if (knownNames.containsKey(s.memberId)) return knownNames[s.memberId]!;
       return s.memberId.substring(0, s.memberId.length.clamp(0, 6));
@@ -2000,8 +2736,13 @@ class _RequestsTabState extends State<_RequestsTab> {
             req.memberStatuses.where((s) => s.status == 'ACCEPTED').toList();
         final declined =
             req.memberStatuses.where((s) => s.status == 'DECLINED').toList();
+        final maybe =
+            req.memberStatuses.where((s) => s.status == 'MAYBE').toList();
         final pending = req.memberStatuses
-            .where((s) => s.status != 'ACCEPTED' && s.status != 'DECLINED')
+            .where((s) =>
+                s.status != 'ACCEPTED' &&
+                s.status != 'DECLINED' &&
+                s.status != 'MAYBE')
             .toList();
 
         Widget section(String label, List<GroupRequestMemberStatus> members,
@@ -2027,7 +2768,7 @@ class _RequestsTabState extends State<_RequestsTab> {
                         radius: 14,
                         backgroundColor: color.withValues(alpha: 0.15),
                         child: Text(
-                          _name(s).isNotEmpty ? _name(s)[0].toUpperCase() : '?',
+                          name(s).isNotEmpty ? name(s)[0].toUpperCase() : '?',
                           style: TextStyle(
                               color: color,
                               fontSize: 11,
@@ -2035,7 +2776,7 @@ class _RequestsTabState extends State<_RequestsTab> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text('@${_name(s)}',
+                      Text('@${name(s)}',
                           style: const TextStyle(
                               color: FlixieColors.light, fontSize: 13)),
                     ]),
@@ -2072,14 +2813,14 @@ class _RequestsTabState extends State<_RequestsTab> {
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 4),
-              Text('Member responses',
-                  style: const TextStyle(
-                      color: FlixieColors.medium, fontSize: 12)),
+              const Text('Member responses',
+                  style: TextStyle(color: FlixieColors.medium, fontSize: 12)),
               const SizedBox(height: 16),
               section('Accepted', accepted, FlixieColors.success,
                   Icons.check_circle_outline),
               section('Declined', declined, FlixieColors.danger,
                   Icons.cancel_outlined),
+              section('Maybe', maybe, FlixieColors.warning, Icons.help_outline),
               section('Pending', pending, FlixieColors.medium, Icons.schedule),
             ],
           ),
@@ -2174,10 +2915,11 @@ class _RequestsTabState extends State<_RequestsTab> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               children: [
-                _filterChip(_RequestFilter.all, 'All'),
+                _filterChip(_RequestFilter.active, 'Active'),
                 _filterChip(_RequestFilter.needsResponse, 'Needs Response'),
-                _filterChip(_RequestFilter.accepted, 'Accepted'),
+                _filterChip(_RequestFilter.completed, 'Completed'),
                 _filterChip(_RequestFilter.byMe, 'By Me'),
+                _filterChip(_RequestFilter.all, 'All'),
               ],
             ),
           ),
@@ -2186,11 +2928,33 @@ class _RequestsTabState extends State<_RequestsTab> {
           Expanded(
             child: displayed.isEmpty
                 ? Center(
-                    child: Text(
-                      _requests.isEmpty
-                          ? 'No watch requests yet.'
-                          : 'No requests match.',
-                      style: const TextStyle(color: FlixieColors.medium),
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Semantics(
+                            label: _searchQuery.isNotEmpty
+                                ? 'No requests match'
+                                : _emptyMessage,
+                            child: Icon(
+                              _filter == _RequestFilter.completed
+                                  ? Icons.movie_outlined
+                                  : Icons.inbox_outlined,
+                              color: FlixieColors.medium,
+                              size: 40,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            _searchQuery.isNotEmpty
+                                ? 'No requests match.'
+                                : _emptyMessage,
+                            style: const TextStyle(color: FlixieColors.medium),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
                     ),
                   )
                 : ListView.builder(
@@ -2202,13 +2966,18 @@ class _RequestsTabState extends State<_RequestsTab> {
                       final currentUserId = widget.currentUserId;
                       final isMyRequest = req.userId == currentUserId;
                       final canDelete = isMyRequest || widget.isAdmin;
+                      final canManage = isMyRequest || widget.isAdmin;
 
-                      // Determine current user's existing status (only relevant for non-requesters)
+                      // Determine current user's existing status
                       final myStatus = _myResponses[req.id] ??
+                          req.currentUserResponse?.apiValue ??
                           req.memberStatuses
                               .where((s) => s.memberId == currentUserId)
                               .map((s) => s.status)
-                              .where((s) => s == 'ACCEPTED' || s == 'DECLINED')
+                              .where((s) =>
+                                  s == 'ACCEPTED' ||
+                                  s == 'DECLINED' ||
+                                  s == 'MAYBE')
                               .firstOrNull;
 
                       final posterUrl = req.moviePosterPath != null
@@ -2221,9 +2990,10 @@ class _RequestsTabState extends State<_RequestsTab> {
                         decoration: BoxDecoration(
                           color: FlixieColors.tabBarBackgroundFocused,
                           borderRadius: BorderRadius.circular(14),
-                          border: const Border(
+                          border: Border(
                             left: BorderSide(
-                                color: FlixieColors.primary, width: 3),
+                                color: _statusBorderColor(req.status),
+                                width: 3),
                           ),
                         ),
                         child: IntrinsicHeight(
@@ -2273,11 +3043,21 @@ class _RequestsTabState extends State<_RequestsTab> {
                                           ],
                                         ),
                                         const SizedBox(height: 4),
-                                        Text(
-                                          'By @${req.requesterUsername ?? 'Unknown'}',
-                                          style: const TextStyle(
-                                              color: FlixieColors.medium,
-                                              fontSize: 12),
+                                        // Status pill + creator
+                                        Row(
+                                          children: [
+                                            _statusPill(req.status),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                'By @${req.requesterUsername ?? 'Unknown'}',
+                                                style: const TextStyle(
+                                                    color: FlixieColors.medium,
+                                                    fontSize: 12),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                         if (req.message != null &&
                                             req.message!.isNotEmpty) ...[
@@ -2326,133 +3106,252 @@ class _RequestsTabState extends State<_RequestsTab> {
                                               req.memberStatuses),
                                         ],
                                         const SizedBox(height: 10),
-                                        // Action row
-                                        Row(
-                                          children: [
-                                            if (!isMyRequest) ...[
-                                              Expanded(
-                                                child: Builder(builder: (_) {
-                                                  if (myStatus == 'ACCEPTED') {
-                                                    return _myStatusChip(
-                                                        'You accepted',
-                                                        FlixieColors.success);
-                                                  }
-                                                  if (myStatus == 'DECLINED') {
-                                                    return _myStatusChip(
-                                                        'You declined',
-                                                        FlixieColors.danger);
-                                                  }
-                                                  return Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      const Text(
-                                                        'Your response',
-                                                        style: TextStyle(
-                                                          color: FlixieColors
-                                                              .medium,
-                                                          fontSize: 11,
-                                                          fontWeight:
-                                                              FontWeight.w600,
+                                        // Member response row (for non-requesters on active requests)
+                                        if (!isMyRequest && req.canRespond) ...[
+                                          Builder(builder: (_) {
+                                            if (myStatus == 'ACCEPTED') {
+                                              return _myStatusChip(
+                                                  'You accepted',
+                                                  FlixieColors.success);
+                                            }
+                                            if (myStatus == 'DECLINED') {
+                                              return _myStatusChip(
+                                                  'You declined',
+                                                  FlixieColors.danger);
+                                            }
+                                            if (myStatus == 'MAYBE') {
+                                              return _myStatusChip(
+                                                  'You said maybe',
+                                                  FlixieColors.warning);
+                                            }
+                                            // No response yet — show buttons
+                                            if (isProcessing) {
+                                              return const Align(
+                                                alignment: Alignment.centerLeft,
+                                                child: SizedBox(
+                                                  width: 20,
+                                                  height: 20,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    color: FlixieColors.primary,
+                                                  ),
+                                                ),
+                                              );
+                                            }
+                                            return Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                const Text(
+                                                  'Your response',
+                                                  style: TextStyle(
+                                                    color: FlixieColors.medium,
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 6),
+                                                Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: OutlinedButton(
+                                                        onPressed: () =>
+                                                            _respond(req,
+                                                                'DECLINED'),
+                                                        style: OutlinedButton
+                                                            .styleFrom(
+                                                          foregroundColor:
+                                                              FlixieColors
+                                                                  .danger,
+                                                          padding:
+                                                              const EdgeInsets
+                                                                  .symmetric(
+                                                                  vertical: 7),
+                                                          side: BorderSide(
+                                                              color: FlixieColors
+                                                                  .danger
+                                                                  .withValues(
+                                                                      alpha:
+                                                                          0.45)),
+                                                          shape: RoundedRectangleBorder(
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(
+                                                                          8)),
+                                                          minimumSize:
+                                                              Size.zero,
+                                                          textStyle:
+                                                              const TextStyle(
+                                                                  fontSize: 12),
                                                         ),
+                                                        child: const Text(
+                                                            'Decline'),
                                                       ),
-                                                      const SizedBox(height: 6),
-                                                      Row(
-                                                        children: [
-                                                          if (isProcessing)
-                                                            const SizedBox(
-                                                              width: 20,
-                                                              height: 20,
-                                                              child: CircularProgressIndicator(
-                                                                  strokeWidth:
-                                                                      2,
-                                                                  color: FlixieColors
-                                                                      .primary),
-                                                            )
-                                                          else ...[
-                                                            Expanded(
-                                                              child:
-                                                                  OutlinedButton(
-                                                                onPressed: () =>
-                                                                    _respond(
-                                                                        req,
-                                                                        'DECLINED'),
-                                                                style: OutlinedButton
-                                                                    .styleFrom(
-                                                                  foregroundColor:
-                                                                      FlixieColors
-                                                                          .danger,
-                                                                  padding: const EdgeInsets
-                                                                      .symmetric(
-                                                                      vertical:
-                                                                          8),
-                                                                  side: BorderSide(
-                                                                      color: FlixieColors
-                                                                          .danger
-                                                                          .withValues(
-                                                                              alpha: 0.45)),
-                                                                  shape: RoundedRectangleBorder(
-                                                                      borderRadius:
-                                                                          BorderRadius.circular(
-                                                                              8)),
-                                                                  minimumSize:
-                                                                      Size.zero,
-                                                                  textStyle:
-                                                                      const TextStyle(
-                                                                          fontSize:
-                                                                              13),
-                                                                ),
-                                                                child: const Text(
-                                                                    'Decline'),
-                                                              ),
-                                                            ),
-                                                            const SizedBox(
-                                                                width: 8),
-                                                            Expanded(
-                                                              child:
-                                                                  ElevatedButton(
-                                                                onPressed: () =>
-                                                                    _respond(
-                                                                        req,
-                                                                        'ACCEPTED'),
-                                                                style: ElevatedButton
-                                                                    .styleFrom(
-                                                                  backgroundColor:
-                                                                      FlixieColors
-                                                                          .primary,
-                                                                  foregroundColor:
-                                                                      Colors
-                                                                          .black,
-                                                                  padding: const EdgeInsets
-                                                                      .symmetric(
-                                                                      vertical:
-                                                                          8),
-                                                                  shape: RoundedRectangleBorder(
-                                                                      borderRadius:
-                                                                          BorderRadius.circular(
-                                                                              8)),
-                                                                  minimumSize:
-                                                                      Size.zero,
-                                                                  textStyle:
-                                                                      const TextStyle(
-                                                                          fontSize:
-                                                                              13),
-                                                                ),
-                                                                child: const Text(
-                                                                    'Accept'),
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ],
+                                                    ),
+                                                    const SizedBox(width: 6),
+                                                    Expanded(
+                                                      child: OutlinedButton(
+                                                        onPressed: () =>
+                                                            _respond(
+                                                                req, 'MAYBE'),
+                                                        style: OutlinedButton
+                                                            .styleFrom(
+                                                          foregroundColor:
+                                                              FlixieColors
+                                                                  .warning,
+                                                          padding:
+                                                              const EdgeInsets
+                                                                  .symmetric(
+                                                                  vertical: 7),
+                                                          side: BorderSide(
+                                                              color: FlixieColors
+                                                                  .warning
+                                                                  .withValues(
+                                                                      alpha:
+                                                                          0.45)),
+                                                          shape: RoundedRectangleBorder(
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(
+                                                                          8)),
+                                                          minimumSize:
+                                                              Size.zero,
+                                                          textStyle:
+                                                              const TextStyle(
+                                                                  fontSize: 12),
+                                                        ),
+                                                        child:
+                                                            const Text('Maybe'),
                                                       ),
-                                                    ],
-                                                  );
-                                                }),
-                                              ),
+                                                    ),
+                                                    const SizedBox(width: 6),
+                                                    Expanded(
+                                                      child: ElevatedButton(
+                                                        onPressed: () =>
+                                                            _respond(req,
+                                                                'ACCEPTED'),
+                                                        style: ElevatedButton
+                                                            .styleFrom(
+                                                          backgroundColor:
+                                                              FlixieColors
+                                                                  .primary,
+                                                          foregroundColor:
+                                                              Colors.black,
+                                                          padding:
+                                                              const EdgeInsets
+                                                                  .symmetric(
+                                                                  vertical: 7),
+                                                          shape: RoundedRectangleBorder(
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(
+                                                                          8)),
+                                                          minimumSize:
+                                                              Size.zero,
+                                                          textStyle:
+                                                              const TextStyle(
+                                                                  fontSize: 12),
+                                                        ),
+                                                        child: const Text(
+                                                            'Accept'),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            );
+                                          }),
+                                        ],
+                                        // Creator / admin actions (active requests only)
+                                        if (canManage && req.isActive) ...[
+                                          const SizedBox(height: 8),
+                                          Row(
+                                            children: [
+                                              if (isProcessing)
+                                                const SizedBox(
+                                                  width: 20,
+                                                  height: 20,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    color: FlixieColors.primary,
+                                                  ),
+                                                )
+                                              else ...[
+                                                Expanded(
+                                                  child: OutlinedButton.icon(
+                                                    onPressed: () =>
+                                                        _markWatched(req),
+                                                    icon: const Icon(
+                                                        Icons
+                                                            .check_circle_outline,
+                                                        size: 14),
+                                                    label: const Text(
+                                                        'Mark Watched'),
+                                                    style: OutlinedButton
+                                                        .styleFrom(
+                                                      foregroundColor:
+                                                          FlixieColors.success,
+                                                      padding: const EdgeInsets
+                                                          .symmetric(
+                                                          vertical: 7),
+                                                      side: BorderSide(
+                                                          color: FlixieColors
+                                                              .success
+                                                              .withValues(
+                                                                  alpha: 0.45)),
+                                                      shape:
+                                                          RoundedRectangleBorder(
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(
+                                                                          8)),
+                                                      minimumSize: Size.zero,
+                                                      textStyle:
+                                                          const TextStyle(
+                                                              fontSize: 12),
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Expanded(
+                                                  child: OutlinedButton.icon(
+                                                    onPressed: () =>
+                                                        _cancelRequest(req),
+                                                    icon: const Icon(
+                                                        Icons.cancel_outlined,
+                                                        size: 14),
+                                                    label: const Text('Cancel'),
+                                                    style: OutlinedButton
+                                                        .styleFrom(
+                                                      foregroundColor:
+                                                          FlixieColors.danger,
+                                                      padding: const EdgeInsets
+                                                          .symmetric(
+                                                          vertical: 7),
+                                                      side: BorderSide(
+                                                          color: FlixieColors
+                                                              .danger
+                                                              .withValues(
+                                                                  alpha: 0.45)),
+                                                      shape:
+                                                          RoundedRectangleBorder(
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(
+                                                                          8)),
+                                                      minimumSize: Size.zero,
+                                                      textStyle:
+                                                          const TextStyle(
+                                                              fontSize: 12),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
                                             ],
-                                          ],
-                                        ),
+                                          ),
+                                        ],
                                       ],
                                     ),
                                   ),
