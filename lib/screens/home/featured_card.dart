@@ -1,0 +1,100 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
+
+import '../../models/movie_short.dart';
+import '../../theme/app_theme.dart';
+
+class FeaturedCard extends StatelessWidget {
+  const FeaturedCard({super.key, required this.movie, this.onTap});
+
+  final MovieShort movie;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 160,
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Poster image
+              if (movie.poster != null)
+                CachedNetworkImage(
+                  imageUrl: 'https://image.tmdb.org/t/p/w342${movie.poster}',
+                  fit: BoxFit.cover,
+                  errorWidget: (_, __, ___) => Container(
+                    color: FlixieColors.primary.withValues(alpha: 0.3),
+                    child: const Icon(Icons.movie_outlined, size: 36),
+                  ),
+                )
+              else
+                Container(
+                  color: FlixieColors.primary.withValues(alpha: 0.3),
+                  child: const Icon(Icons.movie_outlined, size: 36),
+                ),
+              // Gradient overlay
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.8),
+                    ],
+                  ),
+                ),
+              ),
+              // Text content
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(
+                      movie.name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (movie.releaseDate != null &&
+                        movie.releaseDate!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        () {
+                          final raw = movie.releaseDate!;
+                          // Handle ISO format: "2026-03-15" or "2026-03-15T..."
+                          final iso = DateTime.tryParse(raw);
+                          if (iso != null) return iso.year.toString();
+                          // Handle JS date string: "Sun Mar 15 2026"
+                          final parts = raw.split(' ');
+                          if (parts.length == 4) {
+                            return '${parts[2]} ${parts[1]} ${parts[3]}';
+                          }
+                          return raw;
+                        }(),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
