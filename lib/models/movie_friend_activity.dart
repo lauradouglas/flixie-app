@@ -7,6 +7,7 @@ class MovieFriendActivity {
   final bool watched;
   final bool favorited;
   final int? rating;
+  final bool? reviewRecommended;
 
   const MovieFriendActivity({
     required this.userId,
@@ -17,6 +18,7 @@ class MovieFriendActivity {
     required this.watched,
     required this.favorited,
     this.rating,
+    this.reviewRecommended,
   });
 
   factory MovieFriendActivity.fromJson(Map<String, dynamic> json) {
@@ -30,6 +32,8 @@ class MovieFriendActivity {
       watched: json['watched'] as bool? ?? false,
       favorited: json['favorited'] as bool? ?? false,
       rating: json['rating'] as int?,
+      reviewRecommended:
+          (json['review'] as Map<String, dynamic>?)?['recommended'] as bool?,
     );
   }
 }
