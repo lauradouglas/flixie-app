@@ -7,7 +7,8 @@ import '../models/activity_list_item.dart';
 import '../models/conversation.dart';
 import '../models/group.dart';
 import '../models/group_member.dart';
-import '../models/group_watch_request.dart';
+import '../models/group_watch_request.dart'
+    hide WatchRequestFilter, WatchRequestStatus, WatchResponseDecision;
 import '../providers/auth_provider.dart';
 import '../screens/profile/activity_tile.dart';
 import '../models/notification.dart';
@@ -89,7 +90,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
         setState(() {
           _group = coreResults[0] as Group;
           final members = coreResults[1] as List<GroupMember>;
-          _memberCount = members.length;
+          _memberCount = members.where((m) => m.isAccepted).length;
           _groupMembers = members;
           _watchRequests = secondaryResults[0] as List<GroupWatchRequest>;
           _memberActivity = secondaryResults[1] as List<ActivityListItem>;
@@ -196,75 +197,80 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
             onPressed: () => _showGroupOptions(context),
           ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: FlixieColors.primary,
-          unselectedLabelColor: FlixieColors.medium,
-          indicatorColor: FlixieColors.primary,
-          tabs: [
-            const Tab(text: 'Chat'),
-            const Tab(text: 'Activity'),
-            Tab(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('Requests'),
-                  if (_pendingRequestCount > 0) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: FlixieColors.warning,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '$_pendingRequestCount',
-                        style: const TextStyle(
-                          color: Colors.black,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+        bottom: _loadingGroup
+            ? null
+            : TabBar(
+                controller: _tabController,
+                labelColor: FlixieColors.primary,
+                unselectedLabelColor: FlixieColors.medium,
+                indicatorColor: FlixieColors.primary,
+                tabs: [
+                  const Tab(text: 'Chat'),
+                  const Tab(text: 'Activity'),
+                  Tab(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('Requests'),
+                        if (_pendingRequestCount > 0) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: FlixieColors.warning,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '$_pendingRequestCount',
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                  ],
+                  ),
                 ],
               ),
+      ),
+      body: _loadingGroup
+          ? const Center(
+              child: CircularProgressIndicator(color: FlixieColors.primary))
+          : TabBarView(
+              controller: _tabController,
+              children: [
+                _ChatTab(groupId: widget.groupId),
+                _ActivityTab(
+                  group: _group,
+                  memberCount: _memberCount,
+                  groupId: widget.groupId,
+                  conversationId: _conversationId,
+                  initialRequests: _watchRequests,
+                  initialActivity: _memberActivity,
+                  onRefresh: _loadGroup,
+                ),
+                _RequestsTab(
+                  groupId: widget.groupId,
+                  conversationId: _conversationId,
+                  initialRequests: _watchRequests,
+                  currentUserId: context.read<AuthProvider>().dbUser?.id ?? '',
+                  isAdmin: () {
+                    final uid = context.read<AuthProvider>().dbUser?.id;
+                    if (uid == null) return false;
+                    if (_group?.ownerId == uid) return true;
+                    return _groupMembers.any(
+                        (m) => m.memberId == uid && (m.isAdmin || m.isOwner));
+                  }(),
+                  onCountChanged: (count) {
+                    if (mounted) setState(() => _pendingCountOverride = count);
+                  },
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _ChatTab(groupId: widget.groupId),
-          _ActivityTab(
-            group: _group,
-            memberCount: _memberCount,
-            groupId: widget.groupId,
-            conversationId: _conversationId,
-            initialRequests: _watchRequests,
-            initialActivity: _memberActivity,
-            onRefresh: _loadGroup,
-          ),
-          _RequestsTab(
-            groupId: widget.groupId,
-            conversationId: _conversationId,
-            initialRequests: _watchRequests,
-            currentUserId: context.read<AuthProvider>().dbUser?.id ?? '',
-            isAdmin: () {
-              final uid = context.read<AuthProvider>().dbUser?.id;
-              if (uid == null) return false;
-              if (_group?.ownerId == uid) return true;
-              return _groupMembers
-                  .any((m) => m.memberId == uid && (m.isAdmin || m.isOwner));
-            }(),
-            onCountChanged: (count) {
-              if (mounted) setState(() => _pendingCountOverride = count);
-            },
-          ),
-        ],
-      ),
     );
   }
 
@@ -461,20 +467,32 @@ class _ChatTabState extends State<_ChatTab> {
       );
 
       if (mounted) {
-        // Fetch member usernames from Firestore members subcollection
-        final usernames =
-            await ChatService.fetchMemberUsernames(conversation.id)
-                .catchError((_) => <String, String>{});
+        // Fetch member usernames and watch requests in parallel so that
+        // request cards render with correct state on first paint (no flicker).
+        final conversationId = conversation.id;
+        final parallelResults = await Future.wait([
+          ChatService.fetchMemberUsernames(conversationId)
+              .catchError((_) => <String, String>{}),
+          GroupService.getConversationWatchRequests(
+            conversationId,
+            filter: WatchRequestFilter.all,
+            userId: userId,
+          ).catchError((_) => <GroupWatchRequest>[]),
+        ]);
         if (mounted) {
+          final usernames = parallelResults[0] as Map<String, String>;
+          final requests = parallelResults[1] as List<GroupWatchRequest>;
           setState(() {
-            _conversationId = conversation.id;
+            _conversationId = conversationId;
             _memberUsernames = usernames;
+            for (final r in requests) {
+              _requestCache[r.id] = r;
+            }
+            _requestsLoaded = true;
             _initLoading = false;
           });
-          // Preload all watch requests from the API so cards render immediately.
-          _ensureRequests();
         }
-        ChatService.markRead(conversation.id, userId).catchError((_) {});
+        ChatService.markRead(conversationId, userId).catchError((_) {});
       }
     } catch (e) {
       logger.e('Chat init error: $e');
@@ -517,7 +535,7 @@ class _ChatTabState extends State<_ChatTab> {
   /// Also builds a legacy messageId→pgUUID map from the Firestore watchRequests
   /// subcollection for messages that don't carry pgGroupRequestId directly.
   Future<void> _ensureRequests() async {
-    if (_fetchingRequests) return;
+    if (_requestsLoaded || _fetchingRequests) return;
     final conversationId = _conversationId;
     if (conversationId == null) return;
     final userId = _authProvider?.dbUser?.id;

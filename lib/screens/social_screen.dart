@@ -498,7 +498,7 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
       for (var i = 0; i < groupsWithId.length; i++) {
         final group = groupsWithId[i];
         final members = memberResults[i];
-        memberCounts[group.id!] = members.length;
+        memberCounts[group.id!] = members.where((m) => m.isAccepted).length;
         final myMembership = members.firstWhere(
           (m) => m.memberId == userId,
           orElse: () => GroupMember(
