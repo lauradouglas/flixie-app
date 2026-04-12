@@ -4,15 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../models/notification.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/app_logger.dart';
-
-/// Parses the `iconColor` map from a user object into a [Color].
-Color _avatarColorFromIconColor(Map<String, dynamic>? iconColor,
-    {Color fallback = FlixieColors.primary}) {
-  if (iconColor == null) return fallback;
-  final hex = ((iconColor['hexCode'] ?? iconColor['hex']) as String? ?? '')
-      .replaceAll('#', '');
-  return Color(int.tryParse('0xFF$hex') ?? fallback.value);
-}
+import '../../utils/color_utils.dart';
 
 class NotificationRequestCard extends StatelessWidget {
   const NotificationRequestCard({
@@ -306,7 +298,7 @@ class NotificationRequestCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = notification.senderName;
     final initials = notification.senderInitials ?? '';
-    final avatarBg = _avatarColorFromIconColor(notification.senderIconColor);
+    final avatarBg = avatarColorFromIconColor(notification.senderIconColor);
     final accent = _accentColor;
     final msg = notification.watchRequestMessage;
     final hasMessage = msg.isNotEmpty && notification.action == null;

@@ -2,15 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/notification.dart';
 import '../../theme/app_theme.dart';
-
-/// Parses the `iconColor` map from a user object into a [Color].
-Color _avatarColorFromIconColor(Map<String, dynamic>? iconColor,
-    {Color fallback = FlixieColors.primary}) {
-  if (iconColor == null) return fallback;
-  final hex = ((iconColor['hexCode'] ?? iconColor['hex']) as String? ?? '')
-      .replaceAll('#', '');
-  return Color(int.tryParse('0xFF$hex') ?? fallback.value);
-}
+import '../../utils/color_utils.dart';
 
 class NotificationActivityCard extends StatelessWidget {
   const NotificationActivityCard({
@@ -52,7 +44,7 @@ class NotificationActivityCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = notification.senderName;
     final initials = notification.senderInitials ?? '';
-    final avatarBg = _avatarColorFromIconColor(
+    final avatarBg = avatarColorFromIconColor(
       notification.senderIconColor,
       fallback: _accentColor,
     );

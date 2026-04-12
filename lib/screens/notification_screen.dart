@@ -31,15 +31,6 @@ const List<String> _kMonths = [
   'Dec',
 ];
 
-/// Parses the `iconColor` map from a user object into a [Color].
-Color _avatarColorFromIconColor(Map<String, dynamic>? iconColor,
-    {Color fallback = FlixieColors.primary}) {
-  if (iconColor == null) return fallback;
-  final hex = ((iconColor['hexCode'] ?? iconColor['hex']) as String? ?? '')
-      .replaceAll('#', '');
-  return Color(int.tryParse('0xFF$hex') ?? fallback.value);
-}
-
 /// Notification filter tabs.
 enum _NotificationFilter {
   all,

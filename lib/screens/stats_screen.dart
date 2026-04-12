@@ -4,6 +4,11 @@ import 'package:provider/provider.dart';
 import '../models/watchlist_movie.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
+import 'stats/genre_bar.dart';
+import 'stats/monthly_bar_chart.dart';
+import 'stats/stat_card.dart';
+import 'stats/stats_entry.dart';
+import 'stats/year_breakdown.dart';
 
 const List<String> _kMonthNames = [
   'Jan',
@@ -32,7 +37,7 @@ class _StatsScreenState extends State<StatsScreen> {
   int? _selectedYear;
 
   // Parsed entries from user.watchedMovies
-  late final List<_Entry> _allEntries;
+  late final List<StatsEntry> _allEntries;
 
   @override
   void initState() {
@@ -50,7 +55,7 @@ class _StatsScreenState extends State<StatsScreen> {
         } catch (_) {}
       }
       final dateStr = m['watchedAt'] as String? ?? m['createdAt'] as String?;
-      return _Entry(
+      return StatsEntry(
         movie: movie,
         watchedAt: dateStr != null ? DateTime.tryParse(dateStr) : null,
       );
@@ -65,7 +70,7 @@ class _StatsScreenState extends State<StatsScreen> {
     return years.toList()..sort((a, b) => b.compareTo(a));
   }
 
-  List<_Entry> get _entries {
+  List<StatsEntry> get _entries {
     if (_selectedYear == null) return _allEntries;
     return _allEntries
         .where((e) => e.watchedAt?.year == _selectedYear)
