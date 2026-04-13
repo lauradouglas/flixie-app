@@ -290,7 +290,7 @@ class ActivityTile extends StatelessWidget {
                         children: [
                           GestureDetector(
                             onTap: () =>
-                                context.push('/profile/${item.userId}'),
+                                context.push('/friends/${item.userId}'),
                             child: Text(
                               item.username,
                               style: const TextStyle(
