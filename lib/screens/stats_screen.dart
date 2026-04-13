@@ -4,11 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/watchlist_movie.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
-import 'stats/genre_bar.dart';
-import 'stats/monthly_bar_chart.dart';
-import 'stats/stat_card.dart';
 import 'stats/stats_entry.dart';
-import 'stats/year_breakdown.dart';
 
 const List<String> _kMonthNames = [
   'Jan',
@@ -275,14 +271,6 @@ class _StatsScreenState extends State<StatsScreen> {
   }
 }
 
-// ── Data model ───────────────────────────────────────────────────────────────
-
-class _Entry {
-  const _Entry({this.movie, this.watchedAt});
-  final WatchlistMovieDetails? movie;
-  final DateTime? watchedAt;
-}
-
 // ── Widgets ──────────────────────────────────────────────────────────────────
 
 class _SectionHeader extends StatelessWidget {
@@ -513,7 +501,7 @@ class _GenreBar extends StatelessWidget {
 
 class _YearBreakdown extends StatelessWidget {
   const _YearBreakdown({required this.entries, required this.years});
-  final List<_Entry> entries;
+  final List<StatsEntry> entries;
   final List<int> years;
 
   @override
