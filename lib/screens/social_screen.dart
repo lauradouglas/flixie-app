@@ -15,6 +15,13 @@ import '../services/group_service.dart';
 import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_logger.dart';
+import 'social/group_avatar.dart';
+import 'social/group_card.dart';
+import 'social/invitation_card.dart';
+import 'social/pending_friend_card.dart';
+import 'social/section_header.dart';
+import 'social/segmented_toggle.dart';
+import 'social/visibility_chip.dart';
 
 class SocialScreen extends StatefulWidget {
   const SocialScreen({super.key});
@@ -29,7 +36,7 @@ class _SocialScreenState extends State<SocialScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: FlixieColors.background,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: FlixieColors.background,
         elevation: 0,
@@ -43,7 +50,7 @@ class _SocialScreenState extends State<SocialScreen> {
       ),
       body: Column(
         children: [
-          _SegmentedToggle(
+          SocialSegmentedToggle(
             selectedIndex: _selectedTab,
             labels: const ['Friends', 'Groups'],
             onChanged: (i) => setState(() => _selectedTab = i),
@@ -54,64 +61,6 @@ class _SocialScreenState extends State<SocialScreen> {
                 : const _GroupsSubView(),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Segmented toggle
-// ---------------------------------------------------------------------------
-
-class _SegmentedToggle extends StatelessWidget {
-  const _SegmentedToggle({
-    required this.selectedIndex,
-    required this.labels,
-    required this.onChanged,
-  });
-
-  final int selectedIndex;
-  final List<String> labels;
-  final ValueChanged<int> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      child: Container(
-        height: 44,
-        decoration: BoxDecoration(
-          color: FlixieColors.tabBarBackgroundFocused,
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: FlixieColors.tabBarBorder),
-        ),
-        child: Row(
-          children: List.generate(labels.length, (i) {
-            final selected = i == selectedIndex;
-            return Expanded(
-              child: GestureDetector(
-                onTap: () => onChanged(i),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  margin: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    color: selected ? FlixieColors.primary : Colors.transparent,
-                    borderRadius: BorderRadius.circular(27),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    labels[i],
-                    style: TextStyle(
-                      color: selected ? Colors.black : FlixieColors.medium,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }),
-        ),
       ),
     );
   }
@@ -261,13 +210,13 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
           children: [
             // Pending requests section
             if (data != null && data.pendingFriends.isNotEmpty) ...[
-              _SectionHeader(
+              SocialSectionHeader(
                 title: 'PENDING REQUESTS',
                 badge: data.pendingFriends.length,
               ),
               const SizedBox(height: 8),
               ...data.pendingFriends.map(
-                (f) => _PendingFriendCard(
+                (f) => PendingFriendCard(
                   friendship: f,
                   onAccept: () => _acceptRequest(f),
                   onDecline: () => _declineRequest(f),
@@ -291,7 +240,7 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
             ],
 
             // Activity section
-            const _SectionHeader(title: 'FRIENDS ACTIVITY'),
+            const SocialSectionHeader(title: 'FRIENDS ACTIVITY'),
             const SizedBox(height: 8),
             if (_activity.isEmpty)
               Padding(
@@ -311,104 +260,6 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
                 itemBuilder: (_, i) => ActivityTile(item: _activity[i]),
               ),
             const SizedBox(height: 24),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PendingFriendCard extends StatelessWidget {
-  const _PendingFriendCard({
-    required this.friendship,
-    required this.onAccept,
-    required this.onDecline,
-    this.onTap,
-  });
-
-  final Friendship friendship;
-  final VoidCallback onAccept;
-  final VoidCallback onDecline;
-  final VoidCallback? onTap;
-
-  Color _avatarColor() {
-    final hex = friendship.friendUser?.iconColor?['hexCode'] as String?;
-    if (hex != null) {
-      try {
-        return Color(int.parse(hex.replaceFirst('#', 'FF'), radix: 16));
-      } catch (_) {}
-    }
-    return FlixieColors.primary;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final user = friendship.friendUser;
-    final color = _avatarColor();
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: FlixieColors.tabBarBackgroundFocused,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: FlixieColors.tabBarBorder),
-        ),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 22,
-              backgroundColor: color.withValues(alpha: 0.3),
-              child: Text(
-                user?.initials ??
-                    (user?.username.isNotEmpty == true
-                        ? user!.username[0].toUpperCase()
-                        : '?'),
-                style: TextStyle(color: color, fontWeight: FontWeight.bold),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                user?.username ?? 'Unknown',
-                style: const TextStyle(
-                    color: FlixieColors.light, fontWeight: FontWeight.w500),
-              ),
-            ),
-            SizedBox(
-              height: 34,
-              child: OutlinedButton(
-                onPressed: onDecline,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: FlixieColors.danger,
-                  side: const BorderSide(color: FlixieColors.danger),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text('Decline'),
-              ),
-            ),
-            const SizedBox(width: 4),
-            SizedBox(
-              height: 34,
-              child: ElevatedButton(
-                onPressed: onAccept,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: FlixieColors.primary,
-                  foregroundColor: Colors.black,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  textStyle: const TextStyle(fontSize: 13),
-                ),
-                child: const Text('Accept'),
-              ),
-            ),
           ],
         ),
       ),
@@ -644,12 +495,12 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (pendingGroups.isNotEmpty) ...[
-            _SectionHeader(
+            SocialSectionHeader(
               title: 'PENDING INVITATIONS',
               rightLabel: '${pendingGroups.length} REQUESTS',
             ),
             const SizedBox(height: 10),
-            ...pendingGroups.map((g) => _InvitationCard(
+            ...pendingGroups.map((g) => GroupInvitationCard(
                   group: g,
                   invitedByUsername: _inviteNotifications[g.id]?.senderName,
                   onAccept: () => _respondToInvite(g, 'ACCEPTED'),
@@ -660,7 +511,7 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
           Row(
             children: [
               const Expanded(
-                child: _SectionHeader(title: 'MY COMMUNITIES'),
+                child: SocialSectionHeader(title: 'MY COMMUNITIES'),
               ),
               TextButton(
                 onPressed: _showCreateGroupSheet,
@@ -692,7 +543,7 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
               ),
             )
           else
-            ...myGroups.map((g) => _GroupCard(
+            ...myGroups.map((g) => GroupCard(
                   group: g,
                   memberCount: _memberCounts[g.id],
                 )),
@@ -729,213 +580,13 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
         children: pendingGroups
-            .map((g) => _InvitationCard(
+            .map((g) => GroupInvitationCard(
                   group: g,
                   invitedByUsername: _inviteNotifications[g.id]?.senderName,
                   onAccept: () => _respondToInvite(g, 'ACCEPTED'),
                   onDecline: () => _respondToInvite(g, 'DECLINED'),
                 ))
             .toList(),
-      ),
-    );
-  }
-}
-
-class _InvitationCard extends StatelessWidget {
-  const _InvitationCard({
-    required this.group,
-    required this.onAccept,
-    required this.onDecline,
-    this.invitedByUsername,
-  });
-
-  final Group group;
-  final VoidCallback onAccept;
-  final VoidCallback onDecline;
-  final String? invitedByUsername;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: FlixieColors.tabBarBackgroundFocused,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: FlixieColors.tabBarBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              _GroupAvatar(group: group, radius: 26),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      group.name,
-                      style: const TextStyle(
-                        color: FlixieColors.light,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text.rich(
-                      TextSpan(
-                        text: 'Invited by ',
-                        style: const TextStyle(
-                            color: FlixieColors.medium, fontSize: 12),
-                        children: [
-                          TextSpan(
-                            text: invitedByUsername != null
-                                ? '@$invitedByUsername'
-                                : 'group owner',
-                            style: const TextStyle(
-                              color: FlixieColors.primary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: onAccept,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: FlixieColors.success,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                    elevation: 0,
-                  ),
-                  child: const Text('Accept',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: onDecline,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: FlixieColors.danger,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    side: BorderSide(
-                        color: FlixieColors.danger.withValues(alpha: 0.45)),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                  ),
-                  child: const Text('Decline',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _GroupCard extends StatelessWidget {
-  const _GroupCard({required this.group, this.memberCount});
-
-  final Group group;
-  final int? memberCount;
-
-  static String _formatCount(int count) {
-    if (count >= 1000000) return '${(count / 1000000).toStringAsFixed(1)}M';
-    if (count >= 1000) {
-      return '${(count / 1000).toStringAsFixed(count >= 10000 ? 0 : 1)}K';
-    }
-    return '$count';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final count = memberCount ?? group.memberCount;
-    return GestureDetector(
-      onTap: () => context.push('/groups/${group.id}'),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: FlixieColors.tabBarBackgroundFocused,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: FlixieColors.tabBarBorder),
-        ),
-        child: Row(
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                _GroupAvatar(group: group, radius: 26),
-                Positioned(
-                  bottom: 1,
-                  right: 1,
-                  child: Container(
-                    width: 11,
-                    height: 11,
-                    decoration: BoxDecoration(
-                      color: FlixieColors.success,
-                      shape: BoxShape.circle,
-                      border:
-                          Border.all(color: FlixieColors.background, width: 2),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    group.name,
-                    style: const TextStyle(
-                      color: FlixieColors.light,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                    ),
-                  ),
-                  if (count != null)
-                    Text(
-                      '${_formatCount(count)} MEMBER${count == 1 ? '' : 'S'}',
-                      style: const TextStyle(
-                        color: FlixieColors.primary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  if (group.description != null &&
-                      group.description!.isNotEmpty)
-                    Text(
-                      group.description!,
-                      style: const TextStyle(
-                          color: FlixieColors.medium, fontSize: 12),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right, color: FlixieColors.medium),
-          ],
-        ),
       ),
     );
   }
@@ -1019,59 +670,6 @@ class _GroupsTabBar extends StatelessWidget {
               ),
             ],
           ],
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Group avatar helper
-// ---------------------------------------------------------------------------
-
-class _GroupAvatar extends StatelessWidget {
-  const _GroupAvatar({required this.group, this.radius = 24});
-
-  final Group group;
-  final double radius;
-
-  static const List<Color> _palette = [
-    FlixieColors.primary,
-    FlixieColors.secondary,
-    FlixieColors.tertiary,
-    FlixieColors.success,
-    FlixieColors.warning,
-  ];
-
-  Color get _color {
-    final hash = group.name.codeUnits.fold(0, (a, b) => a + b);
-    return _palette[hash % _palette.length];
-  }
-
-  String get _abbr {
-    if (group.abbreviation != null && group.abbreviation!.isNotEmpty) {
-      return group.abbreviation!.toUpperCase();
-    }
-    final words = group.name.trim().split(RegExp(r'\s+'));
-    if (words.length >= 2) {
-      return '${words[0][0]}${words[1][0]}'.toUpperCase();
-    }
-    return group.name.isEmpty
-        ? '?'
-        : group.name.substring(0, group.name.length.clamp(1, 2)).toUpperCase();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return CircleAvatar(
-      radius: radius,
-      backgroundColor: _color.withValues(alpha: 0.3),
-      child: Text(
-        _abbr,
-        style: TextStyle(
-          color: _color,
-          fontWeight: FontWeight.bold,
-          fontSize: radius * 0.7,
         ),
       ),
     );
@@ -1252,13 +850,13 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
             const SizedBox(height: 8),
             Row(
               children: [
-                _VisibilityChip(
+                VisibilityChip(
                   label: 'Public',
                   selected: _isPublic,
                   onTap: () => setState(() => _isPublic = true),
                 ),
                 const SizedBox(width: 10),
-                _VisibilityChip(
+                VisibilityChip(
                   label: 'Private',
                   selected: !_isPublic,
                   onTap: () => setState(() => _isPublic = false),
@@ -1480,111 +1078,6 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
           borderSide: const BorderSide(color: FlixieColors.primary),
         ),
       ),
-    );
-  }
-}
-
-class _VisibilityChip extends StatelessWidget {
-  const _VisibilityChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        decoration: BoxDecoration(
-          color:
-              selected ? FlixieColors.primary : FlixieColors.tabBarBackground,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? FlixieColors.primary : FlixieColors.tabBarBorder,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? Colors.black : FlixieColors.medium,
-            fontWeight: FontWeight.w600,
-            fontSize: 13,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Shared section header
-// ---------------------------------------------------------------------------
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, this.badge, this.rightLabel});
-
-  final String title;
-  final int? badge;
-  final String? rightLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Row(
-      children: [
-        Container(
-          width: 4,
-          height: 22,
-          decoration: BoxDecoration(
-            color: FlixieColors.primary,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Text(
-          title,
-          style: textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-            letterSpacing: 1.5,
-          ),
-        ),
-        if (badge != null) ...[
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-            decoration: BoxDecoration(
-              color: FlixieColors.primary.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              '$badge',
-              style: const TextStyle(
-                  color: FlixieColors.primary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-        if (rightLabel != null) ...[
-          const Spacer(),
-          Text(
-            rightLabel!,
-            style: textTheme.bodySmall?.copyWith(
-              color: FlixieColors.medium,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ],
-      ],
     );
   }
 }

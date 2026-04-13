@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/watchlist_movie.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
+import 'stats/stats_entry.dart';
 
 const List<String> _kMonthNames = [
   'Jan',
@@ -32,7 +33,7 @@ class _StatsScreenState extends State<StatsScreen> {
   int? _selectedYear;
 
   // Parsed entries from user.watchedMovies
-  late final List<_Entry> _allEntries;
+  late final List<StatsEntry> _allEntries;
 
   @override
   void initState() {
@@ -50,7 +51,7 @@ class _StatsScreenState extends State<StatsScreen> {
         } catch (_) {}
       }
       final dateStr = m['watchedAt'] as String? ?? m['createdAt'] as String?;
-      return _Entry(
+      return StatsEntry(
         movie: movie,
         watchedAt: dateStr != null ? DateTime.tryParse(dateStr) : null,
       );
@@ -65,7 +66,7 @@ class _StatsScreenState extends State<StatsScreen> {
     return years.toList()..sort((a, b) => b.compareTo(a));
   }
 
-  List<_Entry> get _entries {
+  List<StatsEntry> get _entries {
     if (_selectedYear == null) return _allEntries;
     return _allEntries
         .where((e) => e.watchedAt?.year == _selectedYear)
@@ -150,7 +151,7 @@ class _StatsScreenState extends State<StatsScreen> {
     final mostActive = _mostActiveMonthIndex;
 
     return Scaffold(
-      backgroundColor: FlixieColors.background,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: FlixieColors.background,
         elevation: 0,
@@ -268,14 +269,6 @@ class _StatsScreenState extends State<StatsScreen> {
             ),
     );
   }
-}
-
-// ── Data model ───────────────────────────────────────────────────────────────
-
-class _Entry {
-  const _Entry({this.movie, this.watchedAt});
-  final WatchlistMovieDetails? movie;
-  final DateTime? watchedAt;
 }
 
 // ── Widgets ──────────────────────────────────────────────────────────────────
@@ -508,7 +501,7 @@ class _GenreBar extends StatelessWidget {
 
 class _YearBreakdown extends StatelessWidget {
   const _YearBreakdown({required this.entries, required this.years});
-  final List<_Entry> entries;
+  final List<StatsEntry> entries;
   final List<int> years;
 
   @override
