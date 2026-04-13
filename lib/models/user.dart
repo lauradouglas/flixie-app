@@ -2,7 +2,7 @@ import '../utils/app_logger.dart';
 
 class User {
   final String id;
-  final String externalId;
+  final String? externalId;
   final String? firstName;
   final String? lastName;
   final String username;
@@ -16,12 +16,12 @@ class User {
   final String? createdAt;
   final String? updatedAt;
   final String? initials;
-  
+
   // Nested objects
   final Map<String, dynamic>? country;
   final Map<String, dynamic>? language;
   final Map<String, dynamic>? iconColor;
-  
+
   // Lists
   final List<dynamic>? watchedMovies;
   final List<dynamic>? watchedShows;
@@ -34,7 +34,7 @@ class User {
 
   const User({
     required this.id,
-    required this.externalId,
+    this.externalId,
     this.firstName,
     this.lastName,
     required this.username,
@@ -64,7 +64,7 @@ class User {
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
       id: json['id'] as String,
-      externalId: json['externalId'] as String,
+      externalId: json['externalId'] as String?,
       firstName: json['firstName'] as String?,
       lastName: json['lastName'] as String?,
       username: json['username'] as String,
