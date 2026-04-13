@@ -4,7 +4,8 @@ import '../../theme/app_theme.dart';
 
 class HomeSectionHeader extends StatelessWidget {
   final String title;
-  const HomeSectionHeader({super.key, required this.title});
+  final VoidCallback? onSeeAll;
+  const HomeSectionHeader({super.key, required this.title, this.onSeeAll});
 
   @override
   Widget build(BuildContext context) {
@@ -30,6 +31,19 @@ class HomeSectionHeader extends StatelessWidget {
               letterSpacing: 1.5,
             ),
           ),
+          if (onSeeAll != null) ...[
+            const Spacer(),
+            GestureDetector(
+              onTap: onSeeAll,
+              child: Text(
+                'See all →',
+                style: textTheme.bodySmall?.copyWith(
+                  color: FlixieColors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

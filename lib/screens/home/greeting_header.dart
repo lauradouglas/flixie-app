@@ -25,20 +25,40 @@ class GreetingHeader extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: FlixieColors.secondary.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(12),
-          border:
-              Border.all(color: FlixieColors.secondary.withValues(alpha: 0.3)),
+          gradient: LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [
+              FlixieColors.primary.withValues(alpha: 0.25),
+              FlixieColors.secondary.withValues(alpha: 0.12),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+              color: FlixieColors.primary.withValues(alpha: 0.35), width: 1),
         ),
         child: Row(
           children: [
+            Container(
+              width: 3,
+              height: 28,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [FlixieColors.primary, FlixieColors.secondary],
+                ),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
                 label,
                 style: const TextStyle(
-                  color: FlixieColors.light,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),

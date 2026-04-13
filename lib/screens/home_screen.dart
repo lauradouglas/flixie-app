@@ -8,7 +8,6 @@ import '../models/movie_short.dart';
 import '../models/top_rated_movie.dart';
 import '../models/activity_list_item.dart';
 import '../services/friend_service.dart';
-import 'profile/activity_tile.dart';
 import '../providers/auth_provider.dart';
 import '../services/movie_service.dart';
 import '../services/trending_service.dart';
@@ -169,6 +168,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 )
               : RefreshIndicator(
                   color: FlixieColors.primary,
+                  backgroundColor: FlixieColors.background,
                   onRefresh: _loadAll,
                   child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
@@ -183,10 +183,13 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                             onDismiss: () =>
                                 setState(() => _showGreeting = false),
                           ),
-                        const HomeSectionHeader(title: 'Featured'),
+                        HomeSectionHeader(
+                          title: 'Featured',
+                          onSeeAll: () => context.push('/search'),
+                        ),
                         const SizedBox(height: 12),
                         SizedBox(
-                          height: 220,
+                          height: 260,
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -257,31 +260,6 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                         if (_friendsActivity.isNotEmpty)
                           TrendingAmongFriendsSection(
                               activity: _friendsActivity),
-
-                        // Friends Activity section
-                        const HomeSectionHeader(title: 'Friends Activity'),
-                        const SizedBox(height: 12),
-                        if (_friendsActivity.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
-                            child: Text('No recent activity from friends.',
-                                style: textTheme.bodySmall
-                                    ?.copyWith(color: FlixieColors.medium)),
-                          )
-                        else
-                          ListView.separated(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            itemCount: _friendsActivity.length > 10
-                                ? 10
-                                : _friendsActivity.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 10),
-                            itemBuilder: (_, i) =>
-                                ActivityTile(item: _friendsActivity[i]),
-                          ),
                       ],
                     ),
                   ),
@@ -289,4 +267,3 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     );
   }
 }
-

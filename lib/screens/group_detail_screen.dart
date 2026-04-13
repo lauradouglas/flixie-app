@@ -176,7 +176,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
         groupName.isNotEmpty ? _groupColor(groupName) : FlixieColors.primary;
 
     return Scaffold(
-      backgroundColor: FlixieColors.background,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: FlixieColors.background,
         elevation: 0,
@@ -394,4 +394,3 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
     );
   }
 }
-

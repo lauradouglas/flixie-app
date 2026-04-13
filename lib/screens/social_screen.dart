@@ -36,7 +36,7 @@ class _SocialScreenState extends State<SocialScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: FlixieColors.background,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: FlixieColors.background,
         elevation: 0,
@@ -1081,5 +1081,3 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
     );
   }
 }
-
-

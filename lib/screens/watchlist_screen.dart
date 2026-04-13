@@ -377,7 +377,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: FlixieColors.background,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: FlixieColors.background,
         elevation: 0,
@@ -734,4 +734,3 @@ class WatchlistMovieCard extends StatelessWidget {
     );
   }
 }
-

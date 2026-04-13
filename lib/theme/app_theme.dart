@@ -94,7 +94,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: FlixieColors.background,
+      scaffoldBackgroundColor: Colors.transparent,
 
       // App bar
       appBarTheme: const AppBarTheme(
@@ -144,10 +144,11 @@ class AppTheme {
 
       // Cards
       cardTheme: CardThemeData(
-        color: FlixieColors.tabBarBackgroundFocused,
-        elevation: 4,
+        color: const Color(0xFF1D3A68),
+        elevation: 2,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.07)),
         ),
       ),
 

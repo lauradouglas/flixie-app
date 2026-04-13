@@ -22,8 +22,15 @@ class HomeListCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return Card(
+    return Container(
       clipBehavior: Clip.hardEdge,
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardTheme.color,
+        borderRadius: BorderRadius.circular(12),
+        border: Border(
+          left: BorderSide(color: FlixieColors.primary, width: 3),
+        ),
+      ),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
@@ -31,8 +38,6 @@ class HomeListCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Left accent bar
-              Container(width: 3, color: FlixieColors.primary),
               // Text content
               Expanded(
                 child: Padding(

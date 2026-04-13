@@ -151,7 +151,7 @@ class _StatsScreenState extends State<StatsScreen> {
     final mostActive = _mostActiveMonthIndex;
 
     return Scaffold(
-      backgroundColor: FlixieColors.background,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: FlixieColors.background,
         elevation: 0,
