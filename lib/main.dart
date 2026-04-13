@@ -40,6 +40,8 @@ void main() async {
   try {
     // Initialize Firebase only if not already initialized
     if (Firebase.apps.isEmpty) {
+      print('Initializing Firebase');
+      //print('Env Settings: ${String.fromEnvironment('FIREBASE_WEB_API_KEY')}');
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );

@@ -15,7 +15,8 @@ class ApiException implements Exception {
 class ApiClient {
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://192.168.1.203:3000',
+    defaultValue:
+        'https://flixie-api-fmcehvaecwdheccm.northeurope-01.azurewebsites.net',
   );
 
   static const Duration _timeout = Duration(seconds: 15);
@@ -102,29 +103,35 @@ class ApiClient {
     apiLogger.d(
         'Headers: ${_headers().map((k, v) => MapEntry(k, k == "Authorization" ? "[REDACTED]" : v))}');
     if (logBody != null) apiLogger.d('Body: $logBody');
-    final response = await http.post(
-      _buildUri(path),
-      headers: _headers(),
-      body: body != null ? jsonEncode(body) : null,
-    ).timeout(_timeout);
+    final response = await http
+        .post(
+          _buildUri(path),
+          headers: _headers(),
+          body: body != null ? jsonEncode(body) : null,
+        )
+        .timeout(_timeout);
     return _parseResponse(response);
   }
 
   static Future<dynamic> put(String path, {dynamic body}) async {
-    final response = await http.put(
-      _buildUri(path),
-      headers: _headers(),
-      body: body != null ? jsonEncode(body) : null,
-    ).timeout(_timeout);
+    final response = await http
+        .put(
+          _buildUri(path),
+          headers: _headers(),
+          body: body != null ? jsonEncode(body) : null,
+        )
+        .timeout(_timeout);
     return _parseResponse(response);
   }
 
   static Future<dynamic> patch(String path, {dynamic body}) async {
-    final response = await http.patch(
-      _buildUri(path),
-      headers: _headers(),
-      body: body != null ? jsonEncode(body) : null,
-    ).timeout(_timeout);
+    final response = await http
+        .patch(
+          _buildUri(path),
+          headers: _headers(),
+          body: body != null ? jsonEncode(body) : null,
+        )
+        .timeout(_timeout);
     return _parseResponse(response);
   }
 
