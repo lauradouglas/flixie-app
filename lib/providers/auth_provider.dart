@@ -173,8 +173,8 @@ class AuthProvider extends ChangeNotifier {
       // we do not want to block the sign-out flow on a network call, and any
       // failure is tolerable because the token will be re-registered on next
       // login.
-      if (_dbUser?.id != null) {
-        unawaited(PushNotificationService.removeToken(_dbUser!.externalId));
+      if (_dbUser?.id != null && _dbUser!.externalId != null) {
+        unawaited(PushNotificationService.removeToken(_dbUser!.externalId!));
       }
       ApiClient.setToken(null);
       _dbUser = null;

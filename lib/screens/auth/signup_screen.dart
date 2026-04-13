@@ -32,6 +32,11 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
 
+  // Dropdown touched tracking
+  bool _languageTouched = false;
+  bool _countryTouched = false;
+  bool _submitAttempted = false;
+
   // Username availability
   bool _checkingUsername = false;
   bool? _usernameAvailable; // null = not checked yet
@@ -118,6 +123,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Future<void> _submit() async {
     // Re-validate form (also triggers username field validator).
+    setState(() => _submitAttempted = true);
     if (!_formKey.currentState!.validate()) return;
 
     // Capture messenger before any await so it's safe after navigation
@@ -187,323 +193,519 @@ class _SignupScreenState extends State<SignupScreen> {
     final textTheme = Theme.of(context).textTheme;
     final isLoading = context.select<AuthProvider, bool>((p) => p.isLoading);
 
+    final inputBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide.none,
+    );
+    final inputEnabledBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+    );
+    final inputFocusedBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: FlixieColors.primary, width: 1.5),
+    );
+    final inputFill = Colors.white.withOpacity(0.06);
+    const inputStyle = TextStyle(color: Colors.white);
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Create Account'),
-        leading: BackButton(onPressed: () => context.pop()),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-          child: Form(
-            key: _formKey,
+      body: Stack(
+        children: [
+          // Background gradient
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF0D1B2A),
+                  Color(0xFF172B4D),
+                  Color(0xFF1A1040),
+                ],
+              ),
+            ),
+          ),
+          // Subtle purple glow top-right
+          Positioned(
+            top: -80,
+            right: -60,
+            child: Container(
+              width: 280,
+              height: 280,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: FlixieColors.primary.withOpacity(0.10),
+              ),
+            ),
+          ),
+          SafeArea(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  'Join Flixie',
-                  style: textTheme.headlineMedium,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Create your account to get started',
-                  style: textTheme.bodySmall,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 32),
-
-                // First name
-                TextFormField(
-                  controller: _firstNameController,
-                  keyboardType: TextInputType.name,
-                  textCapitalization: TextCapitalization.words,
-                  textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
-                    labelText: 'First Name',
-                    prefixIcon: Icon(Icons.person_outline),
-                  ),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return 'Please enter your first name.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                // Last name
-                TextFormField(
-                  controller: _lastNameController,
-                  keyboardType: TextInputType.name,
-                  textCapitalization: TextCapitalization.words,
-                  textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
-                    labelText: 'Last Name',
-                    prefixIcon: Icon(Icons.person_outline),
-                  ),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return 'Please enter your last name.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                // Username
-                Focus(
-                  onFocusChange: (hasFocus) {
-                    if (!hasFocus) _checkUsernameAvailability();
-                  },
-                  child: TextFormField(
-                    controller: _usernameController,
-                    keyboardType: TextInputType.text,
-                    textInputAction: TextInputAction.next,
-                    decoration: InputDecoration(
-                      labelText: 'Username',
-                      prefixIcon: const Icon(Icons.alternate_email),
-                      suffixIcon: _buildUsernameSuffix(),
-                    ),
-                    onChanged: (_) {
-                      if (_usernameAvailable != null) {
-                        setState(() => _usernameAvailable = null);
-                      }
-                    },
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) {
-                        return 'Please enter a username.';
-                      }
-                      if (v.trim().length < 3) {
-                        return 'Username must be at least 3 characters.';
-                      }
-                      if (_usernameAvailable == false) {
-                        return 'This username is already taken.';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Email
-                TextFormField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: Icon(Icons.email_outlined),
-                  ),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return 'Please enter your email.';
-                    }
-                    if (!v.contains('@')) {
-                      return 'Please enter a valid email.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                // Language dropdown
-                if (_loadingRefData)
-                  const Center(child: CircularProgressIndicator())
-                else if (_refDataError)
-                  _buildRefDataErrorRow(onRetry: _loadReferenceData)
-                else
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                // AppBar-style header
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 4),
+                  child: Row(
                     children: [
-                      DropdownFlutter<Language>(
-                        items: _languages,
-                        initialItem: _selectedLanguage,
-                        hintText: 'Select Language',
-                        onChanged: (l) => setState(() => _selectedLanguage = l),
-                        headerBuilder: (ctx, item, _) => Text(item.name),
-                        listItemBuilder: (ctx, item, isSelected, _) =>
-                            Text(item.name),
-                        decoration: CustomDropdownDecoration(
-                          closedFillColor:
-                              Theme.of(context).inputDecorationTheme.fillColor,
-                          expandedFillColor:
-                              Theme.of(context).scaffoldBackgroundColor,
-                          closedBorder: Border.all(
-                            color: FlixieColors.primary.withValues(alpha: 0.4),
-                          ),
-                          expandedBorder: Border.all(
-                            color: FlixieColors.primary,
-                          ),
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back,
+                            color: FlixieColors.light),
+                        onPressed: () => context.pop(),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Create Account',
+                        style: textTheme.titleLarge?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      if (_selectedLanguage == null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 6, left: 12),
-                          child: Text(
-                            'Please select a language.',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
                     ],
                   ),
-                const SizedBox(height: 16),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Header
+                          Text(
+                            'Join Flixie',
+                            style: textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Create your account to get started',
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: FlixieColors.light.withOpacity(0.65),
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 24),
 
-                // Country dropdown
-                if (_loadingRefData)
-                  const Center(child: CircularProgressIndicator())
-                else if (_refDataError)
-                  const SizedBox.shrink()
-                else
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      DropdownFlutter<Country>.search(
-                        items: _countries,
-                        initialItem: _selectedCountry,
-                        hintText: 'Select Country',
-                        onChanged: (c) => setState(() => _selectedCountry = c),
-                        headerBuilder: (ctx, item, _) => Text(item.name),
-                        listItemBuilder: (ctx, item, isSelected, _) =>
-                            Text(item.name),
-                        decoration: CustomDropdownDecoration(
-                          closedFillColor:
-                              Theme.of(context).inputDecorationTheme.fillColor,
-                          expandedFillColor:
-                              Theme.of(context).scaffoldBackgroundColor,
-                          closedBorder: Border.all(
-                            color: FlixieColors.primary.withValues(alpha: 0.4),
-                          ),
-                          expandedBorder: Border.all(
-                            color: FlixieColors.primary,
-                          ),
-                          searchFieldDecoration: SearchFieldDecoration(
-                            fillColor: Theme.of(context)
-                                .inputDecorationTheme
-                                .fillColor,
-                          ),
-                        ),
-                      ),
-                      if (_selectedCountry == null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 6, left: 12),
-                          child: Text(
-                            'Please select a country.',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
-                              fontSize: 12,
+                          // Card
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.08),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // First & Last name row
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextFormField(
+                                        controller: _firstNameController,
+                                        keyboardType: TextInputType.name,
+                                        textCapitalization:
+                                            TextCapitalization.words,
+                                        textInputAction: TextInputAction.next,
+                                        style: inputStyle,
+                                        decoration: InputDecoration(
+                                          labelText: 'First Name',
+                                          filled: true,
+                                          fillColor: inputFill,
+                                          border: inputBorder,
+                                          enabledBorder: inputEnabledBorder,
+                                          focusedBorder: inputFocusedBorder,
+                                        ),
+                                        validator: (v) {
+                                          if (v == null || v.trim().isEmpty) {
+                                            return 'Required';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: TextFormField(
+                                        controller: _lastNameController,
+                                        keyboardType: TextInputType.name,
+                                        textCapitalization:
+                                            TextCapitalization.words,
+                                        textInputAction: TextInputAction.next,
+                                        style: inputStyle,
+                                        decoration: InputDecoration(
+                                          labelText: 'Last Name',
+                                          filled: true,
+                                          fillColor: inputFill,
+                                          border: inputBorder,
+                                          enabledBorder: inputEnabledBorder,
+                                          focusedBorder: inputFocusedBorder,
+                                        ),
+                                        validator: (v) {
+                                          if (v == null || v.trim().isEmpty) {
+                                            return 'Required';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 14),
+
+                                // Username
+                                Focus(
+                                  onFocusChange: (hasFocus) {
+                                    if (!hasFocus) _checkUsernameAvailability();
+                                  },
+                                  child: TextFormField(
+                                    controller: _usernameController,
+                                    textInputAction: TextInputAction.next,
+                                    style: inputStyle,
+                                    decoration: InputDecoration(
+                                      labelText: 'Username',
+                                      prefixIcon: const Icon(
+                                          Icons.alternate_email,
+                                          size: 20),
+                                      suffixIcon: _buildUsernameSuffix(),
+                                      filled: true,
+                                      fillColor: inputFill,
+                                      border: inputBorder,
+                                      enabledBorder: inputEnabledBorder,
+                                      focusedBorder: inputFocusedBorder,
+                                    ),
+                                    onChanged: (_) {
+                                      if (_usernameAvailable != null) {
+                                        setState(
+                                            () => _usernameAvailable = null);
+                                      }
+                                    },
+                                    validator: (v) {
+                                      if (v == null || v.trim().isEmpty) {
+                                        return 'Please enter a username.';
+                                      }
+                                      if (v.trim().length < 3) {
+                                        return 'Username must be at least 3 characters.';
+                                      }
+                                      if (_usernameAvailable == false) {
+                                        return 'This username is already taken.';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+
+                                // Email
+                                TextFormField(
+                                  controller: _emailController,
+                                  keyboardType: TextInputType.emailAddress,
+                                  textInputAction: TextInputAction.next,
+                                  style: inputStyle,
+                                  decoration: InputDecoration(
+                                    labelText: 'Email',
+                                    prefixIcon: const Icon(
+                                        Icons.email_outlined,
+                                        size: 20),
+                                    filled: true,
+                                    fillColor: inputFill,
+                                    border: inputBorder,
+                                    enabledBorder: inputEnabledBorder,
+                                    focusedBorder: inputFocusedBorder,
+                                  ),
+                                  validator: (v) {
+                                    if (v == null || v.trim().isEmpty) {
+                                      return 'Please enter your email.';
+                                    }
+                                    if (!v.contains('@')) {
+                                      return 'Please enter a valid email.';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 14),
+
+                                // Password
+                                TextFormField(
+                                  controller: _passwordController,
+                                  obscureText: _obscurePassword,
+                                  textInputAction: TextInputAction.next,
+                                  style: inputStyle,
+                                  decoration: InputDecoration(
+                                    labelText: 'Password',
+                                    prefixIcon: const Icon(Icons.lock_outlined,
+                                        size: 20),
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _obscurePassword
+                                            ? Icons.visibility_outlined
+                                            : Icons.visibility_off_outlined,
+                                        size: 20,
+                                      ),
+                                      onPressed: () => setState(() =>
+                                          _obscurePassword = !_obscurePassword),
+                                    ),
+                                    filled: true,
+                                    fillColor: inputFill,
+                                    border: inputBorder,
+                                    enabledBorder: inputEnabledBorder,
+                                    focusedBorder: inputFocusedBorder,
+                                  ),
+                                  validator: (v) {
+                                    if (v == null || v.isEmpty) {
+                                      return 'Please enter a password.';
+                                    }
+                                    if (v.length < 6) {
+                                      return 'Password must be at least 6 characters.';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 14),
+
+                                // Confirm password
+                                TextFormField(
+                                  controller: _confirmPasswordController,
+                                  obscureText: _obscureConfirm,
+                                  textInputAction: TextInputAction.next,
+                                  style: inputStyle,
+                                  decoration: InputDecoration(
+                                    labelText: 'Confirm Password',
+                                    prefixIcon: const Icon(Icons.lock_outlined,
+                                        size: 20),
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _obscureConfirm
+                                            ? Icons.visibility_outlined
+                                            : Icons.visibility_off_outlined,
+                                        size: 20,
+                                      ),
+                                      onPressed: () => setState(() =>
+                                          _obscureConfirm = !_obscureConfirm),
+                                    ),
+                                    filled: true,
+                                    fillColor: inputFill,
+                                    border: inputBorder,
+                                    enabledBorder: inputEnabledBorder,
+                                    focusedBorder: inputFocusedBorder,
+                                  ),
+                                  validator: (v) {
+                                    if (v == null || v.isEmpty) {
+                                      return 'Please confirm your password.';
+                                    }
+                                    if (v != _passwordController.text) {
+                                      return 'Passwords do not match.';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 20),
+
+                                // Language / Country / Genres
+                                if (_loadingRefData)
+                                  const Center(
+                                      child: CircularProgressIndicator())
+                                else if (_refDataError)
+                                  _buildRefDataErrorRow(
+                                      onRetry: _loadReferenceData)
+                                else
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      DropdownFlutter<Language>(
+                                        items: _languages,
+                                        initialItem: _selectedLanguage,
+                                        hintText: 'Select Language',
+                                        onChanged: (l) => setState(() {
+                                          _selectedLanguage = l;
+                                          _languageTouched = true;
+                                        }),
+                                        headerBuilder: (ctx, item, _) =>
+                                            Text(item.name),
+                                        listItemBuilder:
+                                            (ctx, item, isSelected, _) =>
+                                                Text(item.name),
+                                        decoration: CustomDropdownDecoration(
+                                          closedFillColor: Theme.of(context)
+                                              .inputDecorationTheme
+                                              .fillColor,
+                                          expandedFillColor: Theme.of(context)
+                                              .scaffoldBackgroundColor,
+                                          closedBorder: Border.all(
+                                            color: FlixieColors.primary
+                                                .withValues(alpha: 0.4),
+                                          ),
+                                          expandedBorder: Border.all(
+                                              color: FlixieColors.primary),
+                                        ),
+                                      ),
+                                      if (_selectedLanguage == null &&
+                                          (_languageTouched || _submitAttempted))
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                              top: 6, left: 12),
+                                          child: Text(
+                                            'Please select a language.',
+                                            style: TextStyle(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .error,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      const SizedBox(height: 14),
+                                      DropdownFlutter<Country>.search(
+                                        items: _countries,
+                                        initialItem: _selectedCountry,
+                                        hintText: 'Select Country',
+                                        onChanged: (c) => setState(() {
+                                          _selectedCountry = c;
+                                          _countryTouched = true;
+                                        }),
+                                        headerBuilder: (ctx, item, _) =>
+                                            Text(item.name),
+                                        listItemBuilder:
+                                            (ctx, item, isSelected, _) =>
+                                                Text(item.name),
+                                        decoration: CustomDropdownDecoration(
+                                          closedFillColor: Theme.of(context)
+                                              .inputDecorationTheme
+                                              .fillColor,
+                                          expandedFillColor: Theme.of(context)
+                                              .scaffoldBackgroundColor,
+                                          closedBorder: Border.all(
+                                            color: FlixieColors.primary
+                                                .withValues(alpha: 0.4),
+                                          ),
+                                          expandedBorder: Border.all(
+                                              color: FlixieColors.primary),
+                                          searchFieldDecoration:
+                                              SearchFieldDecoration(
+                                            fillColor: Theme.of(context)
+                                                .inputDecorationTheme
+                                                .fillColor,
+                                          ),
+                                        ),
+                                      ),
+                                      if (_selectedCountry == null &&
+                                          (_countryTouched || _submitAttempted))
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                              top: 6, left: 12),
+                                          child: Text(
+                                            'Please select a country.',
+                                            style: TextStyle(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .error,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      if (_genres.isNotEmpty) ...[
+                                        const SizedBox(height: 14),
+                                        ..._buildGenrePicker(textTheme),
+                                      ],
+                                    ],
+                                  ),
+
+                                const SizedBox(height: 20),
+
+                                // Create account button
+                                DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [
+                                        FlixieColors.primary,
+                                        Color(0xFF6B5BD6),
+                                      ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: FlixieColors.primary
+                                            .withOpacity(0.35),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: ElevatedButton(
+                                    onPressed: isLoading ? null : _submit,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.transparent,
+                                      shadowColor: Colors.transparent,
+                                      minimumSize:
+                                          const Size.fromHeight(50),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: isLoading
+                                        ? const SizedBox(
+                                            height: 20,
+                                            width: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : const Text(
+                                            'Create Account',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ),
-                    ],
-                  ),
-                const SizedBox(height: 16),
 
-                // Favourite genres (optional)
-                if (!_loadingRefData && !_refDataError && _genres.isNotEmpty)
-                  ..._buildGenrePicker(textTheme),
+                          const SizedBox(height: 20),
 
-                const SizedBox(height: 16),
-
-                // Password
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  textInputAction: TextInputAction.next,
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    prefixIcon: const Icon(Icons.lock_outlined),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
+                          // Sign in link
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'Already have an account?',
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: FlixieColors.light.withOpacity(0.6),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () => context.pop(),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: FlixieColors.primary,
+                                ),
+                                child: const Text(
+                                  'Sign In',
+                                  style: TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      onPressed: () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) {
-                      return 'Please enter a password.';
-                    }
-                    if (v.length < 6) {
-                      return 'Password must be at least 6 characters.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                // Confirm password
-                TextFormField(
-                  controller: _confirmPasswordController,
-                  obscureText: _obscureConfirm,
-                  textInputAction: TextInputAction.done,
-                  onFieldSubmitted: (_) => _submit(),
-                  decoration: InputDecoration(
-                    labelText: 'Confirm Password',
-                    prefixIcon: const Icon(Icons.lock_outlined),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureConfirm
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                      ),
-                      onPressed: () =>
-                          setState(() => _obscureConfirm = !_obscureConfirm),
-                    ),
-                  ),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) {
-                      return 'Please confirm your password.';
-                    }
-                    if (v != _passwordController.text) {
-                      return 'Passwords do not match.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 24),
-
-                // Create account button
-                ElevatedButton(
-                  onPressed: isLoading ? null : _submit,
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(50),
-                  ),
-                  child: isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Create Account'),
-                ),
-
-                const SizedBox(height: 24),
-
-                // Log in link
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Already have an account?',
-                      style: textTheme.bodySmall,
-                    ),
-                    TextButton(
-                      onPressed: () => context.pop(),
-                      child: const Text('Sign In'),
-                    ),
-                  ],
                 ),
               ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }
