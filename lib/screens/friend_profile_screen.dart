@@ -481,9 +481,9 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 24),
                       child: Text(
                         bioText,
-                        textAlign: TextAlign.center,
+                        textAlign: TextAlign.left,
                         style: textTheme.bodySmall
-                            ?.copyWith(color: FlixieColors.medium),
+                            ?.copyWith(color: FlixieColors.light),
                         maxLines: 5,
                         overflow: TextOverflow.ellipsis,
                       ),

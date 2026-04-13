@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -364,8 +363,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
       (_NotificationFilter.all, 'All'),
       (_NotificationFilter.friendRequests, 'Friends'),
       (_NotificationFilter.watchRequests, 'Watch'),
-      // TODO: uncomment when activity notifications are implemented
-      // (_NotificationFilter.groupRequests, 'Groups'),
+      (_NotificationFilter.groupRequests, 'Groups'),
       // TODO: uncomment when activity notifications are implemented
       // (_NotificationFilter.activity, 'Activity'),
       // TODO: uncomment when alert notifications are implemented
@@ -717,9 +715,9 @@ class _RequestCard extends StatelessWidget {
     final movieId = notification.groupWatchMovieId;
     final groupName = notification.groupWatchGroupName;
     if (movieTitle == null || movieTitle.isEmpty) {
-      return Text(
+      return const Text(
         'sent a group watch request',
-        style: const TextStyle(color: FlixieColors.light, fontSize: 13),
+        style: TextStyle(color: FlixieColors.light, fontSize: 13),
       );
     }
     return RichText(
@@ -822,10 +820,6 @@ class _RequestCard extends StatelessWidget {
     final initials = notification.senderInitials ?? '';
     final avatarBg = _avatarColorFromIconColor(notification.senderIconColor);
     final accent = _accentColor;
-    final posterPath = notification.watchMediaPosterPath;
-    final posterUrl = posterPath != null && posterPath.isNotEmpty
-        ? 'https://image.tmdb.org/t/p/w185$posterPath'
-        : null;
     final msg = notification.watchRequestMessage;
     final hasMessage = msg.isNotEmpty && notification.action == null;
 
@@ -973,38 +967,6 @@ class _RequestCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                // Right: poster (only when available — not for friend/group invites)
-                if (posterUrl != null)
-                  SizedBox(
-                    width: 90,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        CachedNetworkImage(
-                          imageUrl: posterUrl,
-                          fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) => Container(
-                            color: FlixieColors.tabBarBorder,
-                            child: Icon(_typeIcon,
-                                color: FlixieColors.medium, size: 28),
-                          ),
-                        ),
-                        Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.centerLeft,
-                              end: Alignment.centerRight,
-                              colors: [
-                                FlixieColors.tabBarBackgroundFocused,
-                                Colors.transparent,
-                              ],
-                              stops: const [0.0, 0.25],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
               ],
             ),
           ),
@@ -1014,7 +976,7 @@ class _RequestCard extends StatelessWidget {
           top: 4,
           right: 4,
           child: IconButton(
-            icon: const Icon(Icons.close, size: 18, color: FlixieColors.medium),
+            icon: const Icon(Icons.close, size: 18, color: FlixieColors.light),
             tooltip: 'Close',
             onPressed: onClose,
             padding: EdgeInsets.zero,
@@ -1164,7 +1126,7 @@ class _ActivityCard extends StatelessWidget {
                   Text(
                     dateStr,
                     style: const TextStyle(
-                      color: FlixieColors.medium,
+                      color: FlixieColors.light,
                       fontSize: 12,
                     ),
                   ),

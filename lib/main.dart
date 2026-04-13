@@ -146,6 +146,11 @@ GoRouter _buildRouter(AuthProvider authProvider) {
             path: '/groups/:id',
             builder: (context, state) => GroupDetailScreen(
               groupId: state.pathParameters['id'] ?? '',
+              initialTab: state.uri.queryParameters['tab'] == 'requests'
+                  ? 2
+                  : state.uri.queryParameters['tab'] == 'chat'
+                      ? 0
+                      : null,
             ),
           ),
           GoRoute(

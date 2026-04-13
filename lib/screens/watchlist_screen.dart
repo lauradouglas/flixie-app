@@ -267,6 +267,9 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     final user = authProvider.dbUser;
     if (user == null) return;
 
+    // Check if already in watched list before removing
+    final alreadyWatched = user.isMovieWatched(item.movieId);
+
     try {
       await UserService.removeFromWatchlist(user.id, item.movieId);
 
@@ -294,6 +297,57 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                 Text('${item.movie?.title ?? "Movie"} removed from watchlist'),
           ),
         );
+      }
+
+      // If not already in watched list, offer to add it
+      if (!alreadyWatched && mounted) {
+        final markWatched = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: FlixieColors.tabBarBackgroundFocused,
+            title: const Text('Did you watch it?',
+                style: TextStyle(color: FlixieColors.light)),
+            content: Text(
+                'Want to add ${item.movie?.title ?? "this movie"} to your watched list?',
+                style: const TextStyle(color: FlixieColors.medium)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('No',
+                    style: TextStyle(color: FlixieColors.medium)),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Yes!',
+                    style: TextStyle(color: FlixieColors.primary)),
+              ),
+            ],
+          ),
+        );
+        if (markWatched == true && mounted) {
+          final watchedResult =
+              await UserService.addToWatched(user.id, item.movieId);
+          final currentWatched = List<dynamic>.from(user.watchedMovies ?? []);
+          if (watchedResult != null) {
+            currentWatched.add(watchedResult.toJson());
+          } else {
+            currentWatched.add({
+              'movieId': item.movieId,
+              'watchedAt': DateTime.now().toIso8601String(),
+            });
+          }
+          authProvider.updateUserList(watchedMovies: currentWatched);
+          authProvider.markActivityChanged();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                    '${item.movie?.title ?? "Movie"} added to watched list'),
+                backgroundColor: FlixieColors.success,
+              ),
+            );
+          }
+        }
       }
     } catch (e) {
       debugPrint('Error removing from watchlist: $e');

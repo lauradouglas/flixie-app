@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/conversation.dart';
+import '../utils/app_logger.dart';
 import 'api_client.dart';
 
 class ChatService {
@@ -41,8 +42,7 @@ class ChatService {
   }
 
   /// Mark a conversation as read for the given user.
-  static Future<void> markRead(
-      String conversationId, String userId) async {
+  static Future<void> markRead(String conversationId, String userId) async {
     await ApiClient.patch(
       '/conversations/$conversationId/read',
       body: {'userId': userId},
@@ -62,13 +62,43 @@ class ChatService {
         .orderBy('createdAt', descending: true)
         .limit(50)
         .snapshots()
-        .map((snap) =>
-            snap.docs.map((d) => ChatMessage.fromFirestore(d)).toList());
+        .map((snap) {
+      logger.d('[ChatService] messagesStream got ${snap.docs.length} docs');
+      if (snap.docs.isNotEmpty) {
+        logger.d(
+            '[ChatService] first message raw data: ${snap.docs.first.data()}');
+      }
+      return snap.docs.map((d) => ChatMessage.fromFirestore(d)).toList();
+    });
+  }
+
+  /// Fetch the members subcollection once and return a userId→username map.
+  static Future<Map<String, String>> fetchMemberUsernames(
+      String conversationId) async {
+    final snap = await _db
+        .collection('conversations')
+        .doc(conversationId)
+        .collection('members')
+        .get();
+    logger.d('[ChatService] members subcollection (${snap.docs.length} docs):');
+    for (final doc in snap.docs) {
+      logger.d('  docId=${doc.id}  data=${doc.data()}');
+    }
+    final map = <String, String>{};
+    for (final doc in snap.docs) {
+      final data = doc.data();
+      final userId = data['userId'] as String? ?? doc.id;
+      final username = data['username'] as String? ??
+          data['firstName'] as String? ??
+          data['displayName'] as String?;
+      if (username != null) map[userId] = username;
+    }
+    logger.d('[ChatService] userId→username map: $map');
+    return map;
   }
 
   /// Real-time unread count for a user in a conversation.
-  static Stream<int> unreadCountStream(
-      String conversationId, String userId) {
+  static Stream<int> unreadCountStream(String conversationId, String userId) {
     return _db
         .collection('conversations')
         .doc(conversationId)
@@ -76,5 +106,28 @@ class ChatService {
         .doc(userId)
         .snapshots()
         .map((s) => (s.data()?['unreadCount'] as int?) ?? 0);
+  }
+
+  /// Fetch watch request documents from Firestore's watchRequests subcollection.
+  /// Returns a map of firestoreDocId → raw data (including movieTitle,
+  /// moviePosterUrl, expiresAt, pgGroupRequestId, createdBy, status, etc.)
+  static Future<Map<String, Map<String, dynamic>>> fetchWatchRequestDocs(
+      String conversationId) async {
+    final snap = await _db
+        .collection('conversations')
+        .doc(conversationId)
+        .collection('watchRequests')
+        .get();
+    final result = <String, Map<String, dynamic>>{};
+    for (final doc in snap.docs) {
+      result[doc.id] = {'id': doc.id, ...doc.data()};
+    }
+    logger.d(
+        '[ChatService] fetchWatchRequestDocs: ${result.length} docs, keys=${result.keys.toList()}');
+    for (final entry in result.entries) {
+      logger.d(
+          '  [WR doc] ${entry.key}: movieTitle=${entry.value['movieTitle']}, pgGroupRequestId=${entry.value['pgGroupRequestId']}, linkedMessageId=${entry.value['linkedMessageId']}');
+    }
+    return result;
   }
 }

@@ -204,6 +204,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           });
           currentWatchlist.add(result.toJson());
           authProvider.markActivityChanged();
+          authProvider.updateUserList(movieWatchlist: currentWatchlist);
         } else {
           // Removed — strip out the entry
           currentWatchlist.removeWhere((item) {
@@ -212,8 +213,51 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             }
             return item == movieId;
           });
+          authProvider.updateUserList(movieWatchlist: currentWatchlist);
+          // Offer to mark as watched if not already
+          if (!_isWatched && mounted) {
+            final markWatched = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                backgroundColor: FlixieColors.tabBarBackgroundFocused,
+                title: const Text('Did you watch it?',
+                    style: TextStyle(color: FlixieColors.light)),
+                content: const Text('Want to add this to your watched list?',
+                    style: TextStyle(color: FlixieColors.medium)),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('No',
+                        style: TextStyle(color: FlixieColors.medium)),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('Yes!',
+                        style: TextStyle(color: FlixieColors.primary)),
+                  ),
+                ],
+              ),
+            );
+            if (markWatched == true && mounted) {
+              await UserService.addToWatched(user.id, movieId);
+              final currentWatched =
+                  List<dynamic>.from(user.watchedMovies ?? []);
+              currentWatched.removeWhere((item) {
+                if (item is Map<String, dynamic>) {
+                  return (item['movieId'] ?? item['id']) == movieId;
+                }
+                return item == movieId;
+              });
+              currentWatched.add({
+                'movieId': movieId,
+                'watchedAt': DateTime.now().toIso8601String()
+              });
+              setState(() => _isWatched = true);
+              authProvider.updateUserList(watchedMovies: currentWatched);
+              authProvider.markActivityChanged();
+            }
+          }
         }
-        authProvider.updateUserList(movieWatchlist: currentWatchlist);
       }
     } catch (e) {
       logger.e('Error toggling watchlist: $e');
@@ -274,10 +318,55 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             updatedWatched.add(movieId);
           }
           authProvider.markActivityChanged();
+          // Also offer to remove from watchlist if it's still there
+          if (_inWatchlist && mounted) {
+            final remove = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                backgroundColor: FlixieColors.tabBarBackgroundFocused,
+                title: const Text('Remove from Watchlist?',
+                    style: TextStyle(color: FlixieColors.light)),
+                content: const Text(
+                    'This movie is in your watchlist. Remove it now that you\'ve watched it?',
+                    style: TextStyle(color: FlixieColors.medium)),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Keep it',
+                        style: TextStyle(color: FlixieColors.medium)),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('Remove',
+                        style: TextStyle(color: FlixieColors.primary)),
+                  ),
+                ],
+              ),
+            );
+            if (remove == true && mounted) {
+              await UserService.removeFromWatchlist(user.id, movieId);
+              final currentWatchlist =
+                  List<dynamic>.from(user.movieWatchlist ?? []);
+              currentWatchlist.removeWhere((item) {
+                if (item is Map<String, dynamic>) {
+                  return (item['movieId'] ?? item['id']) == movieId;
+                }
+                return item == movieId;
+              });
+              setState(() => _inWatchlist = false);
+              authProvider.updateUserList(
+                  movieWatchlist: currentWatchlist,
+                  watchedMovies: updatedWatched);
+            } else {
+              authProvider.updateUserList(watchedMovies: updatedWatched);
+            }
+          } else {
+            authProvider.updateUserList(watchedMovies: updatedWatched);
+          }
         } else {
           updatedWatched.remove(movieId);
+          authProvider.updateUserList(watchedMovies: updatedWatched);
         }
-        authProvider.updateUserList(watchedMovies: updatedWatched);
       }
     } catch (e) {
       logger.e('Error toggling watched: $e');
@@ -1860,6 +1949,19 @@ class _FriendActivityRow extends StatelessWidget {
         color: FlixieColors.tertiary,
       ));
     }
+    if (activity.reviewRecommended == true) {
+      badges.add(const _ActivityBadge(
+        icon: Icons.thumb_up_outlined,
+        label: 'Recommends',
+        color: FlixieColors.success,
+      ));
+    } else if (activity.reviewRecommended == false) {
+      badges.add(const _ActivityBadge(
+        icon: Icons.thumb_down_outlined,
+        label: 'Not recommended',
+        color: Colors.redAccent,
+      ));
+    }
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -2012,13 +2114,18 @@ class _WatchRequestSheetState extends State<_WatchRequestSheet> {
     setState(() => _isSending = true);
     try {
       if (_isGroupMode) {
-        await GroupService.sendWatchRequest(
+        // Legacy fallback: POST /groups/:groupId/send-request
+        // The response may now include a conversationId from the updated backend.
+        final result = await GroupService.sendWatchRequest(
           _selectedGroupId!,
           widget.requesterId,
           _messageController.text.trim(),
           'MOVIE',
           widget.movieId!,
         );
+        final conversationId = result?['conversationId'] as String?;
+        logger.d('[WatchRequest] group send result: $result, '
+            'conversationId: $conversationId');
       } else {
         final result = await RequestService.sendRequest({
           'requesterId': widget.requesterId,

@@ -498,7 +498,7 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
       for (var i = 0; i < groupsWithId.length; i++) {
         final group = groupsWithId[i];
         final members = memberResults[i];
-        memberCounts[group.id!] = members.length;
+        memberCounts[group.id!] = members.where((m) => m.isAccepted).length;
         final myMembership = members.firstWhere(
           (m) => m.memberId == userId,
           orElse: () => GroupMember(
@@ -558,7 +558,7 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
           read: true,
         ).catchError((e) {
           logger.w('Failed to update GROUP_INVITE notification: $e');
-          return FlixieNotification(userId: '', type: '', message: '');
+          return const FlixieNotification(userId: '', type: '', message: '');
         });
       }
       if (mounted) {
@@ -659,7 +659,7 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
           ],
           Row(
             children: [
-              Expanded(
+              const Expanded(
                 child: _SectionHeader(title: 'MY COMMUNITIES'),
               ),
               TextButton(

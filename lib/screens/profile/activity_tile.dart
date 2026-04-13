@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/activity_list_item.dart';
+import '../../models/review.dart';
 import '../../theme/app_theme.dart';
+import '../movie_detail/review_card.dart';
 
 class ActivityTile extends StatelessWidget {
   const ActivityTile({super.key, required this.item});
@@ -165,15 +167,87 @@ class ActivityTile extends StatelessWidget {
       text: TextSpan(
         text: title,
         style: TextStyle(
-          color: canNavigate ? FlixieColors.primary : FlixieColors.light,
+          color: FlixieColors.light,
           fontSize: 15,
           fontWeight: FontWeight.bold,
+          decoration: canNavigate ? TextDecoration.none : null,
         ),
         recognizer: canNavigate
             ? (TapGestureRecognizer()
               ..onTap = () =>
                   context.push(isPerson ? '/people/$navId' : '/movies/$navId'))
             : null,
+      ),
+    );
+  }
+
+  List<Widget> _buildRecommendBadge(bool recommended) {
+    return [
+      const SizedBox(width: 8),
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+        decoration: BoxDecoration(
+          color: (recommended ? FlixieColors.success : Colors.redAccent)
+              .withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: (recommended ? FlixieColors.success : Colors.redAccent)
+                .withValues(alpha: 0.4),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              recommended ? Icons.thumb_up_outlined : Icons.thumb_down_outlined,
+              size: 11,
+              color: recommended ? FlixieColors.success : Colors.redAccent,
+            ),
+            const SizedBox(width: 3),
+            Text(
+              recommended ? 'Recommends' : 'Not recommended',
+              style: TextStyle(
+                color: recommended ? FlixieColors.success : Colors.redAccent,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ];
+  }
+
+  void _openReviewSheet(BuildContext context, Review review) {
+    final currentUserId = context.read<AuthProvider>().dbUser?.id;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF0D1B2A),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: FlixieColors.medium,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            ReviewCard(
+              review: review,
+              currentUserId: currentUserId,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -185,9 +259,12 @@ class ActivityTile extends StatelessWidget {
     final isCurrentUser = item.userId == currentUserId;
     final path = item.mediaPosterPath;
     final bool isPerson = item.type == ActivityListType.favoritePerson;
+    final int? navId = isPerson ? item.personId : item.movieId;
+    final bool isReview = item.type == ActivityListType.movieReview ||
+        item.type == ActivityListType.showReview;
     final posterUrl = path != null ? '$_posterBase$path' : null;
 
-    return Container(
+    final tile = Container(
       clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
         color: FlixieColors.tabBarBackgroundFocused,
@@ -211,12 +288,16 @@ class ActivityTile extends StatelessWidget {
                     if (!isCurrentUser)
                       Row(
                         children: [
-                          Text(
-                            item.username,
-                            style: const TextStyle(
-                              color: FlixieColors.primary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
+                          GestureDetector(
+                            onTap: () =>
+                                context.push('/profile/${item.userId}'),
+                            child: Text(
+                              item.username,
+                              style: const TextStyle(
+                                color: FlixieColors.primary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
                             ),
                           ),
                           if (item.firstName.isNotEmpty ||
@@ -276,6 +357,8 @@ class ActivityTile extends StatelessWidget {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
+                        if (isReview && item.reviewData != null)
+                          ..._buildRecommendBadge(item.reviewData!.recommended),
                       ],
                     ),
                   ],
@@ -283,16 +366,32 @@ class ActivityTile extends StatelessWidget {
               ),
             ),
             // Right: poster full height, flush to edge
-            SizedBox(
-              width: 90,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  posterUrl != null
-                      ? CachedNetworkImage(
-                          imageUrl: posterUrl,
-                          fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) => Container(
+            GestureDetector(
+              onTap: navId != null
+                  ? () => context
+                      .push(isPerson ? '/people/$navId' : '/movies/$navId')
+                  : null,
+              child: SizedBox(
+                width: 90,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    posterUrl != null
+                        ? CachedNetworkImage(
+                            imageUrl: posterUrl,
+                            fit: BoxFit.cover,
+                            fadeInDuration: Duration.zero,
+                            fadeOutDuration: Duration.zero,
+                            errorWidget: (_, __, ___) => Container(
+                              color: FlixieColors.tabBarBorder,
+                              child: Icon(
+                                isPerson ? Icons.person : Icons.movie_outlined,
+                                color: FlixieColors.medium,
+                                size: 28,
+                              ),
+                            ),
+                          )
+                        : Container(
                             color: FlixieColors.tabBarBorder,
                             child: Icon(
                               isPerson ? Icons.person : Icons.movie_outlined,
@@ -300,36 +399,36 @@ class ActivityTile extends StatelessWidget {
                               size: 28,
                             ),
                           ),
-                        )
-                      : Container(
-                          color: FlixieColors.tabBarBorder,
-                          child: Icon(
-                            isPerson ? Icons.person : Icons.movie_outlined,
-                            color: FlixieColors.medium,
-                            size: 28,
-                          ),
+                    // Fade from card background into poster
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                          colors: [
+                            FlixieColors.tabBarBackgroundFocused
+                                .withValues(alpha: 0.6),
+                            FlixieColors.tabBarBackgroundFocused
+                                .withValues(alpha: 0.0),
+                          ],
+                          stops: const [0.0, 0.15],
                         ),
-                  // Fade from card background into poster
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                        colors: [
-                          FlixieColors.tabBarBackgroundFocused,
-                          FlixieColors.tabBarBackgroundFocused
-                              .withValues(alpha: 0.0),
-                        ],
-                        stops: const [0.0, 0.25],
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+            ), // GestureDetector (poster)
           ],
         ),
       ),
     );
+    if (isReview && item.reviewData != null) {
+      return GestureDetector(
+        onTap: () => _openReviewSheet(context, item.reviewData!),
+        child: tile,
+      );
+    }
+    return tile;
   }
 }

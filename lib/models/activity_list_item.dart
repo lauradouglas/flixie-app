@@ -1,3 +1,7 @@
+import 'package:flutter/foundation.dart';
+
+import 'review.dart';
+
 enum ActivityListType {
   movieWatchlist('watchlist-movie'),
   showWatchlist('watchlist-show'),
@@ -44,6 +48,7 @@ class ActivityListItem {
   final String? mediaTitle;
   final String? mediaPosterPath;
   final double? mediaRating;
+  final Review? reviewData;
 
   const ActivityListItem({
     required this.id,
@@ -61,6 +66,7 @@ class ActivityListItem {
     this.mediaTitle,
     this.mediaPosterPath,
     this.mediaRating,
+    this.reviewData,
   });
 
   factory ActivityListItem.fromJson(Map<String, dynamic> json) {
@@ -71,12 +77,47 @@ class ActivityListItem {
     final show = json['show'] as Map<String, dynamic>?;
     final person = json['person'] as Map<String, dynamic>?;
     final review = json['review'] as Map<String, dynamic>?;
+    final type = ActivityListType.fromString(json['type'] as String?);
+    final userId = user?['id'] as String? ??
+        json['userId'] as String? ??
+        json['requesterId'] as String? ??
+        '';
+    Review? reviewData;
+    final isReviewType = type == ActivityListType.movieReview ||
+        type == ActivityListType.showReview;
+    // API returns review fields flat at the top level, not nested under 'review'
+    final src = review ?? (isReviewType ? json : null);
+    if (src != null && isReviewType) {
+      try {
+        reviewData = Review.fromJson(<String, dynamic>{
+          'id': (src['id'] ?? '').toString(),
+          'userId': (src['userId'] ?? userId).toString(),
+          'movieId': src['movieId'] ?? json['movieId'],
+          'showId': src['showId'] ?? json['showId'],
+          'rating': src['rating'] ?? 0,
+          'title': src['title'] ?? '',
+          'body': src['body'] ?? '',
+          'upvotes': src['upvotes'] ?? 0,
+          'downvotes': src['downvotes'] ?? 0,
+          'containsSpoilers': src['containsSpoilers'] ?? false,
+          'language': src['language'] ?? 'en',
+          'recommended': src['recommended'] ?? true,
+          'createdAt': src['createdAt'] ?? '',
+          'updatedAt': src['updatedAt'] ?? '',
+          if (src['user'] != null) 'user': src['user'],
+          if (src['reactions'] != null) 'reactions': src['reactions'],
+          if (src['myReaction'] != null) 'myReaction': src['myReaction'],
+          if (src['movie'] != null)
+            'movieTitle': (src['movie'] as Map<String, dynamic>)['title'],
+        });
+      } catch (e, st) {
+        debugPrint('[ActivityListItem] Review.fromJson failed: $e\n$st');
+        reviewData = null;
+      }
+    }
     return ActivityListItem(
       id: json['id']?.toString() ?? '',
-      userId: user?['id'] as String? ??
-          json['userId'] as String? ??
-          json['requesterId'] as String? ??
-          '',
+      userId: userId,
       username:
           user?['username'] as String? ?? json['username'] as String? ?? '',
       firstName:
@@ -89,7 +130,7 @@ class ActivityListItem {
       removed: json['removed'] as bool? ?? false,
       createdAt: json['createdAt'] as String? ?? '',
       updatedAt: json['updatedAt'] as String? ?? '',
-      type: ActivityListType.fromString(json['type'] as String?),
+      type: type,
       mediaTitle: movie?['title'] as String? ??
           show?['title'] as String? ??
           person?['name'] as String?,
@@ -98,6 +139,7 @@ class ActivityListItem {
           person?['profileImgUrl'] as String?,
       mediaRating: (json['rating'] as num?)?.toDouble() ??
           (review?['rating'] as num?)?.toDouble(),
+      reviewData: reviewData,
     );
   }
 }
