@@ -27,7 +27,10 @@ import 'screens/settings_screen.dart';
 import 'screens/stats_screen.dart';
 import 'screens/watch_history_screen.dart';
 import 'screens/watch_requests_screen.dart';
+import 'screens/movie_list_detail_screen.dart';
+import 'screens/movie_lists_screen.dart';
 import 'screens/social_screen.dart';
+import 'screens/wrapped_screen.dart';
 import 'screens/group_detail_screen.dart';
 import 'screens/group_members_screen.dart';
 import 'screens/auth/login_screen.dart';
@@ -203,8 +206,23 @@ GoRouter _buildRouter(AuthProvider authProvider) {
             builder: (context, state) => const WatchHistoryScreen(),
           ),
           GoRoute(
+            path: '/movie-lists',
+            builder: (context, state) => const MovieListsScreen(),
+          ),
+          GoRoute(
+            path: '/movie-lists/:id',
+            builder: (context, state) => MovieListDetailScreen(
+              listId: state.pathParameters['id'] ?? '',
+              listName: state.uri.queryParameters['name'] ?? 'List',
+            ),
+          ),
+          GoRoute(
             path: '/stats',
             builder: (context, state) => const StatsScreen(),
+          ),
+          GoRoute(
+            path: '/wrapped',
+            builder: (context, state) => const WrappedScreen(),
           ),
           GoRoute(
             path: '/watch-requests',

@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/movie.dart';
 import '../models/movie_credits.dart';
 import '../models/movie_friend_activity.dart';
+import '../models/movie_watch_entry.dart';
 import '../models/review.dart';
 import '../models/similar_movie.dart';
 import '../models/watch_provider.dart';
@@ -22,6 +23,8 @@ import 'movie_detail/cast_card.dart';
 import 'movie_detail/friend_activity_row.dart';
 import 'movie_detail/genre_chip.dart';
 import 'movie_detail/hero_backdrop.dart';
+import 'movie_detail/add_to_list_sheet.dart';
+import 'movie_detail/rewatch_log_sheet.dart';
 import 'movie_detail/review_card.dart';
 import 'movie_detail/score_tile.dart';
 import 'movie_detail/similar_card.dart';
@@ -66,6 +69,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   int _watchedBounceKey = 0;
   int _favoriteBounceKey = 0;
   List<MovieFriendActivity> _friendsActivity = [];
+  List<MovieWatchEntry> _movieWatchHistory = [];
+  bool _watchHistoryLoading = false;
 
   // ---- Data loading ---------------------------------------------------------
 
@@ -153,6 +158,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
           _isLoading = false;
         });
+        if (userId != null) {
+          _loadWatchHistory(userId, id);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -160,6 +168,24 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           _error = e.toString();
           _isLoading = false;
         });
+      }
+    }
+  }
+
+  Future<void> _loadWatchHistory(String userId, int movieId) async {
+    if (!mounted) return;
+    setState(() => _watchHistoryLoading = true);
+    try {
+      final history = await UserService.getMovieWatchHistory(userId, movieId);
+      if (mounted) {
+        setState(() {
+          _movieWatchHistory = history;
+          _watchHistoryLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _watchHistoryLoading = false);
       }
     }
   }
@@ -446,6 +472,93 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     }
   }
 
+  Future<void> _showAddToListSheet() async {
+    final movieId = int.tryParse(widget.movieId);
+    if (movieId == null) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: FlixieColors.tabBarBackgroundFocused,
+      builder: (_) => AddToListSheet(movieId: movieId),
+    );
+  }
+
+  Future<void> _showLogWatchSheet({MovieWatchEntry? entry}) async {
+    final movieId = int.tryParse(widget.movieId);
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (movieId == null || userId == null) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: FlixieColors.tabBarBackgroundFocused,
+      builder: (_) => RewatchLogSheet(
+        initial: entry,
+        onSubmit: ({
+          required String watchedAt,
+          required double? rating,
+          required String? notes,
+        }) async {
+          try {
+            if (entry == null) {
+              await UserService.logMovieWatch(
+                userId,
+                LogMovieWatchRequest(
+                  movieId: movieId,
+                  watchedAt: watchedAt,
+                  rating: rating,
+                  notes: notes,
+                ),
+              );
+            } else {
+              await UserService.updateMovieWatch(
+                userId,
+                entry.id,
+                UpdateMovieWatchRequest(
+                  watchedAt: watchedAt,
+                  rating: rating,
+                  notes: notes,
+                ),
+              );
+            }
+            await _loadWatchHistory(userId, movieId);
+            if (mounted) {
+              setState(() => _isWatched = true);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(entry == null ? 'Watch logged' : 'Watch entry updated'),
+                ),
+              );
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context)
+                  .showSnackBar(SnackBar(content: Text('Unable to save watch entry: $e')));
+            }
+          }
+        },
+      ),
+    );
+  }
+
+  Future<void> _deleteWatchEntry(MovieWatchEntry entry) async {
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    final movieId = int.tryParse(widget.movieId);
+    if (userId == null || movieId == null) return;
+    try {
+      await UserService.deleteMovieWatch(userId, entry.id);
+      await _loadWatchHistory(userId, movieId);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Watch entry deleted')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Unable to delete watch entry: $e')));
+      }
+    }
+  }
+
   // ---- Helpers --------------------------------------------------------------
 
   /// Extracts a 4-digit year from a date string like "2024-03-15".
@@ -555,9 +668,11 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                     const SizedBox(height: 16),
                     _buildFilmInfoCard(movie),
                     const SizedBox(height: 16),
-                    _buildActionButtons(),
-                    const SizedBox(height: 28),
-                    _buildFriendsActivitySection(context),
+                     _buildActionButtons(),
+                     const SizedBox(height: 20),
+                     _buildWatchHistorySection(context),
+                     const SizedBox(height: 28),
+                     _buildFriendsActivitySection(context),
                     const SizedBox(height: 28),
                     _buildTrailersSection(context, movie),
                     const SizedBox(height: 28),
@@ -1204,8 +1319,98 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             onPressed: _showWatchRequestSheet,
           ),
         ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.playlist_add_outlined, size: 18),
+                label: const Text('Add to List'),
+                onPressed: _showAddToListSheet,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.replay_outlined, size: 18),
+                label: Text(_isWatched ? 'Log Rewatch' : 'Log Watch'),
+                onPressed: () => _showLogWatchSheet(),
+              ),
+            ),
+          ],
+        ),
       ],
     );
+  }
+
+  Widget _buildWatchHistorySection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Watch History',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: FlixieColors.light,
+          ),
+        ),
+        const SizedBox(height: 10),
+        if (_watchHistoryLoading)
+          const Center(child: CircularProgressIndicator())
+        else if (_movieWatchHistory.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: FlixieColors.tabBarBackgroundFocused,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Text(
+              'No watch history yet for this movie.',
+              style: TextStyle(color: FlixieColors.medium),
+            ),
+          )
+        else
+          ..._movieWatchHistory.take(5).map(
+                (entry) => Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: FlixieColors.tabBarBackgroundFocused,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ListTile(
+                    title: Text(_formatWatchDate(entry.watchedAt)),
+                    subtitle: Text(
+                      [
+                        if (entry.rating != null) 'Rating: ${entry.rating!.toStringAsFixed(0)}/10',
+                        if (entry.notes != null && entry.notes!.isNotEmpty) entry.notes!,
+                      ].join(' • '),
+                    ),
+                    trailing: PopupMenuButton<String>(
+                      onSelected: (value) {
+                        if (value == 'edit') {
+                          _showLogWatchSheet(entry: entry);
+                          return;
+                        }
+                        _deleteWatchEntry(entry);
+                      },
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(value: 'edit', child: Text('Edit')),
+                        PopupMenuItem(value: 'delete', child: Text('Delete')),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+      ],
+    );
+  }
+
+  String _formatWatchDate(String? iso) {
+    final dt = DateTime.tryParse(iso ?? '');
+    if (dt == null) return 'Unknown date';
+    return '${dt.day}/${dt.month}/${dt.year}';
   }
 
   Widget _buildActionButton({
@@ -1892,4 +2097,3 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     );
   }
 }
-
