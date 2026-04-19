@@ -18,7 +18,6 @@ class ApiClient {
     defaultValue: 'http://192.168.1.203:3000',
   );
 
-  // static const String baseUrl = 'http://192.168.1.203:3000';
   // static const String baseUrl = String.fromEnvironment(
   //   'API_BASE_URL',
   //   defaultValue:
