@@ -57,7 +57,9 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
               s.memberId == userId &&
               (s.status == 'ACCEPTED' ||
                   s.status == 'DECLINED' ||
-                  s.status == 'MAYBE'))) return false;
+                  s.status == 'MAYBE'))) {
+        return false;
+      }
       return true;
     }).length;
   }
@@ -114,11 +116,12 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
       }
     } catch (e) {
       logger.e('GroupDetail load group error: $e');
-      if (mounted)
+      if (mounted) {
         setState(() {
           _loadingGroup = false;
           _loadError = 'Couldn\'t load group. Check your connection.';
         });
+      }
     }
   }
 
@@ -287,8 +290,9 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                             m.memberId == uid && (m.isAdmin || m.isOwner));
                       }(),
                       onCountChanged: (count) {
-                        if (mounted)
+                        if (mounted) {
                           setState(() => _pendingCountOverride = count);
+                        }
                       },
                     ),
                   ],

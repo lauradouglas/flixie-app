@@ -18,7 +18,7 @@ import 'chat_input.dart';
 import 'watch_request_chat_card.dart';
 
 class GroupChatTab extends StatefulWidget {
-  const GroupChatTab({required this.groupId});
+  const GroupChatTab({super.key, required this.groupId});
 
   final String groupId;
 

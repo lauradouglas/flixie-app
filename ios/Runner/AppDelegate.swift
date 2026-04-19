@@ -28,4 +28,5 @@ import FirebaseMessaging
     Messaging.messaging().apnsToken = deviceToken
     super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
   }
+
 }

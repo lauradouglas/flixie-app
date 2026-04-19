@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 
 import '../models/review.dart';
 import '../models/user.dart';
-import '../models/watchlist_movie.dart';
 import '../providers/auth_provider.dart';
 import '../services/friend_service.dart';
 import '../services/user_service.dart';

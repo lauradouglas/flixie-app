@@ -13,7 +13,7 @@ import 'group_hero_banner.dart';
 import 'pending_request_preview_tile.dart';
 
 class GroupActivityTab extends StatefulWidget {
-  const GroupActivityTab({
+  const GroupActivityTab({super.key, 
     required this.group,
     required this.memberCount,
     required this.groupId,

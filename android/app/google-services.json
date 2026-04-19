@@ -7,6 +7,50 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:1093787683868:android:718959216dff6409e963d9",
+        "android_client_info": {
+          "package_name": "com.flixie.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1093787683868-30lmtsubu9agtn9m410rbu4s5jppldhg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.flixie.app",
+            "certificate_hash": "284571a1a4ada451accb51fe93fcca7ddd5c6ac1"
+          }
+        },
+        {
+          "client_id": "1093787683868-6d5o5dduc9jeoas22jtfmfu2rjklmq1i.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCoDU1xEPxVJ-hCr41gc1QIGTKjjQeRTgo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1093787683868-6d5o5dduc9jeoas22jtfmfu2rjklmq1i.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1093787683868-0vo57s3c7hud798645h5cjc11i5jt43v.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.flixie.flixieApp"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:1093787683868:android:ba7f4704c76d4e65e963d9",
         "android_client_info": {
           "package_name": "com.flixie.flixie_app"
@@ -29,6 +73,13 @@
             {
               "client_id": "1093787683868-6d5o5dduc9jeoas22jtfmfu2rjklmq1i.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "1093787683868-0vo57s3c7hud798645h5cjc11i5jt43v.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.flixie.flixieApp"
+              }
             }
           ]
         }

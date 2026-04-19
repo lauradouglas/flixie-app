@@ -10,7 +10,7 @@ import 'request_poster_placeholder.dart';
 enum _RequestFilter { all, needsResponse, active, completed, byMe }
 
 class GroupRequestsTab extends StatefulWidget {
-  const GroupRequestsTab({
+  const GroupRequestsTab({super.key, 
     required this.groupId,
     this.conversationId,
     this.initialRequests = const [],

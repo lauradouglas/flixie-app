@@ -27,7 +27,7 @@ class HomeListCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(12),
-        border: Border(
+        border: const Border(
           left: BorderSide(color: FlixieColors.primary, width: 3),
         ),
       ),

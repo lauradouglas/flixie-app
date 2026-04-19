@@ -43,6 +43,7 @@ dependencies:
 
   # URL launcher
   url_launcher: ^6.2.5
+
   dropdown_flutter: ^1.0.3
 
 dev_dependencies:

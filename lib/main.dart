@@ -90,14 +90,16 @@ void main() async {
 
 /// Global navigator key shared between [_buildRouter] and
 /// [PushNotificationService] so the service can navigate without a BuildContext.
-final GlobalKey<NavigatorState> rootNavigatorKey =
-    GlobalKey<NavigatorState>(debugLabel: 'root');
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(
+  debugLabel: 'root',
+);
 
 /// Builds the GoRouter, refreshing only when auth status changes (not user data).
 GoRouter _buildRouter(AuthProvider authProvider) {
   return GoRouter(
     navigatorKey: rootNavigatorKey,
     refreshListenable: authProvider.authStatusListenable,
+    initialLocation: '/',
     redirect: (context, state) {
       final status = authProvider.status;
       final isAuthRoute = state.matchedLocation.startsWith('/auth');
@@ -126,10 +128,7 @@ GoRouter _buildRouter(AuthProvider authProvider) {
       ShellRoute(
         builder: (context, state, child) => MainNavigationShell(child: child),
         routes: [
-          GoRoute(
-            path: '/',
-            builder: (context, state) => const HomeScreen(),
-          ),
+          GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
           GoRoute(
             path: '/search',
             builder: (context, state) => const SearchScreen(),
@@ -149,8 +148,8 @@ GoRouter _buildRouter(AuthProvider authProvider) {
               initialTab: state.uri.queryParameters['tab'] == 'requests'
                   ? 2
                   : state.uri.queryParameters['tab'] == 'chat'
-                      ? 0
-                      : null,
+                  ? 0
+                  : null,
             ),
           ),
           GoRoute(
@@ -166,15 +165,13 @@ GoRouter _buildRouter(AuthProvider authProvider) {
           ),
           GoRoute(
             path: '/movies/:id',
-            builder: (context, state) => MovieDetailScreen(
-              movieId: state.pathParameters['id'] ?? '0',
-            ),
+            builder: (context, state) =>
+                MovieDetailScreen(movieId: state.pathParameters['id'] ?? '0'),
           ),
           GoRoute(
             path: '/people/:id',
-            builder: (context, state) => PersonDetailScreen(
-              personId: state.pathParameters['id'] ?? '0',
-            ),
+            builder: (context, state) =>
+                PersonDetailScreen(personId: state.pathParameters['id'] ?? '0'),
           ),
           GoRoute(
             path: '/my-reviews',
@@ -182,9 +179,8 @@ GoRouter _buildRouter(AuthProvider authProvider) {
           ),
           GoRoute(
             path: '/friends/:id',
-            builder: (context, state) => FriendProfileScreen(
-              userId: state.pathParameters['id'] ?? '',
-            ),
+            builder: (context, state) =>
+                FriendProfileScreen(userId: state.pathParameters['id'] ?? ''),
           ),
           GoRoute(
             path: '/notifications',
@@ -209,6 +205,17 @@ GoRouter _buildRouter(AuthProvider authProvider) {
           GoRoute(
             path: '/settings',
             builder: (context, state) => const SettingsScreen(),
+          ),
+          // Widget deep-link targets
+          GoRoute(
+            path: '/trending',
+            // Redirect trending to home (home already shows trending content).
+            redirect: (_, __) => '/',
+          ),
+          GoRoute(
+            path: '/groups',
+            // Redirect bare /groups to social screen (groups live there).
+            redirect: (_, __) => '/social',
           ),
         ],
       ),
@@ -295,10 +302,7 @@ class MainNavigationShell extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF172B4D),
-            Color(0xFF1A1040),
-          ],
+          colors: [Color(0xFF172B4D), Color(0xFF1A2550)],
         ),
       ),
       child: Scaffold(

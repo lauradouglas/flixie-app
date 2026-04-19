@@ -7,7 +7,7 @@ import '../../theme/app_theme.dart';
 import 'request_status_badge.dart';
 
 class WatchRequestChatCard extends StatelessWidget {
-  const WatchRequestChatCard({
+  const WatchRequestChatCard({super.key, 
     required this.msg,
     this.cachedRequest,
     this.currentUserId,
