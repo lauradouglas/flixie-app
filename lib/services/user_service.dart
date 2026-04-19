@@ -1,4 +1,8 @@
 import 'package:flixie_app/models/activity_list_item.dart';
+import 'package:flixie_app/models/movie_list.dart';
+import 'package:flixie_app/models/movie_list_movie.dart';
+import 'package:flixie_app/models/movie_watch_entry.dart';
+import 'package:flixie_app/models/movie_wrapped.dart';
 import 'package:flixie_app/models/review.dart';
 
 import '../models/user.dart';
@@ -300,5 +304,147 @@ class UserService {
       apiLogger.e('[Watchlist] Error fetching watchlist: $e');
       rethrow;
     }
+  }
+
+  // ---- Movie Lists (custom folders) -----------------------------------------
+
+  static Future<List<MovieList>> getMovieLists(String userId) async {
+    final data = await ApiClient.get('/users/$userId/movie/watchlists/lists');
+    final lists = (data as List<dynamic>)
+        .whereType<Map<String, dynamic>>()
+        .map(MovieList.fromJson)
+        .where((list) => !list.removed)
+        .toList()
+      ..sort((a, b) => (a.createdAt ?? '').compareTo(b.createdAt ?? ''));
+    return lists;
+  }
+
+  static Future<MovieList> createMovieList(
+    String userId,
+    CreateMovieListRequest request,
+  ) async {
+    final data = await ApiClient.post(
+      '/users/$userId/movie/watchlists/lists',
+      body: request.toJson(),
+    );
+    return MovieList.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<MovieList> renameMovieList(
+    String userId,
+    String listId,
+    UpdateMovieListRequest request,
+  ) async {
+    final data = await ApiClient.patch(
+      '/users/$userId/movie/watchlists/lists/$listId',
+      body: request.toJson(),
+    );
+    return MovieList.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<void> deleteMovieList(String userId, String listId) async {
+    await ApiClient.delete('/users/$userId/movie/watchlists/lists/$listId');
+  }
+
+  static Future<List<MovieListMovie>> getMovieListMovies(
+    String userId,
+    String listId,
+  ) async {
+    final data = await ApiClient.get(
+        '/users/$userId/movie/watchlists/lists/$listId/movies');
+    // Response shape: { list: { id, name }, movies: [...] }
+    final raw = data as Map<String, dynamic>;
+    final moviesList = raw['movies'] as List<dynamic>? ?? [];
+    final movies = moviesList
+        .whereType<Map<String, dynamic>>()
+        .map(MovieListMovie.fromJson)
+        .where((entry) => !entry.removed)
+        .toList()
+      ..sort((a, b) => (b.createdAt ?? '').compareTo(a.createdAt ?? ''));
+    return movies;
+  }
+
+  static Future<MovieListMovie> addMovieToList(
+    String userId,
+    String listId,
+    int movieId,
+  ) async {
+    final data = await ApiClient.post(
+      '/users/$userId/movie/watchlists/lists/$listId/movies/$movieId',
+      body: {},
+    );
+    return MovieListMovie.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<void> removeMovieFromList(
+    String userId,
+    String listId,
+    int movieId,
+  ) async {
+    await ApiClient.delete(
+        '/users/$userId/movie/watchlists/lists/$listId/movies/$movieId');
+  }
+
+  // ---- Rewatch / watch entries ----------------------------------------------
+
+  static Future<MovieWatchEntry> logMovieWatch(
+    String userId,
+    LogMovieWatchRequest request,
+  ) async {
+    final data = await ApiClient.post(
+      '/users/$userId/movie/watches',
+      body: request.toJson(),
+    );
+    return MovieWatchEntry.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<List<MovieWatchEntry>> getUserMovieWatches(
+      String userId) async {
+    final data = await ApiClient.get('/users/$userId/movie/watches');
+    final watches = (data as List<dynamic>)
+        .whereType<Map<String, dynamic>>()
+        .map(MovieWatchEntry.fromJson)
+        .where((entry) => !entry.removed)
+        .toList()
+      ..sort((a, b) => (b.watchedAt ?? '').compareTo(a.watchedAt ?? ''));
+    return watches;
+  }
+
+  static Future<List<MovieWatchEntry>> getMovieWatchHistory(
+    String userId,
+    int movieId,
+  ) async {
+    final data = await ApiClient.get('/users/$userId/movie/$movieId/watches');
+    final watches = (data as List<dynamic>)
+        .whereType<Map<String, dynamic>>()
+        .map(MovieWatchEntry.fromJson)
+        .where((entry) => !entry.removed)
+        .toList()
+      ..sort((a, b) => (b.watchedAt ?? '').compareTo(a.watchedAt ?? ''));
+    return watches;
+  }
+
+  static Future<MovieWatchEntry> updateMovieWatch(
+    String userId,
+    String watchEntryId,
+    UpdateMovieWatchRequest request,
+  ) async {
+    final data = await ApiClient.patch(
+      '/users/$userId/movie/watches/$watchEntryId',
+      body: request.toJson(),
+    );
+    return MovieWatchEntry.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<void> deleteMovieWatch(
+      String userId, String watchEntryId) async {
+    await ApiClient.delete('/users/$userId/movie/watches/$watchEntryId');
+  }
+
+  // ---- Wrapped / Year in Review ---------------------------------------------
+
+  static Future<MovieWrapped> getMovieWrapped(String userId, int year) async {
+    final data = await ApiClient.get('/users/$userId/movie/wrapped/$year');
+    return MovieWrapped.fromJson(data as Map<String, dynamic>);
   }
 }

@@ -232,8 +232,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                                   const SizedBox(width: 12),
                               itemBuilder: (context, index) => FeaturedCard(
                                 movie: _forYouMovies[index],
-                                onTap: () => context.push(
-                                    '/movies/${_forYouMovies[index].id}'),
+                                onTap: () => context
+                                    .push('/movies/${_forYouMovies[index].id}'),
                               ),
                             ),
                           ),

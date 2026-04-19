@@ -30,6 +30,8 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
   int? _filterYear; // null = all years
   int? _filterMaxRuntime; // null = any length, value in minutes
 
+  AuthProvider? _authProvider;
+
   @override
   void initState() {
     super.initState();
@@ -38,7 +40,23 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final newProvider = context.read<AuthProvider>();
+    if (_authProvider != newProvider) {
+      _authProvider?.removeListener(_onUserChanged);
+      _authProvider = newProvider;
+      _authProvider!.addListener(_onUserChanged);
+    }
+  }
+
+  void _onUserChanged() {
+    if (mounted) _loadWatchlist();
+  }
+
+  @override
   void dispose() {
+    _authProvider?.removeListener(_onUserChanged);
     _searchController.dispose();
     super.dispose();
   }

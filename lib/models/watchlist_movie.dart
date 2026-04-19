@@ -19,8 +19,8 @@ class WatchlistMovie {
 
   factory WatchlistMovie.fromJson(Map<String, dynamic> json) {
     return WatchlistMovie(
-      id: json['id'] as String,
-      userId: json['userId'] as String,
+      id: json['id']?.toString() ?? '',
+      userId: json['userId']?.toString() ?? '',
       movieId: _parseInt(json['movieId']) ?? 0,
       removed: json['removed'] as bool?,
       createdAt: json['createdAt'] as String?,

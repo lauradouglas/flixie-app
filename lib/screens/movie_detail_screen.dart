@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/movie.dart';
 import '../models/movie_credits.dart';
 import '../models/movie_friend_activity.dart';
+import '../models/movie_watch_entry.dart';
 import '../models/review.dart';
 import '../models/similar_movie.dart';
 import '../models/watch_provider.dart';
@@ -22,6 +23,8 @@ import 'movie_detail/cast_card.dart';
 import 'movie_detail/friend_activity_row.dart';
 import 'movie_detail/genre_chip.dart';
 import 'movie_detail/hero_backdrop.dart';
+import 'movie_detail/add_to_list_sheet.dart';
+import 'movie_detail/rewatch_log_sheet.dart';
 import 'movie_detail/review_card.dart';
 import 'movie_detail/score_tile.dart';
 import 'movie_detail/similar_card.dart';
@@ -66,6 +69,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   int _watchedBounceKey = 0;
   int _favoriteBounceKey = 0;
   List<MovieFriendActivity> _friendsActivity = [];
+  List<MovieWatchEntry> _movieWatchHistory = [];
+  bool _watchHistoryLoading = false;
 
   // ---- Data loading ---------------------------------------------------------
 
@@ -153,6 +158,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
           _isLoading = false;
         });
+        if (userId != null) {
+          _loadWatchHistory(userId, id);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -160,6 +168,24 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           _error = e.toString();
           _isLoading = false;
         });
+      }
+    }
+  }
+
+  Future<void> _loadWatchHistory(String userId, int movieId) async {
+    if (!mounted) return;
+    setState(() => _watchHistoryLoading = true);
+    try {
+      final history = await UserService.getMovieWatchHistory(userId, movieId);
+      if (mounted) {
+        setState(() {
+          _movieWatchHistory = history;
+          _watchHistoryLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _watchHistoryLoading = false);
       }
     }
   }
@@ -276,12 +302,17 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
     if (user == null || movieId == null) return;
 
+    // When not yet watched, open the log watch sheet so the user can record
+    // date/rating/notes. The sheet marks the movie as watched on success.
+    if (!_isWatched) {
+      await _showLogWatchSheet();
+      return;
+    }
+
     setState(() => _currentlyUpdating = ListUpdateType.watched);
 
     try {
-      await (_isWatched
-          ? UserService.removeFromWatched(user.id, movieId)
-          : UserService.addToWatched(user.id, movieId));
+      await UserService.removeFromWatched(user.id, movieId);
 
       // Successfully updated on server, toggle UI state and update user list
       if (mounted) {
@@ -312,60 +343,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           logger.d('currentWatched: $currentWatched');
         }
 
-        if (_isWatched) {
-          if (!updatedWatched.contains(movieId)) {
-            updatedWatched.add(movieId);
-          }
-          authProvider.markActivityChanged();
-          // Also offer to remove from watchlist if it's still there
-          if (_inWatchlist && mounted) {
-            final remove = await showDialog<bool>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                backgroundColor: FlixieColors.tabBarBackgroundFocused,
-                title: const Text('Remove from Watchlist?',
-                    style: TextStyle(color: FlixieColors.light)),
-                content: const Text(
-                    'This movie is in your watchlist. Remove it now that you\'ve watched it?',
-                    style: TextStyle(color: FlixieColors.medium)),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text('Keep it',
-                        style: TextStyle(color: FlixieColors.medium)),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    child: const Text('Remove',
-                        style: TextStyle(color: FlixieColors.primary)),
-                  ),
-                ],
-              ),
-            );
-            if (remove == true && mounted) {
-              await UserService.removeFromWatchlist(user.id, movieId);
-              final currentWatchlist =
-                  List<dynamic>.from(user.movieWatchlist ?? []);
-              currentWatchlist.removeWhere((item) {
-                if (item is Map<String, dynamic>) {
-                  return (item['movieId'] ?? item['id']) == movieId;
-                }
-                return item == movieId;
-              });
-              setState(() => _inWatchlist = false);
-              authProvider.updateUserList(
-                  movieWatchlist: currentWatchlist,
-                  watchedMovies: updatedWatched);
-            } else {
-              authProvider.updateUserList(watchedMovies: updatedWatched);
-            }
-          } else {
-            authProvider.updateUserList(watchedMovies: updatedWatched);
-          }
-        } else {
-          updatedWatched.remove(movieId);
-          authProvider.updateUserList(watchedMovies: updatedWatched);
-        }
+        // _isWatched is now false (was toggled above); remove from local list
+        updatedWatched.remove(movieId);
+        authProvider.updateUserList(watchedMovies: updatedWatched);
       }
     } catch (e) {
       logger.e('Error toggling watched: $e');
@@ -442,6 +422,156 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to update favorites: $e')),
         );
+      }
+    }
+  }
+
+  Future<void> _showAddToListSheet() async {
+    final movieId = int.tryParse(widget.movieId);
+    if (movieId == null) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: FlixieColors.tabBarBackgroundFocused,
+      builder: (_) => AddToListSheet(movieId: movieId),
+    );
+  }
+
+  Future<void> _showLogWatchSheet({MovieWatchEntry? entry}) async {
+    final movieId = int.tryParse(widget.movieId);
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (movieId == null || userId == null) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => RewatchLogSheet(
+        initial: entry,
+        onSubmit: ({
+          required String watchedAt,
+          required double? rating,
+          required String? notes,
+        }) async {
+          try {
+            if (entry == null) {
+              await UserService.logMovieWatch(
+                userId,
+                LogMovieWatchRequest(
+                  movieId: movieId,
+                  watchedAt: watchedAt,
+                  rating: rating,
+                  notes: notes,
+                ),
+              );
+              // Also mark the movie as watched in the main watched list and
+              // update local user state, then offer to remove from watchlist.
+              await UserService.addToWatched(userId, movieId);
+              final authProvider = context.read<AuthProvider>();
+              final user = authProvider.dbUser;
+              final currentWatched = user?.watchedMovies ?? [];
+              final updatedWatched = <int>[];
+              try {
+                for (final item in currentWatched) {
+                  if (item is int) {
+                    updatedWatched.add(item);
+                  } else if (item is Map<String, dynamic>) {
+                    final id = item['movieId'] ?? item['id'];
+                    if (id is int) updatedWatched.add(id);
+                  }
+                }
+              } catch (_) {}
+              if (!updatedWatched.contains(movieId)) {
+                updatedWatched.add(movieId);
+              }
+              authProvider.updateUserList(watchedMovies: updatedWatched);
+              authProvider.markActivityChanged();
+              // Offer watchlist removal if applicable
+              if (_inWatchlist && mounted) {
+                final remove = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    backgroundColor: FlixieColors.tabBarBackgroundFocused,
+                    title: const Text('Remove from Watchlist?',
+                        style: TextStyle(color: FlixieColors.light)),
+                    content: const Text(
+                        "This movie is in your watchlist. Remove it now that you've watched it?",
+                        style: TextStyle(color: FlixieColors.medium)),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Keep it',
+                            style: TextStyle(color: FlixieColors.medium)),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Remove',
+                            style: TextStyle(color: FlixieColors.primary)),
+                      ),
+                    ],
+                  ),
+                );
+                if (remove == true && mounted) {
+                  await UserService.removeFromWatchlist(userId, movieId);
+                  final currentWatchlist =
+                      List<dynamic>.from(authProvider.dbUser?.movieWatchlist ?? []);
+                  currentWatchlist.removeWhere((item) {
+                    if (item is Map<String, dynamic>) {
+                      return (item['movieId'] ?? item['id']) == movieId;
+                    }
+                    return item == movieId;
+                  });
+                  if (mounted) setState(() => _inWatchlist = false);
+                  authProvider.updateUserList(
+                      movieWatchlist: currentWatchlist,
+                      watchedMovies: updatedWatched);
+                }
+              }
+            } else {
+              await UserService.updateMovieWatch(
+                userId,
+                entry.id,
+                UpdateMovieWatchRequest(
+                  watchedAt: watchedAt,
+                  rating: rating,
+                  notes: notes,
+                ),
+              );
+            }
+            await _loadWatchHistory(userId, movieId);
+            if (mounted) {
+              setState(() => _isWatched = true);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(entry == null ? 'Watch logged' : 'Watch entry updated'),
+                ),
+              );
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context)
+                  .showSnackBar(SnackBar(content: Text('Unable to save watch entry: $e')));
+            }
+          }
+        },
+      ),
+    );
+  }
+
+  Future<void> _deleteWatchEntry(MovieWatchEntry entry) async {
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    final movieId = int.tryParse(widget.movieId);
+    if (userId == null || movieId == null) return;
+    try {
+      await UserService.deleteMovieWatch(userId, entry.id);
+      await _loadWatchHistory(userId, movieId);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Watch entry deleted')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Unable to delete watch entry: $e')));
       }
     }
   }
@@ -555,9 +685,11 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                     const SizedBox(height: 16),
                     _buildFilmInfoCard(movie),
                     const SizedBox(height: 16),
-                    _buildActionButtons(),
-                    const SizedBox(height: 28),
-                    _buildFriendsActivitySection(context),
+                     _buildActionButtons(),
+                     const SizedBox(height: 28),
+                     _buildWatchHistorySection(context),
+                     const SizedBox(height: 28),
+                     _buildFriendsActivitySection(context),
                     const SizedBox(height: 28),
                     _buildTrailersSection(context, movie),
                     const SizedBox(height: 28),
@@ -1204,8 +1336,100 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             onPressed: _showWatchRequestSheet,
           ),
         ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.playlist_add_outlined, size: 18),
+                label: const Text('Add to List'),
+                onPressed: _showAddToListSheet,
+              ),
+            ),
+            if (_isWatched) ...[
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.replay_outlined, size: 18),
+                  label: const Text('Log Rewatch'),
+                  onPressed: () => _showLogWatchSheet(),
+                ),
+              ),
+            ],
+          ],
+        ),
       ],
     );
+  }
+
+  Widget _buildWatchHistorySection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Watch History',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: FlixieColors.light,
+          ),
+        ),
+        const SizedBox(height: 10),
+        if (_watchHistoryLoading)
+          const Center(child: CircularProgressIndicator())
+        else if (_movieWatchHistory.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: FlixieColors.tabBarBackgroundFocused,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Text(
+              'No watch history yet for this movie.',
+              style: TextStyle(color: FlixieColors.medium),
+            ),
+          )
+        else
+          ..._movieWatchHistory.take(5).map(
+                (entry) => Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: FlixieColors.tabBarBackgroundFocused,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ListTile(
+                    title: Text(_formatWatchDate(entry.watchedAt)),
+                    subtitle: Text(
+                      [
+                        if (entry.rating != null) 'Rating: ${entry.rating!.toStringAsFixed(0)}/10',
+                        if (entry.notes != null && entry.notes!.isNotEmpty) entry.notes!,
+                      ].join(' • '),
+                    ),
+                    trailing: PopupMenuButton<String>(
+                      onSelected: (value) {
+                        if (value == 'edit') {
+                          _showLogWatchSheet(entry: entry);
+                          return;
+                        }
+                        _deleteWatchEntry(entry);
+                      },
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(value: 'edit', child: Text('Edit')),
+                        PopupMenuItem(value: 'delete', child: Text('Delete')),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+      ],
+    );
+  }
+
+  String _formatWatchDate(String? iso) {
+    final dt = DateTime.tryParse(iso ?? '');
+    if (dt == null) return 'Unknown date';
+    return '${dt.day}/${dt.month}/${dt.year}';
   }
 
   Widget _buildActionButton({
@@ -1892,4 +2116,3 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     );
   }
 }
-
