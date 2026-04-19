@@ -322,6 +322,25 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Marks onboarding as complete on the backend and updates the cached user.
+  /// Called when the user finishes or skips the post-signup onboarding flow.
+  Future<void> completeOnboarding() async {
+    final userId = _dbUser?.id;
+    if (userId == null) return;
+    try {
+      final updated =
+          await UserService.updateUserField(userId, 'completedSetup', true);
+      _dbUser = updated;
+    } catch (e) {
+      // Optimistically mark complete locally so the user isn't stuck
+      if (_dbUser != null) {
+        _dbUser = _dbUser!.copyWith(completedSetup: true);
+      }
+      logger.w('[AuthProvider] completeOnboarding error: $e');
+    }
+    notifyListeners();
+  }
+
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();

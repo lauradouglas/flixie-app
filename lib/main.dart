@@ -33,6 +33,7 @@ import 'screens/group_members_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/signup_screen.dart';
 import 'screens/auth/forgot_password_screen.dart';
+import 'screens/onboarding/onboarding_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -113,9 +114,20 @@ GoRouter _buildRouter(AuthProvider authProvider) {
       if (status == AuthStatus.unauthenticated && !isAuthRoute) {
         return '/auth/login';
       }
-      if (status == AuthStatus.authenticated && (isAuthRoute || isSplash)) {
-        return '/';
+
+      if (status == AuthStatus.authenticated) {
+        final isOnboarding = state.matchedLocation == '/onboarding';
+        final dbUser = authProvider.dbUser;
+        // New user — must complete onboarding first
+        if (dbUser != null && !dbUser.completedSetup) {
+          return isOnboarding ? null : '/onboarding';
+        }
+        // Setup done — bounce away from auth/splash/onboarding
+        if (isAuthRoute || isSplash || isOnboarding) {
+          return '/';
+        }
       }
+
       return null;
     },
     routes: [
@@ -148,8 +160,8 @@ GoRouter _buildRouter(AuthProvider authProvider) {
               initialTab: state.uri.queryParameters['tab'] == 'requests'
                   ? 2
                   : state.uri.queryParameters['tab'] == 'chat'
-                  ? 0
-                  : null,
+                      ? 0
+                      : null,
             ),
           ),
           GoRoute(
@@ -218,6 +230,12 @@ GoRouter _buildRouter(AuthProvider authProvider) {
             redirect: (_, __) => '/social',
           ),
         ],
+      ),
+
+      // Onboarding (authenticated, completedSetup == false)
+      GoRoute(
+        path: '/onboarding',
+        builder: (context, state) => const OnboardingScreen(),
       ),
 
       // Auth routes (unauthenticated)
