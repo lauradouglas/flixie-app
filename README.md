@@ -88,11 +88,19 @@ lib/
     │   ├── login_screen.dart        # Sign-in screen
     │   ├── signup_screen.dart       # Create-account screen
     │   └── forgot_password_screen.dart # Password-reset screen
+    ├── stats/
+    │   ├── stat_card.dart           # Reusable stats UI card
+    │   ├── monthly_bar_chart.dart   # Reusable monthly chart widget
+    │   ├── genre_bar.dart           # Reusable genre ranking row
+    │   ├── section_header.dart      # Reusable section title row
+    │   └── year_breakdown.dart      # Reusable year breakdown chart
+    ├── stats_screen.dart            # My Stats screen composition
     ├── home_screen.dart             # Home / featured content
     ├── search_screen.dart           # Search & genre browsing
     └── profile_screen.dart          # User profile & sign-out
 test/
-└── widget_test.dart             # Unit & widget tests
+├── widget_test.dart                 # Unit & widget tests
+└── stats_widgets_test.dart          # Stats reusable widget tests
 android/                         # Android-specific configuration
 ios/                             # iOS-specific configuration
 ```
