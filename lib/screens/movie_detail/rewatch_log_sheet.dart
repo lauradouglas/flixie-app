@@ -24,6 +24,7 @@ class RewatchLogSheet extends StatefulWidget {
 class _RewatchLogSheetState extends State<RewatchLogSheet> {
   late DateTime _watchedAt;
   late TextEditingController _notesController;
+  late bool _hasRating;
   double? _rating;
   bool _saving = false;
 
@@ -32,6 +33,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
     super.initState();
     _watchedAt = DateTime.tryParse(widget.initial?.watchedAt ?? '') ?? DateTime.now();
     _rating = widget.initial?.rating;
+    _hasRating = _rating != null;
     _notesController = TextEditingController(text: widget.initial?.notes ?? '');
   }
 
@@ -82,11 +84,16 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
               children: [
                 const Text('Rating'),
                 const Spacer(),
-                if (_rating != null)
-                  TextButton(
-                    onPressed: () => setState(() => _rating = null),
-                    child: const Text('Clear'),
-                  ),
+                Switch(
+                  value: _hasRating,
+                  activeColor: FlixieColors.primary,
+                  onChanged: (value) {
+                    setState(() {
+                      _hasRating = value;
+                      _rating = value ? (_rating ?? 5) : null;
+                    });
+                  },
+                ),
               ],
             ),
             Slider(
@@ -96,7 +103,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
               divisions: 9,
               label: _rating?.toStringAsFixed(0) ?? '—',
               activeColor: FlixieColors.primary,
-              onChanged: (v) => setState(() => _rating = v.roundToDouble()),
+              onChanged: _hasRating ? (v) => setState(() => _rating = v.roundToDouble()) : null,
             ),
             TextField(
               controller: _notesController,
@@ -113,7 +120,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                         setState(() => _saving = true);
                         await widget.onSubmit(
                           watchedAt: _watchedAt.toUtc().toIso8601String(),
-                          rating: _rating,
+                          rating: _hasRating ? _rating : null,
                           notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
                         );
                         if (mounted) Navigator.pop(context);

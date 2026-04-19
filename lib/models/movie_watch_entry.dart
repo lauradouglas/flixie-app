@@ -74,7 +74,7 @@ class LogMovieWatchRequest {
   Map<String, dynamic> toJson() {
     return {
       'movieId': movieId,
-      if (watchedAt != null) 'watchedAt': watchedAt,
+      'watchedAt': watchedAt,
       'rating': rating,
       'notes': notes,
     };
@@ -94,9 +94,9 @@ class UpdateMovieWatchRequest {
 
   Map<String, dynamic> toJson() {
     return {
+      'watchedAt': watchedAt,
       'rating': rating,
       'notes': notes,
-      if (watchedAt != null) 'watchedAt': watchedAt,
     };
   }
 }
