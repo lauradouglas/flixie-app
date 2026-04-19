@@ -15,6 +15,7 @@ import 'my_reviews_screen.dart';
 import 'profile/favorite_movies_section.dart';
 import 'profile/movie_taste_badge.dart';
 import 'profile/profile_stats_row.dart';
+import 'wrapped/friend_wrapped_section.dart';
 
 enum _FriendshipStatus { none, pending, requested, friends }
 
@@ -416,6 +417,40 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     return FlixieColors.primary;
   }
 
+  void _openWrappedSheet() {
+    final user = _user;
+    if (user == null) return;
+    final joinYear = user.createdAt != null
+        ? (DateTime.tryParse(user.createdAt!)?.year ?? DateTime.now().year)
+        : DateTime.now().year;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: true,
+      enableDrag: true,
+      showDragHandle: true,
+      backgroundColor: FlixieColors.background,
+      useSafeArea: true,
+      builder: (sheetContext) {
+        return DraggableScrollableSheet(
+          expand: false,
+          minChildSize: 0.5,
+          initialChildSize: 0.92,
+          maxChildSize: 0.95,
+          builder: (context, scrollController) {
+            return FriendWrappedSection(
+              userId: user.id,
+              joinYear: joinYear,
+              username: user.username,
+              scrollController: scrollController,
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -533,6 +568,30 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                     FriendMiniStats(watchedMovies: _user!.watchedMovies!),
                   ],
 
+                  // Friend's wrapped
+                  if (_user != null) ...[
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _openWrappedSheet,
+                        icon: const Icon(Icons.auto_awesome),
+                        label: Text(
+                          "View ${_user!.username}'s Wrapped",
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: FlixieColors.primary,
+                          side: const BorderSide(color: FlixieColors.primary),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+
                   const SizedBox(height: 24),
                   const Divider(),
                   const SizedBox(height: 16),
@@ -646,4 +705,3 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     );
   }
 }
-

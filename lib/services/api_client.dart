@@ -21,7 +21,7 @@ class ApiClient {
   // static const String baseUrl = String.fromEnvironment(
   //   'API_BASE_URL',
   //   defaultValue:
-  //       'https://flixie-api-fmceRhvaecwdheccm.northeurope-01.azurewebsites.net',
+  //       'https://flixie-api-fmcehvaecwdheccm.northeurope-01.azurewebsites.net',
   // );
 
   static const Duration _timeout = Duration(seconds: 15);
