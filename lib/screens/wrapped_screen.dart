@@ -130,7 +130,7 @@ class _WrappedViewState extends State<_WrappedView> {
                     ...wrapped.monthlyWatchCounts.map(
                       (m) => ListTile(
                         dense: true,
-                        title: Text(_monthNames[((m.month - 1).clamp(0, 11) as int)]),
+                        title: Text(_monthNames[(m.month - 1).clamp(0, 11).toInt()]),
                         trailing: Text('${m.count}'),
                       ),
                     ),

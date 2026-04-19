@@ -70,7 +70,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                   context: context,
                   initialDate: _watchedAt,
                   firstDate: DateTime(1970),
-                  lastDate: DateTime.now().add(const Duration(days: 1)),
+                  lastDate: DateTime.now(),
                 );
                 if (date != null) {
                   setState(() => _watchedAt = date);
