@@ -1,28 +1,31 @@
 class MovieList {
   final String id;
-  final String userId;
+  final String? userId;
   final String name;
   final bool removed;
+  final int? movieCount;
   final String? createdAt;
   final String? updatedAt;
 
   const MovieList({
     required this.id,
-    required this.userId,
+    this.userId,
     required this.name,
     required this.removed,
+    this.movieCount,
     this.createdAt,
     this.updatedAt,
   });
 
   factory MovieList.fromJson(Map<String, dynamic> json) {
     return MovieList(
-      id: json['id'] as String,
-      userId: json['userId'] as String,
+      id: json['id']?.toString() ?? '',
+      userId: json['userId']?.toString(),
       name: json['name'] as String? ?? '',
       removed: json['removed'] as bool? ?? false,
-      createdAt: json['createdAt'] as String?,
-      updatedAt: json['updatedAt'] as String?,
+      movieCount: json['movieCount'] as int?,
+      createdAt: json['createdAt']?.toString(),
+      updatedAt: json['updatedAt']?.toString(),
     );
   }
 
@@ -32,6 +35,7 @@ class MovieList {
       'userId': userId,
       'name': name,
       'removed': removed,
+      'movieCount': movieCount,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
     };

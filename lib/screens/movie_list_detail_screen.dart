@@ -73,8 +73,9 @@ class _MovieListDetailView extends StatelessWidget {
                   itemBuilder: (_, index) {
                     final entry = movies[index];
                     final posterPath = entry.movie?.posterPath;
-                    final posterUrl =
-                        posterPath != null ? 'https://image.tmdb.org/t/p/w500$posterPath' : null;
+                    final posterUrl = posterPath != null
+                        ? 'https://image.tmdb.org/t/p/w500$posterPath'
+                        : null;
                     return GestureDetector(
                       onTap: () => context.push('/movies/${entry.movieId}'),
                       child: Container(
@@ -87,10 +88,11 @@ class _MovieListDetailView extends StatelessWidget {
                           children: [
                             Expanded(
                               child: ClipRRect(
-                                borderRadius:
-                                    const BorderRadius.vertical(top: Radius.circular(12)),
+                                borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(12)),
                                 child: posterUrl == null
                                     ? Container(
+                                        width: double.infinity,
                                         color: const Color(0xFF1E2D40),
                                         child: const Center(
                                           child: Icon(Icons.movie_outlined,
@@ -99,6 +101,7 @@ class _MovieListDetailView extends StatelessWidget {
                                       )
                                     : CachedNetworkImage(
                                         imageUrl: posterUrl,
+                                        width: double.infinity,
                                         fit: BoxFit.cover,
                                       ),
                               ),
@@ -109,7 +112,8 @@ class _MovieListDetailView extends StatelessWidget {
                                 entry.movie?.title ?? 'Unknown',
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontWeight: FontWeight.w600),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600),
                               ),
                             ),
                             Align(
@@ -118,13 +122,15 @@ class _MovieListDetailView extends StatelessWidget {
                                 icon: const Icon(Icons.remove_circle_outline,
                                     color: FlixieColors.danger),
                                 onPressed: () async {
-                                  final ok = await provider.removeMovieFromList(listId, entry.movieId);
+                                  final ok = await provider.removeMovieFromList(
+                                      listId, entry.movieId);
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(ok
                                             ? 'Removed from list'
-                                            : (provider.error ?? 'Unable to remove movie')),
+                                            : (provider.error ??
+                                                'Unable to remove movie')),
                                       ),
                                     );
                                   }

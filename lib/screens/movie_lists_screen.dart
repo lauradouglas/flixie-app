@@ -45,7 +45,8 @@ class _MovieListsView extends StatelessWidget {
           ? const Center(child: CircularProgressIndicator())
           : provider.lists.isEmpty
               ? _EmptyState(
-                  message: provider.error ?? 'No lists yet. Create your first one.',
+                  message:
+                      provider.error ?? 'No lists yet. Create your first one.',
                 )
               : ListView.separated(
                   padding: const EdgeInsets.all(16),
@@ -61,22 +62,26 @@ class _MovieListsView extends StatelessWidget {
                         trailing: PopupMenuButton<String>(
                           onSelected: (value) async {
                             if (value == 'edit') {
-                              await _openListEditor(context, listId: list.id, initialName: list.name);
+                              await _openListEditor(context,
+                                  listId: list.id, initialName: list.name);
                               return;
                             }
                             final ok = await provider.deleteList(list.id);
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content:
-                                      Text(ok ? 'List deleted' : (provider.error ?? 'Failed to delete list')),
+                                  content: Text(ok
+                                      ? 'List deleted'
+                                      : (provider.error ??
+                                          'Failed to delete list')),
                                 ),
                               );
                             }
                           },
                           itemBuilder: (_) => const [
                             PopupMenuItem(value: 'edit', child: Text('Rename')),
-                            PopupMenuItem(value: 'delete', child: Text('Delete')),
+                            PopupMenuItem(
+                                value: 'delete', child: Text('Delete')),
                           ],
                         ),
                         onTap: () => context.push(
@@ -130,14 +135,15 @@ class _MovieListsView extends StatelessWidget {
                     final name = controller.text.trim();
                     if (name.isEmpty) return;
                     final ok = isEdit
-                        ? await provider.renameList(listId!, name)
+                        ? await provider.renameList(listId, name)
                         : (await provider.createList(name)) != null;
                     if (ctx.mounted) Navigator.pop(ctx);
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content:
-                              Text(ok ? (isEdit ? 'List renamed' : 'List created') : (provider.error ?? 'Unable to save list')),
+                          content: Text(ok
+                              ? (isEdit ? 'List renamed' : 'List created')
+                              : (provider.error ?? 'Unable to save list')),
                         ),
                       );
                     }

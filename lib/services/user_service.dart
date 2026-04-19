@@ -350,9 +350,12 @@ class UserService {
     String userId,
     String listId,
   ) async {
-    final data =
-        await ApiClient.get('/users/$userId/movie/watchlists/lists/$listId/movies');
-    final movies = (data as List<dynamic>)
+    final data = await ApiClient.get(
+        '/users/$userId/movie/watchlists/lists/$listId/movies');
+    // Response shape: { list: { id, name }, movies: [...] }
+    final raw = data as Map<String, dynamic>;
+    final moviesList = raw['movies'] as List<dynamic>? ?? [];
+    final movies = moviesList
         .whereType<Map<String, dynamic>>()
         .map(MovieListMovie.fromJson)
         .where((entry) => !entry.removed)
@@ -378,7 +381,8 @@ class UserService {
     String listId,
     int movieId,
   ) async {
-    await ApiClient.delete('/users/$userId/movie/watchlists/lists/$listId/movies/$movieId');
+    await ApiClient.delete(
+        '/users/$userId/movie/watchlists/lists/$listId/movies/$movieId');
   }
 
   // ---- Rewatch / watch entries ----------------------------------------------
@@ -394,7 +398,8 @@ class UserService {
     return MovieWatchEntry.fromJson(data as Map<String, dynamic>);
   }
 
-  static Future<List<MovieWatchEntry>> getUserMovieWatches(String userId) async {
+  static Future<List<MovieWatchEntry>> getUserMovieWatches(
+      String userId) async {
     final data = await ApiClient.get('/users/$userId/movie/watches');
     final watches = (data as List<dynamic>)
         .whereType<Map<String, dynamic>>()
@@ -431,7 +436,8 @@ class UserService {
     return MovieWatchEntry.fromJson(data as Map<String, dynamic>);
   }
 
-  static Future<void> deleteMovieWatch(String userId, String watchEntryId) async {
+  static Future<void> deleteMovieWatch(
+      String userId, String watchEntryId) async {
     await ApiClient.delete('/users/$userId/movie/watches/$watchEntryId');
   }
 
