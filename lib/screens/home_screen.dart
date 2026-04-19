@@ -10,6 +10,7 @@ import '../models/activity_list_item.dart';
 import '../services/friend_service.dart';
 import '../providers/auth_provider.dart';
 import '../services/movie_service.dart';
+import '../services/recommendation_service.dart';
 import '../services/trending_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_logger.dart';
@@ -31,6 +32,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with RouteAware {
   List<MovieShort> _featuredMovies = [];
   List<MovieShort> _nowPlayingMovies = [];
+  List<MovieShort> _forYouMovies = [];
   List<TopRatedMovie> _topRatedThisWeek = [];
   List<ActivityListItem> _friendsActivity = [];
   bool _isLoading = true;
@@ -108,6 +110,11 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         else
           Future.value([]),
         MovieService.getTopRatedThisWeek(),
+        if (user != null)
+          RecommendationService.getUserRecommendations(user.id)
+              .catchError((_) => <MovieShort>[])
+        else
+          Future.value(<MovieShort>[]),
       ]);
       if (mounted) {
         setState(() {
@@ -116,6 +123,9 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
           _friendsActivity =
               results.length > 2 ? results[2] as List<ActivityListItem> : [];
           _topRatedThisWeek = results[3] as List<TopRatedMovie>;
+          _forYouMovies = results.length > 4
+              ? (results[4] as List<MovieShort>).take(20).toList()
+              : [];
           _loadedForUserId = user?.id;
           _isLoading = false;
         });
@@ -204,6 +214,31 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                           ),
                         ),
                         const SizedBox(height: 24),
+                        // For You section
+                        if (_forYouMovies.isNotEmpty) ...[
+                          HomeSectionHeader(
+                            title: 'For You',
+                            onSeeAll: null,
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            height: 260,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
+                              itemCount: _forYouMovies.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 12),
+                              itemBuilder: (context, index) => FeaturedCard(
+                                movie: _forYouMovies[index],
+                                onTap: () => context.push(
+                                    '/movies/${_forYouMovies[index].id}'),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                        ],
                         // Popular section
                         const HomeSectionHeader(title: 'In Theatres Now'),
                         const SizedBox(height: 12),
