@@ -24,16 +24,16 @@ class RewatchLogSheet extends StatefulWidget {
 class _RewatchLogSheetState extends State<RewatchLogSheet> {
   late DateTime _watchedAt;
   late TextEditingController _notesController;
-  late bool _hasRating;
-  double? _rating;
+  // null means "no rating"; 1-10 when set
+  int? _rating;
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
     _watchedAt = DateTime.tryParse(widget.initial?.watchedAt ?? '') ?? DateTime.now();
-    _rating = widget.initial?.rating;
-    _hasRating = _rating != null;
+    final existingRating = widget.initial?.rating;
+    _rating = existingRating != null ? existingRating.round() : null;
     _notesController = TextEditingController(text: widget.initial?.notes ?? '');
   }
 
@@ -45,97 +45,212 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF0D1B2A),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.initial == null ? 'Log Watch' : 'Edit Watch Entry',
-              style: Theme.of(context).textTheme.titleLarge,
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle bar
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: FlixieColors.medium,
+              borderRadius: BorderRadius.circular(2),
             ),
-            const SizedBox(height: 12),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Watched on'),
-              subtitle: Text('${_watchedAt.day}/${_watchedAt.month}/${_watchedAt.year}'),
-              trailing: const Icon(Icons.calendar_today),
-              onTap: () async {
-                final date = await showDatePicker(
-                  context: context,
-                  initialDate: _watchedAt,
-                  firstDate: DateTime(1970),
-                  lastDate: DateTime.now(),
-                );
-                if (date != null) {
-                  setState(() => _watchedAt = date);
-                }
-              },
-            ),
-            const SizedBox(height: 8),
-            Row(
+          ),
+          // Header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Rating'),
-                const Spacer(),
-                Switch(
-                  value: _hasRating,
-                  activeColor: FlixieColors.primary,
-                  onChanged: (value) {
-                    setState(() {
-                      _hasRating = value;
-                      _rating = value ? (_rating ?? 5) : null;
-                    });
-                  },
+                Text(
+                  widget.initial == null ? 'Log Watch' : 'Edit Watch Entry',
+                  style: const TextStyle(
+                    color: FlixieColors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: FlixieColors.light),
+                  onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
             ),
-            Slider(
-              value: (_rating ?? 5).clamp(1, 10).toDouble(),
-              min: 1,
-              max: 10,
-              divisions: 9,
-              label: _rating?.toStringAsFixed(0) ?? '—',
-              activeColor: FlixieColors.primary,
-              onChanged: _hasRating ? (v) => setState(() => _rating = v.roundToDouble()) : null,
-            ),
-            TextField(
-              controller: _notesController,
-              maxLines: 3,
-              decoration: const InputDecoration(hintText: 'Notes (optional)'),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _saving
-                    ? null
-                    : () async {
-                        setState(() => _saving = true);
-                        await widget.onSubmit(
-                          watchedAt: _watchedAt.toUtc().toIso8601String(),
-                          rating: _hasRating ? _rating : null,
-                          notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
-                        );
-                        if (mounted) Navigator.pop(context);
-                      },
-                child: _saving
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(widget.initial == null ? 'Log Watch' : 'Save Changes'),
+          ),
+          const Divider(color: Color(0xFF1E2D40), height: 1),
+          // Form body
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Watched-on date picker
+                  const Text(
+                    'Watched on',
+                    style: TextStyle(
+                      color: FlixieColors.light,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate: _watchedAt,
+                        firstDate: DateTime(1970),
+                        lastDate: DateTime.now(),
+                      );
+                      if (date != null) setState(() => _watchedAt = date);
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1B2E42),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_today,
+                              color: FlixieColors.medium, size: 18),
+                          const SizedBox(width: 10),
+                          Text(
+                            '${_watchedAt.day}/${_watchedAt.month}/${_watchedAt.year}',
+                            style:
+                                const TextStyle(color: FlixieColors.light),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // Star rating (1-10)
+                  const Text(
+                    'Rating',
+                    style: TextStyle(
+                      color: FlixieColors.light,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: List.generate(10, (i) {
+                      final value = i + 1;
+                      final isSelected = _rating != null && value <= _rating!;
+                      return GestureDetector(
+                        onTap: () => setState(() {
+                          // Tapping the currently-selected last star clears the rating
+                          _rating = (_rating == value) ? null : value;
+                        }),
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Icon(
+                            isSelected ? Icons.star : Icons.star_border,
+                            color: isSelected
+                                ? Colors.amber
+                                : FlixieColors.medium,
+                            size: 28,
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _rating != null ? '$_rating / 10' : 'No rating',
+                    style: const TextStyle(
+                      color: FlixieColors.medium,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // Notes
+                  const Text(
+                    'Notes',
+                    style: TextStyle(
+                      color: FlixieColors.light,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _notesController,
+                    maxLines: 3,
+                    style: const TextStyle(color: FlixieColors.white),
+                    decoration: InputDecoration(
+                      hintText: 'Notes (optional)',
+                      hintStyle: const TextStyle(color: FlixieColors.medium),
+                      filled: true,
+                      fillColor: const Color(0xFF1B2E42),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: FlixieColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: _saving
+                          ? null
+                          : () async {
+                              setState(() => _saving = true);
+                              await widget.onSubmit(
+                                watchedAt: _watchedAt.toUtc().toIso8601String(),
+                                rating: _rating?.toDouble(),
+                                notes: _notesController.text.trim().isEmpty
+                                    ? null
+                                    : _notesController.text.trim(),
+                              );
+                              if (mounted) Navigator.pop(context);
+                            },
+                      child: _saving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text(
+                              widget.initial == null
+                                  ? 'Log Watch'
+                                  : 'Save Changes',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

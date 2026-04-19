@@ -302,12 +302,17 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
     if (user == null || movieId == null) return;
 
+    // When not yet watched, open the log watch sheet so the user can record
+    // date/rating/notes. The sheet marks the movie as watched on success.
+    if (!_isWatched) {
+      await _showLogWatchSheet();
+      return;
+    }
+
     setState(() => _currentlyUpdating = ListUpdateType.watched);
 
     try {
-      await (_isWatched
-          ? UserService.removeFromWatched(user.id, movieId)
-          : UserService.addToWatched(user.id, movieId));
+      await UserService.removeFromWatched(user.id, movieId);
 
       // Successfully updated on server, toggle UI state and update user list
       if (mounted) {
@@ -338,60 +343,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           logger.d('currentWatched: $currentWatched');
         }
 
-        if (_isWatched) {
-          if (!updatedWatched.contains(movieId)) {
-            updatedWatched.add(movieId);
-          }
-          authProvider.markActivityChanged();
-          // Also offer to remove from watchlist if it's still there
-          if (_inWatchlist && mounted) {
-            final remove = await showDialog<bool>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                backgroundColor: FlixieColors.tabBarBackgroundFocused,
-                title: const Text('Remove from Watchlist?',
-                    style: TextStyle(color: FlixieColors.light)),
-                content: const Text(
-                    'This movie is in your watchlist. Remove it now that you\'ve watched it?',
-                    style: TextStyle(color: FlixieColors.medium)),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text('Keep it',
-                        style: TextStyle(color: FlixieColors.medium)),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    child: const Text('Remove',
-                        style: TextStyle(color: FlixieColors.primary)),
-                  ),
-                ],
-              ),
-            );
-            if (remove == true && mounted) {
-              await UserService.removeFromWatchlist(user.id, movieId);
-              final currentWatchlist =
-                  List<dynamic>.from(user.movieWatchlist ?? []);
-              currentWatchlist.removeWhere((item) {
-                if (item is Map<String, dynamic>) {
-                  return (item['movieId'] ?? item['id']) == movieId;
-                }
-                return item == movieId;
-              });
-              setState(() => _inWatchlist = false);
-              authProvider.updateUserList(
-                  movieWatchlist: currentWatchlist,
-                  watchedMovies: updatedWatched);
-            } else {
-              authProvider.updateUserList(watchedMovies: updatedWatched);
-            }
-          } else {
-            authProvider.updateUserList(watchedMovies: updatedWatched);
-          }
-        } else {
-          updatedWatched.remove(movieId);
-          authProvider.updateUserList(watchedMovies: updatedWatched);
-        }
+        // _isWatched is now false (was toggled above); remove from local list
+        updatedWatched.remove(movieId);
+        authProvider.updateUserList(watchedMovies: updatedWatched);
       }
     } catch (e) {
       logger.e('Error toggling watched: $e');
@@ -490,7 +444,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.tabBarBackgroundFocused,
+      backgroundColor: Colors.transparent,
       builder: (_) => RewatchLogSheet(
         initial: entry,
         onSubmit: ({
@@ -509,6 +463,69 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   notes: notes,
                 ),
               );
+              // Also mark the movie as watched in the main watched list and
+              // update local user state, then offer to remove from watchlist.
+              await UserService.addToWatched(userId, movieId);
+              final authProvider = context.read<AuthProvider>();
+              final user = authProvider.dbUser;
+              final currentWatched = user?.watchedMovies ?? [];
+              final updatedWatched = <int>[];
+              try {
+                for (final item in currentWatched) {
+                  if (item is int) {
+                    updatedWatched.add(item);
+                  } else if (item is Map<String, dynamic>) {
+                    final id = item['movieId'] ?? item['id'];
+                    if (id is int) updatedWatched.add(id);
+                  }
+                }
+              } catch (_) {}
+              if (!updatedWatched.contains(movieId)) {
+                updatedWatched.add(movieId);
+              }
+              authProvider.updateUserList(watchedMovies: updatedWatched);
+              authProvider.markActivityChanged();
+              // Offer watchlist removal if applicable
+              if (_inWatchlist && mounted) {
+                final remove = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    backgroundColor: FlixieColors.tabBarBackgroundFocused,
+                    title: const Text('Remove from Watchlist?',
+                        style: TextStyle(color: FlixieColors.light)),
+                    content: const Text(
+                        "This movie is in your watchlist. Remove it now that you've watched it?",
+                        style: TextStyle(color: FlixieColors.medium)),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Keep it',
+                            style: TextStyle(color: FlixieColors.medium)),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Remove',
+                            style: TextStyle(color: FlixieColors.primary)),
+                      ),
+                    ],
+                  ),
+                );
+                if (remove == true && mounted) {
+                  await UserService.removeFromWatchlist(userId, movieId);
+                  final currentWatchlist =
+                      List<dynamic>.from(authProvider.dbUser?.movieWatchlist ?? []);
+                  currentWatchlist.removeWhere((item) {
+                    if (item is Map<String, dynamic>) {
+                      return (item['movieId'] ?? item['id']) == movieId;
+                    }
+                    return item == movieId;
+                  });
+                  if (mounted) setState(() => _inWatchlist = false);
+                  authProvider.updateUserList(
+                      movieWatchlist: currentWatchlist,
+                      watchedMovies: updatedWatched);
+                }
+              }
             } else {
               await UserService.updateMovieWatch(
                 userId,
@@ -1329,14 +1346,16 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 onPressed: _showAddToListSheet,
               ),
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.replay_outlined, size: 18),
-                label: Text(_isWatched ? 'Log Rewatch' : 'Log Watch'),
-                onPressed: () => _showLogWatchSheet(),
+            if (_isWatched) ...[
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.replay_outlined, size: 18),
+                  label: const Text('Log Rewatch'),
+                  onPressed: () => _showLogWatchSheet(),
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ],
