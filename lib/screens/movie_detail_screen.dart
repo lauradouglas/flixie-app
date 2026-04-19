@@ -669,7 +669,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                     _buildFilmInfoCard(movie),
                     const SizedBox(height: 16),
                      _buildActionButtons(),
-                     const SizedBox(height: 20),
+                     const SizedBox(height: 28),
                      _buildWatchHistorySection(context),
                      const SizedBox(height: 28),
                      _buildFriendsActivitySection(context),
