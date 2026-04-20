@@ -6,11 +6,12 @@ import '../models/activity_list_item.dart';
 import '../models/friendship.dart';
 import '../models/group.dart';
 import '../models/group_member.dart';
+import '../models/notification.dart';
 import '../providers/auth_provider.dart';
 import '../screens/profile/activity_tile.dart';
 import '../screens/profile/friends_row.dart';
+import '../services/chat_service.dart';
 import '../services/friend_service.dart';
-import '../models/notification.dart';
 import '../services/group_service.dart';
 import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
@@ -395,6 +396,28 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
     if (userId == null || group.id == null) return;
     try {
       await GroupService.updateMemberInviteStatus(group.id!, userId, status);
+
+      // Keep Firestore members in sync immediately after accepting an invite.
+      if (status == 'ACCEPTED') {
+        try {
+          final members = await GroupService.getGroupMembers(group.id!);
+          final memberIds = members
+              .where((m) => m.isAccepted)
+              .map((m) => m.memberId)
+              .toSet()
+              .toList();
+          if (!memberIds.contains(userId)) memberIds.add(userId);
+          await ChatService.getOrCreateGroupConversation(
+            creatorId: userId,
+            pgGroupId: group.id!,
+            name: group.name,
+            memberIds: memberIds,
+          );
+        } catch (e) {
+          logger.w('Invite accepted but Firestore sync failed: $e');
+        }
+      }
+
       // Also update the associated GROUP_INVITE notification so it reflects
       // the accept/decline on the notifications screen.
       final notif = _inviteNotifications[group.id];

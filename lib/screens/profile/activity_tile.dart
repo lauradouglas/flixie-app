@@ -254,7 +254,7 @@ class ActivityTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateStr = _formatDate(item.createdAt).toUpperCase();
+    final dateStr = _formatDate(item.timestamp).toUpperCase();
     final currentUserId = context.read<AuthProvider>().dbUser?.id;
     final isCurrentUser = item.userId == currentUserId;
     final path = item.mediaPosterPath;
@@ -262,6 +262,9 @@ class ActivityTile extends StatelessWidget {
     final int? navId = isPerson ? item.personId : item.movieId;
     final bool isReview = item.type == ActivityListType.movieReview ||
         item.type == ActivityListType.showReview;
+    final bool isWatched = item.type == ActivityListType.movieWatched ||
+        item.type == ActivityListType.showWatched;
+    final hasNotes = (item.notes ?? '').trim().isNotEmpty;
     final posterUrl = path != null ? '$_posterBase$path' : null;
 
     final tile = Container(
@@ -361,6 +364,18 @@ class ActivityTile extends StatelessWidget {
                           ..._buildRecommendBadge(item.reviewData!.recommended),
                       ],
                     ),
+                    if (isWatched && hasNotes) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        item.notes!.trim(),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: FlixieColors.medium,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

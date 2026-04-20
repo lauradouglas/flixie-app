@@ -46,7 +46,7 @@ class GroupService {
   static Future<void> removeMember(String groupId, String userId) async {
     await ApiClient.delete(
       '/groups/$groupId/members',
-      body: {'userId': userId},
+      body: [userId],
     );
   }
 
@@ -71,11 +71,12 @@ class GroupService {
   static Future<void> addMembersToGroup(
       String groupId, List<Map<String, dynamic>> members,
       {String? inviterId}) async {
+    final resolvedMembers = inviterId != null
+        ? members.map((m) => {...m, 'inviterId': inviterId}).toList()
+        : members;
     await ApiClient.post(
       '/groups/$groupId/members',
-      body: inviterId != null
-          ? members.map((m) => {...m, 'inviterId': inviterId}).toList()
-          : members,
+      body: {'members': resolvedMembers},
     );
   }
 
