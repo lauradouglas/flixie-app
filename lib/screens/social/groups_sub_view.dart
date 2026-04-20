@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../models/friendship.dart';
 import '../../models/group.dart';
 import '../../models/group_member.dart';
 import '../../models/notification.dart';

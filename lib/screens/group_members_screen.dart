@@ -114,7 +114,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
   Future<void> _transferOwnership(GroupMember member) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: FlixieColors.tabBarBackgroundFocused,
         title: const Text('Transfer Ownership',
             style: TextStyle(color: FlixieColors.light)),
@@ -124,11 +124,11 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogContext, true),
             style: ElevatedButton.styleFrom(
                 backgroundColor: FlixieColors.primary,
                 foregroundColor: Colors.black),
@@ -159,7 +159,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
   Future<void> _removeMember(GroupMember member) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: FlixieColors.tabBarBackgroundFocused,
         title: const Text('Remove Member',
             style: TextStyle(color: FlixieColors.light)),
@@ -169,11 +169,11 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogContext, true),
             style: ElevatedButton.styleFrom(
                 backgroundColor: FlixieColors.danger,
                 foregroundColor: Colors.white),
@@ -226,7 +226,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => SafeArea(
+      builder: (sheetContext) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -258,7 +258,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                 title: const Text('Promote to Admin',
                     style: TextStyle(color: FlixieColors.light)),
                 onTap: () {
-                  Navigator.pop(context);
+                  Navigator.pop(sheetContext);
                   _changeRole(member, 'ADMIN');
                 },
               ),
@@ -269,7 +269,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                 title: const Text('Demote to Member',
                     style: TextStyle(color: FlixieColors.light)),
                 onTap: () {
-                  Navigator.pop(context);
+                  Navigator.pop(sheetContext);
                   _changeRole(member, 'MEMBER');
                 },
               ),
@@ -280,7 +280,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                 title: const Text('Transfer Ownership',
                     style: TextStyle(color: FlixieColors.light)),
                 onTap: () {
-                  Navigator.pop(context);
+                  Navigator.pop(sheetContext);
                   _transferOwnership(member);
                 },
               ),
@@ -291,7 +291,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                 title: const Text('Remove from Group',
                     style: TextStyle(color: FlixieColors.danger)),
                 onTap: () {
-                  Navigator.pop(context);
+                  Navigator.pop(sheetContext);
                   _removeMember(member);
                 },
               ),

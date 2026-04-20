@@ -513,8 +513,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 );
                 if (remove == true && mounted) {
                   await UserService.removeFromWatchlist(userId, movieId);
-                  final currentWatchlist =
-                      List<dynamic>.from(authProvider.dbUser?.movieWatchlist ?? []);
+                  final currentWatchlist = List<dynamic>.from(
+                      authProvider.dbUser?.movieWatchlist ?? []);
                   currentWatchlist.removeWhere((item) {
                     if (item is Map<String, dynamic>) {
                       return (item['movieId'] ?? item['id']) == movieId;
@@ -539,18 +539,28 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               );
             }
             await _loadWatchHistory(userId, movieId);
+            // Evict the cache and re-fetch the movie so the updated
+            // community rating (voteAverage / voteCount) is reflected.
+            MovieService.evictMovie(movieId);
+            final updatedMovie =
+                await MovieService.getMovieById(movieId, userId: userId);
             if (mounted) {
-              setState(() => _isWatched = true);
+              setState(() {
+                _isWatched = true;
+                _movie = updatedMovie;
+                if (rating != null) _userRating = rating.round();
+              });
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(entry == null ? 'Watch logged' : 'Watch entry updated'),
+                  content: Text(
+                      entry == null ? 'Watch logged' : 'Watch entry updated'),
                 ),
               );
             }
           } catch (e) {
             if (mounted) {
-              ScaffoldMessenger.of(context)
-                  .showSnackBar(SnackBar(content: Text('Unable to save watch entry: $e')));
+              ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Unable to save watch entry: $e')));
             }
           }
         },
@@ -571,8 +581,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Unable to delete watch entry: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Unable to delete watch entry: $e')));
       }
     }
   }
@@ -691,11 +701,11 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                       movie: movie,
                     ),
                     const SizedBox(height: 16),
-                     _buildActionButtons(),
-                     const SizedBox(height: 28),
-                     _buildWatchHistorySection(context),
-                     const SizedBox(height: 28),
-                     _buildFriendsActivitySection(context),
+                    _buildActionButtons(),
+                    const SizedBox(height: 28),
+                    _buildWatchHistorySection(context),
+                    const SizedBox(height: 28),
+                    _buildFriendsActivitySection(context),
                     const SizedBox(height: 28),
                     _buildTrailersSection(context, movie),
                     const SizedBox(height: 28),
@@ -873,66 +883,70 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   void _showRatingSheet() {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: FlixieColors.tabBarBackgroundFocused,
+      clipBehavior: Clip.antiAlias,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Rate this movie',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Tap a score from 1–10',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: FlixieColors.medium),
-              ),
-              const SizedBox(height: 20),
-              GridView.count(
-                crossAxisCount: 5,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
-                children: List.generate(10, (i) {
-                  final rating = i + 1;
-                  final isSelected = _userRating == rating;
-                  return GestureDetector(
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      _setUserRating(rating);
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? FlixieColors.primary
-                            : FlixieColors.primary.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '$rating',
-                        style: TextStyle(
-                          color:
-                              isSelected ? Colors.white : FlixieColors.medium,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
+        return Container(
+          color: FlixieColors.tabBarBackgroundFocused,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Rate this movie',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Tap a score from 1–10',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: FlixieColors.medium),
+                ),
+                const SizedBox(height: 20),
+                GridView.count(
+                  crossAxisCount: 5,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  children: List.generate(10, (i) {
+                    final rating = i + 1;
+                    final isSelected = _userRating == rating;
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _setUserRating(rating);
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? FlixieColors.primary
+                              : FlixieColors.primary.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '$rating',
+                          style: TextStyle(
+                            color:
+                                isSelected ? Colors.white : FlixieColors.medium,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                }),
-              ),
-            ],
+                    );
+                  }),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -1309,8 +1323,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                     title: Text(_formatWatchDate(entry.watchedAt)),
                     subtitle: Text(
                       [
-                        if (entry.rating != null) 'Rating: ${entry.rating!.toStringAsFixed(0)}/10',
-                        if (entry.notes != null && entry.notes!.isNotEmpty) entry.notes!,
+                        if (entry.rating != null)
+                          'Rating: ${entry.rating!.toStringAsFixed(0)}/10',
+                        if (entry.notes != null && entry.notes!.isNotEmpty)
+                          entry.notes!,
                       ].join(' • '),
                     ),
                     trailing: PopupMenuButton<String>(

@@ -74,7 +74,7 @@ void main() {
         _wrap(
           YearBreakdown(
             years: const [2025, 2024],
-            entries: const [
+            entries: [
               StatsEntry(watchedAt: DateTime(2025, 1, 1)),
               StatsEntry(watchedAt: DateTime(2025, 2, 1)),
               StatsEntry(watchedAt: DateTime(2024, 3, 1)),

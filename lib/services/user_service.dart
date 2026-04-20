@@ -166,6 +166,25 @@ class UserService {
     return WatchedMovie.fromJson(data as Map<String, dynamic>);
   }
 
+  static Future<List<WatchedMovie>> getUserWatchedMovies(String userId) async {
+    apiLogger.d('GET /users/$userId/movies/watched');
+    final data = await ApiClient.get('/users/$userId/movies/watched');
+    return (data as List<dynamic>)
+        .whereType<Map<String, dynamic>>()
+        .map(WatchedMovie.fromJson)
+        .where((item) => item.removed != true)
+        .toList();
+  }
+
+  static Future<WatchedMovie?> getLatestMovieWatched(
+      String userId, int movieId) async {
+    apiLogger.d('GET /users/$userId/movie/$movieId/watched');
+    final data = await ApiClient.get('/users/$userId/movie/$movieId/watched');
+    if (data == null) return null;
+    if (data is! Map<String, dynamic>) return null;
+    return WatchedMovie.fromJson(data);
+  }
+
   static Future<FavoriteMovie> addToFavorites(
       String userId, int movieId) async {
     apiLogger.d('POST /users/$userId/movie/favorite/$movieId');
