@@ -3,10 +3,9 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:provider/provider.dart';
 
 import 'package:flixie_app/models/group_watch_request.dart';
-import 'package:flixie_app/providers/auth_provider.dart';
+import 'package:flixie_app/providers/auth_provider.dart' as app_auth;
 import 'package:flixie_app/services/auth_service.dart';
 import 'package:flixie_app/theme/app_theme.dart';
 
@@ -91,25 +90,25 @@ void main() {
 
   group('AuthProvider', () {
     late _FakeAuthService fakeAuth;
-    late AuthProvider authProvider;
+    late app_auth.AuthProvider authProvider;
 
     setUp(() {
       fakeAuth = _FakeAuthService();
-      authProvider = AuthProvider(fakeAuth);
+      authProvider = app_auth.AuthProvider(fakeAuth);
     });
 
     tearDown(() => fakeAuth.close());
 
     test('initial status is unknown', () {
-      expect(authProvider.status, AuthStatus.unknown);
+      expect(authProvider.status, app_auth.AuthStatus.unknown);
     });
 
     test('status becomes authenticated when user emitted', () async {
       fakeAuth.emitUser(_FakeUser());
       await Future<void>.delayed(Duration.zero);
-      expect(authProvider.status, AuthStatus.authenticated);
+      expect(authProvider.status, app_auth.AuthStatus.authenticated);
       expect(authProvider.isAuthenticated, isTrue);
-      expect(authProvider.user?.email, 'test@example.com');
+      expect(authProvider.firebaseUser?.email, 'test@example.com');
     });
 
     test('status becomes unauthenticated when null emitted', () async {
@@ -117,9 +116,9 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       fakeAuth.emitUser(null);
       await Future<void>.delayed(Duration.zero);
-      expect(authProvider.status, AuthStatus.unauthenticated);
+      expect(authProvider.status, app_auth.AuthStatus.unauthenticated);
       expect(authProvider.isAuthenticated, isFalse);
-      expect(authProvider.user, isNull);
+      expect(authProvider.firebaseUser, isNull);
     });
   });
 

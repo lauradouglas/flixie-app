@@ -48,7 +48,15 @@ class ActivityListItem {
   final String? mediaTitle;
   final String? mediaPosterPath;
   final double? mediaRating;
+  final String? watchedAt;
+  final String? notes;
   final Review? reviewData;
+
+  String get timestamp {
+    if (watchedAt != null && watchedAt!.isNotEmpty) return watchedAt!;
+    if (createdAt.isNotEmpty) return createdAt;
+    return updatedAt;
+  }
 
   const ActivityListItem({
     required this.id,
@@ -66,6 +74,8 @@ class ActivityListItem {
     this.mediaTitle,
     this.mediaPosterPath,
     this.mediaRating,
+    this.watchedAt,
+    this.notes,
     this.reviewData,
   });
 
@@ -124,9 +134,9 @@ class ActivityListItem {
           user?['firstName'] as String? ?? json['firstName'] as String? ?? '',
       lastName:
           user?['lastName'] as String? ?? json['lastName'] as String? ?? '',
-      movieId: json['movieId'] as int?,
-      showId: json['showId'] as int?,
-      personId: json['personId'] as int?,
+      movieId: _parseInt(json['movieId']),
+      showId: _parseInt(json['showId']),
+      personId: _parseInt(json['personId']),
       removed: json['removed'] as bool? ?? false,
       createdAt: json['createdAt'] as String? ?? '',
       updatedAt: json['updatedAt'] as String? ?? '',
@@ -139,7 +149,16 @@ class ActivityListItem {
           person?['profileImgUrl'] as String?,
       mediaRating: (json['rating'] as num?)?.toDouble() ??
           (review?['rating'] as num?)?.toDouble(),
+      watchedAt: json['watchedAt'] as String?,
+      notes: json['notes'] as String?,
       reviewData: reviewData,
     );
   }
+}
+
+int? _parseInt(dynamic value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value);
+  return null;
 }

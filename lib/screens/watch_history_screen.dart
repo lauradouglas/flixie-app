@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../models/watchlist_movie.dart';
+import '../models/watched_movie.dart';
 import '../providers/auth_provider.dart';
+import '../services/user_service.dart';
 import '../theme/app_theme.dart';
 
 const List<String> _kMonths = [
@@ -51,41 +53,49 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
     super.dispose();
   }
 
-  void _load() {
-    final raw = context.read<AuthProvider>().dbUser?.watchedMovies;
-    if (raw == null) {
-      setState(() => _loading = false);
+  Future<void> _load() async {
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (userId == null) {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
       return;
     }
-    final entries = raw
-        .whereType<Map<String, dynamic>>()
-        .where((m) => m['removed'] != true)
-        .map((m) {
-          // movie details are embedded the same way as WatchlistMovie
-          WatchlistMovieDetails? movie;
-          if (m['movie'] != null) {
-            try {
-              movie = WatchlistMovieDetails.fromJson(
-                  m['movie'] as Map<String, dynamic>);
-            } catch (_) {}
-          }
-          return _WatchedEntry(
-            id: m['id'] as String? ?? '',
-            movieId: m['movieId'] is int
-                ? m['movieId'] as int
-                : int.tryParse(m['movieId'].toString()) ?? 0,
-            watchedAt: m['watchedAt'] as String? ?? m['createdAt'] as String?,
-            movie: movie,
-          );
-        })
-        .where((e) => e.movie != null)
-        .toList();
+    try {
+      final watched = await UserService.getUserWatchedMovies(userId);
+      final entries = watched
+          .map((m) => _toWatchedEntry(m))
+          .where((e) => e.movie != null)
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        _all = entries;
+        _loading = false;
+      });
+      _applyFilter();
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
 
-    setState(() {
-      _all = entries;
-      _loading = false;
-    });
-    _applyFilter();
+  _WatchedEntry _toWatchedEntry(WatchedMovie item) {
+    WatchlistMovieDetails? movie;
+    final rawMovie = item.movie;
+    if (rawMovie != null) {
+      try {
+        movie = WatchlistMovieDetails.fromJson(rawMovie);
+      } catch (_) {}
+    }
+    return _WatchedEntry(
+      id: item.id,
+      movieId: item.movieId,
+      watchedAt: item.watchedAt ?? item.createdAt,
+      rating: item.rating,
+      notes: item.notes,
+      movie: movie,
+    );
   }
 
   void _applyFilter() {
@@ -252,12 +262,16 @@ class _WatchedEntry {
   final String id;
   final int movieId;
   final String? watchedAt;
+  final double? rating;
+  final String? notes;
   final WatchlistMovieDetails? movie;
 
   const _WatchedEntry({
     required this.id,
     required this.movieId,
     this.watchedAt,
+    this.rating,
+    this.notes,
     this.movie,
   });
 }
@@ -362,6 +376,19 @@ class _WatchedMovieCard extends StatelessWidget {
                           ),
                         ),
                       ],
+                    ),
+                  ],
+                  if (entry.rating != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Your rating: ${entry.rating!.toStringAsFixed(1)}/10',
+                      style: const TextStyle(
+                        color: FlixieColors.tertiary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ],

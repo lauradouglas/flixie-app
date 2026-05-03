@@ -4,7 +4,12 @@ import 'package:provider/provider.dart';
 import '../models/watchlist_movie.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
+import 'stats/genre_bar.dart';
+import 'stats/monthly_bar_chart.dart';
+import 'stats/section_header.dart';
+import 'stats/stat_card.dart';
 import 'stats/stats_entry.dart';
+import 'stats/year_breakdown.dart';
 
 const List<String> _kMonthNames = [
   'Jan',
@@ -191,13 +196,13 @@ class _StatsScreenState extends State<StatsScreen> {
                 // ── Headline cards ──────────────────────────────────────
                 Row(
                   children: [
-                    _StatCard(
+                    StatsCard(
                       label: 'Movies Watched',
                       value: _totalMovies > 0 ? '$_totalMovies' : '—',
                       icon: Icons.movie_outlined,
                     ),
                     const SizedBox(width: 12),
-                    _StatCard(
+                    StatsCard(
                       label: 'Total Runtime',
                       value: _totalMovies > 0 ? _runtimeLabel : '—',
                       icon: Icons.schedule_outlined,
@@ -207,14 +212,14 @@ class _StatsScreenState extends State<StatsScreen> {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    _StatCard(
+                    StatsCard(
                       label: 'Avg Rating',
                       value:
                           _avgRating > 0 ? _avgRating.toStringAsFixed(1) : '—',
                       icon: Icons.star_outline,
                     ),
                     const SizedBox(width: 12),
-                    _StatCard(
+                    StatsCard(
                       label: 'Most Active',
                       value: mostActive >= 0 ? _kMonthNames[mostActive] : '—',
                       subtitle: mostActive >= 0
@@ -228,13 +233,13 @@ class _StatsScreenState extends State<StatsScreen> {
                 const SizedBox(height: 28),
 
                 // ── Monthly bar chart ──────────────────────────────────
-                _SectionHeader(
+                SectionHeader(
                   title: _selectedYear != null
                       ? 'Monthly Activity ($_selectedYear)'
                       : 'Monthly Activity (${DateTime.now().year})',
                 ),
                 const SizedBox(height: 12),
-                _MonthlyBarChart(
+                MonthlyBarChart(
                   buckets: buckets,
                   maxValue: maxBucket,
                   mostActiveIndex: mostActive,
@@ -243,13 +248,13 @@ class _StatsScreenState extends State<StatsScreen> {
                 // ── Top genres ─────────────────────────────────────────
                 if (topGenres.isNotEmpty) ...[
                   const SizedBox(height: 28),
-                  const _SectionHeader(title: 'Top Genres'),
+                  const SectionHeader(title: 'Top Genres'),
                   const SizedBox(height: 12),
                   ...topGenres.asMap().entries.map((entry) {
                     final rank = entry.key;
                     final genre = entry.value;
                     final maxCount = topGenres.first.value;
-                    return _GenreBar(
+                    return GenreBar(
                       rank: rank + 1,
                       name: genre.key,
                       count: genre.value,
@@ -261,294 +266,12 @@ class _StatsScreenState extends State<StatsScreen> {
                 // ── All-time per-year breakdown ────────────────────────
                 if (_selectedYear == null && years.length > 1) ...[
                   const SizedBox(height: 28),
-                  const _SectionHeader(title: 'By Year'),
+                  const SectionHeader(title: 'By Year'),
                   const SizedBox(height: 12),
-                  _YearBreakdown(entries: _allEntries, years: years),
+                  YearBreakdown(entries: _allEntries, years: years),
                 ],
               ],
             ),
-    );
-  }
-}
-
-// ── Widgets ──────────────────────────────────────────────────────────────────
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title});
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 4,
-          height: 18,
-          decoration: BoxDecoration(
-            color: FlixieColors.primary,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          title.toUpperCase(),
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 13,
-            letterSpacing: 1.2,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.label,
-    required this.value,
-    required this.icon,
-    this.subtitle,
-  });
-
-  final String label;
-  final String value;
-  final IconData icon;
-  final String? subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: FlixieColors.tabBarBackgroundFocused,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: FlixieColors.primary, size: 22),
-            const SizedBox(height: 10),
-            Text(
-              value,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            if (subtitle != null) ...[
-              const SizedBox(height: 2),
-              Text(subtitle!,
-                  style: const TextStyle(
-                      color: FlixieColors.medium, fontSize: 11)),
-            ],
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: const TextStyle(color: FlixieColors.medium, fontSize: 12),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MonthlyBarChart extends StatelessWidget {
-  const _MonthlyBarChart({
-    required this.buckets,
-    required this.maxValue,
-    required this.mostActiveIndex,
-  });
-
-  final List<int> buckets;
-  final int maxValue;
-  final int mostActiveIndex;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 120,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: List.generate(12, (i) {
-          final count = buckets[i];
-          final isActive = i == mostActiveIndex;
-          final fraction = maxValue > 0 ? count / maxValue : 0.0;
-
-          return Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  if (count > 0)
-                    Text(
-                      '$count',
-                      style: TextStyle(
-                        color: isActive
-                            ? FlixieColors.primary
-                            : FlixieColors.medium,
-                        fontSize: 9,
-                        fontWeight:
-                            isActive ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
-                  const SizedBox(height: 2),
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 400),
-                    curve: Curves.easeOut,
-                    height: 80 * fraction,
-                    decoration: BoxDecoration(
-                      color: isActive
-                          ? FlixieColors.primary
-                          : FlixieColors.primary.withValues(alpha: 0.35),
-                      borderRadius:
-                          const BorderRadius.vertical(top: Radius.circular(4)),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _kMonthNames[i],
-                    style: TextStyle(
-                      color: isActive ? Colors.white : FlixieColors.medium,
-                      fontSize: 9,
-                      fontWeight:
-                          isActive ? FontWeight.bold : FontWeight.normal,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-}
-
-class _GenreBar extends StatelessWidget {
-  const _GenreBar({
-    required this.rank,
-    required this.name,
-    required this.count,
-    required this.maxCount,
-  });
-
-  final int rank;
-  final String name;
-  final int count;
-  final int maxCount;
-
-  @override
-  Widget build(BuildContext context) {
-    final fraction = maxCount > 0 ? count / maxCount : 0.0;
-    final accent = rank == 1
-        ? FlixieColors.primary
-        : FlixieColors.primary.withValues(alpha: 0.6);
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 20,
-            child: Text(
-              '$rank',
-              style: const TextStyle(
-                  color: FlixieColors.medium,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(name,
-                        style:
-                            const TextStyle(color: Colors.white, fontSize: 13)),
-                    Text('$count',
-                        style: const TextStyle(
-                            color: FlixieColors.medium, fontSize: 12)),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: fraction,
-                    minHeight: 6,
-                    backgroundColor: FlixieColors.tabBarBackgroundFocused,
-                    valueColor: AlwaysStoppedAnimation(accent),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _YearBreakdown extends StatelessWidget {
-  const _YearBreakdown({required this.entries, required this.years});
-  final List<StatsEntry> entries;
-  final List<int> years;
-
-  @override
-  Widget build(BuildContext context) {
-    final maxCount = years.fold<int>(0, (m, y) {
-      final c = entries.where((e) => e.watchedAt?.year == y).length;
-      return c > m ? c : m;
-    });
-
-    return Column(
-      children: years.map((y) {
-        final count = entries.where((e) => e.watchedAt?.year == y).length;
-        final fraction = maxCount > 0 ? count / maxCount : 0.0;
-
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 40,
-                child: Text('$y',
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600)),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: fraction,
-                    minHeight: 8,
-                    backgroundColor: FlixieColors.tabBarBackgroundFocused,
-                    valueColor: AlwaysStoppedAnimation(
-                        FlixieColors.primary.withValues(alpha: 0.7)),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text('$count',
-                  style: const TextStyle(
-                      color: FlixieColors.medium, fontSize: 12)),
-            ],
-          ),
-        );
-      }).toList(),
     );
   }
 }
