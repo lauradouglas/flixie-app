@@ -189,7 +189,13 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         : user?.username;
 
     return Scaffold(
+      backgroundColor: FlixieColors.background,
       appBar: AppBar(
+        backgroundColor: FlixieColors.background,
+        foregroundColor: FlixieColors.light,
+        surfaceTintColor: Colors.transparent,
+        iconTheme: const IconThemeData(color: FlixieColors.light),
+        actionsIconTheme: const IconThemeData(color: FlixieColors.light),
         title: RichText(
           text: const TextSpan(
             children: [
@@ -216,7 +222,10 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.search_outlined),
+            icon: const Icon(
+              Icons.search_outlined,
+              color: FlixieColors.light,
+            ),
             tooltip: 'Search',
             onPressed: () => context.push('/search'),
           ),
@@ -227,7 +236,10 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   unreadCount < 100 ? Text('$unreadCount') : const Text('99+'),
               backgroundColor: FlixieColors.tertiary,
               textColor: Colors.black,
-              child: const Icon(Icons.notifications_outlined),
+              child: const Icon(
+                Icons.notifications_outlined,
+                color: FlixieColors.light,
+              ),
             ),
             onPressed: () async {
               await context.push('/notifications');
