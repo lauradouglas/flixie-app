@@ -20,6 +20,7 @@ class MovieActionButton extends StatelessWidget {
   final bool isLoading;
   final int bounceKey;
   final VoidCallback? onPressed;
+  /// Optional subtitle shown under the primary label (e.g. watch count).
   final String? subtitle;
 
   @override

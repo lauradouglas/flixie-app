@@ -1682,7 +1682,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 child: OutlinedButton.icon(
                   onPressed: _isWatched ? _showLogWatchSheet : _toggleWatched,
                   icon: const Icon(Icons.replay_rounded, size: 18),
-                  label: const Text('Rewatch & Update Rating'),
+                  label:
+                      Text(_isWatched ? 'Rewatch & Update Rating' : 'Mark as Watched'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: FlixieColors.primary,
                     side: BorderSide(
@@ -1845,7 +1846,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   }
 
   Widget _buildFriendsRatingsSection(BuildContext context) {
-    final ratings = _friendRatings().map((rating) => rating.toInt()).toList();
+    final ratings = _friendRatings();
     final average = _averageFriendRating();
 
     return Column(
