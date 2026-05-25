@@ -331,87 +331,98 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ],
 
                     const Divider(),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
 
-                    // Activity section header
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Row(
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+                      decoration: BoxDecoration(
+                        color: FlixieColors.tabBarBackgroundFocused,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: FlixieColors.tabBarBorder),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            width: 4,
-                            height: 22,
-                            decoration: BoxDecoration(
-                              color: FlixieColors.primary,
-                              borderRadius: BorderRadius.circular(2),
-                            ),
+                          Row(
+                            children: [
+                              Text(
+                                'Your activity',
+                                style: textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: FlixieColors.light,
+                                ),
+                              ),
+                              const Spacer(),
+                              if (_activity.isNotEmpty)
+                                Text(
+                                  '${_activity.length}',
+                                  style: const TextStyle(
+                                    color: FlixieColors.medium,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                            ],
                           ),
-                          const SizedBox(width: 10),
-                          Text(
-                            'RECENT ACTIVITY',
-                            style: textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              letterSpacing: 1.5,
+                          const SizedBox(height: 10),
+                          if (_activityLoading)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                              child: Center(child: CircularProgressIndicator()),
+                            )
+                          else if (_activity.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              child: Text(
+                                'No activity yet.',
+                                style: textTheme.bodySmall
+                                    ?.copyWith(color: FlixieColors.medium),
+                              ),
+                            )
+                          else ...[
+                            ListView.separated(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: visibleActivity.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 10),
+                              itemBuilder: (_, i) =>
+                                  ActivityTile(item: visibleActivity[i]),
                             ),
-                          ),
+                            if (_activity.length > _initialActivityCount) ...[
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton(
+                                  onPressed: () => setState(
+                                      () => _showAllActivity = !_showAllActivity),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: FlixieColors.light,
+                                    side: const BorderSide(
+                                        color: FlixieColors.tabBarBorder),
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 13),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    _showAllActivity
+                                        ? 'SHOW LESS'
+                                        : 'VIEW ALL ACTIVITY',
+                                    style: const TextStyle(
+                                      letterSpacing: 1.1,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ],
                       ),
                     ),
-
-                    if (_activityLoading)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: Center(child: CircularProgressIndicator()),
-                      )
-                    else if (_activity.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        child: Text(
-                          'No activity yet.',
-                          style: textTheme.bodySmall
-                              ?.copyWith(color: FlixieColors.medium),
-                        ),
-                      )
-                    else ...[
-                      ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: visibleActivity.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (_, i) =>
-                            ActivityTile(item: visibleActivity[i]),
-                      ),
-                      if (_activity.length > _initialActivityCount) ...[
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton(
-                            onPressed: () => setState(
-                                () => _showAllActivity = !_showAllActivity),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: FlixieColors.light,
-                              side: const BorderSide(
-                                  color: FlixieColors.tabBarBorder),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: Text(
-                              _showAllActivity
-                                  ? 'SHOW LESS'
-                                  : 'LOAD OLDER ACTIVITY',
-                              style: const TextStyle(
-                                letterSpacing: 1.2,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
 
                     const SizedBox(height: 16),
                     const Divider(),

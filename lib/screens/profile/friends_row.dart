@@ -5,7 +5,6 @@ import '../../models/friendship.dart';
 import '../../theme/app_theme.dart';
 import 'add_friend_sheet.dart';
 import 'all_friends_sheet.dart';
-import 'friend_avatar.dart';
 
 class FriendsRow extends StatefulWidget {
   const FriendsRow({
@@ -64,79 +63,163 @@ class _FriendsRowState extends State<FriendsRow> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final friends = widget.data.friendships;
+    final total = friends.length;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      decoration: BoxDecoration(
+        color: FlixieColors.tabBarBackgroundFocused,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: FlixieColors.tabBarBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Container(
-                width: 4,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: FlixieColors.primary,
-                  borderRadius: BorderRadius.circular(2),
+              Text(
+                'Friends',
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: FlixieColors.light,
                 ),
               ),
-              const SizedBox(width: 10),
-              Text(
-                'FRIENDS',
-                style: textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.5,
+              const SizedBox(width: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: FlixieColors.primary.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '$total',
+                  style: const TextStyle(
+                    color: FlixieColors.primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               const Spacer(),
-              IconButton(
+              TextButton.icon(
                 onPressed: () => _showAddFriendSheet(context),
-                icon: const Icon(Icons.person_add_outlined,
-                    color: FlixieColors.primary, size: 20),
-                tooltip: 'Add Friend',
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
+                style: TextButton.styleFrom(
+                  foregroundColor: FlixieColors.primary,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
+                ),
+                icon: const Icon(Icons.person_add_outlined, size: 16),
+                label: const Text('Add'),
               ),
-              const SizedBox(width: 12),
               TextButton(
                 onPressed: () => _showAllFriendsSheet(context),
-                child: const Text(
-                  'See All',
-                  style: TextStyle(color: FlixieColors.primary),
+                style: TextButton.styleFrom(
+                  foregroundColor: FlixieColors.light,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
                 ),
+                child: const Text('See all'),
               ),
             ],
           ),
-        ),
-        if (widget.isLoading)
-          const Center(child: CircularProgressIndicator())
-        else if (friends.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text(
-              'No friends yet.',
-              style: textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
+          const SizedBox(height: 10),
+          if (widget.isLoading)
+            const Center(child: CircularProgressIndicator())
+          else if (friends.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'No friends yet.',
+                style: textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
+              ),
+            )
+          else
+            SizedBox(
+              height: 124,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: friends.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                itemBuilder: (_, i) {
+                  final friend = friends[i].friendUser;
+                  if (friend == null) return const SizedBox.shrink();
+                  return GestureDetector(
+                    onTap: () => context.push('/friends/${friend.id}'),
+                    child: _FriendPreviewCard(user: friend),
+                  );
+                },
+              ),
             ),
-          )
-        else
-          SizedBox(
-            height: 108,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: friends.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 16),
-              itemBuilder: (_, i) {
-                final friend = friends[i].friendUser;
-                if (friend == null) return const SizedBox.shrink();
-                return GestureDetector(
-                  onTap: () => context.push('/friends/${friend.id}'),
-                  child: FriendAvatar(user: friend),
-                );
-              },
-            ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 }
 
+class _FriendPreviewCard extends StatelessWidget {
+  const _FriendPreviewCard({required this.user});
+
+  final FriendshipUser user;
+
+  Color get _avatarColor {
+    final hex = user.iconColor?['hexCode'] as String?;
+    if (hex != null) {
+      try {
+        return Color(int.parse(hex.replaceFirst('#', 'FF'), radix: 16));
+      } catch (_) {}
+    }
+    return FlixieColors.primary;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 92,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF142E55),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: Column(
+        children: [
+          CircleAvatar(
+            radius: 25,
+            backgroundColor: _avatarColor.withValues(alpha: 0.25),
+            child: Text(
+              user.initials ??
+                  (user.username.isNotEmpty ? user.username[0].toUpperCase() : '?'),
+              style: TextStyle(
+                color: _avatarColor,
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            user.firstName?.isNotEmpty == true ? user.firstName! : user.username,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: FlixieColors.light,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 2),
+          const Text(
+            'Friend',
+            style: TextStyle(
+              color: FlixieColors.medium,
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
