@@ -920,7 +920,6 @@ class WatchlistMovieRow extends StatelessWidget {
     final metaParts = [
       if (year != null && year.isNotEmpty) year,
       if (runtime.isNotEmpty) runtime,
-      'PG-13',
     ];
     final metaStr = metaParts.join(' • ');
 
@@ -1118,4 +1117,3 @@ class WatchlistMovieRow extends StatelessWidget {
     );
   }
 }
-

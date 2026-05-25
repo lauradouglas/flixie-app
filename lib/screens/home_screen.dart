@@ -30,6 +30,17 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with RouteAware {
+  static const int _maxHeroCarouselItems = 6;
+  static const List<String> _weekdayLabels = [
+    'Mon',
+    'Tue',
+    'Wed',
+    'Thu',
+    'Fri',
+    'Sat',
+    'Sun',
+  ];
+
   List<MovieShort> _featuredMovies = [];
   List<MovieShort> _nowPlayingMovies = [];
   List<MovieShort> _forYouMovies = [];
@@ -240,7 +251,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   // ── Hero carousel ──────────────────────────────────────────────────────────
 
   Widget _buildHeroCarousel(BuildContext context) {
-    final count = _featuredMovies.length.clamp(0, 6);
+    final count = _featuredMovies.length.clamp(0, _maxHeroCarouselItems);
     return SizedBox(
       height: 440,
       child: PageView.builder(
@@ -254,7 +265,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   }
 
   Widget _buildCarouselDots() {
-    final count = _featuredMovies.length.clamp(0, 6);
+    final count = _featuredMovies.length.clamp(0, _maxHeroCarouselItems);
     if (count <= 1) return const SizedBox.shrink();
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -277,8 +288,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   }
 
   Widget _buildHeroCard(BuildContext context, MovieShort movie) {
-    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    final weekday = weekdays[DateTime.now().weekday - 1];
+    final weekday = _weekdayLabels[DateTime.now().weekday - 1];
 
     return GestureDetector(
       onTap: () => context.push('/movies/${movie.id}'),
