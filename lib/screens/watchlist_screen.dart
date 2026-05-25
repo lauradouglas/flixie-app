@@ -25,7 +25,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
   bool _loading = true;
   String _sortBy =
       'recent'; // recent, titleAsc, titleDesc, ratingDesc, yearAsc, yearDesc
-  int _selectedTab = 0; // 0 = Movies, 1 = Shows, 2 = Upcoming
+  int _selectedTab = 0; // 0 = All, 1 = Movies, 2 = Upcoming, 3 = Watched
 
   // Active filters
   String? _filterGenre; // null = all genres
@@ -601,7 +601,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         return date != null && date.isAfter(today);
       }).toList();
     }
-    // All (0) and Movies (1) — same list (no shows mixed in)
+    // All (0) and Movies (1) show the same list (movie watchlist only; shows are in a separate list)
     return _filteredWatchlist;
   }
 
