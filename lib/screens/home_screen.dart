@@ -318,13 +318,9 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
 
     return GestureDetector(
       onTap: () => context.push('/movies/${movie.id}'),
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
-        ),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
             // Background poster
             if (movie.poster != null)
               CachedNetworkImage(
@@ -448,8 +444,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 ],
               ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }
