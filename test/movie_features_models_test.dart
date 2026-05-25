@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flixie_app/models/movie_friend_list_entry.dart';
 import 'package:flixie_app/models/movie_list.dart';
 import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'package:flixie_app/models/movie_wrapped.dart';
@@ -11,12 +12,68 @@ void main() {
         'id': 'list-1',
         'userId': 'user-1',
         'name': 'Date Night',
+        'description': 'Romance picks',
+        'visibility': 'FRIENDS',
+        'coverImageUrl': 'https://img.example/cover.jpg',
+        'whoCanAddMovies': 'friends',
+        'previewPosterUrls': [
+          'https://img.example/p1.jpg',
+          'https://img.example/p2.jpg',
+        ],
+        'movieCount': '4',
         'removed': false,
         'createdAt': '2025-01-01T00:00:00.000Z',
         'updatedAt': '2025-01-01T00:00:00.000Z',
       });
       expect(model.name, 'Date Night');
+      expect(model.description, 'Romance picks');
+      expect(model.visibility, ListVisibility.friends);
+      expect(model.coverImageUrl, 'https://img.example/cover.jpg');
+      expect(model.whoCanAddMovies, 'friends');
+      expect(model.previewPosterUrls, hasLength(2));
+      expect(model.movieCount, 4);
       expect(model.removed, isFalse);
+    });
+
+    test('create request includes new optional list metadata', () {
+      const request = CreateMovieListRequest(
+        name: 'Sci-Fi',
+        description: 'Mind-bending favorites',
+        visibility: ListVisibility.public,
+        coverImageUrl: 'https://img.example/scifi.jpg',
+        whoCanAddMovies: 'friends',
+      );
+      expect(request.toJson(), {
+        'name': 'Sci-Fi',
+        'description': 'Mind-bending favorites',
+        'visibility': ListVisibility.public,
+        'coverImageUrl': 'https://img.example/scifi.jpg',
+        'whoCanAddMovies': 'friends',
+      });
+    });
+  });
+
+  group('MovieFriendListEntry', () {
+    test('parses nested friend/list response shape', () {
+      final model = MovieFriendListEntry.fromJson({
+        'friend': {
+          'id': 'u-1',
+          'username': 'Sean',
+        },
+        'list': {
+          'id': 'l-1',
+          'name': 'Nolan Masterpieces',
+          'movieCount': 12,
+          'previewPosterUrls': ['https://img.example/poster.jpg'],
+        },
+      });
+
+      expect(model.friendUserId, 'u-1');
+      expect(model.friendName, 'Sean');
+      expect(model.listId, 'l-1');
+      expect(model.listName, 'Nolan Masterpieces');
+      expect(model.movieCount, 12);
+      expect(model.previewPosterUrls, hasLength(1));
     });
   });
 

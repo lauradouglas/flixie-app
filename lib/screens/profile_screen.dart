@@ -15,6 +15,7 @@ import 'profile/favorite_movies_section.dart';
 import 'profile/favorite_people_section.dart';
 import 'profile/friends_row.dart';
 import 'profile/movie_taste_badge.dart';
+import 'profile/lists_preview_section.dart';
 import 'profile/profile_header.dart';
 import 'profile/profile_stats_row.dart';
 import 'profile/ratings_section.dart';
@@ -210,6 +211,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final email = dbUser?.email ?? firebaseUser?.email ?? '';
     final bio = dbUser?.bio;
     final photoUrl = firebaseUser?.photoURL;
+    final userId = dbUser?.id;
 
     final favoriteMovies = dbUser?.favoriteMovies ?? [];
     final favoritePeople = dbUser?.favoritePeople ?? [];
@@ -308,9 +310,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 24),
 
                     // Favorite Movies
+                    if (userId != null) ...[
+                     ListsPreviewSection(
+                       userId: userId,
+                       title: 'Your Lists',
+                       emptyMessage: "You haven't created any lists yet.",
+                       allowManage: true,
+                     ),
+                     const SizedBox(height: 16),
+                    ],
+
+                    // Favorite Movies
                     if (favoriteMovies.isNotEmpty) ...[
-                      FavoriteMoviesSection(favoriteMovies: favoriteMovies),
-                      const SizedBox(height: 16),
+                     FavoriteMoviesSection(favoriteMovies: favoriteMovies),
+                     const SizedBox(height: 16),
                     ],
 
                     // Favorite People

@@ -7,6 +7,8 @@ import '../models/favorite_movie.dart';
 import '../models/movie.dart';
 import '../models/movie_credits.dart';
 import '../models/movie_friend_activity.dart';
+import '../models/movie_friend_list_entry.dart';
+import '../models/movie_list.dart';
 import '../models/movie_watch_entry.dart';
 import '../models/review.dart';
 import '../models/similar_movie.dart';
@@ -68,6 +70,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   bool _isRatingLoading = false;
   ListUpdateType? _currentlyUpdating;
   List<MovieFriendActivity> _friendsActivity = [];
+  List<MovieList> _myListsContainingMovie = [];
+  List<MovieFriendListEntry> _friendsListsContainingMovie = [];
+  bool _listsContainingMovieLoading = false;
   List<MovieWatchEntry> _movieWatchHistory = [];
   bool _watchHistoryLoading = false;
   FriendActivityTab _friendsActivityTab = FriendActivityTab.all;
@@ -170,6 +175,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         });
         if (userId != null) {
           _loadWatchHistory(userId, id);
+          _loadListsContainingMovie(userId, id);
         }
       }
     } catch (e) {
@@ -197,6 +203,30 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       if (mounted) {
         setState(() => _watchHistoryLoading = false);
       }
+    }
+  }
+
+  Future<void> _loadListsContainingMovie(String userId, int movieId) async {
+    if (!mounted) return;
+    setState(() => _listsContainingMovieLoading = true);
+    try {
+      final results = await Future.wait([
+        UserService.getMyListsContainingMovie(userId, movieId),
+        UserService.getFriendsListsContainingMovie(userId, movieId),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _myListsContainingMovie = results[0] as List<MovieList>;
+        _friendsListsContainingMovie = results[1] as List<MovieFriendListEntry>;
+        _listsContainingMovieLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _myListsContainingMovie = const <MovieList>[];
+        _friendsListsContainingMovie = const <MovieFriendListEntry>[];
+        _listsContainingMovieLoading = false;
+      });
     }
   }
 
@@ -392,6 +422,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   }
 
   Future<void> _showAddToListSheet() async {
+    final userId = context.read<AuthProvider>().dbUser?.id;
     final movieId = int.tryParse(widget.movieId);
     if (movieId == null) return;
     await showModalBottomSheet<void>(
@@ -400,6 +431,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       backgroundColor: FlixieColors.tabBarBackgroundFocused,
       builder: (_) => AddToListSheet(movieId: movieId),
     );
+    if (userId != null) {
+      await _loadListsContainingMovie(userId, movieId);
+    }
   }
 
   Future<void> _showLogWatchSheet({MovieWatchEntry? entry}) async {
@@ -683,6 +717,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                     _buildWhereToWatchSection(context),
                     const SizedBox(height: 24),
                     _buildPersonalActivitySection(context),
+                    const SizedBox(height: 24),
+                    _buildYourListsSection(context),
                     const SizedBox(height: 16),
                     _buildTrailersSection(context, movie),
                     const SizedBox(height: 24),
@@ -2126,7 +2162,70 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     );
   }
 
+  Widget _buildYourListsSection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader(context, 'Your Lists'),
+        const SizedBox(height: 10),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: FlixieColors.surface.withValues(alpha: 0.85),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+          ),
+          child: _listsContainingMovieLoading
+              ? const Center(child: CircularProgressIndicator())
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _myListsContainingMovie.isEmpty
+                          ? "This movie isn't in any of your lists yet."
+                          : 'This movie is in ${_myListsContainingMovie.length} of your lists',
+                      style: const TextStyle(color: FlixieColors.medium),
+                    ),
+                    if (_myListsContainingMovie.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      ..._myListsContainingMovie.map(
+                        (list) => ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(list.name),
+                          subtitle: Text('${list.movieCount ?? 0} films'),
+                          trailing: const Icon(
+                            Icons.check_circle,
+                            color: FlixieColors.primary,
+                            size: 18,
+                          ),
+                          onTap: () => context.push(
+                            '/movie-lists/${list.id}?name=${Uri.encodeComponent(list.name)}&owner=${Uri.encodeComponent(list.userId ?? '')}',
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 4),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _showAddToListSheet,
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add to List'),
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildFriendsListsSection(BuildContext context) {
+    final totalFriends = _friendsListsContainingMovie
+        .map((entry) => entry.friendUserId)
+        .toSet()
+        .length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2140,10 +2239,53 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
           ),
-          child: const Text(
-            'Friends list activity is not available for this movie yet.',
-            style: TextStyle(color: FlixieColors.medium),
-          ),
+          child: _listsContainingMovieLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _friendsListsContainingMovie.isEmpty
+                  ? const Text(
+                      "None of your friends have added this to a list yet.",
+                      style: TextStyle(color: FlixieColors.medium),
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'This movie is in $totalFriends friends\' lists',
+                          style: const TextStyle(
+                            color: FlixieColors.medium,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ..._friendsListsContainingMovie.take(6).map(
+                              (entry) => ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: CircleAvatar(
+                                  backgroundColor:
+                                      FlixieColors.primary.withValues(alpha: 0.2),
+                                  child: Text(
+                                    (entry.friendName.isNotEmpty
+                                            ? entry.friendName[0]
+                                            : '?')
+                                        .toUpperCase(),
+                                    style: const TextStyle(
+                                      color: FlixieColors.primary,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                title: Text(
+                                  "${entry.friendName} · ${entry.listName}",
+                                  style: const TextStyle(
+                                    color: FlixieColors.light,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                subtitle: Text('${entry.movieCount ?? 0} films'),
+                              ),
+                            ),
+                      ],
+                    ),
         ),
       ],
     );

@@ -1,5 +1,6 @@
 import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/models/movie_list.dart';
+import 'package:flixie_app/models/movie_friend_list_entry.dart';
 import 'package:flixie_app/models/movie_list_movie.dart';
 import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'package:flixie_app/models/movie_wrapped.dart';
@@ -402,6 +403,35 @@ class UserService {
   ) async {
     await ApiClient.delete(
         '/users/$userId/movie/watchlists/lists/$listId/movies/$movieId');
+  }
+
+  static Future<List<MovieList>> getMyListsContainingMovie(
+    String userId,
+    int movieId,
+  ) async {
+    final data = await ApiClient.get(
+      '/movies/$movieId/lists/me',
+      queryParams: {'userId': userId},
+    );
+    return (data as List<dynamic>)
+        .whereType<Map<String, dynamic>>()
+        .map(MovieList.fromJson)
+        .toList();
+  }
+
+  static Future<List<MovieFriendListEntry>> getFriendsListsContainingMovie(
+    String userId,
+    int movieId,
+  ) async {
+    final data = await ApiClient.get(
+      '/movies/$movieId/lists/friends',
+      queryParams: {'userId': userId},
+    );
+    return (data as List<dynamic>)
+        .whereType<Map<String, dynamic>>()
+        .map(MovieFriendListEntry.fromJson)
+        .where((entry) => entry.listId.isNotEmpty && entry.friendUserId.isNotEmpty)
+        .toList(growable: false);
   }
 
   // ---- Rewatch / watch entries ----------------------------------------------
