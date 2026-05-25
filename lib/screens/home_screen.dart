@@ -21,6 +21,7 @@ import '../theme/app_theme.dart';
 import '../utils/app_logger.dart';
 import '../utils/skeleton.dart';
 import 'home/featured_card.dart';
+import 'home/greeting_header.dart';
 import 'home/section_header.dart';
 import 'profile/activity_tile.dart';
 
@@ -153,12 +154,14 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
           _nowPlayingMovies = (results[1] as List<MovieShort>).take(8).toList();
           _friendsActivity =
               results.length > 2 ? results[2] as List<ActivityListItem> : [];
-          _highlyRatedRecommendations =
-              results.length > 3 ? results[3] as RecommendationFromHighlyRatedResponse? : null;
-          final fallbackForYou =
-              results.length > 4 ? results[4] as List<MovieShort> : <MovieShort>[];
+          _highlyRatedRecommendations = results.length > 3
+              ? results[3] as RecommendationFromHighlyRatedResponse?
+              : null;
+          final fallbackForYou = results.length > 4
+              ? results[4] as List<MovieShort>
+              : <MovieShort>[];
           _forYouMovies = (_highlyRatedRecommendations?.recommendations ?? [])
-              .isNotEmpty
+                  .isNotEmpty
               ? (_highlyRatedRecommendations!.recommendations).take(20).toList()
               : fallbackForYou.take(20).toList();
           _userGroups = results.length > 5 ? results[5] as List<Group> : [];
@@ -180,6 +183,10 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   @override
   Widget build(BuildContext context) {
     final unreadCount = context.watch<AuthProvider>().unreadNotificationCount;
+    final user = context.watch<AuthProvider>().dbUser;
+    final greetingName = (user?.firstName?.trim().isNotEmpty ?? false)
+        ? user!.firstName!.trim()
+        : user?.username;
 
     return Scaffold(
       appBar: AppBar(
@@ -250,8 +257,48 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (_featuredMovies.isNotEmpty) ...[
-                          _buildHeroCarousel(context),
-                          const SizedBox(height: 12),
+                          Stack(
+                            children: [
+                              _buildHeroCarousel(context),
+                              Positioned(
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                child: IgnorePointer(
+                                  child: Container(
+                                    height: 130,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [
+                                          FlixieColors.background
+                                              .withValues(alpha: 0.94),
+                                          FlixieColors.background
+                                              .withValues(alpha: 0.0),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              if (_showGreeting)
+                                Positioned(
+                                  top: 12,
+                                  left: 0,
+                                  right: 0,
+                                  child: GreetingHeader(
+                                    name: greetingName,
+                                    onDismiss: () {
+                                      if (mounted) {
+                                        setState(() => _showGreeting = false);
+                                      }
+                                    },
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
                           _buildCarouselDots(),
                           const SizedBox(height: 20),
                         ],
@@ -321,129 +368,120 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
       child: Stack(
         fit: StackFit.expand,
         children: [
-            // Background poster
-            if (movie.poster != null)
-              CachedNetworkImage(
-                imageUrl: 'https://image.tmdb.org/t/p/w780${movie.poster}',
-                fit: BoxFit.cover,
-                errorWidget: (_, __, ___) => Container(
-                  color: FlixieColors.tabBarBackgroundFocused,
-                  child: const Icon(Icons.movie_outlined,
-                      color: FlixieColors.medium, size: 48),
-                ),
-              )
-            else
-              Container(
+          // Background poster
+          if (movie.poster != null)
+            CachedNetworkImage(
+              imageUrl: 'https://image.tmdb.org/t/p/w780${movie.poster}',
+              fit: BoxFit.cover,
+              errorWidget: (_, __, ___) => Container(
                 color: FlixieColors.tabBarBackgroundFocused,
                 child: const Icon(Icons.movie_outlined,
                     color: FlixieColors.medium, size: 48),
               ),
-            // Gradient overlay
+            )
+          else
             Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  stops: const [0.0, 0.36, 0.7, 1.0],
-                  colors: [
-                    Colors.black.withValues(alpha: 0.08),
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: 0.55),
-                    Colors.black.withValues(alpha: 0.96),
-                  ],
-                ),
-              ),
+              color: FlixieColors.tabBarBackgroundFocused,
+              child: const Icon(Icons.movie_outlined,
+                  color: FlixieColors.medium, size: 48),
             ),
-            // Bottom content
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: 16,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    weekday,
-                    style: const TextStyle(
-                      color: FlixieColors.light,
-                      fontSize: 15,
-                      letterSpacing: 5,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    movie.name.toUpperCase(),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.4,
-                      height: 1.08,
-                    ),
-                  ),
-                  if ((movie.overview ?? '').isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      movie.overview!,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          color: FlixieColors.light,
-                          fontSize: 16,
-                          height: 1.35),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () =>
-                              context.push('/movies/${movie.id}'),
-                          icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                          label: const Text('Play Trailer',
-                              style:
-                                  TextStyle(fontWeight: FontWeight.w700)),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: FlixieColors.primary,
-                            foregroundColor: Colors.white,
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                            elevation: 0,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () =>
-                              context.push('/movies/${movie.id}'),
-                          icon: const Icon(Icons.add_rounded, size: 18),
-                          label: const Text('My List',
-                              style:
-                                  TextStyle(fontWeight: FontWeight.w700)),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.white,
-                            side: BorderSide(
-                                color:
-                                    Colors.white.withValues(alpha: 0.55)),
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+          // Gradient overlay
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                stops: const [0.0, 0.36, 0.7, 1.0],
+                colors: [
+                  Colors.black.withValues(alpha: 0.08),
+                  Colors.transparent,
+                  Colors.black.withValues(alpha: 0.55),
+                  Colors.black.withValues(alpha: 0.96),
                 ],
               ),
             ),
+          ),
+          // Bottom content
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 16,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  weekday,
+                  style: const TextStyle(
+                    color: FlixieColors.light,
+                    fontSize: 15,
+                    letterSpacing: 5,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  movie.name.toUpperCase(),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.4,
+                    height: 1.08,
+                  ),
+                ),
+                if ((movie.overview ?? '').isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    movie.overview!,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: FlixieColors.light, fontSize: 16, height: 1.35),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => context.push('/movies/${movie.id}'),
+                        icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                        label: const Text('Play Trailer',
+                            style: TextStyle(fontWeight: FontWeight.w700)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: FlixieColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => context.push('/movies/${movie.id}'),
+                        icon: const Icon(Icons.add_rounded, size: 18),
+                        label: const Text('My List',
+                            style: TextStyle(fontWeight: FontWeight.w700)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: BorderSide(
+                              color: Colors.white.withValues(alpha: 0.55)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -478,7 +516,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 children: [
                   if (movie.poster != null)
                     CachedNetworkImage(
-                      imageUrl: 'https://image.tmdb.org/t/p/w342${movie.poster}',
+                      imageUrl:
+                          'https://image.tmdb.org/t/p/w342${movie.poster}',
                       fit: BoxFit.cover,
                       errorWidget: (_, __, ___) => Container(
                         color: FlixieColors.tabBarBackgroundFocused,
@@ -565,9 +604,11 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
 
   Widget _buildWatchlistSection(BuildContext context) {
     final user = context.read<AuthProvider>().dbUser;
-    final watchlist =
-        user?.movieWatchlist?.where((w) => w.removed != true).take(10).toList() ??
-            [];
+    final watchlist = user?.movieWatchlist
+            ?.where((w) => w.removed != true)
+            .take(10)
+            .toList() ??
+        [];
     if (watchlist.isEmpty) return const SizedBox.shrink();
 
     return Column(
@@ -587,7 +628,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
             separatorBuilder: (_, __) => const SizedBox(width: 10),
             itemBuilder: (context, index) {
               final item = watchlist[index];
-              final isUpdating = _watchlistUpdatesInFlight.contains(item.movieId);
+              final isUpdating =
+                  _watchlistUpdatesInFlight.contains(item.movieId);
               final posterUrl = item.movie?.posterPath != null
                   ? 'https://image.tmdb.org/t/p/w342${item.movie!.posterPath}'
                   : null;
@@ -616,14 +658,15 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                                       imageUrl: posterUrl,
                                       fit: BoxFit.cover,
                                       errorWidget: (_, __, ___) => Container(
-                                        color:
-                                            FlixieColors.tabBarBackgroundFocused,
+                                        color: FlixieColors
+                                            .tabBarBackgroundFocused,
                                         child: const Icon(Icons.movie_outlined,
                                             color: FlixieColors.medium),
                                       ),
                                     )
                                   : Container(
-                                      color: FlixieColors.tabBarBackgroundFocused,
+                                      color:
+                                          FlixieColors.tabBarBackgroundFocused,
                                       child: const Icon(Icons.movie_outlined,
                                           color: FlixieColors.medium),
                                     ),
@@ -638,7 +681,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                                   : () => _toggleWatchlistState(
                                         context,
                                         movieId: item.movieId,
-                                        movieTitle: item.movie?.title ?? 'Movie',
+                                        movieTitle:
+                                            item.movie?.title ?? 'Movie',
                                         posterPath: item.movie?.posterPath,
                                         currentlyInWatchlist: true,
                                       ),
@@ -733,7 +777,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     if (_forYouMovies.isEmpty) return const SizedBox.shrink();
     final source = _highlyRatedRecommendations?.sourceMovie;
     final sourceTitle = source?.title ?? '';
-    final compactSourceTitle = sourceTitle.characters.length > _maxSourceTitleLength
+    final compactSourceTitle = sourceTitle.characters.length >
+            _maxSourceTitleLength
         ? '${sourceTitle.characters.take(_maxSourceTitleLength).toString()}…'
         : sourceTitle;
     final title = source != null
@@ -829,7 +874,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   decoration: BoxDecoration(
                     color: FlixieColors.tabBarBackgroundFocused,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                    border:
+                        Border.all(color: Colors.white.withValues(alpha: 0.08)),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(12),
@@ -838,7 +884,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                       children: [
                         CircleAvatar(
                           radius: 18,
-                          backgroundColor: FlixieColors.primary.withValues(alpha: 0.2),
+                          backgroundColor:
+                              FlixieColors.primary.withValues(alpha: 0.2),
                           child: Text(
                             initials,
                             style: const TextStyle(
@@ -1004,15 +1051,15 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.favorite_border,
-                  color: FlixieColors.danger),
+              leading:
+                  const Icon(Icons.favorite_border, color: FlixieColors.danger),
               title: const Text('Add to favourites'),
               onTap: () => _handleNotYetImplementedAction(
                   sheetContext, 'Add to favourites'),
             ),
             ListTile(
-              leading:
-                  const Icon(Icons.playlist_add_outlined, color: FlixieColors.light),
+              leading: const Icon(Icons.playlist_add_outlined,
+                  color: FlixieColors.light),
               title: const Text('Add to list'),
               onTap: () =>
                   _handleNotYetImplementedAction(sheetContext, 'Add to list'),
@@ -1025,8 +1072,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   sheetContext, 'Invite friends to watch'),
             ),
             ListTile(
-              leading:
-                  const Icon(Icons.share_outlined, color: FlixieColors.secondary),
+              leading: const Icon(Icons.share_outlined,
+                  color: FlixieColors.secondary),
               title: const Text('Share movie'),
               onTap: () =>
                   _handleNotYetImplementedAction(sheetContext, 'Share movie'),
@@ -1100,13 +1147,15 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
           await UserService.removeFromWatchlist(userId, movieId);
           final currentWatchlist = auth.dbUser?.movieWatchlist ?? [];
           auth.updateUserList(
-            movieWatchlist:
-                currentWatchlist.where((entry) => entry.movieId != movieId).toList(),
+            movieWatchlist: currentWatchlist
+                .where((entry) => entry.movieId != movieId)
+                .toList(),
           );
         }
         if (mounted) {
           Navigator.of(context).maybePop();
-          final ratingLabel = includeRating ? ' • ${rating.toStringAsFixed(0)}/10' : '';
+          final ratingLabel =
+              includeRating ? ' • ${rating.toStringAsFixed(0)}/10' : '';
           final noteLabel =
               notesController.text.trim().isNotEmpty ? ' • note saved' : '';
           final rewatchLabel = rewatch ? ' • rewatch' : '';
@@ -1122,7 +1171,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         logger.w('[HomeScreen] mark watched failed: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not mark this movie as watched')),
+            const SnackBar(
+                content: Text('Could not mark this movie as watched')),
           );
         }
       }
@@ -1161,9 +1211,12 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 value: includeRating,
                 title: const Text('Add rating'),
                 subtitle: Text(
-                  includeRating ? '${rating.toStringAsFixed(0)}/10' : 'Skip rating',
+                  includeRating
+                      ? '${rating.toStringAsFixed(0)}/10'
+                      : 'Skip rating',
                 ),
-                onChanged: (value) => setSheetState(() => includeRating = value),
+                onChanged: (value) =>
+                    setSheetState(() => includeRating = value),
               ),
               if (includeRating)
                 Slider(
