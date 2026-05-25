@@ -11,9 +11,19 @@ class AddToListSheet extends StatelessWidget {
   const AddToListSheet({
     super.key,
     required this.movieId,
+    this.movieTitle,
+    this.moviePosterPath,
+    this.movieReleaseDate,
+    this.movieRuntimeMinutes,
+    this.movieRatingLabel,
   });
 
   final int movieId;
+  final String? movieTitle;
+  final String? moviePosterPath;
+  final String? movieReleaseDate;
+  final int? movieRuntimeMinutes;
+  final String? movieRatingLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -29,14 +39,33 @@ class AddToListSheet extends StatelessWidget {
         repository: const MovieFeaturesRepository(),
         userId: userId,
       )..loadLists(),
-      child: _AddToListSheetBody(movieId: movieId),
+      child: _AddToListSheetBody(
+        movieId: movieId,
+        movieTitle: movieTitle,
+        moviePosterPath: moviePosterPath,
+        movieReleaseDate: movieReleaseDate,
+        movieRuntimeMinutes: movieRuntimeMinutes,
+        movieRatingLabel: movieRatingLabel,
+      ),
     );
   }
 }
 
 class _AddToListSheetBody extends StatefulWidget {
-  const _AddToListSheetBody({required this.movieId});
+  const _AddToListSheetBody({
+    required this.movieId,
+    this.movieTitle,
+    this.moviePosterPath,
+    this.movieReleaseDate,
+    this.movieRuntimeMinutes,
+    this.movieRatingLabel,
+  });
   final int movieId;
+  final String? movieTitle;
+  final String? moviePosterPath;
+  final String? movieReleaseDate;
+  final int? movieRuntimeMinutes;
+  final String? movieRatingLabel;
 
   @override
   State<_AddToListSheetBody> createState() => _AddToListSheetBodyState();
@@ -114,22 +143,45 @@ class _AddToListSheetBodyState extends State<_AddToListSheetBody> {
                       ],
                     ),
                     const SizedBox(height: 10),
+                    _SelectedMovieSummary(
+                      title: widget.movieTitle,
+                      posterPath: widget.moviePosterPath,
+                      releaseDate: widget.movieReleaseDate,
+                      runtimeMinutes: widget.movieRuntimeMinutes,
+                      ratingLabel: widget.movieRatingLabel,
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        const Text(
+                          'MY LISTS',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: FlixieColors.medium,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.7,
+                          ),
+                        ),
+                        const Spacer(),
+                        TextButton.icon(
+                          onPressed: _saving ? null : _openCreateListSheet,
+                          icon: const Icon(Icons.add, size: 16),
+                          label: const Text('Create New List'),
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: const Size(0, 32),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
                     TextField(
                       controller: _searchController,
                       onChanged: (_) => setState(() {}),
                       decoration: const InputDecoration(
                         hintText: 'Search your lists',
                         prefixIcon: Icon(Icons.search),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'YOUR LISTS',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: FlixieColors.medium,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.7,
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -214,13 +266,7 @@ class _AddToListSheetBodyState extends State<_AddToListSheetBody> {
                               },
                             ),
                     ),
-                    const SizedBox(height: 8),
-                    TextButton.icon(
-                      onPressed: _saving ? null : _openCreateListSheet,
-                      icon: const Icon(Icons.add),
-                      label: const Text('Create New List'),
-                    ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
@@ -550,6 +596,81 @@ class _VisibilityOptionTile extends StatelessWidget {
   }
 }
 
+class _SelectedMovieSummary extends StatelessWidget {
+  const _SelectedMovieSummary({
+    required this.title,
+    required this.posterPath,
+    required this.releaseDate,
+    required this.runtimeMinutes,
+    required this.ratingLabel,
+  });
+
+  final String? title;
+  final String? posterPath;
+  final String? releaseDate;
+  final int? runtimeMinutes;
+  final String? ratingLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final year = _extractYear(releaseDate);
+    final runtime = _formatRuntime(runtimeMinutes);
+    final parts = <String>[
+      if (year != null) year,
+      if (runtime != null) runtime,
+      if (ratingLabel != null && ratingLabel!.trim().isNotEmpty)
+        ratingLabel!.trim(),
+    ];
+    final imageUrl = (posterPath != null && posterPath!.isNotEmpty)
+        ? 'https://image.tmdb.org/t/p/w185$posterPath'
+        : null;
+
+    return Row(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            width: 56,
+            height: 76,
+            color: FlixieColors.surface,
+            child: imageUrl == null
+                ? const Icon(Icons.movie_outlined, color: FlixieColors.medium)
+                : Image.network(
+                    imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.broken_image_outlined,
+                      color: FlixieColors.medium,
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title?.trim().isNotEmpty == true ? title!.trim() : 'Selected movie',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+              ),
+              if (parts.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  parts.join('  •  '),
+                  style: const TextStyle(color: FlixieColors.medium, fontSize: 12),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _ListPosterStack extends StatelessWidget {
   const _ListPosterStack({required this.list});
   final MovieList list;
@@ -570,6 +691,7 @@ class _ListPosterStack extends StatelessWidget {
         child: const Icon(Icons.movie_outlined, color: FlixieColors.medium),
       );
     }
+
     return SizedBox(
       width: 64,
       height: 44,
@@ -602,4 +724,18 @@ class _ListPosterStack extends StatelessWidget {
       ),
     );
   }
+}
+
+String? _extractYear(String? releaseDate) {
+  if (releaseDate == null || releaseDate.length < 4) return null;
+  return releaseDate.substring(0, 4);
+}
+
+String? _formatRuntime(int? totalMinutes) {
+  if (totalMinutes == null || totalMinutes <= 0) return null;
+  final hours = totalMinutes ~/ 60;
+  final minutes = totalMinutes % 60;
+  if (hours == 0) return '${minutes}m';
+  if (minutes == 0) return '${hours}h';
+  return '${hours}h ${minutes}m';
 }

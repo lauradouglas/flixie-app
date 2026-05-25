@@ -429,7 +429,16 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: FlixieColors.tabBarBackgroundFocused,
-      builder: (_) => AddToListSheet(movieId: movieId),
+      builder: (_) => AddToListSheet(
+        movieId: movieId,
+        movieTitle: _movie?.title,
+        moviePosterPath: _movie?.posterPath,
+        movieReleaseDate: _movie?.releaseDate,
+        movieRuntimeMinutes: _movie?.runtime,
+        movieRatingLabel: _movie?.voteAverage != null
+            ? '★ ${_movie!.voteAverage!.toStringAsFixed(1)}'
+            : null,
+      ),
     );
     if (userId != null) {
       await _loadListsContainingMovie(userId, movieId);
