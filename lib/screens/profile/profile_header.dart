@@ -53,43 +53,75 @@ class ProfileHeader extends StatelessWidget {
           alignment: Alignment.bottomCenter,
           children: [
             Container(
-              height: 120,
+              height: 130,
               width: double.infinity,
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
+                    Color(0xFF1B3A70),
                     FlixieColors.secondary,
-                    FlixieColors.secondaryTint,
-                    FlixieColors.secondaryShade,
+                    FlixieColors.primary,
                   ],
+                  stops: [0.0, 0.5, 1.0],
                 ),
+              ),
+              child: Stack(
+                children: [
+                  // Subtle pattern overlay
+                  Opacity(
+                    opacity: 0.06,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        gradient: RadialGradient(
+                          center: Alignment(0.8, -0.6),
+                          radius: 1.2,
+                          colors: [Colors.white, Colors.transparent],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             Positioned(
-              bottom: -48,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  CircleAvatar(
-                    radius: 48,
-                    backgroundColor: color.withValues(alpha: 0.95),
-                    backgroundImage:
-                        photoUrl != null ? NetworkImage(photoUrl!) : null,
-                    child: photoUrl == null
-                        ? Icon(Icons.person,
-                            size: 48,
-                            color: Colors.white.withValues(alpha: 0.70))
-                        : null,
+              bottom: -52,
+              child: Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [
+                      FlixieColors.primary.withValues(alpha: 0.6),
+                      FlixieColors.secondary.withValues(alpha: 0.4),
+                    ],
                   ),
-                ],
+                  boxShadow: [
+                    BoxShadow(
+                      color: FlixieColors.primary.withValues(alpha: 0.3),
+                      blurRadius: 16,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: CircleAvatar(
+                  radius: 48,
+                  backgroundColor: color.withValues(alpha: 0.95),
+                  backgroundImage:
+                      photoUrl != null ? NetworkImage(photoUrl!) : null,
+                  child: photoUrl == null
+                      ? Icon(Icons.person,
+                          size: 48,
+                          color: Colors.white.withValues(alpha: 0.70))
+                      : null,
+                ),
               ),
             ),
           ],
         ),
         const SizedBox(
-            height: 56), // accounts for avatar overlap (48 radius + 8 padding)
+            height: 62), // accounts for avatar overlap (48 radius + 14 padding)
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [

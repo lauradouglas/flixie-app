@@ -397,7 +397,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: FlixieColors.background,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
         title: Column(

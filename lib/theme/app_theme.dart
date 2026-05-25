@@ -98,10 +98,11 @@ class AppTheme {
 
       // App bar
       appBarTheme: const AppBarTheme(
-        backgroundColor: FlixieColors.tabBarBackgroundFocused,
+        backgroundColor: Colors.transparent,
         foregroundColor: FlixieColors.light,
         elevation: 0,
-        centerTitle: true,
+        scrolledUnderElevation: 0,
+        centerTitle: false,
         titleTextStyle: TextStyle(
           color: FlixieColors.light,
           fontSize: 20,
@@ -122,7 +123,8 @@ class AppTheme {
       // Navigation bar (Material 3)
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: FlixieColors.tabBarBackground,
-        indicatorColor: FlixieColors.primary.withValues(alpha: 0.2),
+        indicatorColor: FlixieColors.primary.withValues(alpha: 0.15),
+        indicatorShape: const StadiumBorder(),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return const IconThemeData(color: FlixieColors.primary);
@@ -133,22 +135,26 @@ class AppTheme {
           if (states.contains(WidgetState.selected)) {
             return const TextStyle(
               color: FlixieColors.primary,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
             );
           }
-          return const TextStyle(color: FlixieColors.medium, fontSize: 12);
+          return const TextStyle(
+              color: FlixieColors.medium, fontSize: 11);
         }),
         surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        height: 64,
       ),
 
       // Cards
       cardTheme: CardThemeData(
         color: const Color(0xFF1D3A68),
-        elevation: 2,
+        elevation: 4,
+        shadowColor: Colors.black.withValues(alpha: 0.4),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.07)),
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
         ),
       ),
 
@@ -156,11 +162,13 @@ class AppTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: FlixieColors.primary,
-          foregroundColor: Colors.black,
+          foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(12),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          elevation: 4,
+          shadowColor: FlixieColors.primary.withValues(alpha: 0.4),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
         ),
       ),
 
@@ -192,23 +200,23 @@ class AppTheme {
         prefixIconColor: FlixieColors.medium,
         suffixIconColor: FlixieColors.medium,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: FlixieColors.tabBarBorder),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: FlixieColors.tabBarBorder),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: FlixieColors.primary, width: 2),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: FlixieColors.danger),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: FlixieColors.danger, width: 2),
         ),
       ),

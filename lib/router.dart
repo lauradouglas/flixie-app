@@ -217,21 +217,21 @@ class MainNavigationShell extends StatelessWidget {
   final Widget child;
 
   static int _indexFromLocation(String location) {
-    if (location.startsWith('/search')) return 1;
-    if (location.startsWith('/watchlist')) return 2;
+    if (location.startsWith('/watchlist')) return 1;
     if (location.startsWith('/social') || location.startsWith('/groups')) {
-      return 3;
+      return 2;
     }
-    if (location.startsWith('/profile')) return 4;
+    if (location.startsWith('/profile')) return 3;
+    if (location.startsWith('/settings')) return 4;
     return 0;
   }
 
   static const List<String> _routes = [
     '/',
-    '/search',
     '/watchlist',
     '/social',
     '/profile',
+    '/settings',
   ];
 
   @override
@@ -244,59 +244,164 @@ class MainNavigationShell extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF172B4D), Color(0xFF1A2550)],
+          colors: [Color(0xFF172B4D), Color(0xFF001F3F)],
         ),
       ),
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: child,
-        bottomNavigationBar: Container(
-          decoration: BoxDecoration(
-            color: FlixieColors.tabBarBackground,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.3),
-                blurRadius: 8,
-                offset: const Offset(0, -2),
-              ),
-            ],
-            border: Border(
-              top: BorderSide(
-                color: FlixieColors.primary.withValues(alpha: 0.3),
-                width: 1,
-              ),
-            ),
+        bottomNavigationBar: _FlixieNavBar(
+          selectedIndex: selectedIndex,
+          onDestinationSelected: (index) => context.go(_routes[index]),
+        ),
+      ),
+    );
+  }
+}
+
+/// Premium animated bottom navigation bar.
+class _FlixieNavBar extends StatelessWidget {
+  const _FlixieNavBar({
+    required this.selectedIndex,
+    required this.onDestinationSelected,
+  });
+
+  final int selectedIndex;
+  final ValueChanged<int> onDestinationSelected;
+
+  static const _destinations = [
+    _NavDest(icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Home'),
+    _NavDest(
+        icon: Icons.bookmark_border_outlined,
+        activeIcon: Icons.bookmark,
+        label: 'Watchlist'),
+    _NavDest(
+        icon: Icons.people_outline,
+        activeIcon: Icons.people,
+        label: 'Social'),
+    _NavDest(
+        icon: Icons.person_outline,
+        activeIcon: Icons.person,
+        label: 'Profile'),
+    _NavDest(
+        icon: Icons.settings_outlined,
+        activeIcon: Icons.settings,
+        label: 'Settings'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: FlixieColors.tabBarBackground,
+        boxShadow: [
+          BoxShadow(
+            color: FlixieColors.primary.withValues(alpha: 0.08),
+            blurRadius: 20,
+            spreadRadius: 0,
+            offset: const Offset(0, -4),
           ),
-          child: NavigationBar(
-            selectedIndex: selectedIndex,
-            onDestinationSelected: (index) => context.go(_routes[index]),
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.explore_outlined),
-                selectedIcon: Icon(Icons.explore),
-                label: 'Discover',
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.4),
+            blurRadius: 12,
+            offset: const Offset(0, -2),
+          ),
+        ],
+        border: Border(
+          top: BorderSide(
+            color: FlixieColors.primary.withValues(alpha: 0.2),
+            width: 0.5,
+          ),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: List.generate(_destinations.length, (i) {
+              final dest = _destinations[i];
+              final isSelected = i == selectedIndex;
+              return _NavItem(
+                dest: dest,
+                isSelected: isSelected,
+                onTap: () => onDestinationSelected(i),
+              );
+            }),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NavDest {
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+  const _NavDest(
+      {required this.icon, required this.activeIcon, required this.label});
+}
+
+class _NavItem extends StatelessWidget {
+  const _NavItem({
+    required this.dest,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final _NavDest dest;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                decoration: isSelected
+                    ? BoxDecoration(
+                        color: FlixieColors.primary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: FlixieColors.primary.withValues(alpha: 0.25),
+                            blurRadius: 12,
+                            spreadRadius: 0,
+                          ),
+                        ],
+                      )
+                    : null,
+                child: Icon(
+                  isSelected ? dest.activeIcon : dest.icon,
+                  size: 22,
+                  color: isSelected ? FlixieColors.primary : FlixieColors.medium,
+                ),
               ),
-              NavigationDestination(
-                icon: Icon(Icons.search_outlined),
-                selectedIcon: Icon(Icons.search),
-                label: 'Search',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.bookmark_border_outlined),
-                selectedIcon: Icon(Icons.bookmark),
-                label: 'Watchlist',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.people_outline),
-                selectedIcon: Icon(Icons.people),
-                label: 'Social',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.person_outline),
-                selectedIcon: Icon(Icons.person),
-                label: 'Profile',
+              const SizedBox(height: 2),
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 200),
+                style: TextStyle(
+                  color:
+                      isSelected ? FlixieColors.primary : FlixieColors.medium,
+                  fontSize: 10,
+                  fontWeight:
+                      isSelected ? FontWeight.w700 : FontWeight.normal,
+                ),
+                child: Text(dest.label),
               ),
             ],
           ),

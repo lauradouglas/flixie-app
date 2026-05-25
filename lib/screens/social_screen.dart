@@ -38,7 +38,7 @@ class _SocialScreenState extends State<SocialScreen> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: FlixieColors.background,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         title: const Text(
           'Social',

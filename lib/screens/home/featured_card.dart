@@ -13,11 +13,12 @@ class FeaturedCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 180,
+      width: 185,
       child: Card(
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
+          splashColor: FlixieColors.primary.withValues(alpha: 0.15),
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -42,11 +43,11 @@ class FeaturedCard extends StatelessWidget {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    stops: const [0.0, 0.4, 1.0],
+                    stops: const [0.0, 0.45, 1.0],
                     colors: [
                       Colors.transparent,
                       Colors.transparent,
-                      Colors.black.withValues(alpha: 0.9),
+                      Colors.black.withValues(alpha: 0.95),
                     ],
                   ),
                 ),
@@ -54,29 +55,29 @@ class FeaturedCard extends StatelessWidget {
               // Rating chip – top right
               if (movie.voteAverage != null && movie.voteAverage! > 0)
                 Positioned(
-                  top: 8,
-                  right: 8,
+                  top: 10,
+                  right: 10,
                   child: Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.65),
+                      color: Colors.black.withValues(alpha: 0.7),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                          color: FlixieColors.tertiary.withValues(alpha: 0.6)),
+                          color: FlixieColors.tertiary.withValues(alpha: 0.7)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const Icon(Icons.star_rounded,
-                            size: 11, color: FlixieColors.tertiary),
+                            size: 12, color: FlixieColors.tertiary),
                         const SizedBox(width: 3),
                         Text(
                           movie.voteAverage!.toStringAsFixed(1),
                           style: const TextStyle(
                             color: FlixieColors.tertiary,
                             fontSize: 11,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                       ],
@@ -96,6 +97,12 @@ class FeaturedCard extends StatelessWidget {
                         color: Colors.white,
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
+                        shadows: [
+                          Shadow(
+                              color: Colors.black54,
+                              blurRadius: 4,
+                              offset: Offset(0, 1)),
+                        ],
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -117,7 +124,7 @@ class FeaturedCard extends StatelessWidget {
                           return raw;
                         }(),
                         style: const TextStyle(
-                          color: Colors.white60,
+                          color: Colors.white54,
                           fontSize: 11,
                         ),
                       ),

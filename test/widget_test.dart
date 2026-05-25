@@ -80,10 +80,10 @@ void main() {
       );
     });
 
-    test('darkTheme scaffold background matches FlixieColors.background', () {
+    test('darkTheme scaffold background is transparent', () {
       expect(
         AppTheme.darkTheme.scaffoldBackgroundColor,
-        FlixieColors.background,
+        Colors.transparent,
       );
     });
   });

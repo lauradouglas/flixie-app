@@ -1238,6 +1238,18 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 onPressed: _currentlyUpdating != null ? null : _toggleFavorite,
               ),
             ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: MovieActionButton(
+                icon: Icons.replay_outlined,
+                label: 'Rewatch',
+                isActive: _isWatched && _movieWatchHistory.length > 1,
+                color: FlixieColors.primary,
+                isLoading: false,
+                bounceKey: 0,
+                onPressed: _isWatched ? () => _showLogWatchSheet() : null,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 8),
@@ -1267,16 +1279,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 onPressed: _showAddToListSheet,
               ),
             ),
-            if (_isWatched) ...[
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  icon: const Icon(Icons.replay_outlined, size: 18),
-                  label: const Text('Log Rewatch'),
-                  onPressed: () => _showLogWatchSheet(),
-                ),
-              ),
-            ],
           ],
         ),
       ],

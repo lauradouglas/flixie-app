@@ -494,5 +494,4 @@ const List<_MenuItem> _menuItems = [
   _MenuItem(icon: Icons.swap_horiz_outlined, label: 'Watch Requests'),
   _MenuItem(icon: Icons.star_outline, label: 'My Reviews'),
   _MenuItem(icon: Icons.help_outline, label: 'Help & Support'),
-  _MenuItem(icon: Icons.settings_outlined, label: 'Settings'),
 ];

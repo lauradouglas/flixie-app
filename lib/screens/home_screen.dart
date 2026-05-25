@@ -148,8 +148,36 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Flixie'),
+        title: RichText(
+          text: const TextSpan(
+            children: [
+              TextSpan(
+                text: 'fli',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              TextSpan(
+                text: 'xie',
+                style: TextStyle(
+                  color: FlixieColors.primary,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
+          ),
+        ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.search_outlined),
+            tooltip: 'Search',
+            onPressed: () => context.push('/search'),
+          ),
           IconButton(
             icon: Badge(
               isLabelVisible: unreadCount > 0,
@@ -194,7 +222,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                                 setState(() => _showGreeting = false),
                           ),
                         HomeSectionHeader(
-                          title: 'Featured',
+                          title: 'Trending Now',
                           onSeeAll: () => context.push('/search'),
                         ),
                         const SizedBox(height: 12),
