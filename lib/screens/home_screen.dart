@@ -213,131 +213,23 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   onRefresh: _loadAll,
                   child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    padding: const EdgeInsets.fromLTRB(0, 10, 0, 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Greeting
-                        if (_showGreeting)
-                          GreetingHeader(
-                            name: context
-                                .read<AuthProvider>()
-                                .dbUser
-                                ?.username,
-                            onDismiss: () =>
-                                setState(() => _showGreeting = false),
-                          ),
-                        // Hero Carousel
                         if (_featuredMovies.isNotEmpty) ...[
                           _buildHeroCarousel(context),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 12),
                           _buildCarouselDots(),
-                          const SizedBox(height: 22),
+                          const SizedBox(height: 20),
                         ],
-                        // Trending Now
                         HomeSectionHeader(
                           title: 'Trending Now',
                           onSeeAll: () => context.push('/search'),
                         ),
                         const SizedBox(height: 12),
-                        SizedBox(
-                          height: 260,
-                          child: ListView.separated(
-                            scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16),
-                            itemCount: _featuredMovies.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(width: 12),
-                            itemBuilder: (context, index) => FeaturedCard(
-                              movie: _featuredMovies[index],
-                              onTap: () => context.push(
-                                  '/movies/${_featuredMovies[index].id}'),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        // On Your Watchlist
-                        _buildWatchlistSection(context),
-                        // In Theatres Now
-                        HomeSectionHeader(
-                          title: 'In Theatres Now',
-                          onSeeAll: () => context.push('/search'),
-                        ),
-                        const SizedBox(height: 12),
-                        if (_nowPlayingMovies.isNotEmpty)
-                          SizedBox(
-                            height: 260,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16),
-                              itemCount: _nowPlayingMovies.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(width: 12),
-                              itemBuilder: (context, index) => FeaturedCard(
-                                movie: _nowPlayingMovies[index],
-                                onTap: () => context.push(
-                                    '/movies/${_nowPlayingMovies[index].id}'),
-                              ),
-                            ),
-                          ),
-                        const SizedBox(height: 20),
-                        // Top Rated This Week
-                        const HomeSectionHeader(
-                            title: 'Top Rated This Week'),
-                        const SizedBox(height: 12),
-                        if (_topRatedThisWeek.isNotEmpty)
-                          SizedBox(
-                            height: 220,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16),
-                              itemCount: _topRatedThisWeek.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(width: 12),
-                              itemBuilder: (context, index) {
-                                final movie = _topRatedThisWeek[index];
-                                return TopRatedCard(
-                                  movie: movie,
-                                  onTap: () => context
-                                      .push('/movies/${movie.id}'),
-                                );
-                              },
-                            ),
-                          ),
-                        const SizedBox(height: 20),
-                        // Trending Among Friends
-                        if (_friendsActivity.isNotEmpty)
-                          TrendingAmongFriendsSection(
-                              activity: _friendsActivity),
-                        // For You
-                        if (_forYouMovies.isNotEmpty) ...[
-                          const SizedBox(height: 20),
-                          HomeSectionHeader(
-                            title: 'For You',
-                            onSeeAll: null,
-                          ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            height: 260,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16),
-                              itemCount: _forYouMovies.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(width: 12),
-                              itemBuilder: (context, index) => FeaturedCard(
-                                movie: _forYouMovies[index],
-                                onTap: () => context.push(
-                                    '/movies/${_forYouMovies[index].id}'),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                        ],
+                        _buildTrendingNowGrid(context),
+                        const SizedBox(height: 14),
                       ],
                     ),
                   ),
@@ -350,7 +242,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   Widget _buildHeroCarousel(BuildContext context) {
     final count = _featuredMovies.length.clamp(0, 6);
     return SizedBox(
-      height: 400,
+      height: 440,
       child: PageView.builder(
         controller: _heroPageController,
         onPageChanged: (i) => setState(() => _heroPage = i),
@@ -385,13 +277,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   }
 
   Widget _buildHeroCard(BuildContext context, MovieShort movie) {
-    final year =
-        movie.releaseDate != null && movie.releaseDate!.length >= 4
-            ? movie.releaseDate!.substring(0, 4)
-            : '';
-    final vote = movie.voteAverage != null && movie.voteAverage! > 0
-        ? movie.voteAverage!.toStringAsFixed(1)
-        : null;
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final weekday = weekdays[DateTime.now().weekday - 1];
 
     return GestureDetector(
       onTap: () => context.push('/movies/${movie.id}'),
@@ -428,7 +315,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  stops: const [0.0, 0.38, 0.68, 1.0],
+                  stops: const [0.0, 0.36, 0.7, 1.0],
                   colors: [
                     Colors.black.withValues(alpha: 0.08),
                     Colors.transparent,
@@ -438,37 +325,6 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 ),
               ),
             ),
-            // Rating badge – top right
-            if (vote != null)
-              Positioned(
-                top: 14,
-                right: 14,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.55),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                        color: FlixieColors.tertiary.withValues(alpha: 0.7)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.star_rounded,
-                          color: FlixieColors.tertiary, size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        vote,
-                        style: const TextStyle(
-                            color: FlixieColors.tertiary,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
             // Bottom content
             Positioned(
               left: 16,
@@ -478,14 +334,14 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (year.isNotEmpty)
-                    Text(
-                      year,
-                      style: const TextStyle(
-                          color: FlixieColors.light,
-                          fontSize: 12,
-                          letterSpacing: 1.5),
+                  Text(
+                    weekday,
+                    style: const TextStyle(
+                      color: FlixieColors.light,
+                      fontSize: 15,
+                      letterSpacing: 5,
                     ),
+                  ),
                   const SizedBox(height: 4),
                   Text(
                     movie.name.toUpperCase(),
@@ -493,24 +349,25 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 26,
+                      fontSize: 24,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0.4,
+                      height: 1.08,
                     ),
                   ),
                   if ((movie.overview ?? '').isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Text(
                       movie.overview!,
-                      maxLines: 2,
+                      maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           color: FlixieColors.light,
-                          fontSize: 13,
-                          height: 1.45),
+                          fontSize: 16,
+                          height: 1.35),
                     ),
                   ],
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
                   Row(
                     children: [
                       Expanded(
@@ -525,7 +382,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                             backgroundColor: FlixieColors.primary,
                             foregroundColor: Colors.white,
                             padding:
-                                const EdgeInsets.symmetric(vertical: 11),
+                                const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10)),
                             elevation: 0,
@@ -547,7 +404,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                                 color:
                                     Colors.white.withValues(alpha: 0.55)),
                             padding:
-                                const EdgeInsets.symmetric(vertical: 11),
+                                const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10)),
                           ),
@@ -560,6 +417,90 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildTrendingNowGrid(BuildContext context) {
+    final items = _featuredMovies.take(6).toList();
+    if (items.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: items.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 0.64,
+        ),
+        itemBuilder: (context, index) {
+          final movie = items[index];
+          return GestureDetector(
+            onTap: () => context.push('/movies/${movie.id}'),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (movie.poster != null)
+                    CachedNetworkImage(
+                      imageUrl: 'https://image.tmdb.org/t/p/w342${movie.poster}',
+                      fit: BoxFit.cover,
+                      errorWidget: (_, __, ___) => Container(
+                        color: FlixieColors.tabBarBackgroundFocused,
+                        child: const Icon(
+                          Icons.movie_outlined,
+                          color: FlixieColors.medium,
+                        ),
+                      ),
+                    )
+                  else
+                    Container(
+                      color: FlixieColors.tabBarBackgroundFocused,
+                      child: const Icon(
+                        Icons.movie_outlined,
+                        color: FlixieColors.medium,
+                      ),
+                    ),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.82),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 12,
+                    right: 12,
+                    bottom: 12,
+                    child: Text(
+                      movie.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: FlixieColors.white,
+                        fontSize: 21,
+                        fontWeight: FontWeight.w700,
+                        height: 1.1,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
