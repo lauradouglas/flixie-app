@@ -53,21 +53,7 @@ class ActivityTile extends StatelessWidget {
       if (diff.inHours < 24) return '${diff.inHours}h ago';
       if (diff.inDays == 1) return 'Yesterday';
       if (diff.inDays < 7) return '${diff.inDays}d ago';
-      const months = [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'May',
-        'Jun',
-        'Jul',
-        'Aug',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dec',
-      ];
-      return '${dt.day} ${months[dt.month - 1]}';
+      return '${dt.day}/${dt.month}/${dt.year}';
     } catch (_) {
       return '';
     }
@@ -80,15 +66,14 @@ class ActivityTile extends StatelessWidget {
     return 'Friend';
   }
 
-  String _leadingText() {
+  String _actionVerb() {
     switch (item.type) {
       case ActivityListType.movieWatchlist:
       case ActivityListType.showWatchlist:
         return 'added';
       case ActivityListType.movieWatched:
       case ActivityListType.showWatched:
-        final notes = (item.notes ?? '').toLowerCase();
-        return notes.contains('rewatch') ? 'rewatched' : 'watched';
+        return 'watched';
       case ActivityListType.movieRating:
       case ActivityListType.showRating:
         return 'rated';
@@ -108,50 +93,17 @@ class ActivityTile extends StatelessWidget {
     }
   }
 
-  int _starCount() {
-    final raw = item.mediaRating;
-    if (raw == null) return 0;
-    final outOfFive = (raw / 2).round();
-    return outOfFive.clamp(0, 5);
-  }
-
   Widget _buildAvatar() {
-    final name = _displayName();
-    final initial = name.substring(0, 1).toUpperCase();
-    final colorSeed = item.username.hashCode.abs();
-    final colors = [
-      const Color(0xFF2D5BFF),
-      const Color(0xFF8E4DFF),
-      const Color(0xFF00A78E),
-      const Color(0xFFDD5C2B),
-      const Color(0xFFD6387A),
-    ];
-    final bg = colors[colorSeed % colors.length];
-
+    final initial = _displayName().substring(0, 1).toUpperCase();
     return CircleAvatar(
-      radius: 24,
-      backgroundColor: bg.withValues(alpha: 0.35),
+      radius: 22,
+      backgroundColor: FlixieColors.primary.withValues(alpha: 0.25),
       child: Text(
         initial,
         style: const TextStyle(
           color: Colors.white,
+          fontSize: 16,
           fontWeight: FontWeight.w700,
-          fontSize: 20,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRatingStars() {
-    final count = _starCount();
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(
-        5,
-        (index) => Icon(
-          index < count ? Icons.star_rounded : Icons.star_border_rounded,
-          color: FlixieColors.primary,
-          size: 20,
         ),
       ),
     );
@@ -159,38 +111,34 @@ class ActivityTile extends StatelessWidget {
 
   Widget _buildRightVisual(
       {required bool isPerson, required String? posterUrl}) {
-    final bool isWatchlistType = item.type == ActivityListType.movieWatchlist ||
-        item.type == ActivityListType.showWatchlist;
-
     if (posterUrl == null) {
+      final icon = item.type == ActivityListType.movieWatchlist ||
+              item.type == ActivityListType.showWatchlist
+          ? Icons.bookmark_outline_rounded
+          : (isPerson ? Icons.person_outline : Icons.movie_outlined);
+      final iconColor = item.type == ActivityListType.movieWatchlist ||
+              item.type == ActivityListType.showWatchlist
+          ? const Color(0xFFFFD446)
+          : FlixieColors.light;
       return Container(
-        width: 84,
-        height: 84,
+        width: 80,
+        height: 80,
         decoration: BoxDecoration(
           color: const Color(0xFF1C3558).withValues(alpha: 0.86),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(
-          isWatchlistType
-              ? Icons.bookmark_outline_rounded
-              : (isPerson ? Icons.person_outline : Icons.movie_outlined),
-          color: isWatchlistType ? const Color(0xFFFFD446) : FlixieColors.light,
-          size: 32,
-        ),
+        child: Icon(icon, color: iconColor, size: 30),
       );
     }
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(12),
       child: SizedBox(
-        width: 84,
-        height: 84,
+        width: 80,
+        height: 80,
         child: CachedNetworkImage(
           imageUrl: posterUrl,
           fit: BoxFit.cover,
-          fadeInDuration: Duration.zero,
-          fadeOutDuration: Duration.zero,
           errorWidget: (_, __, ___) => Container(
             color: const Color(0xFF1C3558),
             child: Icon(
@@ -202,77 +150,6 @@ class ActivityTile extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  Widget _buildHeadline(
-      BuildContext context, String displayName, String title) {
-    final isRating = item.type == ActivityListType.movieRating ||
-        item.type == ActivityListType.showRating;
-
-    if (isRating) {
-      return Wrap(
-        crossAxisAlignment: WrapCrossAlignment.center,
-        spacing: 6,
-        runSpacing: 4,
-        children: [
-          Text(
-            '$displayName rated',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 21,
-              fontWeight: FontWeight.w700,
-              height: 1.15,
-            ),
-          ),
-          _buildRatingStars(),
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 21,
-              fontWeight: FontWeight.w700,
-              height: 1.15,
-            ),
-          ),
-        ],
-      );
-    }
-
-    final verb = _leadingText();
-    return Text(
-      '$displayName $verb $title',
-      maxLines: 2,
-      overflow: TextOverflow.ellipsis,
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 20,
-        fontWeight: FontWeight.w700,
-        height: 1.18,
-      ),
-    );
-  }
-
-  String? _metaLine() {
-    if (item.type == ActivityListType.movieWatchlist ||
-        item.type == ActivityListType.showWatchlist) {
-      return null;
-    }
-
-    if ((item.notes ?? '').trim().isNotEmpty) {
-      return item.notes!.trim();
-    }
-
-    if (item.type == ActivityListType.movieWatched ||
-        item.type == ActivityListType.showWatched) {
-      return 'Rewatched';
-    }
-
-    if (item.type == ActivityListType.movieReview ||
-        item.type == ActivityListType.showReview) {
-      return 'A cinematic masterpiece.';
-    }
-
-    return null;
   }
 
   void _openReviewSheet(BuildContext context, Review review) {
@@ -299,10 +176,7 @@ class ActivityTile extends StatelessWidget {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            ReviewCard(
-              review: review,
-              currentUserId: currentUserId,
-            ),
+            ReviewCard(review: review, currentUserId: currentUserId),
           ],
         ),
       ),
@@ -311,114 +185,107 @@ class ActivityTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateStr = _formatDate(item.timestamp);
-    final title = item.mediaTitle ?? 'something';
-    final path = item.mediaPosterPath;
-    final bool isPerson = item.type == ActivityListType.favoritePerson;
-    final int? navId = isPerson ? item.personId : item.movieId;
-    final bool isReview = item.type == ActivityListType.movieReview ||
-        item.type == ActivityListType.showReview;
-    final posterUrl = path != null ? '$_posterBase$path' : null;
     final displayName = _displayName();
-    final meta = _metaLine();
+    final title = item.mediaTitle ?? 'something';
+    final dateStr = _formatDate(item.timestamp);
+    final notes = (item.notes ?? '').trim();
+    final isPerson = item.type == ActivityListType.favoritePerson;
+    final navId = isPerson ? item.personId : item.movieId;
+    final isReview = item.type == ActivityListType.movieReview ||
+        item.type == ActivityListType.showReview;
+    final posterUrl = item.mediaPosterPath != null
+        ? '$_posterBase${item.mediaPosterPath}'
+        : null;
 
-    final content = ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: Stack(
+    final tile = Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        gradient: LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [
+            const Color(0xFF10345A).withValues(alpha: 0.9),
+            const Color(0xFF061D3B).withValues(alpha: 0.95),
+          ],
+        ),
+      ),
+      child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            width: 4,
+            height: 112,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-              gradient: LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [
-                  const Color(0xFF10345A).withValues(alpha: 0.9),
-                  const Color(0xFF061D3B).withValues(alpha: 0.95),
-                ],
+              color: _accentColor,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                bottomLeft: Radius.circular(16),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.2),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                GestureDetector(
-                  onTap: () => context.push('/friends/${item.userId}'),
-                  child: _buildAvatar(),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildHeadline(context, displayName, title),
-                      const SizedBox(height: 6),
-                      Text(
-                        dateStr,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: FlixieColors.light,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      if (meta != null) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          meta,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: item.type == ActivityListType.movieWatched ||
-                                    item.type == ActivityListType.showWatched
-                                ? const Color(0xFF19BE7A)
-                                : Colors.white.withValues(alpha: 0.78),
-                            fontSize: 16,
-                            fontWeight: item.type ==
-                                        ActivityListType.movieWatched ||
-                                    item.type == ActivityListType.showWatched
-                                ? FontWeight.w700
-                                : FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                GestureDetector(
-                  onTap: navId != null
-                      ? () => context
-                          .push(isPerson ? '/people/$navId' : '/movies/$navId')
-                      : null,
-                  child: _buildRightVisual(
-                      isPerson: isPerson, posterUrl: posterUrl),
-                ),
-              ],
             ),
           ),
-          Positioned(
-            top: 0,
-            bottom: 0,
-            left: 0,
-            child: Container(
-              width: 4,
-              decoration: BoxDecoration(
-                color: _accentColor,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(18),
-                  bottomLeft: Radius.circular(18),
-                ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  GestureDetector(
+                    onTap: () => context.push('/friends/${item.userId}'),
+                    child: _buildAvatar(),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$displayName ${_actionVerb()} $title',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            height: 1.15,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          dateStr,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: FlixieColors.light,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (notes.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            notes,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.78),
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  GestureDetector(
+                    onTap: navId != null
+                        ? () => context.push(
+                            isPerson ? '/people/$navId' : '/movies/$navId')
+                        : null,
+                    child: _buildRightVisual(
+                        isPerson: isPerson, posterUrl: posterUrl),
+                  ),
+                ],
               ),
             ),
           ),
@@ -429,10 +296,10 @@ class ActivityTile extends StatelessWidget {
     if (isReview && item.reviewData != null) {
       return GestureDetector(
         onTap: () => _openReviewSheet(context, item.reviewData!),
-        child: content,
+        child: tile,
       );
     }
 
-    return content;
+    return tile;
   }
 }

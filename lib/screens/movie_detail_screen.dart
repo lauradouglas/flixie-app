@@ -78,7 +78,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   bool _watchHistoryLoading = false;
   FriendActivityTab _friendsActivityTab = FriendActivityTab.all;
   bool _showFullSynopsis = false;
-  static const int _kPlaceholderWatchedPercent = 92;
   static const List<Color> _kGenreChipColors = [
     FlixieColors.primary,
     FlixieColors.secondary,
@@ -133,7 +132,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       final results = await Future.wait(futures);
       if (mounted) {
         setState(() {
-          _movie = results[0] as Movie;
+          final loadedMovie = results[0] as Movie;
+          _movie = loadedMovie;
           _similar = results[1] as List<SimilarMovie>;
           final credits = results[2] as MovieCredits;
           _cast = credits.castMembers;
@@ -157,7 +157,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               .toSet()
               .toList();
           _watchProviders = results[3] as List<WatchProvider>;
-          _reviews = (_movie!.reviews ?? []).toList();
+          _reviews = (loadedMovie.reviews ?? []).toList();
 
           // Check movie status in user's lists
           final user = authProvider.dbUser;
@@ -668,7 +668,25 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       );
     }
 
-    final movie = _movie!;
+    final movie = _movie;
+    if (movie == null) {
+      return Scaffold(
+        backgroundColor: FlixieColors.background,
+        appBar: AppBar(
+          backgroundColor: FlixieColors.background,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: FlixieColors.light),
+            onPressed: () => context.pop(),
+          ),
+        ),
+        body: const Center(
+          child: Text(
+            'Movie data is unavailable.',
+            style: TextStyle(color: FlixieColors.medium),
+          ),
+        ),
+      );
+    }
     return Scaffold(
       backgroundColor: FlixieColors.background,
       body: RefreshIndicator(
@@ -685,8 +703,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 10),
-                    if (movie.tagline != null && movie.tagline!.isNotEmpty)
-                      _buildTaglineChip(movie.tagline!),
+                    if ((movie.tagline ?? '').isNotEmpty)
+                      _buildTaglineChip(movie.tagline ?? ''),
                     const SizedBox(height: 12),
                     _buildTitleBlock(context, movie),
                     const SizedBox(height: 12),
@@ -719,10 +737,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                     _buildMoreLikeThisSection(context),
                     const SizedBox(height: 24),
                     FilmInfoCard(
-                     director: _director,
-                     writers: _writers,
-                     producers: _producers,
-                     movie: movie,
+                      director: _director,
+                      writers: _writers,
+                      producers: _producers,
+                      movie: movie,
                     ),
                     const SizedBox(height: 24),
                     ExternalLinksSection(movie: movie),
@@ -781,7 +799,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final year = _extractYear(movie.releaseDate);
     final runtime = _formatRuntime(movie.runtime);
     final rating = _contentRating(movie);
-    final meta = [year, runtime, rating].where((s) => s.isNotEmpty).join('  •  ');
+    final meta =
+        [year, runtime, rating].where((s) => s.isNotEmpty).join('  •  ');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -967,8 +986,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final voteCount = movie.voteCount;
     final avgFriendScore = _averageFriendScorePercent();
     final friendAvatars = _friendsActivity.take(3).toList();
-    final watchedPercent =
-        voteCount != null && voteCount > 0 ? _kPlaceholderWatchedPercent : null;
 
     return Container(
       width: double.infinity,
@@ -1001,8 +1018,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                     ),
                     const SizedBox(height: 6),
                     ScoreTile(
-                      value:
-                          score != null ? '${score.toStringAsFixed(1)}/10' : 'N/A',
+                      value: score != null
+                          ? '${score.toStringAsFixed(1)}/10'
+                          : 'N/A',
                       label: voteCount != null
                           ? '${_formatVoteCount(voteCount)} RATINGS'
                           : 'NO RATINGS',
@@ -1046,14 +1064,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                             letterSpacing: 0.6,
                           ),
                         ),
-                        if (watchedPercent != null)
-                          Text(
-                            '$watchedPercent% watched',
-                            style: const TextStyle(
-                              color: FlixieColors.primary,
-                              fontSize: 11,
-                            ),
-                          ),
                       ],
                     ),
                   ),
@@ -1084,7 +1094,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 if (friendAvatars.isNotEmpty)
                   SizedBox(
                     width: 74,
+                    height: 24,
                     child: Stack(
+                      fit: StackFit.expand,
                       children: List.generate(friendAvatars.length, (index) {
                         final friend = friendAvatars[index];
                         final initial = _initialFor(friend.username);
@@ -1092,8 +1104,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                           left: index * 18,
                           child: CircleAvatar(
                             radius: 12,
-                            backgroundColor:
-                                FlixieColors.surfaceElevated.withValues(alpha: 0.95),
+                            backgroundColor: FlixieColors.surfaceElevated
+                                .withValues(alpha: 0.95),
                             child: Text(
                               initial,
                               style: const TextStyle(
@@ -1116,11 +1128,15 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   }
 
   Widget _buildWatchSummaryCard(BuildContext context) {
-    final recentWatch = _movieWatchHistory.isNotEmpty ? _movieWatchHistory.first : null;
+    final recentWatch =
+        _movieWatchHistory.isNotEmpty ? _movieWatchHistory.first : null;
     final hasHistory = recentWatch != null;
     final watchCount = _watchCount;
-    final ratingLabel = _userRating != null ? '${_userRating!}/10' : 'Not rated';
-    final watchDate = hasHistory ? _formatReadableDate(recentWatch.watchedAt) : 'Not watched yet';
+    final ratingLabel =
+        _userRating != null ? '${_userRating!}/10' : 'Not rated';
+    final watchDate = hasHistory
+        ? _formatReadableDate(recentWatch.watchedAt)
+        : 'Not watched yet';
 
     return Container(
       width: double.infinity,
@@ -1146,7 +1162,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               const Spacer(),
               if (watchCount > 0)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                     color: FlixieColors.primary.withValues(alpha: 0.16),
                     borderRadius: BorderRadius.circular(999),
@@ -1538,10 +1555,18 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   decoration: BoxDecoration(
                     color: FlixieColors.surface.withValues(alpha: 0.85),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                    border:
+                        Border.all(color: Colors.white.withValues(alpha: 0.08)),
                   ),
                   child: ListTile(
-                    title: Text(_formatWatchDate(entry.watchedAt)),
+                    title: Text(
+                      _formatWatchDate(entry.watchedAt),
+                      style: const TextStyle(
+                        color: FlixieColors.light,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     subtitle: Text(
                       [
                         if (entry.rating != null)
@@ -1549,8 +1574,15 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                         if (entry.notes != null && entry.notes!.isNotEmpty)
                           entry.notes!,
                       ].join(' • '),
+                      style: const TextStyle(
+                        color: FlixieColors.medium,
+                        fontSize: 14,
+                        height: 1.35,
+                      ),
                     ),
                     trailing: PopupMenuButton<String>(
+                      iconColor: FlixieColors.light,
+                      color: FlixieColors.tabBarBackgroundFocused,
                       onSelected: (value) {
                         if (value == 'edit') {
                           _showLogWatchSheet(entry: entry);
@@ -1559,8 +1591,20 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                         _deleteWatchEntry(entry);
                       },
                       itemBuilder: (_) => const [
-                        PopupMenuItem(value: 'edit', child: Text('Edit')),
-                        PopupMenuItem(value: 'delete', child: Text('Delete')),
+                        PopupMenuItem(
+                          value: 'edit',
+                          child: Text(
+                            'Edit',
+                            style: TextStyle(color: FlixieColors.light),
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Text(
+                            'Delete',
+                            style: TextStyle(color: FlixieColors.danger),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -1598,10 +1642,13 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   Widget _buildPersonalActivitySection(BuildContext context) {
     final userId = context.read<AuthProvider>().dbUser?.id;
-    final myReview =
-        userId == null ? null : _reviews.where((r) => r.userId == userId).firstOrNull;
-    final lastWatch = _movieWatchHistory.isNotEmpty ? _movieWatchHistory.first : null;
-    final hasAnyActivity = lastWatch != null || _userRating != null || myReview != null;
+    final myReview = userId == null
+        ? null
+        : _reviews.where((r) => r.userId == userId).firstOrNull;
+    final lastWatch =
+        _movieWatchHistory.isNotEmpty ? _movieWatchHistory.first : null;
+    final hasAnyActivity =
+        lastWatch != null || _userRating != null || myReview != null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1685,8 +1732,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 child: OutlinedButton.icon(
                   onPressed: _isWatched ? _showLogWatchSheet : _toggleWatched,
                   icon: const Icon(Icons.replay_rounded, size: 18),
-                  label:
-                      Text(_isWatched ? 'Rewatch & Update Rating' : 'Mark as Watched'),
+                  label: Text(_isWatched
+                      ? 'Rewatch & Update Rating'
+                      : 'Mark as Watched'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: FlixieColors.primary,
                     side: BorderSide(
@@ -1789,8 +1837,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                     child: Text(
                       tab.$2,
                       style: TextStyle(
-                        color:
-                            selected ? FlixieColors.primary : FlixieColors.light,
+                        color: selected
+                            ? FlixieColors.primary
+                            : FlixieColors.light,
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
                       ),
@@ -1874,7 +1923,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Average friend rating: ${average!.toStringAsFixed(1)}/10',
+                      'Average friend rating: ${(average ?? 0).toStringAsFixed(1)}/10',
                       style: const TextStyle(
                         color: FlixieColors.white,
                         fontWeight: FontWeight.w700,

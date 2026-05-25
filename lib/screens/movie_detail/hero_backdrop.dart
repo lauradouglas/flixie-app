@@ -25,10 +25,13 @@ class MovieHeroBackdrop extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
+              stops: [0.0, 0.18, 0.62, 0.86, 1.0],
               colors: [
-                Color(0x33000000),
-                Color(0xBF061625),
-                Color(0xFF061625),
+                Color(0x26000000),
+                Color(0x12000000),
+                Color(0x00172B4D),
+                Color(0xA6172B4D),
+                FlixieColors.background,
               ],
             ),
           ),
