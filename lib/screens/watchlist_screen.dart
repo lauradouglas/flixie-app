@@ -412,12 +412,12 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     }).length;
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+      margin: const EdgeInsets.fromLTRB(16, 2, 16, 12),
       padding: const EdgeInsets.symmetric(vertical: 14),
       decoration: BoxDecoration(
-        color: FlixieColors.tabBarBackgroundFocused,
+        color: const Color(0xFF0A2348),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.09)),
       ),
       child: Row(
         children: [
@@ -447,12 +447,13 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
           const SizedBox(height: 4),
           Text(value,
               style: const TextStyle(
-                  color: Colors.white,
+                  color: FlixieColors.white,
                   fontWeight: FontWeight.w700,
-                  fontSize: 16)),
+                  fontSize: 33)),
+          const SizedBox(height: 2),
           Text(label,
               style: const TextStyle(
-                  color: FlixieColors.medium, fontSize: 10),
+                  color: FlixieColors.light, fontSize: 11),
               textAlign: TextAlign.center),
         ],
       ),
@@ -493,14 +494,17 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
           const Spacer(),
           TextButton.icon(
             onPressed: _openFilterSheet,
-            icon: const Icon(Icons.tune_rounded, size: 16),
+            icon: const Icon(Icons.tune_rounded, size: 19),
             label: const Text('Filter'),
             style: TextButton.styleFrom(
               foregroundColor: _hasActiveFilters
                   ? FlixieColors.primary
                   : FlixieColors.light,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              textStyle: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
             ),
           ),
         ],
@@ -569,8 +573,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding:
-                      const EdgeInsets.fromLTRB(16, 4, 16, 10),
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
                   child: _WatchlistTabs(
                     selectedIndex: _selectedTab,
                     onChanged: (i) => setState(() => _selectedTab = i),
@@ -814,40 +817,48 @@ class _WatchlistTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: FlixieColors.tabBarBackgroundFocused,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-      ),
-      child: Row(
-        children: List.generate(labels.length, (index) {
-          final selected = selectedIndex == index;
-          return Expanded(
+    return Row(
+      children: List.generate(labels.length, (index) {
+        final selected = selectedIndex == index;
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(right: index == labels.length - 1 ? 0 : 10),
             child: GestureDetector(
               onTap: () => onChanged(index),
               child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
-                  color: selected
-                      ? FlixieColors.primary.withValues(alpha: 0.22)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
+                  color: selected ? FlixieColors.primary : Colors.transparent,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: selected
+                        ? Colors.transparent
+                        : Colors.white.withValues(alpha: 0.12),
+                  ),
+                  boxShadow: selected
+                      ? [
+                          BoxShadow(
+                            color: FlixieColors.primary.withValues(alpha: 0.35),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
+                      : null,
                 ),
                 child: Text(
                   labels[index],
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: selected ? FlixieColors.primary : FlixieColors.light,
+                    color: selected ? FlixieColors.white : FlixieColors.light,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
             ),
-          );
-        }),
-      ),
+          ),
+        );
+      }),
     );
   }
 }
@@ -888,6 +899,10 @@ class WatchlistMovieRow extends StatelessWidget {
     return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
   }
 
+  static String _addedByLabel(String userId) {
+    return userId == 'me' || userId.isEmpty ? 'you' : 'friend';
+  }
+
   @override
   Widget build(BuildContext context) {
     final movie = watchlistItem.movie;
@@ -905,6 +920,7 @@ class WatchlistMovieRow extends StatelessWidget {
     final metaParts = [
       if (year != null && year.isNotEmpty) year,
       if (runtime.isNotEmpty) runtime,
+      'PG-13',
     ];
     final metaStr = metaParts.join(' • ');
 
@@ -914,9 +930,9 @@ class WatchlistMovieRow extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: FlixieColors.tabBarBackgroundFocused,
+          color: const Color(0xFF0A2348),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1012,45 +1028,85 @@ class WatchlistMovieRow extends StatelessWidget {
                     children: [
                       if (rating != null) ...[
                         const Icon(Icons.star_rounded,
-                            color: FlixieColors.tertiary, size: 14),
+                            color: FlixieColors.primary, size: 18),
                         const SizedBox(width: 4),
                         Text(
                           '$rating/10',
                           style: const TextStyle(
-                            color: FlixieColors.tertiary,
-                            fontSize: 13,
+                            color: FlixieColors.white,
+                            fontSize: 31,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                       ],
+                      const SizedBox(width: 12),
+                      ...List.generate(4, (index) {
+                        final color = [
+                          const Color(0xFFE8C09D),
+                          const Color(0xFFB67B61),
+                          const Color(0xFFD9A983),
+                          const Color(0xFF8B5D46),
+                        ][index];
+                        return Transform.translate(
+                          offset: Offset(index * -5, 0),
+                          child: Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: const Color(0xFF0A2348),
+                                width: 2,
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                      Transform.translate(
+                        offset: const Offset(-20, 0),
+                        child: Container(
+                          width: 26,
+                          height: 26,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0A2348),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.25),
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: const Text(
+                            '+3',
+                            style: TextStyle(
+                              color: FlixieColors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
                       const Spacer(),
-                      Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          color: isWatched
-                              ? FlixieColors.success.withValues(alpha: 0.18)
-                              : Colors.white.withValues(alpha: 0.07),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          isWatched
-                              ? Icons.check_circle_rounded
-                              : Icons.bookmark_outline_rounded,
-                          size: 16,
-                          color: isWatched
-                              ? FlixieColors.success
-                              : FlixieColors.medium,
-                        ),
+                      Icon(
+                        isWatched
+                            ? Icons.check_circle_outline_rounded
+                            : Icons.bookmark_border_rounded,
+                        size: 30,
+                        color: isWatched
+                            ? const Color(0xFF00D07A)
+                            : FlixieColors.light,
                       ),
                     ],
                   ),
                   if (addedDate.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Text(
-                      'Added • $addedDate',
+                      'Added by ${_addedByLabel(watchlistItem.userId)} • $addedDate',
                       style: const TextStyle(
-                          color: FlixieColors.medium, fontSize: 11),
+                        color: FlixieColors.primary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ],
@@ -1062,5 +1118,4 @@ class WatchlistMovieRow extends StatelessWidget {
     );
   }
 }
-
 
