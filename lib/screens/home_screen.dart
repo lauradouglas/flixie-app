@@ -31,7 +31,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with RouteAware {
   // Keep hero carousel concise so primary CTA and dots remain visible above fold.
-  static const int _maxHeroCarouselItems = 6;
+  static const int _kMaxHeroCarouselItems = 6;
   static const List<String> _weekdayLabels = [
     'Mon',
     'Tue',
@@ -252,7 +252,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   // ── Hero carousel ──────────────────────────────────────────────────────────
 
   Widget _buildHeroCarousel(BuildContext context) {
-    final count = _featuredMovies.length.clamp(0, _maxHeroCarouselItems);
+    final count = _featuredMovies.length.clamp(0, _kMaxHeroCarouselItems);
     return SizedBox(
       height: 440,
       child: PageView.builder(
@@ -266,7 +266,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   }
 
   Widget _buildCarouselDots() {
-    final count = _featuredMovies.length.clamp(0, _maxHeroCarouselItems);
+    final count = _featuredMovies.length.clamp(0, _kMaxHeroCarouselItems);
     if (count <= 1) return const SizedBox.shrink();
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
