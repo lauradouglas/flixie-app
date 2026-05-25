@@ -48,12 +48,14 @@ class FlixieColors {
   static const Color darkTint = Color(0xFF33479C);
 
   // Background / navigation
-  static const Color background = Color(0xFF172B4D);
-  static const Color navy = Color(0xFF001F3F);
+  static const Color background = Color(0xFF061625);
+  static const Color surface = Color(0xFF0B2035);
+  static const Color surfaceElevated = Color(0xFF12345A);
+  static const Color navy = Color(0xFF04101D);
   static const Color white = Color(0xFFFFFFFF);
-  static const Color tabBarBackground = Color(0xFF172B4D);
-  static const Color tabBarBackgroundFocused = Color(0xFF1B3258);
-  static const Color tabBarBorder = Color(0xFF1B325B);
+  static const Color tabBarBackground = background;
+  static const Color tabBarBackgroundFocused = surface;
+  static const Color tabBarBorder = Color(0xFF1F3A59);
 }
 
 /// Builds the app-wide [ThemeData] using the Flixie color palette.
@@ -79,9 +81,9 @@ class AppTheme {
       onError: Colors.black,
       errorContainer: FlixieColors.dangerShade,
       onErrorContainer: FlixieColors.light,
-      surface: FlixieColors.tabBarBackgroundFocused,
+      surface: FlixieColors.surface,
       onSurface: FlixieColors.light,
-      surfaceContainerHighest: FlixieColors.tabBarBorder,
+      surfaceContainerHighest: FlixieColors.surfaceElevated,
       onSurfaceVariant: FlixieColors.medium,
       outline: FlixieColors.mediumShade,
       shadow: Colors.black,
@@ -149,7 +151,7 @@ class AppTheme {
 
       // Cards
       cardTheme: CardThemeData(
-        color: const Color(0xFF1D3A68),
+        color: FlixieColors.surface,
         elevation: 4,
         shadowColor: Colors.black.withValues(alpha: 0.4),
         shape: RoundedRectangleBorder(
@@ -194,7 +196,7 @@ class AppTheme {
       // Input fields
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: FlixieColors.tabBarBackgroundFocused,
+        fillColor: FlixieColors.surface,
         labelStyle: const TextStyle(color: FlixieColors.medium),
         hintStyle: const TextStyle(color: FlixieColors.mediumShade),
         prefixIconColor: FlixieColors.medium,

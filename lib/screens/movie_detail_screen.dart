@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -52,6 +50,8 @@ class MovieDetailScreen extends StatefulWidget {
 
 enum ListUpdateType { watchlist, watched, favorite }
 
+enum FriendActivityTab { all, watched, watchlist, ratings, reviews, lists }
+
 class _MovieDetailScreenState extends State<MovieDetailScreen> {
   Movie? _movie;
   List<Review> _reviews = [];
@@ -75,7 +75,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   List<MovieFriendActivity> _friendsActivity = [];
   List<MovieWatchEntry> _movieWatchHistory = [];
   bool _watchHistoryLoading = false;
-  int _detailTabIndex = 0; // 0=Overview, 1=Cast, 2=Reviews, 3=Similar
+  FriendActivityTab _friendsActivityTab = FriendActivityTab.all;
   bool _showFullSynopsis = false;
   static const int _kPlaceholderWatchedPercent = 92;
 
@@ -563,11 +563,13 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     return '${h}h ${m}m';
   }
 
-  static const List<String> _detailTabs = [
-    'Overview',
-    'Cast',
-    'Reviews',
-    'Similar',
+  static const List<(FriendActivityTab, String)> _friendActivityTabs = [
+    (FriendActivityTab.all, 'All'),
+    (FriendActivityTab.watched, 'Watched'),
+    (FriendActivityTab.watchlist, 'Watchlist'),
+    (FriendActivityTab.ratings, 'Ratings'),
+    (FriendActivityTab.reviews, 'Reviews'),
+    (FriendActivityTab.lists, 'Lists'),
   ];
 
   String _contentRating(Movie movie) {
@@ -603,16 +605,16 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(
-        backgroundColor: Color(0xFF0D1B2A),
+        backgroundColor: FlixieColors.background,
         body: Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_error != null) {
       return Scaffold(
-        backgroundColor: const Color(0xFF0D1B2A),
+        backgroundColor: FlixieColors.background,
         appBar: AppBar(
-          backgroundColor: const Color(0xFF0D1B2A),
+          backgroundColor: FlixieColors.background,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: FlixieColors.light),
             onPressed: () => context.pop(),
@@ -660,7 +662,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
     final movie = _movie!;
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1B2A),
+      backgroundColor: FlixieColors.background,
       body: RefreshIndicator(
         color: FlixieColors.primary,
         onRefresh: _refresh,
@@ -674,24 +676,49 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 10),
                     if (movie.tagline != null && movie.tagline!.isNotEmpty)
                       _buildTaglineChip(movie.tagline!),
                     const SizedBox(height: 12),
                     _buildTitleBlock(context, movie),
                     const SizedBox(height: 12),
-                     _buildGenrePills(movie),
-                     const SizedBox(height: 16),
-                     _buildScores(context, movie),
-                     const SizedBox(height: 12),
-                     _buildActionButtons(),
-                     const SizedBox(height: 20),
-                     _buildSynopsis(context, movie),
+                    _buildGenrePills(movie),
                     const SizedBox(height: 16),
-                    _buildDetailTabBar(),
-                    const SizedBox(height: 18),
-                    _buildDetailTabContent(context, movie),
-                    const SizedBox(height: 32),
+                    _buildScores(context, movie),
+                    const SizedBox(height: 12),
+                    _buildActionButtons(),
+                    const SizedBox(height: 16),
+                    _buildPersonalActivitySection(context),
+                    const SizedBox(height: 16),
+                    _buildTrailersSection(context, movie),
+                    const SizedBox(height: 24),
+                    _buildWhereToWatchSection(context),
+                    const SizedBox(height: 24),
+                    _buildTopCastSection(context),
+                    const SizedBox(height: 24),
+                    _buildSynopsis(context, movie),
+                    const SizedBox(height: 24),
+                    _buildWatchHistorySection(context),
+                    const SizedBox(height: 24),
+                    _buildFriendsActivitySection(context),
+                    const SizedBox(height: 24),
+                    _buildFriendsRatingsSection(context),
+                    const SizedBox(height: 24),
+                    _buildFriendsListsSection(context),
+                    const SizedBox(height: 24),
+                    _buildUserReviewsSection(context),
+                    const SizedBox(height: 24),
+                    _buildMoreLikeThisSection(context),
+                    const SizedBox(height: 24),
+                    FilmInfoCard(
+                     director: _director,
+                     writers: _writers,
+                     producers: _producers,
+                     movie: movie,
+                    ),
+                    const SizedBox(height: 24),
+                    ExternalLinksSection(movie: movie),
+                    const SizedBox(height: 110),
                   ],
                 ),
               ),
@@ -708,7 +735,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     return SliverAppBar(
       expandedHeight: 420,
       pinned: true,
-      backgroundColor: const Color(0xFF0D1B2A),
+      backgroundColor: FlixieColors.background,
       automaticallyImplyLeading: false,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back, color: FlixieColors.light),
@@ -781,26 +808,13 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       return const SizedBox.shrink();
     }
 
-    final colors = [
-      const Color(0xFF6366F1), // Indigo
-      const Color(0xFFEC4899), // Pink
-      const Color(0xFF8B5CF6), // Purple
-      const Color(0xFF10B981), // Green
-      const Color(0xFFF59E0B), // Amber
-      const Color(0xFF3B82F6), // Blue
-      const Color(0xFFEF4444), // Red
-      const Color(0xFF14B8A6), // Teal
-    ];
-
-    final random = Random();
-
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: movie.genres!
           .map((genre) => GenreChip(
                 label: genre.name.toUpperCase(),
-                color: colors[random.nextInt(colors.length)],
+                color: FlixieColors.primary,
               ))
           .toList(),
     );
@@ -942,114 +956,159 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   Widget _buildScores(BuildContext context, Movie movie) {
     final score = movie.voteAverage;
     final voteCount = movie.voteCount;
-    final tomatoPercent =
-        score != null ? (score * 10).clamp(0, 100).round() : null;
-    // TODO(laura): replace placeholder watched percentage with real metric.
-    final watchedPercent = voteCount != null
-        ? (voteCount > 0 ? _kPlaceholderWatchedPercent : 0)
-        : null;
+    final ratings = _friendsActivity
+        .where((activity) => activity.rating != null)
+        .map((activity) => activity.rating!.toDouble())
+        .toList();
+    final avgFriendScore = ratings.isEmpty
+        ? null
+        : ((ratings.reduce((a, b) => a + b) / ratings.length) * 10).round();
+    final friendAvatars = _friendsActivity.take(3).toList();
+    final watchedPercent =
+        voteCount != null && voteCount > 0 ? _kPlaceholderWatchedPercent : null;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: FlixieColors.tabBarBackgroundFocused,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        color: FlixieColors.surface.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _inlineMetric(
-                  icon: Icons.star_border_rounded,
-                  iconColor: Colors.deepOrangeAccent,
-                  label: 'FLIXISCORE',
-                ),
-                const SizedBox(height: 6),
-                ScoreTile(
-                  value: score != null ? '${score.toStringAsFixed(1)}/10' : 'N/A',
-                  label: 'COMMUNITY SCORE',
-                  valueColor: FlixieColors.white,
-                  onInfoTap: () => _showFlixScoreInfo(context),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            width: 1,
-            height: 50,
-            color: Colors.white.withValues(alpha: 0.1),
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _inlineMetric(
-                  icon: Icons.trending_up_rounded,
-                  iconColor: FlixieColors.success,
-                  label: 'RATINGS',
-                ),
-                const SizedBox(height: 6),
-                ScoreTile(
-                  value: tomatoPercent != null ? '$tomatoPercent%' : 'N/A',
-                  label: voteCount != null
-                      ? '${_formatVoteCount(voteCount)} VOTES'
-                      : 'NO VOTES',
-                  valueColor: FlixieColors.success,
-                ),
-              ],
-            ),
-          ),
-          Container(
-            width: 1,
-            height: 50,
-            color: Colors.white.withValues(alpha: 0.1),
-          ),
-          Expanded(
-            child: InkWell(
-              borderRadius: BorderRadius.circular(10),
-              onTap: _isRatingLoading ? null : _showRatingSheet,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
+          Row(
+            children: [
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      _userRating != null ? '${_userRating!}/10' : '+ Rate',
-                      style: TextStyle(
-                        color: _userRating != null
-                            ? FlixieColors.tertiary
-                            : FlixieColors.light,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    _inlineMetric(
+                      icon: Icons.star_border_rounded,
+                      iconColor: Colors.deepOrangeAccent,
+                      label: 'FLIXIE SCORE',
                     ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'YOUR RATING',
-                      style: TextStyle(
-                        color: FlixieColors.medium,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.6,
-                      ),
+                    const SizedBox(height: 6),
+                    ScoreTile(
+                      value:
+                          score != null ? '${score.toStringAsFixed(1)}/10' : 'N/A',
+                      label: voteCount != null
+                          ? '${_formatVoteCount(voteCount)} RATINGS'
+                          : 'NO RATINGS',
+                      valueColor: FlixieColors.white,
+                      onInfoTap: () => _showFlixScoreInfo(context),
                     ),
-                    if (watchedPercent != null)
-                      Text(
-                        '$watchedPercent% watched',
-                        style: const TextStyle(
-                          color: FlixieColors.primary,
-                          fontSize: 11,
-                        ),
-                      ),
                   ],
                 ),
               ),
-            ),
+              Container(
+                width: 1,
+                height: 50,
+                color: Colors.white.withValues(alpha: 0.1),
+              ),
+              Expanded(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: _isRatingLoading ? null : _showRatingSheet,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _userRating != null ? '${_userRating!}/10' : '+ Rate',
+                          style: TextStyle(
+                            color: _userRating != null
+                                ? FlixieColors.tertiary
+                                : FlixieColors.light,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'YOUR RATING',
+                          style: TextStyle(
+                            color: FlixieColors.medium,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                        if (watchedPercent != null)
+                          Text(
+                            '$watchedPercent% watched',
+                            style: const TextStyle(
+                              color: FlixieColors.primary,
+                              fontSize: 11,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
+          if (avgFriendScore != null || friendAvatars.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            const Divider(color: FlixieColors.tabBarBorder, height: 1),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Icon(Icons.people_alt_outlined,
+                    size: 16, color: FlixieColors.secondary),
+                const SizedBox(width: 6),
+                Text(
+                  avgFriendScore != null
+                      ? 'Avg Friend Score: $avgFriendScore%'
+                      : 'Friends Activity',
+                  style: const TextStyle(
+                    color: FlixieColors.light,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Spacer(),
+                if (friendAvatars.isNotEmpty)
+                  SizedBox(
+                    width: 74,
+                    child: Stack(
+                      children: List.generate(friendAvatars.length, (index) {
+                        final friend = friendAvatars[index];
+                        final initial = friend.username.isNotEmpty
+                            ? friend.username[0].toUpperCase()
+                            : '?';
+                        return Positioned(
+                          left: index * 18,
+                          child: CircleAvatar(
+                            radius: 12,
+                            backgroundColor:
+                                FlixieColors.surfaceElevated.withValues(alpha: 0.95),
+                            child: Text(
+                              initial,
+                              style: const TextStyle(
+                                color: FlixieColors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -1197,7 +1256,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1B2E42),
+        backgroundColor: FlixieColors.surface,
         title: const Text(
           'FLIXSCORE',
           style: TextStyle(
@@ -1296,38 +1355,48 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Overview',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: FlixieColors.white,
-                fontWeight: FontWeight.bold,
-              ),
-        ),
+        _buildSectionHeader(context, 'Overview'),
         const SizedBox(height: 10),
-        Text(
-          text,
-          maxLines: _showFullSynopsis ? null : 3,
-          overflow: _showFullSynopsis ? TextOverflow.visible : TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: FlixieColors.light,
-            fontSize: 14,
-            height: 1.55,
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: FlixieColors.surface.withValues(alpha: 0.85),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                text,
+                maxLines: _showFullSynopsis ? null : 3,
+                overflow: _showFullSynopsis
+                    ? TextOverflow.visible
+                    : TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: FlixieColors.light,
+                  fontSize: 14,
+                  height: 1.55,
+                ),
+              ),
+              if (showToggle)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: () =>
+                        setState(() => _showFullSynopsis = !_showFullSynopsis),
+                    style: TextButton.styleFrom(
+                      foregroundColor: FlixieColors.primary,
+                      padding: const EdgeInsets.only(top: 4),
+                      minimumSize: Size.zero,
+                    ),
+                    child: Text(_showFullSynopsis ? 'Show less' : 'Show more'),
+                  ),
+                ),
+            ],
           ),
         ),
-        if (showToggle)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton(
-              onPressed: () =>
-                  setState(() => _showFullSynopsis = !_showFullSynopsis),
-              style: TextButton.styleFrom(
-                foregroundColor: FlixieColors.primary,
-                padding: const EdgeInsets.only(top: 4),
-                minimumSize: Size.zero,
-              ),
-              child: Text(_showFullSynopsis ? 'Show less' : 'Show more'),
-            ),
-          ),
       ],
     );
   }
@@ -1344,7 +1413,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF1B2E42),
+      backgroundColor: FlixieColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -1374,12 +1443,13 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   // ---- CTA buttons ---------------------------------------------------------
 
   Widget _buildActionButtons() {
+    final watchCount = _movieWatchHistory.length;
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: FlixieColors.tabBarBackgroundFocused,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        color: FlixieColors.surface.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       child: Row(
         children: [
@@ -1389,7 +1459,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   _isWatched ? Icons.check_circle : Icons.check_circle_outline,
               label: 'Watched',
               isActive: _isWatched,
-              color: Colors.green,
+              color: FlixieColors.success,
               isLoading: _currentlyUpdating == ListUpdateType.watched,
               bounceKey: _watchedBounceKey,
               onPressed: _currentlyUpdating != null ? null : _toggleWatched,
@@ -1401,7 +1471,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               icon: _inWatchlist ? Icons.bookmark : Icons.bookmark_outline,
               label: 'Watchlist',
               isActive: _inWatchlist,
-              color: Colors.amber,
+              color: FlixieColors.warning,
               isLoading: _currentlyUpdating == ListUpdateType.watchlist,
               bounceKey: _watchlistBounceKey,
               onPressed: _currentlyUpdating != null ? null : _toggleWatchlist,
@@ -1413,10 +1483,23 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               icon: _isFavorite ? Icons.favorite : Icons.favorite_outline,
               label: 'Favourite',
               isActive: _isFavorite,
-              color: Colors.red,
+              color: FlixieColors.danger,
               isLoading: _currentlyUpdating == ListUpdateType.favorite,
               bounceKey: _favoriteBounceKey,
               onPressed: _currentlyUpdating != null ? null : _toggleFavorite,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: MovieActionButton(
+              icon: Icons.replay_rounded,
+              label: 'Rewatch',
+              subtitle: watchCount > 0 ? '$watchCount times' : null,
+              isActive: _isWatched,
+              color: FlixieColors.primary,
+              isLoading: false,
+              bounceKey: watchCount,
+              onPressed: _isWatched ? _showLogWatchSheet : null,
             ),
           ),
         ],
@@ -1424,100 +1507,11 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     );
   }
 
-  Widget _buildDetailTabBar() {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: FlixieColors.tabBarBackgroundFocused,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: List.generate(_detailTabs.length, (index) {
-          final selected = _detailTabIndex == index;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _detailTabIndex = index),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: selected
-                      ? FlixieColors.primary.withValues(alpha: 0.22)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  _detailTabs[index],
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: selected ? FlixieColors.primary : FlixieColors.light,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-
-  Widget _buildDetailTabContent(BuildContext context, Movie movie) {
-    switch (_detailTabIndex) {
-      case 0:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildWhereToWatchSection(context),
-            const SizedBox(height: 24),
-            _buildPersonalActivitySection(context),
-            const SizedBox(height: 24),
-            _buildTopCastSection(context),
-            const SizedBox(height: 24),
-            _buildTrailersSection(context, movie),
-            const SizedBox(height: 24),
-            _buildWatchHistorySection(context),
-            const SizedBox(height: 24),
-            FilmInfoCard(
-              director: _director,
-              writers: _writers,
-              producers: _producers,
-              movie: movie,
-            ),
-            const SizedBox(height: 24),
-            ExternalLinksSection(movie: movie),
-          ],
-        );
-      case 1:
-        return _buildTopCastSection(context);
-      case 2:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildUserReviewsSection(context),
-            const SizedBox(height: 24),
-            _buildFriendsActivitySection(context),
-          ],
-        );
-      case 3:
-        return _buildMoreLikeThisSection(context);
-      default:
-        return const SizedBox.shrink();
-    }
-  }
-
   Widget _buildWatchHistorySection(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Watch History',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: FlixieColors.light,
-          ),
-        ),
+        _buildSectionHeader(context, 'Watch History'),
         const SizedBox(height: 10),
         if (_watchHistoryLoading)
           const Center(child: CircularProgressIndicator())
@@ -1526,8 +1520,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: FlixieColors.tabBarBackgroundFocused,
-              borderRadius: BorderRadius.circular(12),
+              color: FlixieColors.surface.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
             ),
             child: const Text(
               'No watch history yet for this movie.',
@@ -1539,8 +1534,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 (entry) => Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   decoration: BoxDecoration(
-                    color: FlixieColors.tabBarBackgroundFocused,
-                    borderRadius: BorderRadius.circular(12),
+                    color: FlixieColors.surface.withValues(alpha: 0.85),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
                   ),
                   child: ListTile(
                     title: Text(_formatWatchDate(entry.watchedAt)),
@@ -1603,6 +1599,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final myReview =
         userId == null ? null : _reviews.where((r) => r.userId == userId).firstOrNull;
     final lastWatch = _movieWatchHistory.isNotEmpty ? _movieWatchHistory.first : null;
+    final watchCount = _movieWatchHistory.length;
     final hasAnyActivity = lastWatch != null || _userRating != null || myReview != null;
 
     return Column(
@@ -1621,22 +1618,23 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           decoration: BoxDecoration(
-            color: FlixieColors.tabBarBackgroundFocused,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+            color: FlixieColors.surface.withValues(alpha: 0.85),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
           ),
-          child: hasAnyActivity
-              ? Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (hasAnyActivity)
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: _activityColumn(
-                        title: 'Watched',
-                        value: lastWatch != null
-                            ? _formatReadableDate(lastWatch.watchedAt)
-                            : '—',
-                        icon: Icons.check_circle_outline,
-                        color: FlixieColors.success,
+                        title: 'Watch count',
+                        value: '$watchCount',
+                        icon: Icons.replay_circle_filled_rounded,
+                        color: FlixieColors.primary,
                       ),
                     ),
                     _verticalDivider(),
@@ -1645,27 +1643,58 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                         title: 'Your rating',
                         value: _userRating != null ? '${_userRating!}/10' : '—',
                         icon: Icons.star_rounded,
-                        color: Colors.amber,
+                        color: FlixieColors.warning,
                       ),
                     ),
                     _verticalDivider(),
                     Expanded(
                       child: _activityColumn(
-                        title: 'Your review',
-                        value: myReview?.body.isNotEmpty == true
-                            ? myReview!.body
-                            : 'No review yet',
-                        icon: Icons.rate_review_outlined,
-                        color: FlixieColors.primary,
-                        maxLines: 3,
+                        title: 'Last watched',
+                        value: lastWatch != null
+                            ? _formatReadableDate(lastWatch.watchedAt)
+                            : '—',
+                        icon: Icons.check_circle_outline,
+                        color: FlixieColors.success,
                       ),
                     ),
                   ],
                 )
-              : const Text(
+              else
+                const Text(
                   'No personal activity yet for this movie.',
                   style: TextStyle(color: FlixieColors.medium),
                 ),
+              const SizedBox(height: 12),
+              if (myReview?.body.isNotEmpty == true)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Text(
+                    myReview!.body,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: FlixieColors.light,
+                      fontSize: 13,
+                      height: 1.45,
+                    ),
+                  ),
+                ),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _isWatched ? _showLogWatchSheet : _toggleWatched,
+                  icon: const Icon(Icons.replay_rounded, size: 18),
+                  label: const Text('Rewatch & Update Rating'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: FlixieColors.primary,
+                    side: BorderSide(
+                      color: FlixieColors.primary.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -1724,21 +1753,199 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   // ---- Friends activity --------------------------------------------------
 
   Widget _buildFriendsActivitySection(BuildContext context) {
-    if (_friendsActivity.isEmpty) return const SizedBox.shrink();
+    final filtered = _filteredFriendsActivity();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Friends',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: FlixieColors.white,
-                fontWeight: FontWeight.bold,
-              ),
+        _buildSectionHeader(context, 'Friends Activity'),
+        const SizedBox(height: 12),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: _friendActivityTabs.map((tab) {
+              final selected = _friendsActivityTab == tab.$1;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: GestureDetector(
+                  onTap: () => setState(() => _friendsActivityTab = tab.$1),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? FlixieColors.primary.withValues(alpha: 0.22)
+                          : FlixieColors.surface,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: selected
+                            ? FlixieColors.primary.withValues(alpha: 0.55)
+                            : Colors.white.withValues(alpha: 0.08),
+                      ),
+                    ),
+                    child: Text(
+                      tab.$2,
+                      style: TextStyle(
+                        color:
+                            selected ? FlixieColors.primary : FlixieColors.light,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
         ),
         const SizedBox(height: 12),
-        ..._friendsActivity.map((a) => FriendActivityRow(activity: a)),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: FlixieColors.surface.withValues(alpha: 0.85),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+          ),
+          child: filtered.isEmpty
+              ? Text(
+                  _friendsActivity.isEmpty
+                      ? 'No friend activity yet for this movie.'
+                      : 'No ${_friendsActivityTab.name} activity yet.',
+                  style: const TextStyle(color: FlixieColors.medium),
+                )
+              : Column(
+                  children: filtered
+                      .map((a) => FriendActivityRow(activity: a))
+                      .toList(growable: false),
+                ),
+        ),
       ],
+    );
+  }
+
+  List<MovieFriendActivity> _filteredFriendsActivity() {
+    return _friendsActivity.where((activity) {
+      switch (_friendsActivityTab) {
+        case FriendActivityTab.all:
+          return true;
+        case FriendActivityTab.watched:
+          return activity.watched;
+        case FriendActivityTab.watchlist:
+          return activity.onWatchlist;
+        case FriendActivityTab.ratings:
+          return activity.rating != null;
+        case FriendActivityTab.reviews:
+          return activity.reviewRecommended != null;
+        case FriendActivityTab.lists:
+          return false;
+      }
+    }).toList(growable: false);
+  }
+
+  Widget _buildFriendsRatingsSection(BuildContext context) {
+    final ratings = _friendsActivity
+        .where((activity) => activity.rating != null)
+        .map((activity) => activity.rating!)
+        .toList();
+    final average = ratings.isEmpty
+        ? null
+        : ratings.reduce((a, b) => a + b) / ratings.length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader(context, 'Friends Ratings'),
+        const SizedBox(height: 10),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: FlixieColors.surface.withValues(alpha: 0.85),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+          ),
+          child: ratings.isEmpty
+              ? const Text(
+                  'No friend ratings yet.',
+                  style: TextStyle(color: FlixieColors.medium),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Average friend rating: ${average!.toStringAsFixed(1)}/10',
+                      style: const TextStyle(
+                        color: FlixieColors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: _friendsActivity
+                          .where((a) => a.rating != null)
+                          .take(6)
+                          .map(
+                            (a) => Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: FlixieColors.surfaceElevated
+                                    .withValues(alpha: 0.6),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                '${a.username}: ${a.rating}/10',
+                                style: const TextStyle(
+                                  color: FlixieColors.light,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(growable: false),
+                    ),
+                  ],
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFriendsListsSection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader(context, 'Friends Lists'),
+        const SizedBox(height: 10),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: FlixieColors.surface.withValues(alpha: 0.85),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+          ),
+          child: const Text(
+            'Friends list activity is not available for this movie yet.',
+            style: TextStyle(color: FlixieColors.medium),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSectionHeader(BuildContext context, String title) {
+    return Text(
+      title,
+      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            color: FlixieColors.white,
+            fontWeight: FontWeight.bold,
+          ),
     );
   }
 
@@ -1751,12 +1958,22 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Trailers',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: FlixieColors.white,
-                fontWeight: FontWeight.bold,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _buildSectionHeader(context, 'Trailers'),
+            if (videos.length > 1)
+              TextButton(
+                onPressed: () => _showAllTrailersSheet(context, videos),
+                child: const Text(
+                  'See all',
+                  style: TextStyle(
+                    color: FlixieColors.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
+          ],
         ),
         const SizedBox(height: 12),
         SizedBox(
@@ -1772,6 +1989,32 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     );
   }
 
+  void _showAllTrailersSheet(BuildContext context, List<dynamic> videos) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (ctx, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: FlixieColors.background,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: ListView.separated(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
+            itemCount: videos.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 14),
+            itemBuilder: (_, i) => VideoCard(video: videos[i]),
+          ),
+        ),
+      ),
+    );
+  }
+
   // ---- Where to watch ------------------------------------------------------
 
   Widget _buildWhereToWatchSection(BuildContext context) {
@@ -1780,13 +2023,11 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'WHERE TO WATCH',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: FlixieColors.white,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.8,
-              ),
+        _buildSectionHeader(context, 'Where to Watch'),
+        const SizedBox(height: 4),
+        const Text(
+          'Provider availability only',
+          style: TextStyle(color: FlixieColors.medium, fontSize: 12),
         ),
         const SizedBox(height: 12),
         SizedBox(
@@ -1816,7 +2057,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         maxChildSize: 0.95,
         builder: (context, scrollController) => Container(
           decoration: const BoxDecoration(
-            color: Color(0xFF0D1B2A),
+            color: FlixieColors.background,
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(
@@ -1853,7 +2094,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   ],
                 ),
               ),
-              const Divider(color: Color(0xFF1E2D40), height: 1),
+              const Divider(color: FlixieColors.tabBarBorder, height: 1),
               // Cast list
               Expanded(
                 child: ListView.builder(
@@ -1866,7 +2107,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1B2E42),
+                        color: FlixieColors.surface,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
@@ -1876,7 +2117,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                             width: 60,
                             height: 80,
                             decoration: BoxDecoration(
-                              color: const Color(0xFF253A50),
+                              color: FlixieColors.surfaceElevated,
                               borderRadius: BorderRadius.circular(8),
                             ),
                             clipBehavior: Clip.antiAlias,
@@ -2025,7 +2266,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         maxChildSize: 0.95,
         builder: (ctx, scrollController) => Container(
           decoration: const BoxDecoration(
-            color: Color(0xFF0D1B2A),
+            color: FlixieColors.background,
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(
@@ -2060,7 +2301,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   ],
                 ),
               ),
-              const Divider(color: Color(0xFF1E2D40), height: 1),
+              const Divider(color: FlixieColors.tabBarBorder, height: 1),
               Expanded(
                 child: ListView.builder(
                   controller: scrollController,

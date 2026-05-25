@@ -26,8 +26,9 @@ class MovieHeroBackdrop extends StatelessWidget {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Color(0x44000000),
-                Color(0xBB000000),
+                Color(0x33000000),
+                Color(0xBF061625),
+                Color(0xFF061625),
               ],
             ),
           ),
@@ -38,7 +39,7 @@ class MovieHeroBackdrop extends StatelessWidget {
 
   Widget _placeholder() {
     return Container(
-      color: const Color(0xFF1B2E42),
+      color: FlixieColors.surface,
       child: const Center(
         child: Icon(
           Icons.movie_creation_outlined,

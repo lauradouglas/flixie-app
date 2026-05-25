@@ -239,11 +239,15 @@ class MainNavigationShell extends StatelessWidget {
     final selectedIndex = _indexFromLocation(location);
 
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF172B4D), Color(0xFF001F3F)],
+          colors: [
+            FlixieColors.surface,
+            FlixieColors.background,
+            FlixieColors.navy,
+          ],
         ),
       ),
       child: Scaffold(
