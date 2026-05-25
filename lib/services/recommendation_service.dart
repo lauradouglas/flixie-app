@@ -5,7 +5,7 @@ import 'api_client.dart';
 class RecommendationSourceMovie {
   final int? id;
   final String title;
-  final int? rating;
+  final double? rating;
 
   const RecommendationSourceMovie({
     required this.id,
@@ -20,9 +20,7 @@ class RecommendationSourceMovie {
           ? idValue
           : int.tryParse(idValue?.toString() ?? ''),
       title: (json['title'] ?? json['name'] ?? '') as String,
-      rating: json['rating'] is int
-          ? json['rating'] as int
-          : (json['rating'] as num?)?.toInt(),
+      rating: (json['rating'] as num?)?.toDouble(),
     );
   }
 }

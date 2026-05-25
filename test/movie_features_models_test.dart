@@ -72,7 +72,7 @@ void main() {
 
       expect(model.sourceMovie, isNotNull);
       expect(model.sourceMovie!.title, 'Interstellar');
-      expect(model.sourceMovie!.rating, 9);
+      expect(model.sourceMovie!.rating, 9.0);
       expect(model.recommendations, hasLength(1));
       expect(model.recommendations.first.name, 'Arrival');
     });
