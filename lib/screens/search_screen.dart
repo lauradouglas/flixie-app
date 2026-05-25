@@ -35,12 +35,7 @@ class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _controller = TextEditingController();
   String _query = '';
   Timer? _debounce;
-  final List<String> _recentSearches = [
-    'Dune: Part Two',
-    'The Batman',
-    'Interstellar',
-    'Oppenheimer',
-  ];
+  final List<String> _recentSearches = [];
   static const List<String> _popularSearches = [
     'Oppenheimer',
     'The Dark Knight',
