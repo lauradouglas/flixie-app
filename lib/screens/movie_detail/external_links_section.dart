@@ -39,9 +39,9 @@ class ExternalLinksSection extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: const Color(0xFF0F2033),
+            color: FlixieColors.surface,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF1E2D40)),
+            border: Border.all(color: FlixieColors.tabBarBorder),
           ),
           child: Row(
             mainAxisAlignment: fullWidth

@@ -5,10 +5,16 @@ import '../../models/movie_short.dart';
 import '../../theme/app_theme.dart';
 
 class FeaturedCard extends StatelessWidget {
-  const FeaturedCard({super.key, required this.movie, this.onTap});
+  const FeaturedCard({
+    super.key,
+    required this.movie,
+    this.onTap,
+    this.showNewBadge = false,
+  });
 
   final MovieShort movie;
   final VoidCallback? onTap;
+  final bool showNewBadge;
 
   @override
   Widget build(BuildContext context) {
@@ -81,6 +87,36 @@ class FeaturedCard extends StatelessWidget {
                           ),
                         ),
                       ],
+                    ),
+                  ),
+                ),
+              // NEW badge – top left
+              if (showNewBadge)
+                Positioned(
+                  top: 10,
+                  left: 10,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: FlixieColors.primary,
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: FlixieColors.primary.withValues(alpha: 0.35),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: const Text(
+                      'NEW',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.4,
+                      ),
                     ),
                   ),
                 ),

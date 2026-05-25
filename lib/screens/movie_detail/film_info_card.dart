@@ -63,7 +63,7 @@ class FilmInfoCard extends StatelessWidget {
     const divider = Column(
       children: [
         SizedBox(height: 12),
-        Divider(color: Color(0xFF1E2D40), thickness: 1, height: 1),
+        Divider(color: FlixieColors.tabBarBorder, thickness: 1, height: 1),
         SizedBox(height: 12),
       ],
     );
@@ -104,9 +104,9 @@ class FilmInfoCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F2033),
+        color: FlixieColors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF1E2D40)),
+        border: Border.all(color: FlixieColors.tabBarBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

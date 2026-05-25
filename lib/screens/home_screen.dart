@@ -37,6 +37,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   static const int _maxHeroCarouselItems = 6;
   static const int _maxSourceTitleLength = 18;
   static const double _defaultQuickRating = 5;
+  static const int _recentTheatreDays = 45;
   static const String _defaultGroupInitial = 'G';
   static const List<String> _weekdayLabels = [
     'Mon',
@@ -511,15 +512,32 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             itemCount: items.length,
             separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, index) => FeaturedCard(
-              movie: items[index],
-              onTap: () => context.push('/movies/${items[index].id}'),
-            ),
+            itemBuilder: (context, index) {
+              final movie = items[index];
+              return FeaturedCard(
+                movie: movie,
+                showNewBadge: _isRecentlyAddedToTheatres(movie),
+                onTap: () => context.push('/movies/${movie.id}'),
+              );
+            },
           ),
         ),
         const SizedBox(height: 20),
       ],
     );
+  }
+
+  bool _isRecentlyAddedToTheatres(MovieShort movie) {
+    final raw = movie.releaseDate;
+    if (raw == null || raw.isEmpty) return false;
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return false;
+    final release = DateTime(parsed.year, parsed.month, parsed.day);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final daysSinceRelease = today.difference(release).inDays;
+
+    return daysSinceRelease >= 0 && daysSinceRelease <= _recentTheatreDays;
   }
 
   Widget _buildWatchlistSection(BuildContext context) {

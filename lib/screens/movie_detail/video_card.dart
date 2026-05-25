@@ -57,7 +57,7 @@ class VideoCard extends StatelessWidget {
                   height: 170,
                   width: 300,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1B2E42),
+                    color: FlixieColors.surface,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   clipBehavior: Clip.antiAlias,
@@ -103,7 +103,7 @@ class VideoCard extends StatelessWidget {
 
   Widget _thumbnailFallback() {
     return Container(
-      color: const Color(0xFF253A50),
+      color: FlixieColors.surfaceElevated,
       child: const Center(
         child: Icon(
           Icons.play_circle_outline,

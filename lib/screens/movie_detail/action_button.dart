@@ -10,6 +10,7 @@ class MovieActionButton extends StatelessWidget {
     required this.isLoading,
     required this.bounceKey,
     required this.onPressed,
+    this.subtitle,
   });
 
   final IconData icon;
@@ -19,6 +20,8 @@ class MovieActionButton extends StatelessWidget {
   final bool isLoading;
   final int bounceKey;
   final VoidCallback? onPressed;
+  /// Optional subtitle shown under the primary label (e.g. watch count).
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context) {
@@ -29,16 +32,18 @@ class MovieActionButton extends StatelessWidget {
         curve: Curves.easeInOut,
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
         decoration: BoxDecoration(
-          color: isActive ? color.withOpacity(0.18) : Colors.white.withOpacity(0.05),
+          color:
+              isActive ? color.withValues(alpha: 0.18) : Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isActive ? color.withOpacity(0.5) : Colors.white.withOpacity(0.12),
+            color:
+                isActive ? color.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.12),
             width: 1,
           ),
           boxShadow: isActive
               ? [
                   BoxShadow(
-                    color: color.withOpacity(0.25),
+                    color: color.withValues(alpha: 0.25),
                     blurRadius: 12,
                     spreadRadius: 0,
                   ),
@@ -78,7 +83,7 @@ class MovieActionButton extends StatelessWidget {
                               size: 22,
                               color: isActive
                                   ? color
-                                  : Colors.white.withOpacity(0.5),
+                                  : Colors.white.withValues(alpha: 0.5),
                             ),
                           ),
                         );
@@ -91,9 +96,22 @@ class MovieActionButton extends StatelessWidget {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                color: isActive ? color : Colors.white.withOpacity(0.5),
+                color: isActive ? color : Colors.white.withValues(alpha: 0.5),
               ),
             ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                subtitle!,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: isActive
+                      ? color.withValues(alpha: 0.9)
+                      : Colors.white.withValues(alpha: 0.4),
+                ),
+              ),
+            ],
           ],
         ),
       ),

@@ -23,7 +23,7 @@ class CastCard extends StatelessWidget {
               height: 120,
               width: 100,
               decoration: BoxDecoration(
-                color: const Color(0xFF1B2E42),
+                color: FlixieColors.surface,
                 borderRadius: BorderRadius.circular(10),
               ),
               clipBehavior: Clip.antiAlias,
@@ -64,7 +64,7 @@ class CastCard extends StatelessWidget {
 
   Widget _avatarFallback() {
     return Container(
-      color: const Color(0xFF253A50),
+      color: FlixieColors.surfaceElevated,
       child: const Center(
         child: Icon(Icons.person, color: FlixieColors.medium, size: 40),
       ),

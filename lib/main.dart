@@ -104,10 +104,15 @@ class _FlixieAppState extends State<FlixieApp> {
     return MaterialApp.router(
       title: 'Flixie',
       debugShowCheckedModeBanner: false,
+      color: FlixieColors.background,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
       routerConfig: _router,
+      builder: (context, child) => ColoredBox(
+        color: isDark ? FlixieColors.background : const Color(0xFFF5F7FA),
+        child: child ?? const SizedBox.shrink(),
+      ),
     );
   }
 }

@@ -23,7 +23,7 @@ class SimilarMovieCard extends StatelessWidget {
               height: 160,
               width: 120,
               decoration: BoxDecoration(
-                color: const Color(0xFF1B2E42),
+                color: FlixieColors.surface,
                 borderRadius: BorderRadius.circular(10),
               ),
               clipBehavior: Clip.antiAlias,
@@ -55,7 +55,7 @@ class SimilarMovieCard extends StatelessWidget {
 
   Widget _posterFallback() {
     return Container(
-      color: const Color(0xFF253A50),
+      color: FlixieColors.surfaceElevated,
       child: const Center(
         child: Icon(
           Icons.movie_creation_outlined,
