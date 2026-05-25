@@ -14,8 +14,9 @@ class RecommendationSourceMovie {
   });
 
   factory RecommendationSourceMovie.fromJson(Map<String, dynamic> json) {
+    final idValue = json['id'];
     return RecommendationSourceMovie(
-      id: json['id'] is int ? json['id'] as int : int.parse('${json['id']}'),
+      id: idValue is int ? idValue : int.tryParse('$idValue') ?? 0,
       title: (json['title'] ?? json['name'] ?? '') as String,
       rating: json['rating'] is int
           ? json['rating'] as int

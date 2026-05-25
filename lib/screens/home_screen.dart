@@ -34,6 +34,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with RouteAware {
   // Keep hero carousel concise so primary CTA and dots remain visible above fold.
   static const int _maxHeroCarouselItems = 6;
+  static const int _maxSourceTitleLength = 18;
+  static const double _defaultQuickRating = 8;
   static const List<String> _weekdayLabels = [
     'Mon',
     'Tue',
@@ -736,8 +738,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     if (_forYouMovies.isEmpty) return const SizedBox.shrink();
     final source = _highlyRatedRecommendations?.sourceMovie;
     final sourceTitle = source?.title ?? '';
-    final compactSourceTitle = sourceTitle.characters.length > 18
-        ? '${sourceTitle.characters.take(18)}…'
+    final compactSourceTitle = sourceTitle.characters.length > _maxSourceTitleLength
+        ? '${sourceTitle.characters.take(_maxSourceTitleLength)}…'
         : sourceTitle;
     final title = source != null
         ? 'Because You Rated $compactSourceTitle'
@@ -756,7 +758,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _forYouMovies.length.clamp(0, 10).toInt(),
+            itemCount: _forYouMovies.length.clamp(0, 10),
             separatorBuilder: (_, __) => const SizedBox(width: 12),
             itemBuilder: (context, index) => FeaturedCard(
               movie: _forYouMovies[index],
@@ -812,7 +814,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _userGroups.length.clamp(0, 10).toInt(),
+            itemCount: _userGroups.length.clamp(0, 10),
             separatorBuilder: (_, __) => const SizedBox(width: 10),
             itemBuilder: (context, index) {
               final group = _userGroups[index];
@@ -1086,7 +1088,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     final userId = auth.dbUser?.id;
     if (userId == null) return;
 
-    double rating = 8;
+    double rating = _defaultQuickRating;
     bool includeRating = true;
     bool rewatch = false;
     final notesController = TextEditingController();
