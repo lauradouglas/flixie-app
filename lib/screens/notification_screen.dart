@@ -33,11 +33,8 @@ const List<String> _kMonths = [
 /// Notification filter tabs.
 enum _NotificationFilter {
   all,
-  friendRequests,
-  watchRequests,
-  groupRequests,
+  requests,
   activity,
-  alerts
 }
 
 class NotificationScreen extends StatefulWidget {
@@ -234,32 +231,14 @@ class _NotificationScreenState extends State<NotificationScreen> {
   bool _isActivityType(FlixieNotification n) =>
       !n.isRequest && n.type != 'ALERT';
 
-  bool _isAlertType(FlixieNotification n) => n.type == 'ALERT';
-
   List<FlixieNotification> get _filtered {
     switch (_filter) {
       case _NotificationFilter.all:
         return _notifications;
-      case _NotificationFilter.friendRequests:
-        return _notifications
-            .where((n) => n.type == FlixieNotification.friendRequest)
-            .toList();
-      case _NotificationFilter.watchRequests:
-        return _notifications
-            .where((n) =>
-                n.type == FlixieNotification.movieWatchRequest ||
-                n.type == FlixieNotification.showWatchRequest)
-            .toList();
-      case _NotificationFilter.groupRequests:
-        return _notifications
-            .where((n) =>
-                n.type == FlixieNotification.groupRequest ||
-                n.type == FlixieNotification.groupInvite)
-            .toList();
+      case _NotificationFilter.requests:
+        return _notifications.where(_isRequestType).toList();
       case _NotificationFilter.activity:
         return _notifications.where(_isActivityType).toList();
-      case _NotificationFilter.alerts:
-        return _notifications.where(_isAlertType).toList();
     }
   }
 
@@ -353,40 +332,44 @@ class _NotificationScreenState extends State<NotificationScreen> {
   Widget _buildFilterChips() {
     final filters = [
       (_NotificationFilter.all, 'All'),
-      (_NotificationFilter.friendRequests, 'Friends'),
-      (_NotificationFilter.watchRequests, 'Watch'),
-      (_NotificationFilter.groupRequests, 'Groups'),
-      // TODO: uncomment when activity notifications are implemented
-      // (_NotificationFilter.activity, 'Activity'),
-      // TODO: uncomment when alert notifications are implemented
-      // (_NotificationFilter.alerts, 'Alerts'),
+      (_NotificationFilter.requests, 'Requests'),
+      (_NotificationFilter.activity, 'Activity'),
     ];
 
-    return Container(
-      width: double.infinity,
-      color: FlixieColors.tabBarBackgroundFocused,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      child: Container(
+        decoration: BoxDecoration(
+          color: FlixieColors.tabBarBackgroundFocused,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        ),
         child: Row(
           children: filters.map((entry) {
             final (f, label) = entry;
             final selected = _filter == f;
-
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: ChoiceChip(
-                label: Text(label),
-                selected: selected,
-                onSelected: (_) => setState(() => _filter = f),
-                selectedColor: FlixieColors.primary,
-                backgroundColor: FlixieColors.tabBarBorder,
-                labelStyle: TextStyle(
-                  color: selected ? Colors.black : FlixieColors.light,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+            return Expanded(
+              child: GestureDetector(
+                onTap: () => setState(() => _filter = f),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? FlixieColors.primary.withValues(alpha: 0.25)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color:
+                          selected ? FlixieColors.primary : FlixieColors.light,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                side: BorderSide.none,
               ),
             );
           }).toList(),
@@ -403,11 +386,19 @@ class _NotificationScreenState extends State<NotificationScreen> {
     if (items.isEmpty) {
       return _buildEmptyState();
     }
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (context, i) => _buildCard(items[i]),
+    final unreadItems = items.where((n) => !n.isRead).toList();
+    return Column(
+      children: [
+        Expanded(
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+            itemCount: items.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemBuilder: (context, i) => _buildCard(items[i]),
+          ),
+        ),
+        _buildMarkAllAsReadButton(unreadItems),
+      ],
     );
   }
 
@@ -419,37 +410,87 @@ class _NotificationScreenState extends State<NotificationScreen> {
     if (pending.isEmpty && newItems.isEmpty && earlier.isEmpty) {
       return _buildEmptyState();
     }
+    final unreadItems = [...pending, ...newItems, ...earlier]
+        .where((n) => !n.isRead)
+        .toList();
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    return Column(
       children: [
-        if (pending.isNotEmpty) ...[
-          _buildSectionHeader('REQUESTS'),
-          const SizedBox(height: 10),
-          ...pending.map((n) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _buildCard(n),
-              )),
-          const SizedBox(height: 16),
-        ],
-        if (newItems.isNotEmpty) ...[
-          _buildSectionHeader('NEW'),
-          const SizedBox(height: 10),
-          ...newItems.map((n) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _buildCard(n),
-              )),
-          const SizedBox(height: 16),
-        ],
-        if (earlier.isNotEmpty) ...[
-          _buildSectionHeader('EARLIER'),
-          const SizedBox(height: 10),
-          ...earlier.map((n) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _buildCard(n),
-              )),
-        ],
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+            children: [
+              if (pending.isNotEmpty) ...[
+                _buildSectionHeader('REQUESTS'),
+                const SizedBox(height: 10),
+                ...pending.map((n) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _buildCard(n),
+                    )),
+                const SizedBox(height: 16),
+              ],
+              if (newItems.isNotEmpty) ...[
+                _buildSectionHeader('NEW'),
+                const SizedBox(height: 10),
+                ...newItems.map((n) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _buildCard(n),
+                    )),
+                const SizedBox(height: 16),
+              ],
+              if (earlier.isNotEmpty) ...[
+                _buildSectionHeader('EARLIER'),
+                const SizedBox(height: 10),
+                ...earlier.map((n) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _buildCard(n),
+                    )),
+              ],
+            ],
+          ),
+        ),
+        _buildMarkAllAsReadButton(unreadItems),
       ],
+    );
+  }
+
+  Widget _buildMarkAllAsReadButton(List<FlixieNotification> unread) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: unread.isEmpty
+                ? null
+                : () async {
+                    try {
+                      await Future.wait(
+                        unread
+                            .where((n) => n.id != null)
+                            .map(
+                              (n) => NotificationService.updateNotification(
+                                n.id!,
+                                read: true,
+                              ),
+                            ),
+                      );
+                      await _load();
+                    } catch (_) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Failed to mark all as read.'),
+                          backgroundColor: FlixieColors.danger,
+                        ),
+                      );
+                    }
+                  },
+            child: const Text('Mark all as read'),
+          ),
+        ),
+      ),
     );
   }
 
@@ -514,4 +555,3 @@ class _NotificationScreenState extends State<NotificationScreen> {
     );
   }
 }
-

@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/user.dart' as user_model;
 import '../providers/auth_provider.dart';
 import '../services/user_service.dart';
 import '../theme/app_theme.dart';
 import 'settings/change_password_sheet.dart';
+import 'settings/constants.dart';
 import 'settings/favorite_genres_sheet.dart';
 import 'settings/icon_color_sheet.dart';
 import 'settings/settings_tile.dart';
@@ -18,7 +21,7 @@ class SettingsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: FlixieColors.background,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         title: const Text(
           'Settings',
@@ -30,33 +33,81 @@ class SettingsScreen extends StatelessWidget {
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
           _sectionLabel('Account'),
-          SettingsTile(
-            icon: Icons.person_outline,
-            label: 'Edit Profile',
-            onTap: () => _showEditProfileSheet(context),
-          ),
-          const SizedBox(height: 8),
-          SettingsTile(
-            icon: Icons.lock_outline,
-            label: 'Change Password',
-            onTap: () => _showChangePasswordSheet(context),
-          ),
-          const SizedBox(height: 8),
-          SettingsTile(
-            icon: Icons.movie_filter_outlined,
-            label: 'Favourite Genres',
-            onTap: () => _showFavoriteGenresSheet(context),
-          ),
-          const SizedBox(height: 8),
-          SettingsTile(
-            icon: Icons.palette_outlined,
-            label: 'Avatar Colour',
-            onTap: () => _showIconColorSheet(context),
+          _SettingsGroup(
+            children: [
+              SettingsTile(
+                icon: Icons.person_outline,
+                label: 'Edit Profile',
+                onTap: () => _showEditProfileSheet(context),
+              ),
+              SettingsTile(
+                icon: Icons.lock_outline,
+                label: 'Change Password',
+                onTap: () => _showChangePasswordSheet(context),
+              ),
+              SettingsTile(
+                icon: Icons.privacy_tip_outlined,
+                label: 'Privacy',
+                onTap: () {},
+                isLast: true,
+              ),
+            ],
           ),
           const SizedBox(height: 24),
+          _sectionLabel('Preferences'),
+          _SettingsGroup(
+            children: [
+              SettingsTile(
+                icon: Icons.notifications_outlined,
+                label: 'Notifications',
+                onTap: () {},
+              ),
+              SettingsTile(
+                icon: Icons.dark_mode_outlined,
+                label: 'Appearance',
+                onTap: () {},
+              ),
+              SettingsTile(
+                icon: Icons.tune_outlined,
+                label: 'Content Preferences',
+                onTap: () => _showFavoriteGenresSheet(context),
+              ),
+              SettingsTile(
+                icon: Icons.palette_outlined,
+                label: 'Avatar Colour',
+                onTap: () => _showIconColorSheet(context),
+                isLast: true,
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          _sectionLabel('Support'),
+          _SettingsGroup(
+            children: [
+              SettingsTile(
+                icon: Icons.help_outline,
+                label: 'Help Center',
+                onTap: () => context.push('/help-support'),
+              ),
+              SettingsTile(
+                icon: Icons.feedback_outlined,
+                label: 'Send Feedback',
+                onTap: () => _sendFeedback(),
+              ),
+              SettingsTile(
+                icon: Icons.info_outline,
+                label: 'About Flixie',
+                onTap: () => _showAboutDialog(context),
+                isLast: true,
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+          const _LogOutButton(),
+          const SizedBox(height: 16),
         ],
       ),
     );
@@ -64,14 +115,13 @@ class SettingsScreen extends StatelessWidget {
 
   Widget _sectionLabel(String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 10, left: 4),
       child: Text(
         text,
         style: const TextStyle(
-          color: FlixieColors.primary,
+          color: FlixieColors.medium,
           fontSize: 13,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.8,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -119,6 +169,106 @@ class SettingsScreen extends StatelessWidget {
       builder: (_) => IconColorSheet(
         userId: dbUser.id,
         currentColorId: dbUser.iconColorId,
+      ),
+    );
+  }
+
+  Future<void> _sendFeedback() async {
+    final uri = Uri.parse('mailto:support@flixie.app?subject=Flixie%20Feedback');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
+  }
+
+  void _showAboutDialog(BuildContext context) {
+    showAboutDialog(
+      context: context,
+      applicationName: 'Flixie',
+      applicationVersion: '1.0.1',
+      applicationLegalese: '© 2024 Flixie',
+    );
+  }
+}
+
+/// Groups settings tiles into a rounded card container.
+class _SettingsGroup extends StatelessWidget {
+  const _SettingsGroup({required this.children});
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1D3A68),
+        borderRadius: BorderRadius.circular(kSettingsCornerRadius),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.06),
+        ),
+      ),
+      child: Column(children: children),
+    );
+  }
+}
+
+/// Log out button shown at the bottom of Settings.
+class _LogOutButton extends StatelessWidget {
+  const _LogOutButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: FlixieColors.danger.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(kSettingsCornerRadius),
+        border: Border.all(
+          color: FlixieColors.danger.withValues(alpha: 0.3),
+        ),
+      ),
+      child: ListTile(
+        leading: const Icon(Icons.logout_rounded, color: FlixieColors.danger),
+        title: const Text(
+          'Log Out',
+          style: TextStyle(
+            color: FlixieColors.danger,
+            fontWeight: FontWeight.w600,
+            fontSize: 15,
+          ),
+        ),
+        onTap: () async {
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: const Color(0xFF1D3A68),
+              title: const Text(
+                'Log Out',
+                style: TextStyle(color: Colors.white),
+              ),
+              content: const Text(
+                'Are you sure you want to log out?',
+                style: TextStyle(color: FlixieColors.light),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(color: FlixieColors.medium),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text(
+                    'Log Out',
+                    style: TextStyle(color: FlixieColors.danger),
+                  ),
+                ),
+              ],
+            ),
+          );
+          if (confirmed == true && context.mounted) {
+            await context.read<AuthProvider>().signOut();
+          }
+        },
       ),
     );
   }

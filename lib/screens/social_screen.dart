@@ -8,7 +8,6 @@ import '../models/group.dart';
 import '../models/group_member.dart';
 import '../models/notification.dart';
 import '../providers/auth_provider.dart';
-import '../screens/profile/activity_tile.dart';
 import '../screens/profile/friends_row.dart';
 import '../services/chat_service.dart';
 import '../services/friend_service.dart';
@@ -17,6 +16,7 @@ import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_logger.dart';
 import 'social/group_card.dart';
+import 'social/group_avatar.dart';
 import 'social/invitation_card.dart';
 import 'social/pending_friend_card.dart';
 import 'social/section_header.dart';
@@ -38,7 +38,7 @@ class _SocialScreenState extends State<SocialScreen> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: FlixieColors.background,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         title: const Text(
           'Social',
@@ -47,6 +47,15 @@ class _SocialScreenState extends State<SocialScreen> {
             fontWeight: FontWeight.bold,
           ),
         ),
+        actions: [
+          IconButton(
+            onPressed: () {
+              // TODO(laura): wire friend discovery/search flow.
+            },
+            icon: const Icon(Icons.person_add_alt_1_outlined),
+            tooltip: 'Find friends',
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -197,7 +206,11 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
     }
 
     final data = _friendsData;
-    final textTheme = Theme.of(context).textTheme;
+    final friends = data?.friendships
+            .map((f) => f.friendUser)
+            .whereType<FriendshipUser>()
+            .toList() ??
+        const <FriendshipUser>[];
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -208,6 +221,10 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (friends.isNotEmpty) ...[
+              _FriendStoryStrip(friends: friends),
+              const SizedBox(height: 14),
+            ],
             // Pending requests section
             if (data != null && data.pendingFriends.isNotEmpty) ...[
               SocialSectionHeader(
@@ -240,15 +257,14 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
             ],
 
             // Activity section
-            const SocialSectionHeader(title: 'FRIENDS ACTIVITY'),
+            const SocialSectionHeader(title: 'FRIEND ACTIVITY'),
             const SizedBox(height: 8),
             if (_activity.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
                 child: Text(
                   'No recent activity.',
-                  style:
-                      textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
+                  style: TextStyle(color: FlixieColors.medium),
                 ),
               )
             else
@@ -257,11 +273,225 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: _activity.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (_, i) => ActivityTile(item: _activity[i]),
+                itemBuilder: (_, i) =>
+                    _FriendActivityFeedCard(item: _activity[i]),
               ),
             const SizedBox(height: 24),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Friends widgets
+// ---------------------------------------------------------------------------
+
+class _FriendStoryStrip extends StatelessWidget {
+  const _FriendStoryStrip({required this.friends});
+
+  final List<FriendshipUser> friends;
+
+  Color _avatarColor(Map<String, dynamic>? iconColor) {
+    final raw = (iconColor?['hexCode'] ?? iconColor?['hex']) as String?;
+    if (raw == null || raw.isEmpty) return FlixieColors.primary;
+    final hex = raw.replaceAll('#', '');
+    return Color(int.tryParse('0xFF$hex') ?? FlixieColors.primary.toARGB32());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 72,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: friends.length + 1,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (_, index) {
+          if (index == friends.length) {
+            return const CircleAvatar(
+              radius: 21,
+              backgroundColor: FlixieColors.tabBarBackgroundFocused,
+              child: Icon(Icons.add, color: FlixieColors.light),
+            );
+          }
+          final friend = friends[index];
+          final initial = friend.username.isNotEmpty
+              ? friend.username[0].toUpperCase()
+              : '?';
+          return GestureDetector(
+            onTap: () => context.push('/friends/${friend.id}'),
+            child: Column(
+              children: [
+                CircleAvatar(
+                  radius: 21,
+                  backgroundColor: _avatarColor(friend.iconColor),
+                  child: Text(
+                    initial,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                SizedBox(
+                  width: 48,
+                  child: Text(
+                    friend.firstName?.isNotEmpty == true
+                        ? friend.firstName!
+                        : friend.username,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: FlixieColors.medium,
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _FriendActivityFeedCard extends StatelessWidget {
+  const _FriendActivityFeedCard({required this.item});
+
+  final ActivityListItem item;
+
+  String _timeAgo() {
+    try {
+      final dt = DateTime.parse(item.timestamp);
+      final diff = DateTime.now().difference(dt);
+      if (diff.inHours < 1) return '${diff.inMinutes}m';
+      if (diff.inHours < 24) return '${diff.inHours}h';
+      return '${diff.inDays}d';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  String _subtitle() {
+    switch (item.type) {
+      case ActivityListType.movieReview:
+      case ActivityListType.showReview:
+        return 'reviewed ${item.mediaTitle ?? 'a title'}';
+      case ActivityListType.movieWatchlist:
+      case ActivityListType.showWatchlist:
+        return 'added ${item.mediaTitle ?? 'a title'} to watchlist';
+      case ActivityListType.movieWatched:
+      case ActivityListType.showWatched:
+        return 'watched ${item.mediaTitle ?? 'a title'}';
+      default:
+        return item.mediaTitle ?? 'posted activity';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final poster = item.mediaPosterPath;
+    final posterUrl = poster == null || poster.isEmpty
+        ? null
+        : 'https://image.tmdb.org/t/p/w500$poster';
+    final username = item.username.isNotEmpty ? item.username : 'Friend';
+    final rating = item.mediaRating;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: FlixieColors.tabBarBackgroundFocused,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ListTile(
+            dense: true,
+            leading: CircleAvatar(
+              radius: 16,
+              backgroundColor: FlixieColors.primary.withValues(alpha: 0.25),
+              child: Text(
+                username[0].toUpperCase(),
+                style: const TextStyle(
+                  color: FlixieColors.light,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            title: Text(
+              username,
+              style: const TextStyle(
+                color: FlixieColors.light,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+            subtitle: Text(
+              _subtitle(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: FlixieColors.medium, fontSize: 12),
+            ),
+            trailing: Text(
+              _timeAgo(),
+              style: const TextStyle(color: FlixieColors.medium, fontSize: 12),
+            ),
+          ),
+          if (posterUrl != null)
+            GestureDetector(
+              onTap: () {
+                final id = item.movieId;
+                if (id != null) context.push('/movies/$id');
+              },
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(14),
+                ),
+                child: Stack(
+                  alignment: Alignment.bottomLeft,
+                  children: [
+                    Image.network(
+                      posterUrl,
+                      width: double.infinity,
+                      height: 170,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        height: 170,
+                        color: FlixieColors.tabBarBorder,
+                        alignment: Alignment.center,
+                        child: const Icon(Icons.movie_outlined,
+                            color: FlixieColors.medium),
+                      ),
+                    ),
+                    if (rating != null)
+                      Container(
+                        margin: const EdgeInsets.all(10),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.55),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '★ ${rating.toStringAsFixed(1)}',
+                          style: const TextStyle(
+                            color: FlixieColors.primary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -284,7 +514,7 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
   final Map<String, GroupMember> _pendingInvites = {};
   final Map<String, int> _memberCounts = {};
   final Map<String, FlixieNotification> _inviteNotifications = {};
-  int _innerTab = 0;
+  int _innerTab = 0; // 0 = Groups, 1 = Invites
   String? _error;
 
   @override
@@ -495,15 +725,13 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
           onChanged: (i) => setState(() => _innerTab = i),
         ),
         Expanded(
-          child: _innerTab == 1
-              ? _buildDiscoverTab()
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  color: FlixieColors.primary,
-                  child: _innerTab == 2
-                      ? _buildRequestsTab(pendingGroups)
-                      : _buildMyGroupsTab(pendingGroups, myGroups),
-                ),
+          child: RefreshIndicator(
+            onRefresh: _load,
+            color: FlixieColors.primary,
+            child: _innerTab == 1
+                ? _buildRequestsTab(pendingGroups)
+                : _buildMyGroupsTab(pendingGroups, myGroups),
+          ),
         ),
       ],
     );
@@ -516,6 +744,44 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (myGroups.isNotEmpty) ...[
+            SizedBox(
+              height: 62,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: myGroups.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                itemBuilder: (_, i) {
+                  final g = myGroups[i];
+                  return GestureDetector(
+                    onTap: () => context.push('/groups/${g.id}'),
+                    child: Column(
+                      children: [
+                        GroupAvatar(group: g, radius: 20),
+                        const SizedBox(height: 4),
+                        SizedBox(
+                          width: 56,
+                          child: Text(
+                            g.abbreviation?.isNotEmpty == true
+                                ? g.abbreviation!
+                                : g.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: FlixieColors.medium,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
           if (pendingGroups.isNotEmpty) ...[
             SocialSectionHeader(
               title: 'PENDING INVITATIONS',
@@ -535,17 +801,13 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
               const Expanded(
                 child: SocialSectionHeader(title: 'MY COMMUNITIES'),
               ),
-              TextButton(
+              FilledButton.tonalIcon(
                 onPressed: _showCreateGroupSheet,
-                style: TextButton.styleFrom(
-                  foregroundColor: FlixieColors.primary,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  minimumSize: Size.zero,
-                ),
-                child: const Text(
-                  'CREATE NEW +',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('Create'),
+                style: FilledButton.styleFrom(
+                  foregroundColor: FlixieColors.light,
+                  backgroundColor: FlixieColors.primary.withValues(alpha: 0.2),
                 ),
               ),
             ],
@@ -571,19 +833,6 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
                 )),
           const SizedBox(height: 24),
         ],
-      ),
-    );
-  }
-
-  Widget _buildDiscoverTab() {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(32),
-        child: Text(
-          'Discover groups\ncoming soon',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: FlixieColors.medium, fontSize: 15),
-        ),
       ),
     );
   }
@@ -636,11 +885,9 @@ class _GroupsTabBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       child: Row(
         children: [
-          _tab(0, 'My Groups'),
+          _tab(0, 'Groups'),
           const SizedBox(width: 8),
-          _tab(1, 'Discover'),
-          const SizedBox(width: 8),
-          _tab(2, 'Requests'),
+          _tab(1, 'Invites'),
         ],
       ),
     );
@@ -648,7 +895,7 @@ class _GroupsTabBar extends StatelessWidget {
 
   Widget _tab(int index, String label) {
     final selected = index == selectedIndex;
-    final showBadge = index == 2 && pendingCount > 0;
+    final showBadge = index == 1 && pendingCount > 0;
     return GestureDetector(
       onTap: () => onChanged(index),
       child: AnimatedContainer(

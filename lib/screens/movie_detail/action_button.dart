@@ -22,67 +22,80 @@ class MovieActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final buttonColor = isActive ? color : Colors.grey;
-    return OutlinedButton(
-      style: OutlinedButton.styleFrom(
-        side: BorderSide(
-          color: isActive ? color : Colors.grey.withOpacity(0.5),
-          width: 1.5,
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        shape: RoundedRectangleBorder(
+    return GestureDetector(
+      onTap: onPressed,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+        decoration: BoxDecoration(
+          color: isActive ? color.withOpacity(0.18) : Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-      onPressed: onPressed,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            height: 24,
-            width: 24,
-            child: isLoading
-                ? CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    valueColor: AlwaysStoppedAnimation<Color>(buttonColor),
-                  )
-                : TweenAnimationBuilder<double>(
-                    key: ValueKey<String>('$icon-$bounceKey'),
-                    duration: const Duration(milliseconds: 500),
-                    tween: Tween<double>(begin: 1.4, end: 1.0),
-                    curve: Curves.elasticOut,
-                    builder: (context, value, child) {
-                      return Transform.scale(
-                        scale: value,
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 300),
-                          transitionBuilder: (child, animation) {
-                            return ScaleTransition(
-                              scale: animation,
-                              child: child,
-                            );
-                          },
-                          child: Icon(
-                            icon,
-                            key: ValueKey<IconData>(icon),
-                            size: 24,
-                            color: buttonColor,
-                          ),
-                        ),
-                      );
-                    },
+          border: Border.all(
+            color: isActive ? color.withOpacity(0.5) : Colors.white.withOpacity(0.12),
+            width: 1,
+          ),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: color.withOpacity(0.25),
+                    blurRadius: 12,
+                    spreadRadius: 0,
                   ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: buttonColor,
+                ]
+              : null,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              height: 24,
+              width: 24,
+              child: isLoading
+                  ? CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation<Color>(color),
+                    )
+                  : TweenAnimationBuilder<double>(
+                      key: ValueKey<String>('$icon-$bounceKey'),
+                      duration: const Duration(milliseconds: 500),
+                      tween: Tween<double>(begin: 1.4, end: 1.0),
+                      curve: Curves.elasticOut,
+                      builder: (context, value, child) {
+                        return Transform.scale(
+                          scale: value,
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            transitionBuilder: (child, animation) {
+                              return ScaleTransition(
+                                scale: animation,
+                                child: child,
+                              );
+                            },
+                            child: Icon(
+                              icon,
+                              key: ValueKey<IconData>(icon),
+                              size: 22,
+                              color: isActive
+                                  ? color
+                                  : Colors.white.withOpacity(0.5),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
             ),
-          ),
-        ],
+            const SizedBox(height: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                color: isActive ? color : Colors.white.withOpacity(0.5),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

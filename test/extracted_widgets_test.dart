@@ -227,7 +227,7 @@ void main() {
           ),
         ),
       );
-      await tester.tap(find.byType(OutlinedButton));
+      await tester.tap(find.byType(GestureDetector).first);
       expect(tapped, isTrue);
     });
   });
