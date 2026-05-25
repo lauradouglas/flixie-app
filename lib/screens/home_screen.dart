@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:characters/characters.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -735,8 +736,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     if (_forYouMovies.isEmpty) return const SizedBox.shrink();
     final source = _highlyRatedRecommendations?.sourceMovie;
     final sourceTitle = source?.title ?? '';
-    final compactSourceTitle = sourceTitle.length > 18
-        ? '${sourceTitle.substring(0, 18)}…'
+    final compactSourceTitle = sourceTitle.characters.length > 18
+        ? '${sourceTitle.characters.take(18)}…'
         : sourceTitle;
     final title = source != null
         ? 'Because You Rated $compactSourceTitle'
@@ -815,8 +816,9 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
             separatorBuilder: (_, __) => const SizedBox(width: 10),
             itemBuilder: (context, index) {
               final group = _userGroups[index];
-              final initials = group.name.isNotEmpty
-                  ? group.name.trim().substring(0, 1).toUpperCase()
+              final trimmedName = group.name.trim();
+              final initials = trimmedName.isNotEmpty
+                  ? trimmedName.characters.first.toUpperCase()
                   : 'G';
               return InkWell(
                 borderRadius: BorderRadius.circular(14),
@@ -1201,7 +1203,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () {
-                        includeRating = false;
+                        setSheetState(() => includeRating = false);
                         saveWatched();
                       },
                       child: const Text('Mark without rating'),
