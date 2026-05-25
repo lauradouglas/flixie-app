@@ -225,7 +225,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   onRefresh: _loadAll,
                   child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(0, 10, 0, 16),
+                    padding: const EdgeInsets.fromLTRB(0, 0, 0, 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -241,7 +241,10 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                         ),
                         const SizedBox(height: 12),
                         _buildTrendingNowGrid(context),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 20),
+                        _buildJustOutSection(context),
+                        _buildWatchlistSection(context),
+                        _buildInTheatresSection(context),
                       ],
                     ),
                   ),
@@ -513,6 +516,67 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
           );
         },
       ),
+    );
+  }
+
+  Widget _buildJustOutSection(BuildContext context) {
+    final items = _forYouMovies.isNotEmpty
+        ? _forYouMovies.take(10).toList()
+        : _featuredMovies.skip(1).take(10).toList();
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        HomeSectionHeader(
+          title: 'Just Out',
+          onSeeAll: () => context.push('/search'),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 260,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: items.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, index) => FeaturedCard(
+              movie: items[index],
+              onTap: () => context.push('/movies/${items[index].id}'),
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  Widget _buildInTheatresSection(BuildContext context) {
+    if (_nowPlayingMovies.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        HomeSectionHeader(
+          title: 'In Theatres Now',
+          onSeeAll: () => context.push('/search'),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 260,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: _nowPlayingMovies.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, index) => FeaturedCard(
+              movie: _nowPlayingMovies[index],
+              onTap: () => context.push('/movies/${_nowPlayingMovies[index].id}'),
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+      ],
     );
   }
 
