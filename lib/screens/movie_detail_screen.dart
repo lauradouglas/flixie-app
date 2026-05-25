@@ -1002,7 +1002,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                     _inlineMetric(
                       icon: Icons.star_border_rounded,
                       iconColor: Colors.deepOrangeAccent,
-                      label: 'FLIXIE SCORE',
+                      label: 'FLIXISCORE',
                     ),
                     const SizedBox(height: 6),
                     ScoreTile(
@@ -1503,7 +1503,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               isActive: _isWatched,
               color: FlixieColors.primary,
               isLoading: false,
-              bounceKey: _watchCount,
+              bounceKey: 0,
               onPressed: _isWatched ? _showLogWatchSheet : null,
             ),
           ),
