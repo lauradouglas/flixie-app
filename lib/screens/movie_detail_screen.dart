@@ -76,6 +76,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   List<MovieWatchEntry> _movieWatchHistory = [];
   bool _watchHistoryLoading = false;
   int _detailTabIndex = 0; // 0=Overview, 1=Cast, 2=Reviews, 3=Similar
+  static const int _placeholderWatchedPercent = 92;
 
   // ---- Data loading ---------------------------------------------------------
 
@@ -944,7 +945,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final tomatoPercent =
         score != null ? (score * 10).clamp(0, 100).round() : null;
     // TODO(laura): replace placeholder watched percentage with real metric.
-    final watchedPercent = voteCount != null ? (voteCount > 0 ? 92 : 0) : null;
+    final watchedPercent = voteCount != null
+        ? (voteCount > 0 ? _placeholderWatchedPercent : 0)
+        : null;
 
     return Row(
       children: [
