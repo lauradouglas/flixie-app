@@ -222,6 +222,10 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                             onDismiss: () =>
                                 setState(() => _showGreeting = false),
                           ),
+                        if (_featuredMovies.isNotEmpty) ...[
+                          _buildHeroFeature(context, _featuredMovies.first),
+                          const SizedBox(height: 22),
+                        ],
                         HomeSectionHeader(
                           title: 'Trending Now',
                           onSeeAll: () => context.push('/search'),
@@ -242,7 +246,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 20),
                         // For You section
                         if (_forYouMovies.isNotEmpty) ...[
                           HomeSectionHeader(
@@ -266,27 +270,37 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 20),
                         ],
                         // Popular section
-                        const HomeSectionHeader(title: 'In Theatres Now'),
+                        const HomeSectionHeader(title: 'In Cinemas'),
                         const SizedBox(height: 12),
-                        ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: _nowPlayingMovies.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 10),
-                          itemBuilder: (context, index) {
-                            final movie = _nowPlayingMovies[index];
-                            return HomeListCard(
-                              movie: movie,
-                              onTap: () => context.push('/movies/${movie.id}'),
-                            );
-                          },
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 16),
+                          padding: const EdgeInsets.fromLTRB(10, 10, 10, 2),
+                          decoration: BoxDecoration(
+                            color: FlixieColors.tabBarBackgroundFocused,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.06),
+                            ),
+                          ),
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: _nowPlayingMovies.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 10),
+                            itemBuilder: (context, index) {
+                              final movie = _nowPlayingMovies[index];
+                              return HomeListCard(
+                                movie: movie,
+                                onTap: () => context.push('/movies/${movie.id}'),
+                              );
+                            },
+                          ),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 20),
                         // Top Rated This Week section
                         const HomeSectionHeader(title: 'Top Rated This Week'),
                         const SizedBox(height: 12),
@@ -318,7 +332,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                               },
                             ),
                           ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 20),
 
                         // Trending Among Friends section
                         if (_friendsActivity.isNotEmpty)
@@ -328,6 +342,152 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                     ),
                   ),
                 ),
+    );
+  }
+
+  Widget _buildHeroFeature(BuildContext context, MovieShort movie) {
+    final releaseYear = movie.releaseDate != null && movie.releaseDate!.length >= 4
+        ? movie.releaseDate!.substring(0, 4)
+        : '';
+    final vote = movie.voteAverage != null && movie.voteAverage! > 0
+        ? movie.voteAverage!.toStringAsFixed(1)
+        : 'N/A';
+
+    return Container(
+      height: 360,
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (movie.poster != null)
+            Image.network(
+              'https://image.tmdb.org/t/p/w780${movie.poster}',
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                color: FlixieColors.tabBarBackgroundFocused,
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.movie_outlined,
+                  color: FlixieColors.medium,
+                  size: 46,
+                ),
+              ),
+            )
+          else
+            Container(
+              color: FlixieColors.tabBarBackgroundFocused,
+              alignment: Alignment.center,
+              child: const Icon(
+                Icons.movie_outlined,
+                color: FlixieColors.medium,
+                size: 46,
+              ),
+            ),
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withValues(alpha: 0.15),
+                  Colors.black.withValues(alpha: 0.35),
+                  Colors.black.withValues(alpha: 0.86),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            top: 14,
+            right: 14,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.45),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: FlixieColors.primary.withValues(alpha: 0.5)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.star_rounded,
+                      color: FlixieColors.tertiary, size: 14),
+                  const SizedBox(width: 4),
+                  Text(
+                    vote,
+                    style: const TextStyle(
+                      color: FlixieColors.tertiary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 14,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (releaseYear.isNotEmpty)
+                  Text(
+                    releaseYear,
+                    style: const TextStyle(
+                      color: FlixieColors.light,
+                      fontSize: 12,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                const SizedBox(height: 5),
+                Text(
+                  movie.name.toUpperCase(),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                if ((movie.overview ?? '').isNotEmpty)
+                  Text(
+                    movie.overview!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: FlixieColors.light,
+                      height: 1.45,
+                    ),
+                  ),
+                const SizedBox(height: 14),
+                OutlinedButton.icon(
+                  onPressed: () => context.push('/movies/${movie.id}'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: FlixieColors.primary,
+                    side: const BorderSide(color: FlixieColors.primary),
+                    backgroundColor: Colors.black.withValues(alpha: 0.28),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                  ),
+                  icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                  label: const Text(
+                    'View movie',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
