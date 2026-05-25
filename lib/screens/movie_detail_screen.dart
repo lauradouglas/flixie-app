@@ -805,14 +805,15 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   // ---- Genre pills ---------------------------------------------------------
 
   Widget _buildGenrePills(Movie movie) {
-    if (movie.genres == null || movie.genres!.isEmpty) {
+    final genres = movie.genres;
+    if (genres == null || genres.isEmpty) {
       return const SizedBox.shrink();
     }
 
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: movie.genres!.asMap().entries.map((entry) {
+      children: genres.asMap().entries.map((entry) {
         final colors = [
           FlixieColors.primary,
           FlixieColors.secondary,
@@ -1450,7 +1451,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   // ---- CTA buttons ---------------------------------------------------------
 
   Widget _buildActionButtons() {
-    final watchCount = _watchCount;
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -1501,11 +1501,11 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             child: MovieActionButton(
               icon: Icons.replay_rounded,
               label: 'Rewatch',
-              subtitle: watchCount > 0 ? '$watchCount times' : null,
+              subtitle: _watchCount > 0 ? '$_watchCount times' : null,
               isActive: _isWatched,
               color: FlixieColors.primary,
               isLoading: false,
-              bounceKey: watchCount,
+              bounceKey: _watchCount,
               onPressed: _isWatched ? _showLogWatchSheet : null,
             ),
           ),
@@ -1606,7 +1606,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final myReview =
         userId == null ? null : _reviews.where((r) => r.userId == userId).firstOrNull;
     final lastWatch = _movieWatchHistory.isNotEmpty ? _movieWatchHistory.first : null;
-    final watchCount = _movieWatchHistory.length;
     final hasAnyActivity = lastWatch != null || _userRating != null || myReview != null;
 
     return Column(
@@ -1639,7 +1638,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                     Expanded(
                       child: _activityColumn(
                         title: 'Watch count',
-                        value: '$watchCount',
+                        value: '$_watchCount',
                         icon: Icons.replay_circle_filled_rounded,
                         color: FlixieColors.primary,
                       ),
@@ -1676,7 +1675,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Text(
-                    myReview!.body,
+                    myReview?.body ?? '',
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -1884,7 +1883,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Average friend rating: ${average!.toStringAsFixed(1)}/10',
+                      'Average friend rating: ${average?.toStringAsFixed(1) ?? '0.0'}/10',
                       style: const TextStyle(
                         color: FlixieColors.white,
                         fontWeight: FontWeight.w700,
