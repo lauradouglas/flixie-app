@@ -504,7 +504,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: FlixieColors.white,
-                        fontSize: 21.0,
+                        fontSize: 21,
                         fontWeight: FontWeight.w700,
                         height: 1.1,
                       ),
