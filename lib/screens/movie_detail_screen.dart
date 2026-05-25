@@ -78,6 +78,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   FriendActivityTab _friendsActivityTab = FriendActivityTab.all;
   bool _showFullSynopsis = false;
   static const int _kPlaceholderWatchedPercent = 92;
+  int get _watchCount => _movieWatchHistory.length;
 
   // ---- Data loading ---------------------------------------------------------
 
@@ -811,12 +812,18 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: movie.genres!
-          .map((genre) => GenreChip(
-                label: genre.name.toUpperCase(),
-                color: FlixieColors.primary,
-              ))
-          .toList(),
+      children: movie.genres!.asMap().entries.map((entry) {
+        final colors = [
+          FlixieColors.primary,
+          FlixieColors.secondary,
+          FlixieColors.tertiary,
+          FlixieColors.warning,
+        ];
+        return GenreChip(
+          label: entry.value.name.toUpperCase(),
+          color: colors[entry.key % colors.length],
+        );
+      }).toList(),
     );
   }
 
@@ -1117,7 +1124,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   Widget _buildWatchSummaryCard(BuildContext context) {
     final recentWatch = _movieWatchHistory.isNotEmpty ? _movieWatchHistory.first : null;
     final hasHistory = recentWatch != null;
-    final watchCount = _movieWatchHistory.length;
+    final watchCount = _watchCount;
     final ratingLabel = _userRating != null ? '${_userRating!}/10' : 'Not rated';
     final watchDate = hasHistory ? _formatReadableDate(recentWatch.watchedAt) : 'Not watched yet';
 
@@ -1443,7 +1450,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   // ---- CTA buttons ---------------------------------------------------------
 
   Widget _buildActionButtons() {
-    final watchCount = _movieWatchHistory.length;
+    final watchCount = _watchCount;
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -1812,6 +1819,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               ? Text(
                   _friendsActivity.isEmpty
                       ? 'No friend activity yet for this movie.'
+                      : _friendsActivityTab == FriendActivityTab.lists
+                          ? 'Lists activity is coming soon.'
                       : 'No ${_friendsActivityTab.name} activity yet.',
                   style: const TextStyle(color: FlixieColors.medium),
                 )
