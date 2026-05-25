@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:characters/characters.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -1493,7 +1494,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             child: MovieActionButton(
               icon: Icons.replay_rounded,
               label: 'Rewatch',
-              subtitle: _watchCount > 0 ? '$_watchCount times' : null,
+              subtitle: _watchCount > 0
+                  ? '$_watchCount ${_watchCount == 1 ? 'time' : 'times'}'
+                  : null,
               isActive: _isWatched,
               color: FlixieColors.primary,
               isLoading: false,
@@ -1813,7 +1816,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                       ? 'No friend activity yet for this movie.'
                       : _friendsActivityTab == FriendActivityTab.lists
                           ? 'Lists activity is coming soon.'
-                      : 'No ${_friendsActivityTab.name} activity yet.',
+                          : 'No ${_friendTabLabel(_friendsActivityTab).toLowerCase()} activity yet.',
                   style: const TextStyle(color: FlixieColors.medium),
                 )
               : Column(
@@ -1871,7 +1874,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Average friend rating: ${average?.toStringAsFixed(1) ?? '0.0'}/10',
+                      'Average friend rating: ${average!.toStringAsFixed(1)}/10',
                       style: const TextStyle(
                         color: FlixieColors.white,
                         fontWeight: FontWeight.w700,
@@ -1966,7 +1969,15 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   String _initialFor(String value) {
     if (value.isEmpty) return '?';
-    return value.substring(0, 1).toUpperCase();
+    return value.characters.first.toUpperCase();
+  }
+
+  String _friendTabLabel(FriendActivityTab tab) {
+    return _kFriendActivityTabs
+            .where((entry) => entry.$1 == tab)
+            .map((entry) => entry.$2)
+            .firstOrNull ??
+        'Activity';
   }
 
   // ---- Trailers -----------------------------------------------------------
