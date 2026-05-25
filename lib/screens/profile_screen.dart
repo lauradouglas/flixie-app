@@ -433,10 +433,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             context.push('/watch-history');
                           } else if (item.label == 'My Lists') {
                             context.push('/movie-lists');
-                          } else if (item.label == 'My Stats') {
+                          } else if (item.label == 'Recap') {
                             context.push('/stats');
-                          } else if (item.label == 'Year in Review') {
-                            context.push('/wrapped');
                           } else if (item.label == 'Watch Requests') {
                             context.push('/watch-requests');
                           } else if (item.label == 'Help & Support') {
@@ -489,8 +487,7 @@ class _MenuItem {
 const List<_MenuItem> _menuItems = [
   _MenuItem(icon: Icons.history, label: 'Watch History'),
   _MenuItem(icon: Icons.bookmarks_outlined, label: 'My Lists'),
-  _MenuItem(icon: Icons.bar_chart_outlined, label: 'My Stats'),
-  _MenuItem(icon: Icons.auto_graph_outlined, label: 'Year in Review'),
+  _MenuItem(icon: Icons.auto_graph_outlined, label: 'Recap'),
   _MenuItem(icon: Icons.swap_horiz_outlined, label: 'Watch Requests'),
   _MenuItem(icon: Icons.star_outline, label: 'My Reviews'),
   _MenuItem(icon: Icons.help_outline, label: 'Help & Support'),

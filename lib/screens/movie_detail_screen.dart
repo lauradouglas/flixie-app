@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../models/favorite_movie.dart';
 import '../models/movie.dart';
 import '../models/movie_credits.dart';
 import '../models/movie_friend_activity.dart';
@@ -12,6 +13,8 @@ import '../models/movie_watch_entry.dart';
 import '../models/review.dart';
 import '../models/similar_movie.dart';
 import '../models/watch_provider.dart';
+import '../models/watched_movie.dart';
+import '../models/watchlist_movie.dart';
 import '../providers/auth_provider.dart';
 import '../services/movie_service.dart';
 import '../services/user_service.dart';
@@ -83,7 +86,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   Future<void> _refresh() async {
     final id = int.tryParse(widget.movieId);
-    if (id != null) MovieService.evictMovie(id);
+    if (id != null) context.read<MovieService>().evictMovie(id);
     await _load();
   }
 
@@ -104,16 +107,17 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final userId = authProvider.dbUser?.id;
 
     try {
+      final movieService = context.read<MovieService>();
       final futures = <Future>[
-        MovieService.getMovieById(id, userId: userId),
-        MovieService.getMovieRecommendations(id),
-        MovieService.getMovieCredits(id),
-        MovieService.getMovieWatchProviders(
+        movieService.getMovieById(id, userId: userId),
+        movieService.getMovieRecommendations(id),
+        movieService.getMovieCredits(id),
+        movieService.getMovieWatchProviders(
             id, 'US'), // TODO: Get region from user profile
       ];
       if (userId != null) {
-        futures.add(MovieService.getUserMovieRating(id, userId));
-        futures.add(MovieService.getFriendsMovieActivity(id, userId));
+        futures.add(movieService.getUserMovieRating(id, userId));
+        futures.add(movieService.getFriendsMovieActivity(id, userId));
       }
       final results = await Future.wait(futures);
       if (mounted) {
@@ -216,29 +220,19 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           _watchlistBounceKey++;
         });
 
-        // Keep all existing Map entries (so WatchlistScreen can parse them),
-        // then append or remove the affected entry.
-        final currentWatchlist = List<dynamic>.from(user.movieWatchlist ?? []);
+        // Keep existing entries, then append or remove the affected entry.
+        final currentWatchlist =
+            List<WatchlistMovie>.from(user.movieWatchlist ?? []);
 
         if (_inWatchlist) {
-          // Added — append the full Map returned by the API
-          currentWatchlist.removeWhere((item) {
-            if (item is Map<String, dynamic>) {
-              return (item['movieId'] ?? item['id']) == movieId;
-            }
-            return item == movieId;
-          });
-          currentWatchlist.add(result.toJson());
+          // Added
+          currentWatchlist.removeWhere((item) => item.movieId == movieId);
+          currentWatchlist.add(result);
           authProvider.markActivityChanged();
           authProvider.updateUserList(movieWatchlist: currentWatchlist);
         } else {
-          // Removed — strip out the entry
-          currentWatchlist.removeWhere((item) {
-            if (item is Map<String, dynamic>) {
-              return (item['movieId'] ?? item['id']) == movieId;
-            }
-            return item == movieId;
-          });
+          // Removed
+          currentWatchlist.removeWhere((item) => item.movieId == movieId);
           authProvider.updateUserList(movieWatchlist: currentWatchlist);
           // Offer to mark as watched if not already
           if (!_isWatched && mounted) {
@@ -265,21 +259,20 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               ),
             );
             if (markWatched == true && mounted) {
-              await UserService.addToWatched(user.id, movieId);
-              final currentWatched =
-                  List<dynamic>.from(user.watchedMovies ?? []);
-              currentWatched.removeWhere((item) {
-                if (item is Map<String, dynamic>) {
-                  return (item['movieId'] ?? item['id']) == movieId;
-                }
-                return item == movieId;
-              });
-              currentWatched.add({
-                'movieId': movieId,
-                'watchedAt': DateTime.now().toIso8601String()
-              });
+              final watchedResult =
+                  await UserService.addToWatched(user.id, movieId);
+              final updatedWatched =
+                  List<WatchedMovie>.from(user.watchedMovies ?? []);
+              updatedWatched.removeWhere((item) => item.movieId == movieId);
+              updatedWatched.add(watchedResult ??
+                  WatchedMovie(
+                    id: '',
+                    userId: user.id,
+                    movieId: movieId,
+                    watchedAt: DateTime.now().toIso8601String(),
+                  ));
               setState(() => _isWatched = true);
-              authProvider.updateUserList(watchedMovies: currentWatched);
+              authProvider.updateUserList(watchedMovies: updatedWatched);
               authProvider.markActivityChanged();
             }
           }
@@ -324,28 +317,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           _watchedBounceKey++;
         });
 
-        final currentWatched = user.watchedMovies ?? [];
-        final updatedWatched = <int>[];
-
-        try {
-          for (var item in currentWatched) {
-            if (item is int) {
-              updatedWatched.add(item);
-            } else if (item is Map<String, dynamic>) {
-              final id = item['movieId'] ?? item['id'];
-              if (id is int) {
-                updatedWatched.add(id);
-              }
-            }
-          }
-        } catch (e) {
-          logger.w('Error processing watched list: $e');
-          logger.d('currentWatched type: ${currentWatched.runtimeType}');
-          logger.d('currentWatched: $currentWatched');
-        }
-
         // _isWatched is now false (was toggled above); remove from local list
-        updatedWatched.remove(movieId);
+        final updatedWatched = (user.watchedMovies ?? [])
+            .where((item) => item.movieId != movieId)
+            .toList();
         authProvider.updateUserList(watchedMovies: updatedWatched);
       }
     } catch (e) {
@@ -368,9 +343,13 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
     setState(() => _currentlyUpdating = ListUpdateType.favorite);
     try {
-      await (_isFavorite
-          ? UserService.removeFromFavorites(user.id, movieId)
-          : UserService.addToFavorites(user.id, movieId));
+      final FavoriteMovie? addedFavorite;
+      if (_isFavorite) {
+        await UserService.removeFromFavorites(user.id, movieId);
+        addedFavorite = null;
+      } else {
+        addedFavorite = await UserService.addToFavorites(user.id, movieId);
+      }
 
       // Successfully updated on server, toggle UI state and update user list
       if (mounted) {
@@ -381,38 +360,21 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           _favoriteBounceKey++;
         });
 
-        final currentFavorites = user.favoriteMovies ?? [];
-        final updatedFavorites = <int>[];
-
-        for (var item in currentFavorites) {
-          try {
-            int? movieIdToAdd;
-
-            if (item is int) {
-              movieIdToAdd = item;
-            } else if (item is Map) {
-              final map = item;
-              movieIdToAdd = map['movieId'] as int?;
-              movieIdToAdd ??= map['id'] as int?;
-            }
-
-            if (movieIdToAdd != null) {
-              updatedFavorites.add(movieIdToAdd);
-            }
-          } catch (e) {
-            logger.w('Skipping problematic item in favorites: $e');
-            logger.d('Item type: ${item.runtimeType}');
-            logger.d('Item value: $item');
-          }
-        }
-
+        List<FavoriteMovie> updatedFavorites;
         if (_isFavorite) {
-          if (!updatedFavorites.contains(movieId)) {
-            updatedFavorites.add(movieId);
+          // Added
+          updatedFavorites =
+              List<FavoriteMovie>.from(user.favoriteMovies ?? []);
+          if (addedFavorite != null &&
+              !updatedFavorites.any((f) => f.movieId == movieId)) {
+            updatedFavorites.add(addedFavorite);
           }
           authProvider.markActivityChanged();
         } else {
-          updatedFavorites.remove(movieId);
+          // Removed
+          updatedFavorites = (user.favoriteMovies ?? [])
+              .where((f) => f.movieId != movieId)
+              .toList();
         }
         authProvider.updateUserList(favoriteMovies: updatedFavorites);
       }
@@ -466,24 +428,20 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               );
               // Also mark the movie as watched in the main watched list and
               // update local user state, then offer to remove from watchlist.
-              await UserService.addToWatched(userId, movieId);
+              final watchedResult =
+                  await UserService.addToWatched(userId, movieId);
               final authProvider = context.read<AuthProvider>();
               final user = authProvider.dbUser;
-              final currentWatched = user?.watchedMovies ?? [];
-              final updatedWatched = <int>[];
-              try {
-                for (final item in currentWatched) {
-                  if (item is int) {
-                    updatedWatched.add(item);
-                  } else if (item is Map<String, dynamic>) {
-                    final id = item['movieId'] ?? item['id'];
-                    if (id is int) updatedWatched.add(id);
-                  }
-                }
-              } catch (_) {}
-              if (!updatedWatched.contains(movieId)) {
-                updatedWatched.add(movieId);
-              }
+              final updatedWatched =
+                  List<WatchedMovie>.from(user?.watchedMovies ?? []);
+              updatedWatched.removeWhere((item) => item.movieId == movieId);
+              updatedWatched.add(watchedResult ??
+                  WatchedMovie(
+                    id: '',
+                    userId: userId,
+                    movieId: movieId,
+                    watchedAt: DateTime.now().toIso8601String(),
+                  ));
               authProvider.updateUserList(watchedMovies: updatedWatched);
               authProvider.markActivityChanged();
               // Offer watchlist removal if applicable
@@ -513,17 +471,13 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 );
                 if (remove == true && mounted) {
                   await UserService.removeFromWatchlist(userId, movieId);
-                  final currentWatchlist = List<dynamic>.from(
-                      authProvider.dbUser?.movieWatchlist ?? []);
-                  currentWatchlist.removeWhere((item) {
-                    if (item is Map<String, dynamic>) {
-                      return (item['movieId'] ?? item['id']) == movieId;
-                    }
-                    return item == movieId;
-                  });
+                  final updatedWatchlist =
+                      (authProvider.dbUser?.movieWatchlist ?? [])
+                          .where((item) => item.movieId != movieId)
+                          .toList();
                   if (mounted) setState(() => _inWatchlist = false);
                   authProvider.updateUserList(
-                      movieWatchlist: currentWatchlist,
+                      movieWatchlist: updatedWatchlist,
                       watchedMovies: updatedWatched);
                 }
               }
@@ -541,9 +495,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             await _loadWatchHistory(userId, movieId);
             // Evict the cache and re-fetch the movie so the updated
             // community rating (voteAverage / voteCount) is reflected.
-            MovieService.evictMovie(movieId);
+            final movieService = context.read<MovieService>();
+            movieService.evictMovie(movieId);
             final updatedMovie =
-                await MovieService.getMovieById(movieId, userId: userId);
+                await movieService.getMovieById(movieId, userId: userId);
             if (mounted) {
               setState(() {
                 _isWatched = true;
@@ -849,9 +804,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
     setState(() => _isRatingLoading = true);
     try {
+      final movieService = context.read<MovieService>();
       // Add rating and get updated vote average and count
       final response =
-          await MovieService.addMovieRating(movieId, user.id, rating);
+          await movieService.addMovieRating(movieId, user.id, rating);
 
       // Extract updated vote data from response (safely parse types)
       final newVoteAverage = _parseDouble(response['voteAverage']);
@@ -864,7 +820,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       );
 
       // Update cache with the new movie data
-      MovieService.updateCachedMovie(updatedMovie);
+      movieService.updateCachedMovie(updatedMovie);
 
       if (mounted) {
         HapticFeedback.lightImpact();

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../models/movie_short.dart';
 import '../models/person.dart';
@@ -62,9 +63,10 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _loadDefaultData() async {
     try {
+      final movieService = context.read<MovieService>();
       final results = await Future.wait([
         TrendingService.getTrendingMovies(),
-        MovieService.getTopRatedMovies(),
+        movieService.getTopRatedMovies(),
       ]);
       if (mounted) {
         setState(() {

@@ -22,20 +22,51 @@ class WrappedScreen extends StatelessWidget {
     final joinYear = user.createdAt != null
         ? (DateTime.tryParse(user.createdAt!)?.year ?? currentYear)
         : currentYear;
+    return WrappedContent(
+      userId: user.id,
+      joinYear: joinYear,
+    );
+  }
+}
+
+class WrappedContent extends StatelessWidget {
+  const WrappedContent({
+    super.key,
+    required this.userId,
+    required this.joinYear,
+    this.embedded = false,
+  });
+
+  final String userId;
+  final int joinYear;
+  final bool embedded;
+
+  @override
+  Widget build(BuildContext context) {
+    final currentYear = DateTime.now().year;
     return ChangeNotifierProvider(
       create: (_) => MovieWrappedProvider(
         repository: const MovieFeaturesRepository(),
-        userId: user.id,
+        userId: userId,
       )..loadYear(currentYear),
-      child: _WrappedView(initialYear: currentYear, joinYear: joinYear),
+      child: _WrappedView(
+        initialYear: currentYear,
+        joinYear: joinYear,
+        embedded: embedded,
+      ),
     );
   }
 }
 
 class _WrappedView extends StatefulWidget {
-  const _WrappedView({required this.initialYear, required this.joinYear});
+  const _WrappedView({
+    required this.initialYear,
+    required this.joinYear,
+    required this.embedded,
+  });
   final int initialYear;
   final int joinYear;
+  final bool embedded;
 
   @override
   State<_WrappedView> createState() => _WrappedViewState();
@@ -50,136 +81,155 @@ class _WrappedViewState extends State<_WrappedView> {
     _year = widget.initialYear;
   }
 
+  Widget _buildYearSelector() {
+    return DropdownButton<int>(
+      value: _year,
+      underline: const SizedBox(),
+      dropdownColor: FlixieColors.tabBarBackgroundFocused,
+      items: List.generate(
+        DateTime.now().year - widget.joinYear + 1,
+        (i) => DateTime.now().year - i,
+      )
+          .map((y) => DropdownMenuItem(value: y, child: Text('$y')))
+          .toList(),
+      onChanged: (value) {
+        if (value == null) return;
+        setState(() => _year = value);
+        context.read<MovieWrappedProvider>().loadYear(value);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<MovieWrappedProvider>();
     final wrapped = provider.wrapped;
+    final body = provider.isLoading
+        ? const Center(child: CircularProgressIndicator())
+        : wrapped == null
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    provider.error ?? 'No wrapped data for $_year.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: FlixieColors.medium),
+                  ),
+                ),
+              )
+            : ListView(
+                padding: const EdgeInsets.only(bottom: 16),
+                children: [
+                  if (widget.embedded) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: _buildYearSelector(),
+                      ),
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 16),
+                  ],
+                  if (wrapped.wrappedCard != null) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: WrappedSummaryCard(card: wrapped.wrappedCard!),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: WrappedHeadlineCard(
+                      title: 'Movies Watched',
+                      value: '${wrapped.totalMoviesWatched}',
+                      icon: Icons.movie_outlined,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: WrappedHeadlineCard(
+                            title: 'Total Watches',
+                            value: '${wrapped.rewatchCount}',
+                            icon: Icons.replay,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: WrappedHeadlineCard(
+                            title: 'Hours',
+                            value:
+                                wrapped.totalHoursWatched.toStringAsFixed(1),
+                            icon: Icons.schedule_outlined,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const HomeSectionHeader(title: 'Monthly Activity'),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: WrappedMonthGrid(months: wrapped.monthlyWatchCounts),
+                  ),
+                  if (wrapped.topGenres.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    const HomeSectionHeader(title: 'Top Genres'),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: WrappedGenreChips(genres: wrapped.topGenres),
+                    ),
+                  ],
+                  if (wrapped.topDirectors.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    const HomeSectionHeader(title: 'Top Directors'),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: WrappedDirectorList(directors: wrapped.topDirectors),
+                    ),
+                  ],
+                  if (wrapped.highestRatedMovies.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    const HomeSectionHeader(title: 'Highest Rated'),
+                    const SizedBox(height: 8),
+                    ...wrapped.highestRatedMovies.map(
+                      (m) => Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: WrappedRatedMovieRow(movie: m),
+                      ),
+                    ),
+                  ],
+                  if (wrapped.topMovies.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    const HomeSectionHeader(title: 'Most Rewatched'),
+                    const SizedBox(height: 8),
+                    ...wrapped.topMovies.map(
+                      (m) => Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: WrappedRewatchMovieRow(movie: m),
+                      ),
+                    ),
+                  ],
+                ],
+              );
+
+    if (widget.embedded) {
+      return body;
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Year in Review'),
         actions: [
-          DropdownButton<int>(
-            value: _year,
-            underline: const SizedBox(),
-            dropdownColor: FlixieColors.tabBarBackgroundFocused,
-            items: List.generate(
-              DateTime.now().year - widget.joinYear + 1,
-              (i) => DateTime.now().year - i,
-            )
-                .map((y) => DropdownMenuItem(value: y, child: Text('$y')))
-                .toList(),
-            onChanged: (value) {
-              if (value == null) return;
-              setState(() => _year = value);
-              context.read<MovieWrappedProvider>().loadYear(value);
-            },
-          ),
+          _buildYearSelector(),
           const SizedBox(width: 8),
         ],
       ),
-      body: provider.isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : wrapped == null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text(
-                      provider.error ?? 'No wrapped data for $_year.',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: FlixieColors.medium),
-                    ),
-                  ),
-                )
-              : ListView(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  children: [
-                    if (wrapped.wrappedCard != null) ...[
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: WrappedSummaryCard(card: wrapped.wrappedCard!),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: WrappedHeadlineCard(
-                        title: 'Movies Watched',
-                        value: '${wrapped.totalMoviesWatched}',
-                        icon: Icons.movie_outlined,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: WrappedHeadlineCard(
-                              title: 'Total Watches',
-                              value: '${wrapped.rewatchCount}',
-                              icon: Icons.replay,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: WrappedHeadlineCard(
-                              title: 'Hours',
-                              value:
-                                  wrapped.totalHoursWatched.toStringAsFixed(1),
-                              icon: Icons.schedule_outlined,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    const HomeSectionHeader(title: 'Monthly Activity'),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child:
-                          WrappedMonthGrid(months: wrapped.monthlyWatchCounts),
-                    ),
-                    if (wrapped.topGenres.isNotEmpty) ...[
-                      const SizedBox(height: 20),
-                      const HomeSectionHeader(title: 'Top Genres'),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: WrappedGenreChips(genres: wrapped.topGenres),
-                      ),
-                    ],
-                    if (wrapped.topDirectors.isNotEmpty) ...[
-                      const SizedBox(height: 20),
-                      const HomeSectionHeader(title: 'Top Directors'),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: WrappedDirectorList(
-                            directors: wrapped.topDirectors),
-                      ),
-                    ],
-                    if (wrapped.highestRatedMovies.isNotEmpty) ...[
-                      const SizedBox(height: 20),
-                      const HomeSectionHeader(title: 'Highest Rated'),
-                      const SizedBox(height: 8),
-                      ...wrapped.highestRatedMovies.map(
-                        (m) => Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: WrappedRatedMovieRow(movie: m),
-                        ),
-                      ),
-                    ],
-                    if (wrapped.topMovies.isNotEmpty) ...[
-                      const SizedBox(height: 20),
-                      const HomeSectionHeader(title: 'Most Rewatched'),
-                      const SizedBox(height: 8),
-                      ...wrapped.topMovies.map(
-                        (m) => Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: WrappedRewatchMovieRow(movie: m),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+      body: body,
     );
   }
 }

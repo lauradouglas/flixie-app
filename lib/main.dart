@@ -10,6 +10,7 @@ import 'providers/auth_provider.dart';
 import 'router.dart';
 import 'services/auth_service.dart';
 import 'services/movie_cache_service.dart';
+import 'services/movie_service.dart';
 import 'services/push_notification_service.dart';
 import 'theme/app_theme.dart';
 import 'utils/app_logger.dart';
@@ -20,8 +21,8 @@ void main() async {
   try {
     // Initialize Firebase only if not already initialized
     if (Firebase.apps.isEmpty) {
-      print('Initializing Firebase');
-      //print('Env Settings: ${String.fromEnvironment('FIREBASE_WEB_API_KEY')}');
+      logger.i('Initializing Firebase');
+      //logger.d('Env Settings: ${String.fromEnvironment('FIREBASE_WEB_API_KEY')}');
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
@@ -61,8 +62,16 @@ void main() async {
   );
 
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => AuthProvider(AuthService()),
+    MultiProvider(
+      providers: [
+        Provider<MovieService>(create: (_) => MovieService()),
+        ChangeNotifierProvider(
+          create: (context) => AuthProvider(
+            AuthService(),
+            context.read<MovieService>(),
+          ),
+        ),
+      ],
       child: const FlixieApp(),
     ),
   );
@@ -90,10 +99,14 @@ class _FlixieAppState extends State<FlixieApp> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = context
+        .select<AuthProvider, bool>((auth) => auth.dbUser?.darkMode ?? true);
     return MaterialApp.router(
       title: 'Flixie',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
       routerConfig: _router,
     );
   }
