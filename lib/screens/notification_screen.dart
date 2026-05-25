@@ -396,7 +396,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
             itemBuilder: (context, i) => _buildCard(items[i]),
           ),
         ),
-        _buildMarkAllAsReadButton(items),
+        _buildMarkAllAsReadButton(items.where((n) => !n.isRead).toList()),
       ],
     );
   }
@@ -446,14 +446,15 @@ class _NotificationScreenState extends State<NotificationScreen> {
           ),
         ),
         _buildMarkAllAsReadButton(
-          [...pending, ...newItems, ...earlier],
+          [...pending, ...newItems, ...earlier]
+              .where((n) => !n.isRead)
+              .toList(),
         ),
       ],
     );
   }
 
-  Widget _buildMarkAllAsReadButton(List<FlixieNotification> items) {
-    final unread = items.where((n) => !n.isRead).toList();
+  Widget _buildMarkAllAsReadButton(List<FlixieNotification> unread) {
     return SafeArea(
       top: false,
       child: Padding(

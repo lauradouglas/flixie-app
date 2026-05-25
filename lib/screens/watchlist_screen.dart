@@ -21,6 +21,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
 
   List<WatchlistMovie> _allWatchlist = [];
   List<WatchlistMovie> _filteredWatchlist = [];
+  List<dynamic> _showWatchlist = [];
   bool _loading = true;
   String _sortBy =
       'recent'; // recent, titleAsc, titleDesc, ratingDesc, yearAsc, yearDesc
@@ -66,6 +67,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
   void _loadWatchlist() {
     final authProvider = context.read<AuthProvider>();
     final userWatchlist = authProvider.dbUser?.movieWatchlist;
+    _showWatchlist = List<dynamic>.from(authProvider.dbUser?.showWatchlist ?? []);
 
     if (userWatchlist == null) {
       setState(() => _loading = false);
@@ -500,6 +502,10 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
   }
 
   Widget _buildContent() {
+    if (_selectedTab == 1) {
+      return _buildShowsContent();
+    }
+
     final items = _visibleWatchlist();
     if (items.isEmpty) {
       final emptyLabel = switch (_selectedTab) {
@@ -553,6 +559,148 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         );
       },
     );
+  }
+
+  Widget _buildShowsContent() {
+    final query = _searchController.text.toLowerCase();
+    final shows = _showWatchlist.where((item) {
+      final title = _showTitle(item).toLowerCase();
+      return title.contains(query);
+    }).toList();
+
+    if (shows.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.live_tv_outlined, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text(
+              'No shows in your watchlist yet',
+              style: TextStyle(color: Colors.grey, fontSize: 16),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+      itemCount: shows.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final show = shows[index];
+        final title = _showTitle(show);
+        final year = _showYear(show);
+        final posterUrl = _showPosterUrl(show);
+        return InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Show detail navigation is coming soon.'),
+              ),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: FlixieColors.tabBarBackgroundFocused,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+            ),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: posterUrl != null
+                      ? CachedNetworkImage(
+                          imageUrl: posterUrl,
+                          width: 60,
+                          height: 86,
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) => Container(
+                            width: 60,
+                            height: 86,
+                            color: Colors.grey[900],
+                            child:
+                                const Icon(Icons.live_tv, color: Colors.grey),
+                          ),
+                        )
+                      : Container(
+                          width: 60,
+                          height: 86,
+                          color: Colors.grey[900],
+                          child: const Icon(Icons.live_tv, color: Colors.grey),
+                        ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: FlixieColors.light,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        year,
+                        style: const TextStyle(
+                          color: FlixieColors.medium,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: FlixieColors.medium),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  String _showTitle(dynamic item) {
+    if (item is Map<String, dynamic>) {
+      final nested = item['show'] as Map<String, dynamic>?;
+      return (nested?['title'] as String?) ??
+          (item['title'] as String?) ??
+          'Untitled Show';
+    }
+    return 'Untitled Show';
+  }
+
+  String _showYear(dynamic item) {
+    if (item is Map<String, dynamic>) {
+      final nested = item['show'] as Map<String, dynamic>?;
+      final date = (nested?['releaseDate'] as String?) ??
+          (nested?['firstAirDate'] as String?) ??
+          (item['releaseDate'] as String?) ??
+          '';
+      final year = date.split('-').first;
+      if (year.isNotEmpty) return year;
+    }
+    return 'N/A';
+  }
+
+  String? _showPosterUrl(dynamic item) {
+    if (item is Map<String, dynamic>) {
+      final nested = item['show'] as Map<String, dynamic>?;
+      final poster =
+          (nested?['posterPath'] as String?) ?? (item['posterPath'] as String?);
+      if (poster == null || poster.isEmpty) return null;
+      return 'https://image.tmdb.org/t/p/w500$poster';
+    }
+    return null;
   }
 }
 
