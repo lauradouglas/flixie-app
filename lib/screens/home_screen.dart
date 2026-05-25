@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -17,7 +18,6 @@ import '../utils/app_logger.dart';
 import '../utils/skeleton.dart';
 import 'home/featured_card.dart';
 import 'home/greeting_header.dart';
-import 'home/list_card.dart';
 import 'home/section_header.dart';
 import 'home/top_rated_card.dart';
 import 'home/trending_friends_section.dart';
@@ -41,6 +41,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   String? _loadedForUserId;
   Timer? _greetingTimer;
   AuthProvider? _authProvider;
+  final PageController _heroPageController = PageController();
+  int _heroPage = 0;
 
   static final RouteObserver<ModalRoute<void>> _routeObserver =
       RouteObserver<ModalRoute<void>>();
@@ -78,6 +80,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     _greetingTimer?.cancel();
     _routeObserver.unsubscribe(this);
     _authProvider?.removeListener(_onAuthChanged);
+    _heroPageController.dispose();
     super.dispose();
   }
 
@@ -144,7 +147,6 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     final unreadCount = context.watch<AuthProvider>().unreadNotificationCount;
 
     return Scaffold(
@@ -218,14 +220,21 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                         // Greeting
                         if (_showGreeting)
                           GreetingHeader(
-                            name: context.read<AuthProvider>().dbUser?.username,
+                            name: context
+                                .read<AuthProvider>()
+                                .dbUser
+                                ?.username,
                             onDismiss: () =>
                                 setState(() => _showGreeting = false),
                           ),
+                        // Hero Carousel
                         if (_featuredMovies.isNotEmpty) ...[
-                          _buildHeroFeature(context, _featuredMovies.first),
+                          _buildHeroCarousel(context),
+                          const SizedBox(height: 10),
+                          _buildCarouselDots(),
                           const SizedBox(height: 22),
                         ],
+                        // Trending Now
                         HomeSectionHeader(
                           title: 'Trending Now',
                           onSeeAll: () => context.push('/search'),
@@ -235,20 +244,77 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                           height: 260,
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16),
                             itemCount: _featuredMovies.length,
                             separatorBuilder: (_, __) =>
                                 const SizedBox(width: 12),
                             itemBuilder: (context, index) => FeaturedCard(
                               movie: _featuredMovies[index],
-                              onTap: () => context
-                                  .push('/movies/${_featuredMovies[index].id}'),
+                              onTap: () => context.push(
+                                  '/movies/${_featuredMovies[index].id}'),
                             ),
                           ),
                         ),
                         const SizedBox(height: 20),
-                        // For You section
+                        // On Your Watchlist
+                        _buildWatchlistSection(context),
+                        // In Theatres Now
+                        HomeSectionHeader(
+                          title: 'In Theatres Now',
+                          onSeeAll: () => context.push('/search'),
+                        ),
+                        const SizedBox(height: 12),
+                        if (_nowPlayingMovies.isNotEmpty)
+                          SizedBox(
+                            height: 260,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16),
+                              itemCount: _nowPlayingMovies.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 12),
+                              itemBuilder: (context, index) => FeaturedCard(
+                                movie: _nowPlayingMovies[index],
+                                onTap: () => context.push(
+                                    '/movies/${_nowPlayingMovies[index].id}'),
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: 20),
+                        // Top Rated This Week
+                        const HomeSectionHeader(
+                            title: 'Top Rated This Week'),
+                        const SizedBox(height: 12),
+                        if (_topRatedThisWeek.isNotEmpty)
+                          SizedBox(
+                            height: 220,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16),
+                              itemCount: _topRatedThisWeek.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 12),
+                              itemBuilder: (context, index) {
+                                final movie = _topRatedThisWeek[index];
+                                return TopRatedCard(
+                                  movie: movie,
+                                  onTap: () => context
+                                      .push('/movies/${movie.id}'),
+                                );
+                              },
+                            ),
+                          ),
+                        const SizedBox(height: 20),
+                        // Trending Among Friends
+                        if (_friendsActivity.isNotEmpty)
+                          TrendingAmongFriendsSection(
+                              activity: _friendsActivity),
+                        // For You
                         if (_forYouMovies.isNotEmpty) ...[
+                          const SizedBox(height: 20),
                           HomeSectionHeader(
                             title: 'For You',
                             onSeeAll: null,
@@ -258,86 +324,20 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                             height: 260,
                             child: ListView.separated(
                               scrollDirection: Axis.horizontal,
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 16),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16),
                               itemCount: _forYouMovies.length,
                               separatorBuilder: (_, __) =>
                                   const SizedBox(width: 12),
                               itemBuilder: (context, index) => FeaturedCard(
                                 movie: _forYouMovies[index],
-                                onTap: () => context
-                                    .push('/movies/${_forYouMovies[index].id}'),
+                                onTap: () => context.push(
+                                    '/movies/${_forYouMovies[index].id}'),
                               ),
                             ),
                           ),
                           const SizedBox(height: 20),
                         ],
-                        // Popular section
-                        const HomeSectionHeader(title: 'In Cinemas'),
-                        const SizedBox(height: 12),
-                        Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 16),
-                          padding: const EdgeInsets.fromLTRB(10, 10, 10, 2),
-                          decoration: BoxDecoration(
-                            color: FlixieColors.tabBarBackgroundFocused,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.06),
-                            ),
-                          ),
-                          child: ListView.separated(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: _nowPlayingMovies.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 10),
-                            itemBuilder: (context, index) {
-                              final movie = _nowPlayingMovies[index];
-                              return HomeListCard(
-                                movie: movie,
-                                onTap: () => context.push('/movies/${movie.id}'),
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        // Top Rated This Week section
-                        const HomeSectionHeader(title: 'Top Rated This Week'),
-                        const SizedBox(height: 12),
-                        if (_topRatedThisWeek.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
-                            child: Text('No top rated movies this week.',
-                                style: textTheme.bodySmall
-                                    ?.copyWith(color: FlixieColors.medium)),
-                          )
-                        else
-                          SizedBox(
-                            height: 220,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 16),
-                              itemCount: _topRatedThisWeek.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(width: 12),
-                              itemBuilder: (context, index) {
-                                final movie = _topRatedThisWeek[index];
-                                return TopRatedCard(
-                                  movie: movie,
-                                  onTap: () =>
-                                      context.push('/movies/${movie.id}'),
-                                );
-                              },
-                            ),
-                          ),
-                        const SizedBox(height: 20),
-
-                        // Trending Among Friends section
-                        if (_friendsActivity.isNotEmpty)
-                          TrendingAmongFriendsSection(
-                              activity: _friendsActivity),
                       ],
                     ),
                   ),
@@ -345,149 +345,301 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     );
   }
 
-  Widget _buildHeroFeature(BuildContext context, MovieShort movie) {
-    final releaseYear = movie.releaseDate != null && movie.releaseDate!.length >= 4
-        ? movie.releaseDate!.substring(0, 4)
-        : '';
+  // ── Hero carousel ──────────────────────────────────────────────────────────
+
+  Widget _buildHeroCarousel(BuildContext context) {
+    final count = _featuredMovies.length.clamp(0, 6);
+    return SizedBox(
+      height: 400,
+      child: PageView.builder(
+        controller: _heroPageController,
+        onPageChanged: (i) => setState(() => _heroPage = i),
+        itemCount: count,
+        itemBuilder: (context, index) =>
+            _buildHeroCard(context, _featuredMovies[index]),
+      ),
+    );
+  }
+
+  Widget _buildCarouselDots() {
+    final count = _featuredMovies.length.clamp(0, 6);
+    if (count <= 1) return const SizedBox.shrink();
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(
+        count,
+        (i) => AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          margin: const EdgeInsets.symmetric(horizontal: 3),
+          width: i == _heroPage ? 20 : 6,
+          height: 6,
+          decoration: BoxDecoration(
+            color: i == _heroPage
+                ? FlixieColors.primary
+                : Colors.white.withValues(alpha: 0.3),
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeroCard(BuildContext context, MovieShort movie) {
+    final year =
+        movie.releaseDate != null && movie.releaseDate!.length >= 4
+            ? movie.releaseDate!.substring(0, 4)
+            : '';
     final vote = movie.voteAverage != null && movie.voteAverage! > 0
         ? movie.voteAverage!.toStringAsFixed(1)
-        : 'N/A';
+        : null;
 
-    return Container(
-      height: 360,
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (movie.poster != null)
-            Image.network(
-              'https://image.tmdb.org/t/p/w780${movie.poster}',
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
+    return GestureDetector(
+      onTap: () => context.push('/movies/${movie.id}'),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+        ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Background poster
+            if (movie.poster != null)
+              CachedNetworkImage(
+                imageUrl: 'https://image.tmdb.org/t/p/w780${movie.poster}',
+                fit: BoxFit.cover,
+                errorWidget: (_, __, ___) => Container(
+                  color: FlixieColors.tabBarBackgroundFocused,
+                  child: const Icon(Icons.movie_outlined,
+                      color: FlixieColors.medium, size: 48),
+                ),
+              )
+            else
+              Container(
                 color: FlixieColors.tabBarBackgroundFocused,
-                alignment: Alignment.center,
-                child: const Icon(
-                  Icons.movie_outlined,
-                  color: FlixieColors.medium,
-                  size: 46,
+                child: const Icon(Icons.movie_outlined,
+                    color: FlixieColors.medium, size: 48),
+              ),
+            // Gradient overlay
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  stops: const [0.0, 0.38, 0.68, 1.0],
+                  colors: [
+                    Colors.black.withValues(alpha: 0.08),
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.55),
+                    Colors.black.withValues(alpha: 0.96),
+                  ],
                 ),
               ),
-            )
-          else
-            Container(
-              color: FlixieColors.tabBarBackgroundFocused,
-              alignment: Alignment.center,
-              child: const Icon(
-                Icons.movie_outlined,
-                color: FlixieColors.medium,
-                size: 46,
-              ),
             ),
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withValues(alpha: 0.15),
-                  Colors.black.withValues(alpha: 0.35),
-                  Colors.black.withValues(alpha: 0.86),
-                ],
+            // Rating badge – top right
+            if (vote != null)
+              Positioned(
+                top: 14,
+                right: 14,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.55),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                        color: FlixieColors.tertiary.withValues(alpha: 0.7)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.star_rounded,
+                          color: FlixieColors.tertiary, size: 14),
+                      const SizedBox(width: 4),
+                      Text(
+                        vote,
+                        style: const TextStyle(
+                            color: FlixieColors.tertiary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
-          Positioned(
-            top: 14,
-            right: 14,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.45),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: FlixieColors.primary.withValues(alpha: 0.5)),
-              ),
-              child: Row(
+            // Bottom content
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 16,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.star_rounded,
-                      color: FlixieColors.tertiary, size: 14),
-                  const SizedBox(width: 4),
-                  Text(
-                    vote,
-                    style: const TextStyle(
-                      color: FlixieColors.tertiary,
-                      fontWeight: FontWeight.w700,
+                  if (year.isNotEmpty)
+                    Text(
+                      year,
+                      style: const TextStyle(
+                          color: FlixieColors.light,
+                          fontSize: 12,
+                          letterSpacing: 1.5),
                     ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: 14,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (releaseYear.isNotEmpty)
+                  const SizedBox(height: 4),
                   Text(
-                    releaseYear,
-                    style: const TextStyle(
-                      color: FlixieColors.light,
-                      fontSize: 12,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                const SizedBox(height: 5),
-                Text(
-                  movie.name.toUpperCase(),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                if ((movie.overview ?? '').isNotEmpty)
-                  Text(
-                    movie.overview!,
+                    movie.name.toUpperCase(),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: FlixieColors.light,
-                      height: 1.45,
+                      color: Colors.white,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.4,
                     ),
                   ),
-                const SizedBox(height: 14),
-                OutlinedButton.icon(
-                  onPressed: () => context.push('/movies/${movie.id}'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: FlixieColors.primary,
-                    side: const BorderSide(color: FlixieColors.primary),
-                    backgroundColor: Colors.black.withValues(alpha: 0.28),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 10),
+                  if ((movie.overview ?? '').isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      movie.overview!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: FlixieColors.light,
+                          fontSize: 13,
+                          height: 1.45),
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () =>
+                              context.push('/movies/${movie.id}'),
+                          icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                          label: const Text('Play Trailer',
+                              style:
+                                  TextStyle(fontWeight: FontWeight.w700)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: FlixieColors.primary,
+                            foregroundColor: Colors.white,
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 11),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            elevation: 0,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () =>
+                              context.push('/movies/${movie.id}'),
+                          icon: const Icon(Icons.add_rounded, size: 18),
+                          label: const Text('My List',
+                              style:
+                                  TextStyle(fontWeight: FontWeight.w700)),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: BorderSide(
+                                color:
+                                    Colors.white.withValues(alpha: 0.55)),
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 11),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                  label: const Text(
-                    'View movie',
-                    style: TextStyle(fontWeight: FontWeight.w700),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWatchlistSection(BuildContext context) {
+    final user = context.read<AuthProvider>().dbUser;
+    final watchlist =
+        user?.movieWatchlist?.where((w) => w.removed != true).take(10).toList() ??
+            [];
+    if (watchlist.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        HomeSectionHeader(
+          title: 'On Your Watchlist',
+          onSeeAll: () => context.go('/watchlist'),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 180,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: watchlist.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (context, index) {
+              final item = watchlist[index];
+              final posterUrl = item.movie?.posterPath != null
+                  ? 'https://image.tmdb.org/t/p/w342${item.movie!.posterPath}'
+                  : null;
+              return GestureDetector(
+                onTap: () => context.push('/movies/${item.movieId}'),
+                child: SizedBox(
+                  width: 110,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: SizedBox(
+                          width: 110,
+                          height: 148,
+                          child: posterUrl != null
+                              ? CachedNetworkImage(
+                                  imageUrl: posterUrl,
+                                  fit: BoxFit.cover,
+                                  errorWidget: (_, __, ___) => Container(
+                                    color:
+                                        FlixieColors.tabBarBackgroundFocused,
+                                    child: const Icon(Icons.movie_outlined,
+                                        color: FlixieColors.medium),
+                                  ),
+                                )
+                              : Container(
+                                  color: FlixieColors.tabBarBackgroundFocused,
+                                  child: const Icon(Icons.movie_outlined,
+                                      color: FlixieColors.medium),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        item.movie?.title ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: FlixieColors.light,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              );
+            },
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 20),
+      ],
     );
   }
 }

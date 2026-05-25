@@ -684,8 +684,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                      const SizedBox(height: 16),
                      _buildScores(context, movie),
                      const SizedBox(height: 12),
-                     _buildWatchSummaryCard(context),
-                     const SizedBox(height: 12),
                      _buildActionButtons(),
                      const SizedBox(height: 20),
                      _buildSynopsis(context, movie),
