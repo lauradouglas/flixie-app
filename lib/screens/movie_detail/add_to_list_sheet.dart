@@ -416,7 +416,12 @@ class _CreateListFromMovieSheetState extends State<_CreateListFromMovieSheet> {
                   children: const [
                     Icon(Icons.image_outlined, color: FlixieColors.primary),
                     SizedBox(height: 8),
-                    Text('Add Cover Image'),
+                    Text('Cover Image'),
+                    SizedBox(height: 4),
+                    Text(
+                      'Paste a URL below',
+                      style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+                    ),
                   ],
                 ),
               ),
