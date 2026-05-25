@@ -386,6 +386,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     if (items.isEmpty) {
       return _buildEmptyState();
     }
+    final unreadItems = items.where((n) => !n.isRead).toList();
     return Column(
       children: [
         Expanded(
@@ -396,7 +397,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
             itemBuilder: (context, i) => _buildCard(items[i]),
           ),
         ),
-        _buildMarkAllAsReadButton(items.where((n) => !n.isRead).toList()),
+        _buildMarkAllAsReadButton(unreadItems),
       ],
     );
   }
@@ -409,6 +410,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
     if (pending.isEmpty && newItems.isEmpty && earlier.isEmpty) {
       return _buildEmptyState();
     }
+    final unreadItems = [...pending, ...newItems, ...earlier]
+        .where((n) => !n.isRead)
+        .toList();
 
     return Column(
       children: [
@@ -445,11 +449,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
             ],
           ),
         ),
-        _buildMarkAllAsReadButton(
-          [...pending, ...newItems, ...earlier]
-              .where((n) => !n.isRead)
-              .toList(),
-        ),
+        _buildMarkAllAsReadButton(unreadItems),
       ],
     );
   }

@@ -497,7 +497,6 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         return date != null && date.isAfter(today);
       }).toList();
     }
-    if (_selectedTab == 1) return const <WatchlistMovie>[];
     return _filteredWatchlist;
   }
 

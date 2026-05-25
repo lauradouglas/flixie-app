@@ -3,6 +3,11 @@ import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 
 const double _kSettingsCornerRadius = 14;
+const double _kTileHorizontalPadding = 16;
+const double _kTileIconSize = 34;
+const double _kTileGap = 14;
+const double _kDividerLeftInset =
+    _kTileHorizontalPadding + _kTileIconSize + _kTileGap;
 
 class SettingsTile extends StatelessWidget {
   const SettingsTile({
@@ -32,20 +37,22 @@ class SettingsTile extends StatelessWidget {
             onTap: onTap,
             borderRadius: BorderRadius.circular(_kSettingsCornerRadius),
             child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.symmetric(
+                horizontal: _kTileHorizontalPadding,
+                vertical: 14,
+              ),
               child: Row(
                 children: [
                   Container(
-                    width: 34,
-                    height: 34,
+                    width: _kTileIconSize,
+                    height: _kTileIconSize,
                     decoration: BoxDecoration(
                       color: FlixieColors.primary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(icon, color: FlixieColors.primary, size: 18),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: _kTileGap),
                   Expanded(
                     child: Text(
                       label,
@@ -66,7 +73,7 @@ class SettingsTile extends StatelessWidget {
         ),
         if (!isLast)
           Padding(
-            padding: const EdgeInsets.only(left: 64),
+            padding: const EdgeInsets.only(left: _kDividerLeftInset),
             child: Divider(
               height: 1,
               thickness: 0.5,
