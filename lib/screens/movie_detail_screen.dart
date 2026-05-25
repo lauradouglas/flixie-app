@@ -78,6 +78,12 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   FriendActivityTab _friendsActivityTab = FriendActivityTab.all;
   bool _showFullSynopsis = false;
   static const int _kPlaceholderWatchedPercent = 92;
+  static const List<Color> _kGenreChipColors = [
+    FlixieColors.primary,
+    FlixieColors.secondary,
+    FlixieColors.tertiary,
+    FlixieColors.warning,
+  ];
   int get _watchCount => _movieWatchHistory.length;
 
   // ---- Data loading ---------------------------------------------------------
@@ -564,7 +570,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     return '${h}h ${m}m';
   }
 
-  static const List<(FriendActivityTab, String)> _friendActivityTabs = [
+  static const List<(FriendActivityTab, String)> _kFriendActivityTabs = [
     (FriendActivityTab.all, 'All'),
     (FriendActivityTab.watched, 'Watched'),
     (FriendActivityTab.watchlist, 'Watchlist'),
@@ -814,15 +820,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       spacing: 8,
       runSpacing: 8,
       children: genres.asMap().entries.map((entry) {
-        final colors = [
-          FlixieColors.primary,
-          FlixieColors.secondary,
-          FlixieColors.tertiary,
-          FlixieColors.warning,
-        ];
         return GenreChip(
           label: entry.value.name.toUpperCase(),
-          color: colors[entry.key % colors.length],
+          color: _kGenreChipColors[entry.key % _kGenreChipColors.length],
         );
       }).toList(),
     );
@@ -1092,9 +1092,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                     child: Stack(
                       children: List.generate(friendAvatars.length, (index) {
                         final friend = friendAvatars[index];
-                        final initial = friend.username.isNotEmpty
-                            ? friend.username[0].toUpperCase()
-                            : '?';
+                        final initial = _initialFor(friend.username);
                         return Positioned(
                           left: index * 18,
                           child: CircleAvatar(
@@ -1769,7 +1767,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
-            children: _friendActivityTabs.map((tab) {
+            children: _kFriendActivityTabs.map((tab) {
               final selected = _friendsActivityTab == tab.$1;
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
@@ -1955,6 +1953,11 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             fontWeight: FontWeight.bold,
           ),
     );
+  }
+
+  String _initialFor(String value) {
+    if (value.isEmpty) return '?';
+    return value.substring(0, 1).toUpperCase();
   }
 
   // ---- Trailers -----------------------------------------------------------
