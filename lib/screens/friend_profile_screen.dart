@@ -74,6 +74,29 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     }
   }
 
+  Widget _buildTopStat({required String label, required String value}) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            color: FlixieColors.light,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: const TextStyle(
+            color: FlixieColors.medium,
+            fontSize: 11,
+          ),
+        ),
+      ],
+    );
+  }
+
   Future<void> _loadReviews() async {
     try {
       final reviews = await UserService.getUserMovieReviews(widget.userId);
@@ -457,6 +480,12 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     final visibleReviews = _showAllReviews
         ? _reviews
         : _reviews.take(_initialReviewCount).toList();
+    final watchedCount =
+        (_user?.watchedMovies?.length ?? 0) + (_user?.watchedShows?.length ?? 0);
+    final watchlistCount = (_user?.movieWatchlist?.length ?? 0) +
+        (_user?.showWatchlist?.length ?? 0);
+    final favoritesCount = (_user?.favoriteMovies?.length ?? 0) +
+        (_user?.favoriteShows?.length ?? 0);
 
     return Scaffold(
       appBar: AppBar(
@@ -472,77 +501,87 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  const SizedBox(height: 16),
-
-                  // Avatar
-                  CircleAvatar(
-                    radius: 48,
-                    backgroundColor: _avatarColor.withValues(alpha: 0.3),
-                    child: Text(
-                      _user?.initials ??
-                          (_user?.username.isNotEmpty == true
-                              ? _user!.username[0].toUpperCase()
-                              : '?'),
-                      style: TextStyle(
-                        color: _avatarColor,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 24,
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(18),
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF123D72), Color(0xFF0A2248)],
                       ),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                    ),
+                    child: Column(
+                      children: [
+                        CircleAvatar(
+                          radius: 46,
+                          backgroundColor: _avatarColor.withValues(alpha: 0.25),
+                          child: Text(
+                            _user?.initials ??
+                                (_user?.username.isNotEmpty == true
+                                    ? _user!.username[0].toUpperCase()
+                                    : '?'),
+                            style: TextStyle(
+                              color: _avatarColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 24,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          _user?.username ?? '',
+                          style: textTheme.headlineSmall,
+                        ),
+                        if ((_user?.firstName != null ||
+                                _user?.lastName != null) &&
+                            '${_user?.firstName ?? ''} ${_user?.lastName ?? ''}'
+                                .trim()
+                                .isNotEmpty)
+                          Text(
+                            '${_user?.firstName ?? ''} ${_user?.lastName ?? ''}'
+                                .trim(),
+                            style: textTheme.bodySmall
+                                ?.copyWith(color: FlixieColors.medium),
+                          ),
+                        if (_user?.bio case final bioText
+                            when bioText != null && bioText.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            bioText,
+                            textAlign: TextAlign.center,
+                            style: textTheme.bodySmall
+                                ?.copyWith(color: FlixieColors.light),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                        const SizedBox(height: 14),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            _buildTopStat(
+                                label: 'Reviews', value: '${_reviews.length}'),
+                            _buildTopStat(
+                                label: 'Watchlist', value: '$watchlistCount'),
+                            _buildTopStat(
+                                label: 'Favourites', value: '$favoritesCount'),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 12),
 
-                  // Username
-                  Text(
-                    _user?.username ?? '',
-                    style: textTheme.headlineMedium,
-                  ),
-
-                  // Full name if available
-                  if ((_user?.firstName != null || _user?.lastName != null) &&
-                      '${_user?.firstName ?? ''} ${_user?.lastName ?? ''}'
-                          .trim()
-                          .isNotEmpty)
-                    Text(
-                      '${_user?.firstName ?? ''} ${_user?.lastName ?? ''}'
-                          .trim(),
-                      style: textTheme.bodySmall,
-                    ),
-
-                  // Bio
-                  if (_user?.bio case final bioText
-                      when bioText != null && bioText.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Text(
-                        bioText,
-                        textAlign: TextAlign.left,
-                        style: textTheme.bodySmall
-                            ?.copyWith(color: FlixieColors.light),
-                        maxLines: 5,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-
+                  const SizedBox(height: 14),
+                  SizedBox(width: double.infinity, child: _buildFriendshipButton()),
                   const SizedBox(height: 16),
 
-                  // Add / Remove Friend button
-                  _buildFriendshipButton(),
-
-                  const SizedBox(height: 16),
-
-                  const SizedBox(height: 24),
-
-                  // Stats row
                   ProfileStatsRow(
-                    watched: (_user?.watchedMovies?.length ?? 0) +
-                        (_user?.watchedShows?.length ?? 0),
-                    watchlist: (_user?.movieWatchlist?.length ?? 0) +
-                        (_user?.showWatchlist?.length ?? 0),
-                    favorites: (_user?.favoriteMovies?.length ?? 0) +
-                        (_user?.favoriteShows?.length ?? 0),
+                    watched: watchedCount,
+                    watchlist: watchlistCount,
+                    favorites: favoritesCount,
                   ),
 
                   // Taste compatibility
