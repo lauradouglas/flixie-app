@@ -329,7 +329,7 @@ class UserService {
   // ---- Movie Lists (custom folders) -----------------------------------------
 
   static Future<List<MovieList>> getMovieLists(String userId) async {
-    final data = await ApiClient.get('/users/$userId/movie/watchlists/lists');
+    final data = await ApiClient.get('/users/$userId/movie/lists');
     final lists = (data as List<dynamic>)
         .whereType<Map<String, dynamic>>()
         .map(MovieList.fromJson)
@@ -344,7 +344,7 @@ class UserService {
     CreateMovieListRequest request,
   ) async {
     final data = await ApiClient.post(
-      '/users/$userId/movie/watchlists/lists',
+      '/users/$userId/movie/lists',
       body: request.toJson(),
     );
     return MovieList.fromJson(data as Map<String, dynamic>);
@@ -356,22 +356,22 @@ class UserService {
     UpdateMovieListRequest request,
   ) async {
     final data = await ApiClient.patch(
-      '/users/$userId/movie/watchlists/lists/$listId',
+      '/users/$userId/movie/lists/$listId',
       body: request.toJson(),
     );
     return MovieList.fromJson(data as Map<String, dynamic>);
   }
 
   static Future<void> deleteMovieList(String userId, String listId) async {
-    await ApiClient.delete('/users/$userId/movie/watchlists/lists/$listId');
+    await ApiClient.delete('/users/$userId/movie/lists/$listId');
   }
 
   static Future<List<MovieListMovie>> getMovieListMovies(
     String userId,
     String listId,
   ) async {
-    final data = await ApiClient.get(
-        '/users/$userId/movie/watchlists/lists/$listId/movies');
+    final data =
+        await ApiClient.get('/users/$userId/movie/lists/$listId/movies');
     // Response shape: { list: { id, name }, movies: [...] }
     final raw = data as Map<String, dynamic>;
     final moviesList = raw['movies'] as List<dynamic>? ?? [];
@@ -390,10 +390,27 @@ class UserService {
     int movieId,
   ) async {
     final data = await ApiClient.post(
-      '/users/$userId/movie/watchlists/lists/$listId/movies/$movieId',
+      '/users/$userId/movie/lists/$listId/movies/$movieId',
       body: {},
     );
     return MovieListMovie.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<List<MovieListMovie>> addMoviesToList(
+    String userId,
+    String listId,
+    List<int> movieIds,
+  ) async {
+    final data = await ApiClient.post(
+      '/users/$userId/movie/lists/$listId/movies',
+      body: {'movieIds': movieIds},
+    );
+    final raw = data as Map<String, dynamic>;
+    final movies = raw['movies'] as List<dynamic>? ?? [];
+    return movies
+        .whereType<Map<String, dynamic>>()
+        .map(MovieListMovie.fromJson)
+        .toList(growable: false);
   }
 
   static Future<void> removeMovieFromList(
@@ -402,21 +419,24 @@ class UserService {
     int movieId,
   ) async {
     await ApiClient.delete(
-        '/users/$userId/movie/watchlists/lists/$listId/movies/$movieId');
+        '/users/$userId/movie/lists/$listId/movies/$movieId');
   }
 
   static Future<List<MovieList>> getMyListsContainingMovie(
     String userId,
     int movieId,
   ) async {
-    final data = await ApiClient.get(
-      '/movies/$movieId/lists/me',
-      queryParams: {'userId': userId},
-    );
-    return (data as List<dynamic>)
-        .whereType<Map<String, dynamic>>()
-        .map(MovieList.fromJson)
-        .toList();
+    final lists = await getMovieLists(userId);
+    if (lists.isEmpty) return const <MovieList>[];
+
+    final result = <MovieList>[];
+    for (final list in lists) {
+      final movies = await getMovieListMovies(userId, list.id);
+      if (movies.any((entry) => entry.movieId == movieId && !entry.removed)) {
+        result.add(list);
+      }
+    }
+    return result;
   }
 
   static Future<List<MovieFriendListEntry>> getFriendsListsContainingMovie(
@@ -430,7 +450,8 @@ class UserService {
     return (data as List<dynamic>)
         .whereType<Map<String, dynamic>>()
         .map(MovieFriendListEntry.fromJson)
-        .where((entry) => entry.listId.isNotEmpty && entry.friendUserId.isNotEmpty)
+        .where(
+            (entry) => entry.listId.isNotEmpty && entry.friendUserId.isNotEmpty)
         .toList(growable: false);
   }
 

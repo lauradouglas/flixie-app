@@ -2261,8 +2261,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                               (entry) => ListTile(
                                 contentPadding: EdgeInsets.zero,
                                 leading: CircleAvatar(
-                                  backgroundColor:
-                                      FlixieColors.primary.withValues(alpha: 0.2),
+                                  backgroundColor: FlixieColors.primary
+                                      .withValues(alpha: 0.2),
                                   child: Text(
                                     (entry.friendName.isNotEmpty
                                             ? entry.friendName[0]
@@ -2281,7 +2281,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                                subtitle: Text('${entry.movieCount ?? 0} films'),
+                                subtitle:
+                                    Text('${entry.movieCount ?? 0} films'),
                               ),
                             ),
                       ],

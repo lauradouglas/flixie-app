@@ -35,10 +35,10 @@ class MovieList {
       description: json['description'] as String?,
       visibility: _parseVisibility(json['visibility']?.toString()),
       coverImageUrl: json['coverImageUrl']?.toString(),
-      whoCanAddMovies: (json['whoCanAddMovies']?.toString().trim().isNotEmpty ??
-              false)
-          ? json['whoCanAddMovies'].toString()
-          : 'owner',
+      whoCanAddMovies:
+          (json['whoCanAddMovies']?.toString().trim().isNotEmpty ?? false)
+              ? json['whoCanAddMovies'].toString()
+              : 'owner',
       previewPosterUrls: _parsePreviewPosterUrls(json),
       removed: json['removed'] as bool? ?? false,
       movieCount: _parseInt(json['movieCount']),
@@ -67,6 +67,7 @@ class MovieList {
 
 class CreateMovieListRequest {
   final String name;
+  final List<int>? movieIds;
   final String? description;
   final String visibility;
   final String? coverImageUrl;
@@ -74,6 +75,7 @@ class CreateMovieListRequest {
 
   const CreateMovieListRequest({
     required this.name,
+    this.movieIds,
     this.description,
     this.visibility = ListVisibility.private,
     this.coverImageUrl,
@@ -82,6 +84,7 @@ class CreateMovieListRequest {
 
   Map<String, dynamic> toJson() => {
         'name': name,
+        if (movieIds != null && movieIds!.isNotEmpty) 'movieIds': movieIds,
         if (description != null && description!.trim().isNotEmpty)
           'description': description,
         'visibility': visibility,

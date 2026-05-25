@@ -146,16 +146,19 @@ class MovieListsProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
 
-    Future<List<MovieList>> getListsContainingMovie(int movieId) async {
-      try {
-        final containing = await repository.getMyListsContainingMovie(userId, movieId);
-        return containing.where((list) => !list.removed).toList(growable: false);
-      } catch (e) {
-        error = _friendlyError(e);
-        notifyListeners();
-        return const <MovieList>[];
-      }
+  Future<List<MovieList>> getListsContainingMovie(int movieId) async {
+    try {
+      final containing = await repository.getMyListsContainingMovie(
+        userId,
+        movieId,
+      );
+      return containing.where((list) => !list.removed).toList(growable: false);
+    } catch (e) {
+      error = _friendlyError(e);
+      notifyListeners();
+      return const <MovieList>[];
     }
   }
 

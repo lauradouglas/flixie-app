@@ -146,8 +146,9 @@ class _AddToListSheetBodyState extends State<_AddToListSheetBody> {
                   ),
                 const SizedBox(height: 8),
                 TextButton.icon(
-                  onPressed:
-                      _saving ? null : () => _showCreateListDialog(context, provider),
+                  onPressed: _saving
+                      ? null
+                      : () => _showCreateListDialog(context, provider),
                   icon: const Icon(Icons.add),
                   label: const Text('Create new list'),
                 ),
