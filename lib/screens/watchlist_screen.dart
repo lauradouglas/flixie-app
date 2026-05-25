@@ -931,7 +931,7 @@ class WatchlistMovieRow extends StatelessWidget {
     final avg = movie.voteAverage;
     final rating = (avg == null || avg == 0.0) ? null : avg.toStringAsFixed(1);
     final posterUrl = movie.posterPath != null
-        ? 'https://image.tmdb.org/t/p/w342${movie.posterPath}'
+        ? 'https://image.tmdb.org/t/p/w185${movie.posterPath}'
         : null;
     final addedDate = _formatDate(watchlistItem.createdAt);
 
@@ -1116,7 +1116,8 @@ class WatchlistMovieRow extends StatelessWidget {
                   MovieQuickActions(
                     showMarkWatched: !isWatched,
                     onMarkWatched: onMarkAsWatched,
-                    onFavourite: () => _showComingSoon(context, 'Favourite'),
+                    onFavourite: () =>
+                        _showComingSoon(context, 'Add to favourites'),
                     onRemove: onRemove,
                   ),
                   if (rating != null) ...[
@@ -1263,7 +1264,7 @@ class MovieQuickActions extends StatelessWidget {
           ),
         _QuickActionChip(
           icon: Icons.favorite_border_rounded,
-          label: 'Favourite',
+          label: 'Add to favourites',
           onTap: onFavourite,
         ),
         _QuickActionChip(
