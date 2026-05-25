@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flixie_app/models/movie_list.dart';
 import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'package:flixie_app/models/movie_wrapped.dart';
+import 'package:flixie_app/services/recommendation_service.dart';
 
 void main() {
   group('MovieList', () {
@@ -49,6 +50,31 @@ void main() {
         ],
       });
       expect(wrapped.monthlyWatchCounts.map((e) => e.month).toList(), [1, 12]);
+    });
+  });
+
+  group('RecommendationFromHighlyRatedResponse', () {
+    test('parses source movie and recommendation list', () {
+      final model = RecommendationFromHighlyRatedResponse.fromJson({
+        'sourceMovie': {
+          'id': 123,
+          'title': 'Interstellar',
+          'rating': 9,
+        },
+        'recommendations': [
+          {
+            'id': 321,
+            'title': 'Arrival',
+            'poster': '/abc.jpg',
+          },
+        ],
+      });
+
+      expect(model.sourceMovie, isNotNull);
+      expect(model.sourceMovie!.title, 'Interstellar');
+      expect(model.sourceMovie!.rating, 9);
+      expect(model.recommendations, hasLength(1));
+      expect(model.recommendations.first.name, 'Arrival');
     });
   });
 }

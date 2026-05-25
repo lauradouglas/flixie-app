@@ -90,7 +90,7 @@ class HomeScreenSkeleton extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          // Section header — "In Theatres Now"
+          // Section header — "Just Out"
           const _SkeletonSectionHeader(),
           const SizedBox(height: 12),
           // List cards
