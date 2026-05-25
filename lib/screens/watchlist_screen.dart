@@ -892,12 +892,6 @@ class WatchlistMovieRow extends StatelessWidget {
     required this.onRemove,
   });
 
-  static const List<Color> _friendDotColors = [
-    FlixieColors.primary,
-    FlixieColors.secondary,
-    FlixieColors.tertiary,
-  ];
-
   static String _runtimeLabel(int? minutes) {
     if (minutes == null || minutes == 0) return '';
     final h = minutes ~/ 60;
@@ -918,8 +912,13 @@ class WatchlistMovieRow extends StatelessWidget {
     return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
   }
 
-  static String _addedByLabel(String userId) {
-    return userId == 'me' || userId.isEmpty ? 'you' : 'friend';
+  void _showComingSoon(BuildContext context, String actionLabel) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$actionLabel is coming soon'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -932,7 +931,7 @@ class WatchlistMovieRow extends StatelessWidget {
     final avg = movie.voteAverage;
     final rating = (avg == null || avg == 0.0) ? null : avg.toStringAsFixed(1);
     final posterUrl = movie.posterPath != null
-        ? 'https://image.tmdb.org/t/p/w185${movie.posterPath}'
+        ? 'https://image.tmdb.org/t/p/w342${movie.posterPath}'
         : null;
     final addedDate = _formatDate(watchlistItem.createdAt);
 
@@ -941,30 +940,42 @@ class WatchlistMovieRow extends StatelessWidget {
       if (runtime.isNotEmpty) runtime,
     ];
     final metaStr = metaParts.join(' • ');
+    final badges = [
+      if (friendOverlapCount > 0)
+        friendOverlapCount > 1 ? '$friendOverlapCount friends watched' : 'Friend watched',
+      if (isWatched) 'Watched',
+    ];
 
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: const Color(0xFF0A2348),
+          color: FlixieColors.surface,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.18),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Poster
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: SizedBox(
-                width: 76,
-                height: 110,
+                width: 84,
+                height: 124,
                 child: posterUrl != null
                     ? CachedNetworkImage(
                         imageUrl: posterUrl,
                         fit: BoxFit.cover,
+                        filterQuality: FilterQuality.high,
                         placeholder: (_, __) =>
                             Container(color: Colors.grey[900]),
                         errorWidget: (_, __, ___) => Container(
@@ -979,13 +990,12 @@ class WatchlistMovieRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            // Content
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Expanded(
                         child: Text(
@@ -999,14 +1009,31 @@ class WatchlistMovieRow extends StatelessWidget {
                           ),
                         ),
                       ),
+                      const SizedBox(width: 2),
+                      WatchlistToggleButton(
+                        isInWatchlist: true,
+                        onPressed: onRemove,
+                      ),
                       PopupMenuButton<String>(
+                        tooltip: 'More actions',
                         padding: EdgeInsets.zero,
                         icon: const Icon(Icons.more_horiz_rounded,
                             color: FlixieColors.medium, size: 20),
                         color: FlixieColors.tabBarBackgroundFocused,
                         onSelected: (value) {
-                          if (value == 'watched') onMarkAsWatched();
-                          if (value == 'remove') onRemove();
+                          if (value == 'watched') {
+                            onMarkAsWatched();
+                          } else if (value == 'remove') {
+                            onRemove();
+                          } else if (value == 'favourite') {
+                            _showComingSoon(context, 'Add to favourites');
+                          } else if (value == 'list') {
+                            _showComingSoon(context, 'Add to list');
+                          } else if (value == 'invite') {
+                            _showComingSoon(context, 'Invite friends');
+                          } else if (value == 'share') {
+                            _showComingSoon(context, 'Share');
+                          }
                         },
                         itemBuilder: (_) => const [
                           PopupMenuItem(
@@ -1016,6 +1043,46 @@ class WatchlistMovieRow extends StatelessWidget {
                                   color: FlixieColors.success, size: 20),
                               SizedBox(width: 8),
                               Text('Mark as Watched',
+                                  style: TextStyle(color: Colors.white)),
+                            ]),
+                          ),
+                          PopupMenuItem(
+                            value: 'favourite',
+                            child: Row(children: [
+                              Icon(Icons.favorite_border_rounded,
+                                  color: FlixieColors.danger, size: 20),
+                              SizedBox(width: 8),
+                              Text('Add to favourites',
+                                  style: TextStyle(color: Colors.white)),
+                            ]),
+                          ),
+                          PopupMenuItem(
+                            value: 'list',
+                            child: Row(children: [
+                              Icon(Icons.playlist_add_rounded,
+                                  color: FlixieColors.secondary, size: 20),
+                              SizedBox(width: 8),
+                              Text('Add to list',
+                                  style: TextStyle(color: Colors.white)),
+                            ]),
+                          ),
+                          PopupMenuItem(
+                            value: 'invite',
+                            child: Row(children: [
+                              Icon(Icons.group_add_outlined,
+                                  color: FlixieColors.primary, size: 20),
+                              SizedBox(width: 8),
+                              Text('Invite friends',
+                                  style: TextStyle(color: Colors.white)),
+                            ]),
+                          ),
+                          PopupMenuItem(
+                            value: 'share',
+                            child: Row(children: [
+                              Icon(Icons.share_outlined,
+                                  color: FlixieColors.secondary, size: 20),
+                              SizedBox(width: 8),
+                              Text('Share',
                                   style: TextStyle(color: Colors.white)),
                             ]),
                           ),
@@ -1033,55 +1100,41 @@ class WatchlistMovieRow extends StatelessWidget {
                       ),
                     ],
                   ),
-                  if (metaStr.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      metaStr,
-                      style: const TextStyle(
-                          color: FlixieColors.medium, fontSize: 12),
+                  if (metaStr.isNotEmpty || addedDate.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: CompactMovieMeta(
+                        primaryMeta: metaStr,
+                        addedDate: addedDate,
+                      ),
                     ),
+                  if (badges.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    MovieBadgeRow(labels: badges),
                   ],
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      if (rating != null) ...[
+                  const SizedBox(height: 6),
+                  MovieQuickActions(
+                    showMarkWatched: !isWatched,
+                    onMarkWatched: onMarkAsWatched,
+                    onFavourite: () => _showComingSoon(context, 'Favourite'),
+                    onRemove: onRemove,
+                  ),
+                  if (rating != null) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
                         const Icon(Icons.star_rounded,
-                            color: FlixieColors.primary, size: 18),
-                        const SizedBox(width: 4),
+                            color: FlixieColors.primary, size: 14),
+                        const SizedBox(width: 3),
                         Text(
                           '$rating/10',
                           style: const TextStyle(
-                            color: FlixieColors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
+                            color: FlixieColors.light,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
-                      if (friendOverlapCount > 0) ...[
-                        const SizedBox(width: 10),
-                        _FriendOverlapDots(count: friendOverlapCount),
-                      ],
-                      const Spacer(),
-                      Icon(
-                        isWatched
-                            ? Icons.check_circle_outline_rounded
-                            : Icons.bookmark_border_rounded,
-                        size: 24,
-                        color: isWatched
-                            ? const Color(0xFF00D07A)
-                            : FlixieColors.light,
-                      ),
-                    ],
-                  ),
-                  if (addedDate.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      'Added by ${_addedByLabel(watchlistItem.userId)} • $addedDate',
-                      style: const TextStyle(
-                        color: FlixieColors.primary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
                     ),
                   ],
                 ],
@@ -1094,54 +1147,176 @@ class WatchlistMovieRow extends StatelessWidget {
   }
 }
 
-class _FriendOverlapDots extends StatelessWidget {
-  const _FriendOverlapDots({required this.count});
+class WatchlistToggleButton extends StatelessWidget {
+  const WatchlistToggleButton({
+    super.key,
+    required this.isInWatchlist,
+    required this.onPressed,
+  });
 
-  final int count;
+  final bool isInWatchlist;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    final visible = count > 3 ? 3 : count;
-    final width = visible <= 0 ? 0.0 : 12.0 + (visible - 1) * 9.0;
-    return Row(
-      children: [
-        SizedBox(
-          width: width,
-          height: 12,
-          child: Stack(
-            children: List.generate(
-              visible,
-              (index) => Positioned(
-                left: index * 9,
-                child: Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: WatchlistMovieRow._friendDotColors[
-                        index % WatchlistMovieRow._friendDotColors.length],
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: FlixieColors.tabBarBackgroundFocused,
-                      width: 1.2,
-                    ),
-                  ),
+    return IconButton(
+      tooltip: isInWatchlist ? 'Remove from watchlist' : 'Add to watchlist',
+      visualDensity: VisualDensity.compact,
+      iconSize: 22,
+      splashRadius: 20,
+      onPressed: onPressed,
+      icon: Icon(
+        isInWatchlist ? Icons.bookmark_rounded : Icons.bookmark_outline_rounded,
+        color: isInWatchlist ? FlixieColors.warning : FlixieColors.light,
+      ),
+    );
+  }
+}
+
+class CompactMovieMeta extends StatelessWidget {
+  const CompactMovieMeta({
+    super.key,
+    required this.primaryMeta,
+    required this.addedDate,
+  });
+
+  final String primaryMeta;
+  final String addedDate;
+
+  @override
+  Widget build(BuildContext context) {
+    final parts = [
+      if (primaryMeta.isNotEmpty) primaryMeta,
+      if (addedDate.isNotEmpty) 'Added $addedDate',
+    ];
+    if (parts.isEmpty) return const SizedBox.shrink();
+    return Text(
+      parts.join('  •  '),
+      style: const TextStyle(
+        color: FlixieColors.medium,
+        fontSize: 12,
+      ),
+    );
+  }
+}
+
+class MovieBadgeRow extends StatelessWidget {
+  const MovieBadgeRow({super.key, required this.labels});
+
+  final List<String> labels;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      children: labels
+          .map(
+            (label) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: FlixieColors.primary.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: FlixieColors.primary.withValues(alpha: 0.35),
+                ),
+              ),
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: FlixieColors.light,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
+          )
+          .toList(),
+    );
+  }
+}
+
+class MovieQuickActions extends StatelessWidget {
+  const MovieQuickActions({
+    super.key,
+    required this.showMarkWatched,
+    required this.onMarkWatched,
+    required this.onFavourite,
+    required this.onRemove,
+  });
+
+  final bool showMarkWatched;
+  final VoidCallback onMarkWatched;
+  final VoidCallback onFavourite;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 4,
+      children: [
+        if (showMarkWatched)
+          _QuickActionChip(
+            icon: Icons.check_rounded,
+            label: 'Watched',
+            onTap: onMarkWatched,
+          ),
+        _QuickActionChip(
+          icon: Icons.favorite_border_rounded,
+          label: 'Favourite',
+          onTap: onFavourite,
+        ),
+        _QuickActionChip(
+          icon: Icons.remove_circle_outline_rounded,
+          label: 'Remove',
+          onTap: onRemove,
+        ),
+      ],
+    );
+  }
+}
+
+class _QuickActionChip extends StatelessWidget {
+  const _QuickActionChip({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 12, color: FlixieColors.light),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: FlixieColors.light,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
         ),
-        if (count > visible) ...[
-          const SizedBox(width: 4),
-          Text(
-            '+${count - visible}',
-            style: const TextStyle(
-              color: FlixieColors.medium,
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ],
+      ),
     );
   }
 }
