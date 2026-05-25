@@ -85,37 +85,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     _load();
   }
 
-  class _InlineMetric extends StatelessWidget {
-    const _InlineMetric({
-      required this.icon,
-      required this.iconColor,
-      required this.label,
-    });
-
-    final IconData icon;
-    final Color iconColor;
-    final String label;
-
-    @override
-    Widget build(BuildContext context) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: iconColor),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              color: FlixieColors.light,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      );
-    }
-  }
-
   Future<void> _refresh() async {
     final id = int.tryParse(widget.movieId);
     if (id != null) context.read<MovieService>().evictMovie(id);
@@ -600,8 +569,31 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   ];
 
   String _contentRating(Movie movie) {
+    // TODO(laura): replace fallback with certification/country rating from API.
     if (movie.adult) return 'R';
     return 'PG-13';
+  }
+
+  Widget _inlineMetric({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: iconColor),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: const TextStyle(
+            color: FlixieColors.light,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
   }
 
   // ---- Build ----------------------------------------------------------------
@@ -724,7 +716,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       actions: [
         IconButton(
           icon: const Icon(Icons.share_outlined, color: FlixieColors.light),
-          onPressed: () {},
+          onPressed: () {
+            // TODO(laura): wire native share flow for movie links.
+          },
         ),
       ],
       flexibleSpace: FlexibleSpaceBar(
@@ -949,25 +943,24 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final voteCount = movie.voteCount;
     final tomatoPercent =
         score != null ? (score * 10).clamp(0, 100).round() : null;
-    final watchedPercent = voteCount != null
-        ? (voteCount > 0 ? 92 : 0)
-        : null; // approximate visual placeholder until a dedicated metric exists
+    // TODO(laura): replace placeholder watched percentage with real metric.
+    final watchedPercent = voteCount != null ? (voteCount > 0 ? 92 : 0) : null;
 
     return Row(
       children: [
-        _InlineMetric(
+        _inlineMetric(
           icon: Icons.star,
           iconColor: Colors.amber,
           label: score != null ? '${score.toStringAsFixed(1)}/10' : 'N/A',
         ),
         const SizedBox(width: 16),
-        _InlineMetric(
+        _inlineMetric(
           icon: Icons.favorite,
           iconColor: FlixieColors.danger,
           label: tomatoPercent != null ? '$tomatoPercent%' : 'N/A',
         ),
         const SizedBox(width: 16),
-        _InlineMetric(
+        _inlineMetric(
           icon: Icons.check_circle,
           iconColor: FlixieColors.success,
           label: watchedPercent != null ? '$watchedPercent%' : 'N/A',

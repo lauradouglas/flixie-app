@@ -49,7 +49,9 @@ class _SocialScreenState extends State<SocialScreen> {
         ),
         actions: [
           IconButton(
-            onPressed: () {},
+            onPressed: () {
+              // TODO(laura): wire friend discovery/search flow.
+            },
             icon: const Icon(Icons.person_add_alt_1_outlined),
             tooltip: 'Find friends',
           ),
