@@ -964,13 +964,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   Widget _buildScores(BuildContext context, Movie movie) {
     final score = movie.voteAverage;
     final voteCount = movie.voteCount;
-    final ratings = _friendsActivity
-        .where((activity) => activity.rating != null)
-        .map((activity) => activity.rating!.toDouble())
-        .toList();
-    final avgFriendScore = ratings.isEmpty
-        ? null
-        : ((ratings.reduce((a, b) => a + b) / ratings.length) * 10).round();
+    final avgFriendScore = _averageFriendScorePercent();
     final friendAvatars = _friendsActivity.take(3).toList();
     final watchedPercent =
         voteCount != null && voteCount > 0 ? _kPlaceholderWatchedPercent : null;
@@ -1851,13 +1845,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   }
 
   Widget _buildFriendsRatingsSection(BuildContext context) {
-    final ratings = _friendsActivity
-        .where((activity) => activity.rating != null)
-        .map((activity) => activity.rating!)
-        .toList();
-    final average = ratings.isEmpty
-        ? null
-        : ratings.reduce((a, b) => a + b) / ratings.length;
+    final ratings = _friendRatings().map((rating) => rating.toInt()).toList();
+    final average = _averageFriendRating();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1953,6 +1942,25 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             fontWeight: FontWeight.bold,
           ),
     );
+  }
+
+  List<double> _friendRatings() {
+    return _friendsActivity
+        .where((activity) => activity.rating != null)
+        .map((activity) => activity.rating!.toDouble())
+        .toList(growable: false);
+  }
+
+  double? _averageFriendRating() {
+    final ratings = _friendRatings();
+    if (ratings.isEmpty) return null;
+    return ratings.reduce((a, b) => a + b) / ratings.length;
+  }
+
+  int? _averageFriendScorePercent() {
+    final avg = _averageFriendRating();
+    if (avg == null) return null;
+    return (avg * 10).round();
   }
 
   String _initialFor(String value) {
