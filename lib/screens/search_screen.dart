@@ -35,6 +35,19 @@ class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _controller = TextEditingController();
   String _query = '';
   Timer? _debounce;
+  final List<String> _recentSearches = [
+    'Dune: Part Two',
+    'The Batman',
+    'Interstellar',
+    'Oppenheimer',
+  ];
+  static const List<String> _popularSearches = [
+    'Oppenheimer',
+    'The Dark Knight',
+    'Inception',
+    'Breaking Bad',
+    'The Lord of the Rings',
+  ];
 
   // Default view data
   List<MovieShort> _trendingMovies = [];
@@ -105,6 +118,9 @@ class _SearchScreenState extends State<SearchScreen> {
         setState(() {
           _searchResults = results;
           _isSearching = false;
+          _recentSearches.remove(query);
+          _recentSearches.insert(0, query);
+          if (_recentSearches.length > 8) _recentSearches.removeLast();
         });
       }
     } catch (e) {
@@ -134,22 +150,22 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildSearchBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
       child: TextField(
         controller: _controller,
         onChanged: _onSearchChanged,
         decoration: InputDecoration(
-          hintText: 'Movies, actors, directors...',
-          prefixIcon: const Icon(Icons.search),
+          hintText: 'Search movies, shows, people...',
+          prefixIcon: const Icon(Icons.search_rounded),
           suffixIcon: _query.isNotEmpty
               ? IconButton(
-                  icon: const Icon(Icons.close),
+                  icon: const Icon(Icons.close_rounded),
                   onPressed: () {
                     _controller.clear();
                     _onSearchChanged('');
                   },
                 )
-              : const Icon(Icons.tune),
+              : const Icon(Icons.mic_none_rounded),
         ),
       ),
     );
@@ -160,6 +176,7 @@ class _SearchScreenState extends State<SearchScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
+    final recent = _recentSearches;
     final discoverMovies = _discoverAll
         ? _trendingMovies
         : _trendingMovies
@@ -167,16 +184,88 @@ class _SearchScreenState extends State<SearchScreen> {
             .toList();
 
     return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Discover section
-          const SizedBox(height: 24),
+          Row(
+            children: [
+              const Text(
+                'Recent Searches',
+                style: TextStyle(
+                  color: FlixieColors.light,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                ),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () => setState(() => _recentSearches.clear()),
+                child: const Text('Clear'),
+              ),
+            ],
+          ),
+          if (recent.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'No recent searches yet.',
+                style: TextStyle(color: FlixieColors.medium),
+              ),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: recent
+                  .map(
+                    (term) => ActionChip(
+                      backgroundColor: FlixieColors.tabBarBackgroundFocused,
+                      side: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.07),
+                      ),
+                      label: Text(
+                        term,
+                        style: const TextStyle(color: FlixieColors.light),
+                      ),
+                      onPressed: () {
+                        _controller.text = term;
+                        _onSearchChanged(term);
+                      },
+                    ),
+                  )
+                  .toList(),
+            ),
+          const SizedBox(height: 20),
+          const Text(
+            'Popular Searches',
+            style: TextStyle(
+              color: FlixieColors.light,
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 10),
+          ..._popularSearches.map(
+            (term) => ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading:
+                  const Icon(Icons.search_rounded, color: FlixieColors.medium),
+              title: Text(
+                term,
+                style: const TextStyle(color: FlixieColors.light),
+              ),
+              onTap: () {
+                _controller.text = term;
+                _onSearchChanged(term);
+              },
+            ),
+          ),
+          const SizedBox(height: 18),
           _buildDiscoverSection(discoverMovies),
-
-          // Top Rated section
           if (_topRatedMovies.isNotEmpty) ...[
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             const _SectionHeader(title: 'Top Rated'),
             const SizedBox(height: 8),
             ..._topRatedMovies.take(5).map(
@@ -186,8 +275,6 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
                 ),
           ],
-
-          const SizedBox(height: 24),
         ],
       ),
     );

@@ -24,6 +24,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
   bool _loading = true;
   String _sortBy =
       'recent'; // recent, titleAsc, titleDesc, ratingDesc, yearAsc, yearDesc
+  int _selectedTab = 0; // 0 = Movies, 1 = Shows, 2 = Upcoming
 
   // Active filters
   String? _filterGenre; // null = all genres
@@ -414,17 +415,22 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.search_rounded, color: Colors.white),
+            tooltip: 'Search',
+            onPressed: () => context.push('/search'),
+          ),
           Stack(
             children: [
               IconButton(
-                icon: const Icon(Icons.tune_rounded, color: Colors.white),
+                icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
                 tooltip: 'Sort & Filter',
                 onPressed: _openFilterSheet,
               ),
               if (_hasActiveFilters)
                 Positioned(
-                  right: 8,
-                  top: 8,
+                  right: 10,
+                  top: 10,
                   child: Container(
                     width: 8,
                     height: 8,
@@ -437,60 +443,91 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
             ],
           ),
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(60),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: TextField(
-              controller: _searchController,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'Search watchlist...',
-                hintStyle: const TextStyle(color: Colors.grey),
-                prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                filled: true,
-                fillColor: FlixieColors.tabBarBackgroundFocused,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-              ),
-            ),
-          ),
-        ),
       ),
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(color: FlixieColors.primary))
-          : _buildContent(),
+          : Column(
+              children: [
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: _WatchlistTabs(
+                    selectedIndex: _selectedTab,
+                    onChanged: (i) => setState(() => _selectedTab = i),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: TextField(
+                    controller: _searchController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: 'Search watchlist...',
+                      hintStyle: const TextStyle(color: Colors.grey),
+                      prefixIcon:
+                          const Icon(Icons.search_rounded, color: Colors.grey),
+                      filled: true,
+                      fillColor: FlixieColors.tabBarBackgroundFocused,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Expanded(child: _buildContent()),
+              ],
+            ),
     );
   }
 
+  List<WatchlistMovie> _visibleWatchlist() {
+    if (_selectedTab == 2) {
+      final today = DateTime.now();
+      return _filteredWatchlist.where((item) {
+        final date = DateTime.tryParse(item.movie?.releaseDate ?? '');
+        return date != null && date.isAfter(today);
+      }).toList();
+    }
+    if (_selectedTab == 1) return const <WatchlistMovie>[];
+    return _filteredWatchlist;
+  }
+
   Widget _buildContent() {
-    if (_filteredWatchlist.isEmpty) {
+    final items = _visibleWatchlist();
+    if (items.isEmpty) {
+      final emptyLabel = switch (_selectedTab) {
+        1 => 'No shows in your watchlist yet',
+        2 => 'No upcoming titles in your watchlist',
+        _ => _searchController.text.isNotEmpty
+            ? 'No movies found'
+            : 'Your watchlist is empty',
+      };
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              _searchController.text.isNotEmpty
-                  ? Icons.search_off
-                  : Icons.movie_outlined,
+              _selectedTab == 1
+                  ? Icons.live_tv_outlined
+                  : (_searchController.text.isNotEmpty
+                      ? Icons.search_off
+                      : Icons.movie_outlined),
               size: 64,
               color: Colors.grey,
             ),
             const SizedBox(height: 16),
             Text(
-              _searchController.text.isNotEmpty
-                  ? 'No movies found'
-                  : 'Your watchlist is empty',
+              emptyLabel,
               style: const TextStyle(color: Colors.grey, fontSize: 16),
             ),
-            if (_searchController.text.isEmpty) ...[
+            if (_searchController.text.isEmpty && _selectedTab == 0) ...[
               const SizedBox(height: 8),
               const Text(
                 'Add movies to start building your watchlist',
@@ -502,57 +539,78 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       );
     }
 
-    final items = _filteredWatchlist;
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: (items.length / 2).ceil(),
-      itemBuilder: (context, rowIndex) {
-        final leftIndex = rowIndex * 2;
-        final rightIndex = leftIndex + 1;
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: WatchlistMovieCard(
-                    watchlistItem: items[leftIndex],
-                    onTap: () =>
-                        context.push('/movies/${items[leftIndex].movieId}'),
-                    onMarkAsWatched: () => _markAsWatched(items[leftIndex]),
-                    onRemove: () => _removeFromWatchlist(items[leftIndex]),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                if (rightIndex < items.length)
-                  Expanded(
-                    child: WatchlistMovieCard(
-                      watchlistItem: items[rightIndex],
-                      onTap: () =>
-                          context.push('/movies/${items[rightIndex].movieId}'),
-                      onMarkAsWatched: () => _markAsWatched(items[rightIndex]),
-                      onRemove: () => _removeFromWatchlist(items[rightIndex]),
-                    ),
-                  )
-                else
-                  const Expanded(child: SizedBox()),
-              ],
-            ),
-          ),
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+      itemCount: items.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final item = items[index];
+        return WatchlistMovieRow(
+          watchlistItem: item,
+          onTap: () => context.push('/movies/${item.movieId}'),
+          onMarkAsWatched: () => _markAsWatched(item),
+          onRemove: () => _removeFromWatchlist(item),
         );
       },
     );
   }
 }
 
-class WatchlistMovieCard extends StatelessWidget {
+class _WatchlistTabs extends StatelessWidget {
+  const _WatchlistTabs({required this.selectedIndex, required this.onChanged});
+
+  final int selectedIndex;
+  final ValueChanged<int> onChanged;
+
+  static const labels = ['Movies', 'Shows', 'Upcoming'];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: FlixieColors.tabBarBackgroundFocused,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: Row(
+        children: List.generate(labels.length, (index) {
+          final selected = selectedIndex == index;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => onChanged(index),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? FlixieColors.primary.withValues(alpha: 0.22)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  labels[index],
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: selected ? FlixieColors.primary : FlixieColors.light,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+class WatchlistMovieRow extends StatelessWidget {
   final WatchlistMovie watchlistItem;
   final VoidCallback onTap;
   final VoidCallback onMarkAsWatched;
   final VoidCallback onRemove;
 
-  const WatchlistMovieCard({
+  const WatchlistMovieRow({
     super.key,
     required this.watchlistItem,
     required this.onTap,
@@ -573,165 +631,130 @@ class WatchlistMovieCard extends StatelessWidget {
         ? 'https://image.tmdb.org/t/p/w500${movie.posterPath}'
         : null;
 
-    // Parse date for "Added on" display
-    String addedDate = 'Unknown';
-    if (watchlistItem.createdAt != null) {
-      final date = DateTime.tryParse(watchlistItem.createdAt!);
-      if (date != null) {
-        addedDate =
-            '${date.month}/${date.day}/${date.year.toString().substring(2)}';
-      }
-    }
-
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
       child: Container(
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: FlixieColors.tabBarBackgroundFocused,
           borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            // Poster with play button and menu
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(12)),
-                  child: posterUrl != null
-                      ? CachedNetworkImage(
-                          imageUrl: posterUrl,
-                          width: double.infinity,
-                          height: 230,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            height: 230,
-                            color: Colors.grey[900],
-                            child: const Center(
-                              child: CircularProgressIndicator(
-                                  color: FlixieColors.primary),
-                            ),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: posterUrl != null
+                  ? CachedNetworkImage(
+                      imageUrl: posterUrl,
+                      width: 60,
+                      height: 86,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        width: 60,
+                        height: 86,
+                        color: Colors.grey[900],
+                        child: const Center(
+                          child: SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
                           ),
-                          errorWidget: (context, url, error) => Container(
-                            height: 230,
-                            color: Colors.grey[900],
-                            child: const Icon(Icons.movie, color: Colors.grey),
-                          ),
-                        )
-                      : Container(
-                          height: 230,
-                          color: Colors.grey[900],
-                          child: const Icon(Icons.movie,
-                              size: 48, color: Colors.grey),
                         ),
-                ),
-                // Three-dot menu (top right)
-                Positioned(
-                  top: 4,
-                  right: 4,
-                  child: PopupMenuButton<String>(
-                    icon: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Colors.black54,
-                        borderRadius: BorderRadius.circular(16),
                       ),
-                      child: const Icon(Icons.more_vert,
-                          color: Colors.white, size: 18),
+                      errorWidget: (context, url, error) => Container(
+                        width: 60,
+                        height: 86,
+                        color: Colors.grey[900],
+                        child: const Icon(Icons.movie, color: Colors.grey),
+                      ),
+                    )
+                  : Container(
+                      width: 60,
+                      height: 86,
+                      color: Colors.grey[900],
+                      child:
+                          const Icon(Icons.movie, size: 28, color: Colors.grey),
                     ),
-                    color: FlixieColors.tabBarBackgroundFocused,
-                    onSelected: (value) {
-                      if (value == 'watched') {
-                        onMarkAsWatched();
-                      } else if (value == 'remove') {
-                        onRemove();
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'watched',
-                        child: Row(
-                          children: [
-                            Icon(Icons.check_circle_outline,
-                                color: FlixieColors.success, size: 20),
-                            SizedBox(width: 8),
-                            Text('Mark as Watched',
-                                style: TextStyle(color: Colors.white)),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'remove',
-                        child: Row(
-                          children: [
-                            Icon(Icons.remove_circle_outline,
-                                color: FlixieColors.danger, size: 20),
-                            SizedBox(width: 8),
-                            Text('Remove',
-                                style: TextStyle(color: Colors.white)),
-                          ],
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    movie.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: FlixieColors.light,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    year,
+                    style: const TextStyle(
+                      color: FlixieColors.medium,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.play_circle_outline,
+                          color: FlixieColors.primary, size: 18),
+                      const SizedBox(width: 6),
+                      Text(
+                        rating == 'N/A' ? 'No rating yet' : 'TMDB $rating',
+                        style: const TextStyle(
+                          color: FlixieColors.medium,
+                          fontSize: 12,
                         ),
                       ),
                     ],
                   ),
+                ],
+              ),
+            ),
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_horiz_rounded,
+                  color: FlixieColors.medium),
+              color: FlixieColors.tabBarBackgroundFocused,
+              onSelected: (value) {
+                if (value == 'watched') {
+                  onMarkAsWatched();
+                } else if (value == 'remove') {
+                  onRemove();
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'watched',
+                  child: Row(
+                    children: [
+                      Icon(Icons.check_circle_outline,
+                          color: FlixieColors.success, size: 20),
+                      SizedBox(width: 8),
+                      Text('Mark as Watched',
+                          style: TextStyle(color: Colors.white)),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'remove',
+                  child: Row(
+                    children: [
+                      Icon(Icons.remove_circle_outline,
+                          color: FlixieColors.danger, size: 20),
+                      SizedBox(width: 8),
+                      Text('Remove', style: TextStyle(color: Colors.white)),
+                    ],
+                  ),
                 ),
               ],
-            ),
-            // Movie info — Expanded so both cards in a row reach the same height
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Title
-                    Text(
-                      movie.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: FlixieColors.warning,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    // Year and Rating
-                    Row(
-                      children: [
-                        Text(
-                          year,
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 11,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        const Icon(Icons.star, color: Colors.amber, size: 11),
-                        const SizedBox(width: 2),
-                        Text(
-                          rating,
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    // Added date
-                    Text(
-                      'ADDED ON $addedDate',
-                      style: const TextStyle(
-                        color: Colors.grey,
-                        fontSize: 9,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ),
           ],
         ),

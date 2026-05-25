@@ -12,6 +12,8 @@ import 'settings/favorite_genres_sheet.dart';
 import 'settings/icon_color_sheet.dart';
 import 'settings/settings_tile.dart';
 
+const double _kSettingsCornerRadius = 14;
+
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -48,14 +50,9 @@ class SettingsScreen extends StatelessWidget {
                 onTap: () => _showChangePasswordSheet(context),
               ),
               SettingsTile(
-                icon: Icons.movie_filter_outlined,
-                label: 'Favourite Genres',
-                onTap: () => _showFavoriteGenresSheet(context),
-              ),
-              SettingsTile(
-                icon: Icons.palette_outlined,
-                label: 'Avatar Colour',
-                onTap: () => _showIconColorSheet(context),
+                icon: Icons.privacy_tip_outlined,
+                label: 'Privacy',
+                onTap: () {},
                 isLast: true,
               ),
             ],
@@ -77,7 +74,12 @@ class SettingsScreen extends StatelessWidget {
               SettingsTile(
                 icon: Icons.tune_outlined,
                 label: 'Content Preferences',
-                onTap: () {},
+                onTap: () => _showFavoriteGenresSheet(context),
+              ),
+              SettingsTile(
+                icon: Icons.palette_outlined,
+                label: 'Avatar Colour',
+                onTap: () => _showIconColorSheet(context),
                 isLast: true,
               ),
             ],
@@ -116,12 +118,11 @@ class SettingsScreen extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10, left: 4),
       child: Text(
-        text.toUpperCase(),
+        text,
         style: const TextStyle(
-          color: FlixieColors.primary,
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.2,
+          color: FlixieColors.medium,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -200,7 +201,7 @@ class _SettingsGroup extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF1D3A68),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(_kSettingsCornerRadius),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.06),
         ),
@@ -217,7 +218,7 @@ class _LogOutButton extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: FlixieColors.danger.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(_kSettingsCornerRadius),
         border: Border.all(
           color: FlixieColors.danger.withValues(alpha: 0.3),
         ),

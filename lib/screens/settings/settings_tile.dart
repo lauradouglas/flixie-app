@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../theme/app_theme.dart';
 
+const double _kSettingsCornerRadius = 14;
+
 class SettingsTile extends StatelessWidget {
   const SettingsTile({
     super.key,
@@ -28,7 +30,7 @@ class SettingsTile extends StatelessWidget {
           color: Colors.transparent,
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(_kSettingsCornerRadius),
             child: Padding(
               padding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
