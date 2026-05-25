@@ -188,6 +188,18 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       _filterYear != null ||
       _filterMaxRuntime != null;
 
+  Map<int, int> _friendOverlapCounts(String currentUserId) {
+    final movieFriendUsers = <int, Set<String>>{};
+    for (final item in _allWatchlist) {
+      final userId = item.userId;
+      if (userId.isEmpty || userId == 'me' || userId == currentUserId) continue;
+      movieFriendUsers.putIfAbsent(item.movieId, () => <String>{}).add(userId);
+    }
+    return {
+      for (final entry in movieFriendUsers.entries) entry.key: entry.value.length
+    };
+  }
+
   void _openFilterSheet() {
     showModalBottomSheet(
       context: context,
@@ -446,7 +458,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
               style: const TextStyle(
                   color: FlixieColors.white,
                   fontWeight: FontWeight.w700,
-                  fontSize: 33)),
+                  fontSize: 22)),
           const SizedBox(height: 2),
           Text(label,
               style: const TextStyle(
@@ -608,6 +620,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
   Widget _buildContent() {
     final items = _visibleWatchlist();
     final user = context.read<AuthProvider>().dbUser;
+    final overlapCounts = _friendOverlapCounts(user?.id ?? '');
 
     if (items.isEmpty) {
       final emptyLabel = switch (_selectedTab) {
@@ -653,6 +666,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         return WatchlistMovieRow(
           watchlistItem: item,
           isWatched: isWatched,
+          friendOverlapCount: overlapCounts[item.movieId] ?? 0,
           onTap: () => context.push('/movies/${item.movieId}'),
           onMarkAsWatched: () => _markAsWatched(item),
           onRemove: () => _removeFromWatchlist(item),
@@ -863,6 +877,7 @@ class _WatchlistTabs extends StatelessWidget {
 class WatchlistMovieRow extends StatelessWidget {
   final WatchlistMovie watchlistItem;
   final bool isWatched;
+  final int friendOverlapCount;
   final VoidCallback onTap;
   final VoidCallback onMarkAsWatched;
   final VoidCallback onRemove;
@@ -871,10 +886,17 @@ class WatchlistMovieRow extends StatelessWidget {
     super.key,
     required this.watchlistItem,
     required this.isWatched,
+    this.friendOverlapCount = 0,
     required this.onTap,
     required this.onMarkAsWatched,
     required this.onRemove,
   });
+
+  static const List<Color> _friendDotColors = [
+    FlixieColors.primary,
+    FlixieColors.secondary,
+    FlixieColors.tertiary,
+  ];
 
   static String _runtimeLabel(int? minutes) {
     if (minutes == null || minutes == 0) return '';
@@ -1030,17 +1052,21 @@ class WatchlistMovieRow extends StatelessWidget {
                           '$rating/10',
                           style: const TextStyle(
                             color: FlixieColors.white,
-                            fontSize: 31,
+                            fontSize: 16,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
+                      ],
+                      if (friendOverlapCount > 0) ...[
+                        const SizedBox(width: 10),
+                        _FriendOverlapDots(count: friendOverlapCount),
                       ],
                       const Spacer(),
                       Icon(
                         isWatched
                             ? Icons.check_circle_outline_rounded
                             : Icons.bookmark_border_rounded,
-                        size: 30,
+                        size: 24,
                         color: isWatched
                             ? const Color(0xFF00D07A)
                             : FlixieColors.light,
@@ -1064,6 +1090,58 @@ class WatchlistMovieRow extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _FriendOverlapDots extends StatelessWidget {
+  const _FriendOverlapDots({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = count > 3 ? 3 : count;
+    final width = visible <= 0 ? 0.0 : 12.0 + (visible - 1) * 9.0;
+    return Row(
+      children: [
+        SizedBox(
+          width: width,
+          height: 12,
+          child: Stack(
+            children: List.generate(
+              visible,
+              (index) => Positioned(
+                left: index * 9,
+                child: Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: WatchlistMovieRow._friendDotColors[
+                        index % WatchlistMovieRow._friendDotColors.length],
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: FlixieColors.tabBarBackgroundFocused,
+                      width: 1.2,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (count > visible) ...[
+          const SizedBox(width: 4),
+          Text(
+            '+${count - visible}',
+            style: const TextStyle(
+              color: FlixieColors.medium,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
