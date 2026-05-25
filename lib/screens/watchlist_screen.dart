@@ -5,8 +5,11 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../theme/app_theme.dart';
 import '../providers/auth_provider.dart';
 import '../services/user_service.dart';
+import '../models/favorite_movie.dart';
 import '../models/watched_movie.dart';
 import '../models/watchlist_movie.dart';
+import 'movie_detail/add_to_list_sheet.dart';
+import 'movie_detail/watch_request_sheet.dart';
 import 'watchlist/filter_sheet.dart';
 
 class WatchlistScreen extends StatefulWidget {
@@ -67,7 +70,8 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
   void _loadWatchlist() {
     final authProvider = context.read<AuthProvider>();
     final userWatchlist = authProvider.dbUser?.movieWatchlist;
-    _showWatchlist = List<dynamic>.from(authProvider.dbUser?.showWatchlist ?? []);
+    _showWatchlist =
+        List<dynamic>.from(authProvider.dbUser?.showWatchlist ?? []);
 
     if (userWatchlist == null) {
       setState(() => _loading = false);
@@ -187,18 +191,6 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       _filterMinRating != null ||
       _filterYear != null ||
       _filterMaxRuntime != null;
-
-  Map<int, int> _friendOverlapCounts(String currentUserId) {
-    final movieFriendUsers = <int, Set<String>>{};
-    for (final item in _allWatchlist) {
-      final userId = item.userId;
-      if (userId.isEmpty || userId == 'me' || userId == currentUserId) continue;
-      movieFriendUsers.putIfAbsent(item.movieId, () => <String>{}).add(userId);
-    }
-    return {
-      for (final entry in movieFriendUsers.entries) entry.key: entry.value.length
-    };
-  }
 
   void _openFilterSheet() {
     showModalBottomSheet(
@@ -383,6 +375,103 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     }
   }
 
+  Future<void> _addToFavorites(WatchlistMovie item) async {
+    final authProvider = context.read<AuthProvider>();
+    final user = authProvider.dbUser;
+    if (user == null) return;
+
+    final movieId = item.movieId;
+    if (user.isMovieFavorite(movieId)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${item.movie?.title ?? "Movie"} is already in favourites',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      final addedFavorite = await UserService.addToFavorites(user.id, movieId);
+      final updatedFavorites =
+          List<FavoriteMovie>.from(user.favoriteMovies ?? []);
+      if (!updatedFavorites.any((f) => f.movieId == movieId)) {
+        updatedFavorites.add(addedFavorite);
+      }
+
+      authProvider.updateUserList(favoriteMovies: updatedFavorites);
+      authProvider.markActivityChanged();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text('${item.movie?.title ?? "Movie"} added to favourites'),
+            backgroundColor: FlixieColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error adding to favorites: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to add to favourites'),
+            backgroundColor: FlixieColors.danger,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _showAddToListSheet(WatchlistMovie item) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: FlixieColors.tabBarBackgroundFocused,
+      builder: (_) => AddToListSheet(movieId: item.movieId),
+    );
+  }
+
+  void _showWatchRequestSheet(WatchlistMovie item) {
+    final auth = context.read<AuthProvider>();
+    final friends = auth.cachedFriends?.friendships ?? [];
+    final userId = auth.dbUser?.id;
+    if (userId == null) return;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: FlixieColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => MovieWatchRequestSheet(
+        movieId: item.movieId,
+        movieTitle: item.movie?.title,
+        requesterId: userId,
+        friends: friends,
+        onSuccess: () {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Watch request sent!')),
+            );
+          }
+        },
+        onError: () {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Failed to send watch request')),
+            );
+          }
+        },
+      ),
+    );
+  }
+
   String _totalRuntimeLabel() {
     final total = _allWatchlist.fold<int>(
         0, (sum, item) => sum + (item.movie?.runtime ?? 0));
@@ -433,8 +522,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       ),
       child: Row(
         children: [
-          _statItem(
-              Icons.bookmark_border_rounded, total.toString(), 'Total',
+          _statItem(Icons.bookmark_border_rounded, total.toString(), 'Total',
               FlixieColors.primary),
           _statDivider(),
           _statItem(Icons.star_border_rounded, highlyRated.toString(),
@@ -461,8 +549,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                   fontSize: 22)),
           const SizedBox(height: 2),
           Text(label,
-              style: const TextStyle(
-                  color: FlixieColors.light, fontSize: 11),
+              style: const TextStyle(color: FlixieColors.light, fontSize: 11),
               textAlign: TextAlign.center),
         ],
       ),
@@ -506,9 +593,8 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
             icon: const Icon(Icons.tune_rounded, size: 19),
             label: const Text('Filter'),
             style: TextButton.styleFrom(
-              foregroundColor: _hasActiveFilters
-                  ? FlixieColors.primary
-                  : FlixieColors.light,
+              foregroundColor:
+                  _hasActiveFilters ? FlixieColors.primary : FlixieColors.light,
               textStyle: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -553,8 +639,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
           Stack(
             children: [
               IconButton(
-                icon:
-                    const Icon(Icons.more_vert_rounded, color: Colors.white),
+                icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
                 tooltip: 'Sort & Filter',
                 onPressed: _openFilterSheet,
               ),
@@ -620,7 +705,6 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
   Widget _buildContent() {
     final items = _visibleWatchlist();
     final user = context.read<AuthProvider>().dbUser;
-    final overlapCounts = _friendOverlapCounts(user?.id ?? '');
 
     if (items.isEmpty) {
       final emptyLabel = switch (_selectedTab) {
@@ -666,9 +750,11 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         return WatchlistMovieRow(
           watchlistItem: item,
           isWatched: isWatched,
-          friendOverlapCount: overlapCounts[item.movieId] ?? 0,
           onTap: () => context.push('/movies/${item.movieId}'),
           onMarkAsWatched: () => _markAsWatched(item),
+          onAddToFavourites: () => _addToFavorites(item),
+          onAddToList: () => _showAddToListSheet(item),
+          onRequestToWatch: () => _showWatchRequestSheet(item),
           onRemove: () => _removeFromWatchlist(item),
         );
       },
@@ -833,7 +919,8 @@ class _WatchlistTabs extends StatelessWidget {
         final selected = selectedIndex == index;
         return Expanded(
           child: Padding(
-            padding: EdgeInsets.only(right: index == labels.length - 1 ? 0 : 10),
+            padding:
+                EdgeInsets.only(right: index == labels.length - 1 ? 0 : 10),
             child: GestureDetector(
               onTap: () => onChanged(index),
               child: Container(
@@ -877,18 +964,22 @@ class _WatchlistTabs extends StatelessWidget {
 class WatchlistMovieRow extends StatelessWidget {
   final WatchlistMovie watchlistItem;
   final bool isWatched;
-  final int friendOverlapCount;
   final VoidCallback onTap;
   final VoidCallback onMarkAsWatched;
+  final VoidCallback onAddToFavourites;
+  final VoidCallback onAddToList;
+  final VoidCallback onRequestToWatch;
   final VoidCallback onRemove;
 
   const WatchlistMovieRow({
     super.key,
     required this.watchlistItem,
     required this.isWatched,
-    this.friendOverlapCount = 0,
     required this.onTap,
     required this.onMarkAsWatched,
+    required this.onAddToFavourites,
+    required this.onAddToList,
+    required this.onRequestToWatch,
     required this.onRemove,
   });
 
@@ -906,19 +997,20 @@ class WatchlistMovieRow extends StatelessWidget {
     final dt = DateTime.tryParse(iso);
     if (dt == null) return '';
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
     ];
     return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
-  }
-
-  void _showComingSoon(BuildContext context, String actionLabel) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$actionLabel is coming soon'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
   }
 
   @override
@@ -940,11 +1032,6 @@ class WatchlistMovieRow extends StatelessWidget {
       if (runtime.isNotEmpty) runtime,
     ];
     final metaStr = metaParts.join(' • ');
-    final badges = [
-      if (friendOverlapCount > 0)
-        friendOverlapCount > 1 ? '$friendOverlapCount friends watched' : 'Friend watched',
-      if (isWatched) 'Watched',
-    ];
 
     return InkWell(
       onTap: onTap,
@@ -964,7 +1051,7 @@ class WatchlistMovieRow extends StatelessWidget {
           ],
         ),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
@@ -1026,13 +1113,18 @@ class WatchlistMovieRow extends StatelessWidget {
                           } else if (value == 'remove') {
                             onRemove();
                           } else if (value == 'favourite') {
-                            _showComingSoon(context, 'Add to favourites');
+                            onAddToFavourites();
                           } else if (value == 'list') {
-                            _showComingSoon(context, 'Add to list');
-                          } else if (value == 'invite') {
-                            _showComingSoon(context, 'Invite friends');
+                            onAddToList();
+                          } else if (value == 'request_watch') {
+                            onRequestToWatch();
                           } else if (value == 'share') {
-                            _showComingSoon(context, 'Share');
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Share is coming soon'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
                           }
                         },
                         itemBuilder: (_) => const [
@@ -1067,12 +1159,12 @@ class WatchlistMovieRow extends StatelessWidget {
                             ]),
                           ),
                           PopupMenuItem(
-                            value: 'invite',
+                            value: 'request_watch',
                             child: Row(children: [
                               Icon(Icons.group_add_outlined,
                                   color: FlixieColors.primary, size: 20),
                               SizedBox(width: 8),
-                              Text('Invite friends',
+                              Text('Request to watch',
                                   style: TextStyle(color: Colors.white)),
                             ]),
                           ),
@@ -1108,18 +1200,6 @@ class WatchlistMovieRow extends StatelessWidget {
                         addedDate: addedDate,
                       ),
                     ),
-                  if (badges.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    MovieBadgeRow(labels: badges),
-                  ],
-                  const SizedBox(height: 6),
-                  MovieQuickActions(
-                    showMarkWatched: !isWatched,
-                    onMarkWatched: onMarkAsWatched,
-                    onFavourite: () =>
-                        _showComingSoon(context, 'Add to favourites'),
-                    onRemove: onRemove,
-                  ),
                   if (rating != null) ...[
                     const SizedBox(height: 4),
                     Row(
@@ -1196,127 +1276,6 @@ class CompactMovieMeta extends StatelessWidget {
       style: const TextStyle(
         color: FlixieColors.medium,
         fontSize: 12,
-      ),
-    );
-  }
-}
-
-class MovieBadgeRow extends StatelessWidget {
-  const MovieBadgeRow({super.key, required this.labels});
-
-  final List<String> labels;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 6,
-      runSpacing: 4,
-      children: labels
-          .map(
-            (label) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: FlixieColors.primary.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                  color: FlixieColors.primary.withValues(alpha: 0.35),
-                ),
-              ),
-              child: Text(
-                label,
-                style: const TextStyle(
-                  color: FlixieColors.light,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          )
-          .toList(),
-    );
-  }
-}
-
-class MovieQuickActions extends StatelessWidget {
-  const MovieQuickActions({
-    super.key,
-    required this.showMarkWatched,
-    required this.onMarkWatched,
-    required this.onFavourite,
-    required this.onRemove,
-  });
-
-  final bool showMarkWatched;
-  final VoidCallback onMarkWatched;
-  final VoidCallback onFavourite;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 4,
-      children: [
-        if (showMarkWatched)
-          _QuickActionChip(
-            icon: Icons.check_rounded,
-            label: 'Watched',
-            onTap: onMarkWatched,
-          ),
-        _QuickActionChip(
-          icon: Icons.favorite_border_rounded,
-          label: 'Add to favourites',
-          onTap: onFavourite,
-        ),
-        _QuickActionChip(
-          icon: Icons.remove_circle_outline_rounded,
-          label: 'Remove',
-          onTap: onRemove,
-        ),
-      ],
-    );
-  }
-}
-
-class _QuickActionChip extends StatelessWidget {
-  const _QuickActionChip({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: onTap,
-        child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 12, color: FlixieColors.light),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: FlixieColors.light,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
