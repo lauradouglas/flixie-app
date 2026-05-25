@@ -35,7 +35,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   // Keep hero carousel concise so primary CTA and dots remain visible above fold.
   static const int _maxHeroCarouselItems = 6;
   static const int _maxSourceTitleLength = 18;
-  static const double _defaultQuickRating = 8;
+  static const double _defaultQuickRating = 5;
   static const String _defaultGroupInitial = 'G';
   static const List<String> _weekdayLabels = [
     'Mon',
@@ -320,7 +320,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
       onTap: () => context.push('/movies/${movie.id}'),
       child: Container(
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
         ),
         child: Stack(
           fit: StackFit.expand,

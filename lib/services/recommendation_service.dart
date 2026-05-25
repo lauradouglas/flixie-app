@@ -3,9 +3,9 @@ import '../utils/app_logger.dart';
 import 'api_client.dart';
 
 class RecommendationSourceMovie {
-  final int id;
+  final int? id;
   final String title;
-  final int rating;
+  final int? rating;
 
   const RecommendationSourceMovie({
     required this.id,
@@ -16,11 +16,11 @@ class RecommendationSourceMovie {
   factory RecommendationSourceMovie.fromJson(Map<String, dynamic> json) {
     final idValue = json['id'];
     return RecommendationSourceMovie(
-      id: idValue is int ? idValue : int.tryParse('$idValue') ?? 0,
+      id: idValue is int ? idValue : int.tryParse('$idValue'),
       title: (json['title'] ?? json['name'] ?? '') as String,
       rating: json['rating'] is int
           ? json['rating'] as int
-          : (json['rating'] as num?)?.toInt() ?? 0,
+          : (json['rating'] as num?)?.toInt(),
     );
   }
 }
