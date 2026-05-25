@@ -8,11 +8,10 @@ import '../providers/auth_provider.dart';
 import '../services/user_service.dart';
 import '../theme/app_theme.dart';
 import 'settings/change_password_sheet.dart';
+import 'settings/constants.dart';
 import 'settings/favorite_genres_sheet.dart';
 import 'settings/icon_color_sheet.dart';
 import 'settings/settings_tile.dart';
-
-const double _kSettingsCornerRadius = 14;
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -107,7 +106,7 @@ class SettingsScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 32),
-          _LogOutButton(),
+          const _LogOutButton(),
           const SizedBox(height: 16),
         ],
       ),
@@ -201,7 +200,7 @@ class _SettingsGroup extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF1D3A68),
-        borderRadius: BorderRadius.circular(_kSettingsCornerRadius),
+        borderRadius: BorderRadius.circular(kSettingsCornerRadius),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.06),
         ),
@@ -213,12 +212,14 @@ class _SettingsGroup extends StatelessWidget {
 
 /// Log out button shown at the bottom of Settings.
 class _LogOutButton extends StatelessWidget {
+  const _LogOutButton({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         color: FlixieColors.danger.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(_kSettingsCornerRadius),
+        borderRadius: BorderRadius.circular(kSettingsCornerRadius),
         border: Border.all(
           color: FlixieColors.danger.withValues(alpha: 0.3),
         ),
