@@ -151,7 +151,9 @@ class MovieListsProvider extends ChangeNotifier {
       try {
         final containing = await repository.getMyListsContainingMovie(userId, movieId);
         return containing.where((list) => !list.removed).toList(growable: false);
-      } catch (_) {
+      } catch (e) {
+        error = _friendlyError(e);
+        notifyListeners();
         return const <MovieList>[];
       }
     }

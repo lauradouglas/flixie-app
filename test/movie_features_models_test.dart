@@ -51,6 +51,26 @@ void main() {
         'whoCanAddMovies': 'friends',
       });
     });
+
+    test('create request omits blank optional fields', () {
+      const request = CreateMovieListRequest(name: 'Watch Later');
+      expect(request.toJson(), {
+        'name': 'Watch Later',
+        'visibility': ListVisibility.private,
+        'whoCanAddMovies': 'owner',
+      });
+    });
+
+    test('update request serializes only provided fields', () {
+      const request = UpdateMovieListRequest(
+        description: 'Updated description',
+        visibility: ListVisibility.friends,
+      );
+      expect(request.toJson(), {
+        'description': 'Updated description',
+        'visibility': ListVisibility.friends,
+      });
+    });
   });
 
   group('MovieFriendListEntry', () {

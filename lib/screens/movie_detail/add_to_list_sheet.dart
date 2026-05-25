@@ -168,20 +168,47 @@ class _AddToListSheetBodyState extends State<_AddToListSheetBody> {
     setState(() => _saving = true);
     final toAdd = _selectedListIds.difference(_initialListIds).toList();
     final toRemove = _initialListIds.difference(_selectedListIds).toList();
+    final failed = <String>[];
 
     for (final listId in toAdd) {
-      await provider.addMovieToList(listId, widget.movieId);
+      final ok = await provider.addMovieToList(listId, widget.movieId);
+      if (!ok) failed.add(listId);
     }
     for (final listId in toRemove) {
-      await provider.removeMovieFromList(listId, widget.movieId);
+      final ok = await provider.removeMovieFromList(listId, widget.movieId);
+      if (!ok) failed.add(listId);
     }
 
     if (!mounted) return;
     setState(() => _saving = false);
+    if (failed.isNotEmpty) {
+      final listNames = failed
+          .map(
+            (id) => provider.lists
+                .firstWhere(
+                  (list) => list.id == id,
+                  orElse: () => const MovieList(
+                    id: '',
+                    name: 'Unknown List',
+                    removed: false,
+                  ),
+                )
+                .name,
+          )
+          .toSet()
+          .join(', ');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to update lists: $listNames. ${provider.error ?? 'Please try again.'}',
+          ),
+        ),
+      );
+      return;
+    }
     Navigator.pop(context, true);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Lists updated')),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Lists updated')));
   }
 
   Future<void> _showCreateListDialog(
