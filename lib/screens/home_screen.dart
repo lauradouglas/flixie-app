@@ -36,6 +36,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   static const int _maxHeroCarouselItems = 6;
   static const int _maxSourceTitleLength = 18;
   static const double _defaultQuickRating = 8;
+  static const String _defaultGroupInitial = 'G';
   static const List<String> _weekdayLabels = [
     'Mon',
     'Tue',
@@ -318,7 +319,6 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     return GestureDetector(
       onTap: () => context.push('/movies/${movie.id}'),
       child: Container(
-        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
         ),
@@ -799,7 +799,11 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   }
 
   Widget _buildTrendingGroupsSection(BuildContext context) {
-    if (_userGroups.isEmpty) return const SizedBox.shrink();
+    final groupsWithIds = _userGroups
+        .where((group) => group.id != null && group.id!.isNotEmpty)
+        .take(10)
+        .toList();
+    if (groupsWithIds.isEmpty) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -814,17 +818,17 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _userGroups.length.clamp(0, 10),
+            itemCount: groupsWithIds.length,
             separatorBuilder: (_, __) => const SizedBox(width: 10),
             itemBuilder: (context, index) {
-              final group = _userGroups[index];
+              final group = groupsWithIds[index];
               final trimmedName = group.name.trim();
               final initials = trimmedName.isNotEmpty
                   ? trimmedName.characters.first.toUpperCase()
-                  : 'G';
+                  : _defaultGroupInitial;
               return InkWell(
                 borderRadius: BorderRadius.circular(14),
-                onTap: group.id == null ? null : () => context.push('/groups/${group.id}'),
+                onTap: () => context.push('/groups/${group.id}'),
                 child: Ink(
                   width: 210,
                   decoration: BoxDecoration(
@@ -1094,7 +1098,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     final notesController = TextEditingController();
     final watchedAt = DateTime.now();
 
-    Future<void> saveWatched() async {
+    Future<void> commitWatchedEntry() async {
       try {
         await UserService.addToWatched(userId, movieId);
         if (isInWatchlist) {
@@ -1206,7 +1210,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                     child: OutlinedButton(
                       onPressed: () {
                         setSheetState(() => includeRating = false);
-                        saveWatched();
+                        commitWatchedEntry();
                       },
                       child: const Text('Mark without rating'),
                     ),
@@ -1214,7 +1218,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   const SizedBox(width: 10),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: saveWatched,
+                      onPressed: commitWatchedEntry,
                       child: const Text('Save'),
                     ),
                   ),
