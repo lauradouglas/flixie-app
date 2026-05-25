@@ -382,6 +382,132 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     return '${hours}h ${minutes}m total';
   }
 
+  String _sortByLabel() {
+    switch (_sortBy) {
+      case 'recent':
+        return 'Date Added';
+      case 'titleAsc':
+        return 'Title A–Z';
+      case 'titleDesc':
+        return 'Title Z–A';
+      case 'ratingDesc':
+        return 'Rating';
+      case 'yearDesc':
+        return 'Year (Newest)';
+      case 'yearAsc':
+        return 'Year (Oldest)';
+      default:
+        return 'Date Added';
+    }
+  }
+
+  Widget _buildStatsRow() {
+    final total = _allWatchlist.length;
+    final highlyRated =
+        _allWatchlist.where((i) => (i.movie?.voteAverage ?? 0) >= 7.5).length;
+    final today = DateTime.now();
+    final upcoming = _allWatchlist.where((i) {
+      final d = DateTime.tryParse(i.movie?.releaseDate ?? '');
+      return d != null && d.isAfter(today);
+    }).length;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      decoration: BoxDecoration(
+        color: FlixieColors.tabBarBackgroundFocused,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: Row(
+        children: [
+          _statItem(
+              Icons.bookmark_border_rounded, total.toString(), 'Total',
+              FlixieColors.primary),
+          _statDivider(),
+          _statItem(Icons.star_border_rounded, highlyRated.toString(),
+              'Highly Rated', FlixieColors.tertiary),
+          _statDivider(),
+          _statItem(Icons.calendar_today_outlined, upcoming.toString(),
+              'Upcoming', FlixieColors.secondary),
+          _statDivider(),
+          _statItem(Icons.people_outline_rounded, '0', 'Friends Added',
+              Colors.lightBlueAccent),
+        ],
+      ),
+    );
+  }
+
+  Widget _statItem(IconData icon, String value, String label, Color color) {
+    return Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 4),
+          Text(value,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16)),
+          Text(label,
+              style: const TextStyle(
+                  color: FlixieColors.medium, fontSize: 10),
+              textAlign: TextAlign.center),
+        ],
+      ),
+    );
+  }
+
+  Widget _statDivider() {
+    return Container(
+      width: 1,
+      height: 44,
+      color: Colors.white.withValues(alpha: 0.08),
+    );
+  }
+
+  Widget _buildSortFilterRow() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+      child: Row(
+        children: [
+          const Text('Sort by ',
+              style: TextStyle(color: FlixieColors.medium, fontSize: 13)),
+          GestureDetector(
+            onTap: _openFilterSheet,
+            child: Row(
+              children: [
+                Text(
+                  _sortByLabel(),
+                  style: const TextStyle(
+                      color: FlixieColors.light,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13),
+                ),
+                const Icon(Icons.keyboard_arrow_down_rounded,
+                    color: FlixieColors.light, size: 18),
+              ],
+            ),
+          ),
+          const Spacer(),
+          TextButton.icon(
+            onPressed: _openFilterSheet,
+            icon: const Icon(Icons.tune_rounded, size: 16),
+            label: const Text('Filter'),
+            style: TextButton.styleFrom(
+              foregroundColor: _hasActiveFilters
+                  ? FlixieColors.primary
+                  : FlixieColors.light,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -390,42 +516,32 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Icon(Icons.bookmark_border_rounded,
+                color: FlixieColors.primary, size: 26),
+            SizedBox(width: 8),
+            Text(
               'Watchlist',
               style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold),
             ),
-            if (!_loading && _allWatchlist.isNotEmpty)
-              Text(
-                () {
-                  final runtime = _totalRuntimeLabel();
-                  final count =
-                      '${_allWatchlist.length} item${_allWatchlist.length == 1 ? '' : 's'}';
-                  return runtime.isEmpty ? count : '$count · $runtime';
-                }(),
-                style: const TextStyle(
-                  color: Colors.grey,
-                  fontSize: 12,
-                ),
-              ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.search_rounded, color: Colors.white),
-            tooltip: 'Search',
-            onPressed: () => context.push('/search'),
+            icon: const Icon(Icons.person_add_outlined, color: Colors.white),
+            tooltip: 'Invite friend',
+            onPressed: () {},
           ),
           Stack(
             children: [
               IconButton(
-                icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
+                icon:
+                    const Icon(Icons.more_vert_rounded, color: Colors.white),
                 tooltip: 'Sort & Filter',
                 onPressed: _openFilterSheet,
               ),
@@ -450,39 +566,18 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
           ? const Center(
               child: CircularProgressIndicator(color: FlixieColors.primary))
           : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      const EdgeInsets.fromLTRB(16, 4, 16, 10),
                   child: _WatchlistTabs(
                     selectedIndex: _selectedTab,
                     onChanged: (i) => setState(() => _selectedTab = i),
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: TextField(
-                    controller: _searchController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      hintText: 'Search watchlist...',
-                      hintStyle: const TextStyle(color: Colors.grey),
-                      prefixIcon:
-                          const Icon(Icons.search_rounded, color: Colors.grey),
-                      filled: true,
-                      fillColor: FlixieColors.tabBarBackgroundFocused,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
+                if (_allWatchlist.isNotEmpty) _buildStatsRow(),
+                if (_allWatchlist.isNotEmpty) _buildSortFilterRow(),
                 Expanded(child: _buildContent()),
               ],
             ),
