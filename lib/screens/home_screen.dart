@@ -255,13 +255,6 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                           _buildCarouselDots(),
                           const SizedBox(height: 20),
                         ],
-                        HomeSectionHeader(
-                          title: 'Trending Now',
-                          onSeeAll: () => context.push('/search'),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildTrendingNowGrid(context),
-                        const SizedBox(height: 20),
                         _buildJustOutSection(context),
                         _buildWatchlistSection(context),
                         _buildBecauseYouRatedSection(context),
@@ -445,90 +438,6 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
               ),
             ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildTrendingNowGrid(BuildContext context) {
-    final items = _featuredMovies.take(6).toList();
-    if (items.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: items.length,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisSpacing: 10,
-          crossAxisSpacing: 10,
-          childAspectRatio: 0.64,
-        ),
-        itemBuilder: (context, index) {
-          final movie = items[index];
-          return GestureDetector(
-            onTap: () => context.push('/movies/${movie.id}'),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (movie.poster != null)
-                    CachedNetworkImage(
-                      imageUrl: 'https://image.tmdb.org/t/p/w342${movie.poster}',
-                      fit: BoxFit.cover,
-                      errorWidget: (_, __, ___) => Container(
-                        color: FlixieColors.tabBarBackgroundFocused,
-                        child: const Icon(
-                          Icons.movie_outlined,
-                          color: FlixieColors.medium,
-                        ),
-                      ),
-                    )
-                  else
-                    Container(
-                      color: FlixieColors.tabBarBackgroundFocused,
-                      child: const Icon(
-                        Icons.movie_outlined,
-                        color: FlixieColors.medium,
-                      ),
-                    ),
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.82),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: 12,
-                    right: 12,
-                    bottom: 12,
-                    child: Text(
-                      movie.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: FlixieColors.white,
-                        fontSize: 21,
-                        fontWeight: FontWeight.w700,
-                        height: 1.1,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
       ),
     );
   }
