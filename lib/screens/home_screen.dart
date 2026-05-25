@@ -739,7 +739,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     final source = _highlyRatedRecommendations?.sourceMovie;
     final sourceTitle = source?.title ?? '';
     final compactSourceTitle = sourceTitle.characters.length > _maxSourceTitleLength
-        ? '${sourceTitle.characters.take(_maxSourceTitleLength)}…'
+        ? '${sourceTitle.characters.take(_maxSourceTitleLength).toString()}…'
         : sourceTitle;
     final title = source != null
         ? 'Because You Rated $compactSourceTitle'
