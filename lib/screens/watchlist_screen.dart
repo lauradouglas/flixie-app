@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../theme/app_theme.dart';
 import '../providers/auth_provider.dart';
 import '../services/user_service.dart';
+import '../models/watched_movie.dart';
 import '../models/watchlist_movie.dart';
 import 'watchlist/filter_sheet.dart';
 
@@ -71,12 +72,9 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     }
 
     try {
-      // Parse the watchlist from user data
-      final watchlist = userWatchlist
-          .whereType<Map<String, dynamic>>()
-          .map((item) => WatchlistMovie.fromJson(item))
-          .where((item) => item.removed != true)
-          .toList();
+      // The list is already typed — just filter out removed entries
+      final watchlist =
+          (userWatchlist).where((item) => item.removed != true).toList();
 
       setState(() {
         _allWatchlist = watchlist;
@@ -226,26 +224,19 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
           await UserService.addToWatched(user.id, item.movieId);
 
       // Update the local user lists
-      final currentWatchlist = List<dynamic>.from(user.movieWatchlist ?? []);
-      currentWatchlist.removeWhere((w) {
-        if (w is Map<String, dynamic>) {
-          return (w['movieId'] ?? w['id']) == item.movieId;
-        }
-        return w == item.movieId;
-      });
+      final currentWatchlist =
+          List<WatchlistMovie>.from(user.movieWatchlist ?? []);
+      currentWatchlist.removeWhere((w) => w.movieId == item.movieId);
 
-      final currentWatched = List<dynamic>.from(user.watchedMovies ?? []);
-      // Add the watched movie (prefer the API response, fallback to creating object)
-      if (watchedMovie != null) {
-        currentWatched.add(watchedMovie.toJson());
-      } else {
-        // If API didn't return data, create a basic watched record
-        currentWatched.add({
-          'movieId': item.movieId,
-          'userId': user.id,
-          'watchedAt': DateTime.now().toIso8601String(),
-        });
-      }
+      final currentWatched = List<WatchedMovie>.from(user.watchedMovies ?? []);
+      // Add the watched movie (prefer the API response, fallback to minimal object)
+      currentWatched.add(watchedMovie ??
+          WatchedMovie(
+            id: '',
+            userId: user.id,
+            movieId: item.movieId,
+            watchedAt: DateTime.now().toIso8601String(),
+          ));
 
       // Update provider with both lists
       authProvider.updateUserList(
@@ -293,13 +284,9 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       await UserService.removeFromWatchlist(user.id, item.movieId);
 
       // Update the local user list
-      final currentWatchlist = List<dynamic>.from(user.movieWatchlist ?? []);
-      currentWatchlist.removeWhere((w) {
-        if (w is Map<String, dynamic>) {
-          return (w['movieId'] ?? w['id']) == item.movieId;
-        }
-        return w == item.movieId;
-      });
+      final currentWatchlist =
+          List<WatchlistMovie>.from(user.movieWatchlist ?? []);
+      currentWatchlist.removeWhere((w) => w.movieId == item.movieId);
 
       // Update provider
       authProvider.updateUserList(movieWatchlist: currentWatchlist);
@@ -346,15 +333,15 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         if (markWatched == true && mounted) {
           final watchedResult =
               await UserService.addToWatched(user.id, item.movieId);
-          final currentWatched = List<dynamic>.from(user.watchedMovies ?? []);
-          if (watchedResult != null) {
-            currentWatched.add(watchedResult.toJson());
-          } else {
-            currentWatched.add({
-              'movieId': item.movieId,
-              'watchedAt': DateTime.now().toIso8601String(),
-            });
-          }
+          final currentWatched =
+              List<WatchedMovie>.from(user.watchedMovies ?? []);
+          currentWatched.add(watchedResult ??
+              WatchedMovie(
+                id: '',
+                userId: user.id,
+                movieId: item.movieId,
+                watchedAt: DateTime.now().toIso8601String(),
+              ));
           authProvider.updateUserList(watchedMovies: currentWatched);
           authProvider.markActivityChanged();
           if (mounted) {

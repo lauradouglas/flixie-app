@@ -6,6 +6,7 @@ class FavoriteMovie {
   final bool? removed;
   final String? createdAt;
   final String? updatedAt;
+  final Map<String, dynamic>? movie;
 
   const FavoriteMovie({
     required this.id,
@@ -15,6 +16,7 @@ class FavoriteMovie {
     this.removed,
     this.createdAt,
     this.updatedAt,
+    this.movie,
   });
 
   factory FavoriteMovie.fromJson(Map<String, dynamic> json) {
@@ -26,6 +28,7 @@ class FavoriteMovie {
       removed: json['removed'] as bool?,
       createdAt: json['createdAt'] as String?,
       updatedAt: json['updatedAt'] as String?,
+      movie: json['movie'] as Map<String, dynamic>?,
     );
   }
 
@@ -38,6 +41,7 @@ class FavoriteMovie {
       'removed': removed,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
+      if (movie != null) 'movie': movie,
     };
   }
 }

@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../models/favorite_movie.dart';
 import '../../theme/app_theme.dart';
 
 class FavoriteMoviesSection extends StatelessWidget {
@@ -10,7 +11,7 @@ class FavoriteMoviesSection extends StatelessWidget {
     required this.favoriteMovies,
   });
 
-  final List<dynamic> favoriteMovies;
+  final List<FavoriteMovie> favoriteMovies;
 
   void _showAllMoviesSheet(BuildContext context) {
     showModalBottomSheet(
@@ -97,16 +98,10 @@ class FavoriteMoviesSection extends StatelessWidget {
   }
 
   /// Returns (movieId, title, posterPath) from a favoriteMovies item.
-  (int?, String, String?) _parseMovie(dynamic item) {
-    if (item is Map<String, dynamic>) {
-      final movie = item['movie'] as Map<String, dynamic>?;
-      final id =
-          (item['movieId'] as num?)?.toInt() ?? (movie?['id'] as num?)?.toInt();
-      final title = movie?['title'] as String? ?? 'Unknown';
-      final poster = movie?['posterPath'] as String?;
-      return (id, title, poster);
-    }
-    return (null, 'Unknown', null);
+  (int?, String, String?) _parseMovie(FavoriteMovie item) {
+    final title = item.movie?['title'] as String? ?? 'Unknown';
+    final poster = item.movie?['posterPath'] as String?;
+    return (item.movieId, title, poster);
   }
 }
 
@@ -177,18 +172,12 @@ class _MoviePosterCard extends StatelessWidget {
 
 class _AllFavoriteMoviesSheet extends StatelessWidget {
   const _AllFavoriteMoviesSheet({required this.favoriteMovies});
-  final List<dynamic> favoriteMovies;
+  final List<FavoriteMovie> favoriteMovies;
 
-  (int?, String, String?) _parseMovie(dynamic item) {
-    if (item is Map<String, dynamic>) {
-      final movie = item['movie'] as Map<String, dynamic>?;
-      final id =
-          (item['movieId'] as num?)?.toInt() ?? (movie?['id'] as num?)?.toInt();
-      final title = movie?['title'] as String? ?? 'Unknown';
-      final poster = movie?['posterPath'] as String?;
-      return (id, title, poster);
-    }
-    return (null, 'Unknown', null);
+  (int?, String, String?) _parseMovie(FavoriteMovie item) {
+    final title = item.movie?['title'] as String? ?? 'Unknown';
+    final poster = item.movie?['posterPath'] as String?;
+    return (item.movieId, title, poster);
   }
 
   @override

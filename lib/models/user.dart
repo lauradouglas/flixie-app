@@ -1,4 +1,7 @@
 import '../utils/app_logger.dart';
+import 'favorite_movie.dart';
+import 'watched_movie.dart';
+import 'watchlist_movie.dart';
 
 class User {
   final String id;
@@ -23,11 +26,11 @@ class User {
   final Map<String, dynamic>? iconColor;
 
   // Lists
-  final List<dynamic>? watchedMovies;
+  final List<WatchedMovie>? watchedMovies;
   final List<dynamic>? watchedShows;
-  final List<dynamic>? movieWatchlist;
+  final List<WatchlistMovie>? movieWatchlist;
   final List<dynamic>? showWatchlist;
-  final List<dynamic>? favoriteMovies;
+  final List<FavoriteMovie>? favoriteMovies;
   final List<dynamic>? favoriteShows;
   final List<dynamic>? favoritePeople;
   final List<dynamic>? favoriteGenres;
@@ -81,11 +84,23 @@ class User {
       country: json['country'] as Map<String, dynamic>?,
       language: json['language'] as Map<String, dynamic>?,
       iconColor: json['iconColor'] as Map<String, dynamic>?,
-      watchedMovies: json['watchedMovies'] as List<dynamic>?,
+      watchedMovies: json['watchedMovies'] != null
+          ? (json['watchedMovies'] as List<dynamic>)
+              .map((e) => WatchedMovie.fromJson(e as Map<String, dynamic>))
+              .toList()
+          : null,
       watchedShows: json['watchedShows'] as List<dynamic>?,
-      movieWatchlist: json['movieWatchlist'] as List<dynamic>?,
+      movieWatchlist: json['movieWatchlist'] != null
+          ? (json['movieWatchlist'] as List<dynamic>)
+              .map((e) => WatchlistMovie.fromJson(e as Map<String, dynamic>))
+              .toList()
+          : null,
       showWatchlist: json['showWatchlist'] as List<dynamic>?,
-      favoriteMovies: json['favoriteMovies'] as List<dynamic>?,
+      favoriteMovies: json['favoriteMovies'] != null
+          ? (json['favoriteMovies'] as List<dynamic>)
+              .map((e) => FavoriteMovie.fromJson(e as Map<String, dynamic>))
+              .toList()
+          : null,
       favoriteShows: json['favoriteShows'] as List<dynamic>?,
       favoritePeople: json['favoritePeople'] as List<dynamic>?,
       favoriteGenres: json['favoriteGenres'] as List<dynamic>?,
@@ -93,55 +108,14 @@ class User {
   }
 
   // Helper methods to check movie status
-  bool isMovieInWatchlist(int movieId) {
-    if (movieWatchlist == null) return false;
-    try {
-      return movieWatchlist!.any((item) {
-        if (item is Map<String, dynamic>) {
-          return item['movieId'] == movieId || item['id'] == movieId;
-        }
-        if (item is int) return item == movieId;
-        return false;
-      });
-    } catch (e) {
-      logger.w('Error checking watchlist: $e');
-      return false;
-    }
-  }
+  bool isMovieInWatchlist(int movieId) =>
+      movieWatchlist?.any((item) => item.movieId == movieId) ?? false;
 
-  bool isMovieWatched(int movieId) {
-    if (watchedMovies == null) return false;
-    try {
-      return watchedMovies!.any((item) {
-        if (item is Map<String, dynamic>) {
-          return item['movieId'] == movieId || item['id'] == movieId;
-        }
-        if (item is int) return item == movieId;
-        return false;
-      });
-    } catch (e) {
-      logger.w('Error checking watched: $e');
-      return false;
-    }
-  }
+  bool isMovieWatched(int movieId) =>
+      watchedMovies?.any((item) => item.movieId == movieId) ?? false;
 
-  bool isMovieFavorite(int movieId) {
-    if (favoriteMovies == null) return false;
-    try {
-      return favoriteMovies!.any((item) {
-        if (item is Map<String, dynamic>) {
-          return item['movieId'] == movieId || item['id'] == movieId;
-        }
-        if (item is int) return item == movieId;
-        return false;
-      });
-    } catch (e) {
-      logger.w('Error checking favorite: $e');
-      logger.d('favoriteMovies type: ${favoriteMovies.runtimeType}');
-      logger.d('favoriteMovies value: $favoriteMovies');
-      return false;
-    }
-  }
+  bool isMovieFavorite(int movieId) =>
+      favoriteMovies?.any((item) => item.movieId == movieId) ?? false;
 
   bool isPersonFavorite(int personId) {
     if (favoritePeople == null) return false;
@@ -179,11 +153,11 @@ class User {
     Map<String, dynamic>? country,
     Map<String, dynamic>? language,
     Map<String, dynamic>? iconColor,
-    List<dynamic>? watchedMovies,
+    List<WatchedMovie>? watchedMovies,
     List<dynamic>? watchedShows,
-    List<dynamic>? movieWatchlist,
+    List<WatchlistMovie>? movieWatchlist,
     List<dynamic>? showWatchlist,
-    List<dynamic>? favoriteMovies,
+    List<FavoriteMovie>? favoriteMovies,
     List<dynamic>? favoriteShows,
     List<dynamic>? favoritePeople,
     List<dynamic>? favoriteGenres,
@@ -238,11 +212,11 @@ class User {
       'country': country,
       'language': language,
       'iconColor': iconColor,
-      'watchedMovies': watchedMovies,
+      'watchedMovies': watchedMovies?.map((e) => e.toJson()).toList(),
       'watchedShows': watchedShows,
-      'movieWatchlist': movieWatchlist,
+      'movieWatchlist': movieWatchlist?.map((e) => e.toJson()).toList(),
       'showWatchlist': showWatchlist,
-      'favoriteMovies': favoriteMovies,
+      'favoriteMovies': favoriteMovies?.map((e) => e.toJson()).toList(),
       'favoriteShows': favoriteShows,
       'favoritePeople': favoritePeople,
       'favoriteGenres': favoriteGenres,

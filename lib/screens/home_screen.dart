@@ -102,14 +102,15 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     logger.d('[HomeScreen] loading, user=[200b${user?.id}, region=$region');
 
     try {
+      final movieService = context.read<MovieService>();
       final results = await Future.wait([
         TrendingService.getTrendingMovies(),
-        MovieService.getNowPlayingMovies(region: region),
+        movieService.getNowPlayingMovies(region: region),
         if (user != null)
           FriendService.getFriendsActivityLists(user.id)
         else
           Future.value([]),
-        MovieService.getTopRatedThisWeek(),
+        movieService.getTopRatedThisWeek(),
         if (user != null)
           RecommendationService.getUserRecommendations(user.id)
               .catchError((_) => <MovieShort>[])

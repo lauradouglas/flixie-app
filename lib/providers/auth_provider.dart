@@ -5,11 +5,14 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 
 import '../models/activity_list_item.dart';
+import '../models/favorite_movie.dart';
 import '../models/friendship.dart';
 import '../models/movie_rating.dart';
 import '../models/movie_short.dart';
 import '../models/review.dart';
 import '../models/user.dart' as models;
+import '../models/watched_movie.dart';
+import '../models/watchlist_movie.dart';
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../services/friend_service.dart';
@@ -31,11 +34,12 @@ class AuthProvider extends ChangeNotifier {
   // Prefetched friends activity for home screen
   List<ActivityListItem>? _cachedFriendsActivity;
   List<ActivityListItem>? get cachedFriendsActivity => _cachedFriendsActivity;
-  AuthProvider(this._authService) {
+  AuthProvider(this._authService, this._movieService) {
     _authService.authStateChanges.listen(_onAuthStateChanged);
   }
 
   final AuthService _authService;
+  final MovieService _movieService;
   final _authStatusNotifier = _AuthStatusNotifier();
 
   AuthStatus _status = AuthStatus.unknown;
@@ -234,7 +238,8 @@ class AuthProvider extends ChangeNotifier {
           .then((v) => _cachedReviews = v, onError: (_) {}),
       TrendingService.getTrendingMovies()
           .then((v) => _cachedTrending = v, onError: (_) {}),
-      MovieService.getNowPlayingMovies(region: region)
+      _movieService
+          .getNowPlayingMovies(region: region)
           .then((v) => _cachedNowPlaying = v, onError: (_) {}),
       NotificationService.getNotifications(userId).then(
           (v) => _unreadNotificationCount = v.where((n) => !n.isRead).length,
@@ -528,9 +533,9 @@ class AuthProvider extends ChangeNotifier {
 
   /// Updates a specific list field on the user
   void updateUserList({
-    List<dynamic>? watchedMovies,
-    List<dynamic>? movieWatchlist,
-    List<dynamic>? favoriteMovies,
+    List<WatchedMovie>? watchedMovies,
+    List<WatchlistMovie>? movieWatchlist,
+    List<FavoriteMovie>? favoriteMovies,
     List<dynamic>? favoritePeople,
   }) {
     if (_dbUser == null) return;

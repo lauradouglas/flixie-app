@@ -21,7 +21,6 @@ import 'screens/watch_requests_screen.dart';
 import 'screens/movie_list_detail_screen.dart';
 import 'screens/movie_lists_screen.dart';
 import 'screens/social_screen.dart';
-import 'screens/wrapped_screen.dart';
 import 'screens/group_detail_screen.dart';
 import 'screens/group_members_screen.dart';
 import 'screens/auth/login_screen.dart';
@@ -159,7 +158,7 @@ GoRouter buildRouter(AuthProvider authProvider) {
           ),
           GoRoute(
             path: '/wrapped',
-            builder: (context, state) => const WrappedScreen(),
+            redirect: (context, state) => '/stats',
           ),
           GoRoute(
             path: '/watch-requests',
