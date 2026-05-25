@@ -16,6 +16,7 @@ import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_logger.dart';
 import 'social/group_card.dart';
+import 'social/group_avatar.dart';
 import 'social/invitation_card.dart';
 import 'social/pending_friend_card.dart';
 import 'social/section_header.dart';
