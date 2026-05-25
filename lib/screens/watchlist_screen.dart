@@ -430,9 +430,6 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
           _statDivider(),
           _statItem(Icons.calendar_today_outlined, upcoming.toString(),
               'Upcoming', FlixieColors.secondary),
-          _statDivider(),
-          _statItem(Icons.people_outline_rounded, '0', 'Friends Added',
-              Colors.lightBlueAccent),
         ],
       ),
     );
@@ -1038,53 +1035,6 @@ class WatchlistMovieRow extends StatelessWidget {
                           ),
                         ),
                       ],
-                      const SizedBox(width: 12),
-                      ...List.generate(4, (index) {
-                        final color = [
-                          const Color(0xFFE8C09D),
-                          const Color(0xFFB67B61),
-                          const Color(0xFFD9A983),
-                          const Color(0xFF8B5D46),
-                        ][index];
-                        return Transform.translate(
-                          offset: Offset(index * -5, 0),
-                          child: Container(
-                            width: 24,
-                            height: 24,
-                            decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: const Color(0xFF0A2348),
-                                width: 2,
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                      Transform.translate(
-                        offset: const Offset(-20, 0),
-                        child: Container(
-                          width: 26,
-                          height: 26,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0A2348),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.25),
-                            ),
-                          ),
-                          alignment: Alignment.center,
-                          child: const Text(
-                            '+3',
-                            style: TextStyle(
-                              color: FlixieColors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
                       const Spacer(),
                       Icon(
                         isWatched
