@@ -156,7 +156,7 @@ class ActivityTile extends StatelessWidget {
         return 'One of your favorites';
       case ActivityListType.movieWatched:
       case ActivityListType.showWatched:
-        return 'You’ve watched this';
+        return null;
       case ActivityListType.movieRating:
       case ActivityListType.showRating:
         if (item.mediaRating != null) {
