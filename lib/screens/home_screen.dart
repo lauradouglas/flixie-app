@@ -5,6 +5,7 @@ import 'package:characters/characters.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/movie_short.dart';
 import '../models/group.dart';
@@ -39,15 +40,6 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   static const double _defaultQuickRating = 5;
   static const int _recentTheatreDays = 45;
   static const String _defaultGroupInitial = 'G';
-  static const List<String> _weekdayLabels = [
-    'Mon',
-    'Tue',
-    'Wed',
-    'Thu',
-    'Fri',
-    'Sat',
-    'Sun',
-  ];
 
   List<MovieShort> _featuredMovies = [];
   List<MovieShort> _nowPlayingMovies = [];
@@ -56,6 +48,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   List<Group> _userGroups = [];
   RecommendationFromHighlyRatedResponse? _highlyRatedRecommendations;
   final Set<int> _watchlistUpdatesInFlight = <int>{};
+  Set<int> _watchlistMovieIds = {};
   bool _isLoading = true;
   String? _error;
   bool _showGreeting = true;
@@ -135,7 +128,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         else
           Future.value([]),
         if (user != null)
-          RecommendationService.getRecommendationsFromHighlyRated()
+          RecommendationService.getRecommendationsFromHighlyRated(
+                  userId: user.id)
               .catchError((_) => null)
         else
           Future.value(null),
@@ -148,6 +142,11 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
           GroupService.getUserGroups(user.id).catchError((_) => <Group>[])
         else
           Future.value(<Group>[]),
+        if (user != null)
+          UserService.getUserWatchlist(user.id)
+              .catchError((_) => <WatchlistMovie>[])
+        else
+          Future.value(<WatchlistMovie>[]),
       ]);
       if (mounted) {
         setState(() {
@@ -166,6 +165,10 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
               ? (_highlyRatedRecommendations!.recommendations).take(20).toList()
               : fallbackForYou.take(20).toList();
           _userGroups = results.length > 5 ? results[5] as List<Group> : [];
+          final watchlist = results.length > 6
+              ? results[6] as List<WatchlistMovie>
+              : <WatchlistMovie>[];
+          _watchlistMovieIds = watchlist.map((w) => w.movieId).toSet();
           _loadedForUserId = user?.id;
           _isLoading = false;
         });
@@ -178,6 +181,68 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
           _error = 'Couldn\'t load content. Check your connection.';
         });
       }
+    }
+  }
+
+  Future<void> _toggleHeroWatchlist(
+      BuildContext context, MovieShort movie) async {
+    final user = context.read<AuthProvider>().dbUser;
+    if (user == null) {
+      context.push('/movies/${movie.id}');
+      return;
+    }
+    final movieId = movie.id;
+    if (_watchlistUpdatesInFlight.contains(movieId)) return;
+    final inWatchlist = _watchlistMovieIds.contains(movieId);
+    setState(() {
+      _watchlistUpdatesInFlight.add(movieId);
+      if (inWatchlist) {
+        _watchlistMovieIds.remove(movieId);
+      } else {
+        _watchlistMovieIds.add(movieId);
+      }
+    });
+    try {
+      if (inWatchlist) {
+        await UserService.removeFromWatchlist(user.id, movieId);
+      } else {
+        await UserService.addToWatchlist(user.id, movieId);
+      }
+    } catch (e) {
+      logger.e('[HomeScreen] watchlist toggle error: $e');
+      if (mounted) {
+        setState(() {
+          if (inWatchlist) {
+            _watchlistMovieIds.add(movieId);
+          } else {
+            _watchlistMovieIds.remove(movieId);
+          }
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _watchlistUpdatesInFlight.remove(movieId));
+    }
+  }
+
+  Future<void> _playTrailer(BuildContext context, MovieShort movie) async {
+    final movieId = movie.id;
+    try {
+      final movieService = context.read<MovieService>();
+      final full = await movieService.getMovieById(movieId);
+      final trailer = (full.videos ?? []).firstWhere(
+        (v) => v.videoTypeName.toLowerCase().contains('trailer'),
+        orElse: () => (full.videos ?? []).isNotEmpty
+            ? full.videos!.first
+            : throw Exception('no video'),
+      );
+      final uri = Uri.parse(trailer.youtubeUrl);
+      if (context.mounted) {
+        if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+          if (context.mounted) context.push('/movies/${movie.id}');
+        }
+      }
+    } catch (_) {
+      if (context.mounted) context.push('/movies/${movie.id}');
     }
   }
 
@@ -367,8 +432,6 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   }
 
   Widget _buildHeroCard(BuildContext context, MovieShort movie) {
-    final weekday = _weekdayLabels[DateTime.now().weekday - 1];
-
     return GestureDetector(
       onTap: () => context.push('/movies/${movie.id}'),
       child: Stack(
@@ -417,15 +480,6 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  weekday,
-                  style: const TextStyle(
-                    color: FlixieColors.light,
-                    fontSize: 15,
-                    letterSpacing: 5,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
                   movie.name.toUpperCase(),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -452,7 +506,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: () => context.push('/movies/${movie.id}'),
+                        onPressed: () => _playTrailer(context, movie),
                         icon: const Icon(Icons.play_arrow_rounded, size: 18),
                         label: const Text('Play Trailer',
                             style: TextStyle(fontWeight: FontWeight.w700)),
@@ -469,10 +523,19 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                     const SizedBox(width: 10),
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: () => context.push('/movies/${movie.id}'),
-                        icon: const Icon(Icons.add_rounded, size: 18),
-                        label: const Text('My List',
-                            style: TextStyle(fontWeight: FontWeight.w700)),
+                        onPressed: () => _toggleHeroWatchlist(context, movie),
+                        icon: Icon(
+                          _watchlistMovieIds.contains(movie.id)
+                              ? Icons.bookmark
+                              : Icons.bookmark_outline,
+                          size: 18,
+                        ),
+                        label: Text(
+                          _watchlistMovieIds.contains(movie.id)
+                              ? 'On Watchlist'
+                              : 'Watchlist',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white,
                           side: BorderSide(

@@ -329,7 +329,7 @@ class UserService {
   // ---- Movie Lists (custom folders) -----------------------------------------
 
   static Future<List<MovieList>> getMovieLists(String userId) async {
-    final data = await ApiClient.get('/users/$userId/movie/lists');
+    final data = await ApiClient.get('/users/$userId/movies/lists');
     final lists = (data as List<dynamic>)
         .whereType<Map<String, dynamic>>()
         .map(MovieList.fromJson)
@@ -344,7 +344,7 @@ class UserService {
     CreateMovieListRequest request,
   ) async {
     final data = await ApiClient.post(
-      '/users/$userId/movie/lists',
+      '/users/$userId/movies/lists',
       body: request.toJson(),
     );
     return MovieList.fromJson(data as Map<String, dynamic>);
@@ -356,14 +356,14 @@ class UserService {
     UpdateMovieListRequest request,
   ) async {
     final data = await ApiClient.patch(
-      '/users/$userId/movie/lists/$listId',
+      '/users/$userId/movies/lists/$listId',
       body: request.toJson(),
     );
     return MovieList.fromJson(data as Map<String, dynamic>);
   }
 
   static Future<void> deleteMovieList(String userId, String listId) async {
-    await ApiClient.delete('/users/$userId/movie/lists/$listId');
+    await ApiClient.delete('/users/$userId/movies/lists/$listId');
   }
 
   static Future<List<MovieListMovie>> getMovieListMovies(
@@ -371,7 +371,7 @@ class UserService {
     String listId,
   ) async {
     final data =
-        await ApiClient.get('/users/$userId/movie/lists/$listId/movies');
+        await ApiClient.get('/users/$userId/movies/lists/$listId/movies');
     // Response shape: { list: { id, name }, movies: [...] }
     final raw = data as Map<String, dynamic>;
     final moviesList = raw['movies'] as List<dynamic>? ?? [];
@@ -390,7 +390,7 @@ class UserService {
     int movieId,
   ) async {
     final data = await ApiClient.post(
-      '/users/$userId/movie/lists/$listId/movies/$movieId',
+      '/users/$userId/movies/lists/$listId/movies/$movieId',
       body: {},
     );
     return MovieListMovie.fromJson(data as Map<String, dynamic>);
@@ -402,7 +402,7 @@ class UserService {
     List<int> movieIds,
   ) async {
     final data = await ApiClient.post(
-      '/users/$userId/movie/lists/$listId/movies',
+      '/users/$userId/movies/lists/$listId/movies',
       body: {'movieIds': movieIds},
     );
     final raw = data as Map<String, dynamic>;
@@ -419,7 +419,7 @@ class UserService {
     int movieId,
   ) async {
     await ApiClient.delete(
-        '/users/$userId/movie/lists/$listId/movies/$movieId');
+        '/users/$userId/movies/lists/$listId/movies/$movieId');
   }
 
   static Future<List<MovieList>> getMyListsContainingMovie(
@@ -444,7 +444,7 @@ class UserService {
     int movieId,
   ) async {
     final data = await ApiClient.get(
-      '/movies/$movieId/lists/friends',
+      '/movies/id/$movieId/friends-activity',
       queryParams: {'userId': userId},
     );
     return (data as List<dynamic>)

@@ -8,6 +8,7 @@ import '../models/group.dart';
 import '../models/group_member.dart';
 import '../models/notification.dart';
 import '../providers/auth_provider.dart';
+import '../screens/profile/add_friend_sheet.dart';
 import '../screens/profile/friends_row.dart';
 import '../services/chat_service.dart';
 import '../services/friend_service.dart';
@@ -128,6 +129,18 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
     }
   }
 
+  void _showAddFriendSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: FlixieColors.tabBarBackgroundFocused,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => const AddFriendSheet(),
+    );
+  }
+
   Future<void> _acceptRequest(Friendship friendship) async {
     try {
       await FriendService.updateRequest(friendship.id, 'ACCEPTED');
@@ -222,7 +235,10 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (friends.isNotEmpty) ...[
-              _FriendStoryStrip(friends: friends),
+              _FriendStoryStrip(
+                friends: friends,
+                onAddTap: _showAddFriendSheet,
+              ),
               const SizedBox(height: 14),
             ],
             // Pending requests section
@@ -289,9 +305,10 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
 // ---------------------------------------------------------------------------
 
 class _FriendStoryStrip extends StatelessWidget {
-  const _FriendStoryStrip({required this.friends});
+  const _FriendStoryStrip({required this.friends, required this.onAddTap});
 
   final List<FriendshipUser> friends;
+  final VoidCallback onAddTap;
 
   Color _avatarColor(Map<String, dynamic>? iconColor) {
     final raw = (iconColor?['hexCode'] ?? iconColor?['hex']) as String?;
@@ -310,10 +327,23 @@ class _FriendStoryStrip extends StatelessWidget {
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (_, index) {
           if (index == friends.length) {
-            return const CircleAvatar(
-              radius: 21,
-              backgroundColor: FlixieColors.tabBarBackgroundFocused,
-              child: Icon(Icons.add, color: FlixieColors.light),
+            return GestureDetector(
+              onTap: onAddTap,
+              child: const Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircleAvatar(
+                    radius: 21,
+                    backgroundColor: FlixieColors.tabBarBackgroundFocused,
+                    child: Icon(Icons.add, color: FlixieColors.light),
+                  ),
+                  SizedBox(height: 4),
+                  SizedBox(
+                    width: 48,
+                    height: 12,
+                  ),
+                ],
+              ),
             );
           }
           final friend = friends[index];

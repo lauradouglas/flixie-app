@@ -48,28 +48,31 @@ class SettingsScreen extends StatelessWidget {
                 label: 'Change Password',
                 onTap: () => _showChangePasswordSheet(context),
               ),
-              SettingsTile(
-                icon: Icons.privacy_tip_outlined,
-                label: 'Privacy',
-                onTap: () {},
-                isLast: true,
-              ),
+              // TODO: implement Privacy screen
+              // SettingsTile(
+              //   icon: Icons.privacy_tip_outlined,
+              //   label: 'Privacy',
+              //   onTap: () {},
+              //   isLast: true,
+              // ),
             ],
           ),
           const SizedBox(height: 24),
           _sectionLabel('Preferences'),
           _SettingsGroup(
             children: [
-              SettingsTile(
-                icon: Icons.notifications_outlined,
-                label: 'Notifications',
-                onTap: () {},
-              ),
-              SettingsTile(
-                icon: Icons.dark_mode_outlined,
-                label: 'Appearance',
-                onTap: () {},
-              ),
+              // TODO: implement Notifications settings
+              // SettingsTile(
+              //   icon: Icons.notifications_outlined,
+              //   label: 'Notifications',
+              //   onTap: () {},
+              // ),
+              // TODO: implement Appearance settings
+              // SettingsTile(
+              //   icon: Icons.dark_mode_outlined,
+              //   label: 'Appearance',
+              //   onTap: () {},
+              // ),
               SettingsTile(
                 icon: Icons.tune_outlined,
                 label: 'Content Preferences',
@@ -174,7 +177,8 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Future<void> _sendFeedback() async {
-    final uri = Uri.parse('mailto:support@flixie.app?subject=Flixie%20Feedback');
+    final uri =
+        Uri.parse('mailto:support@flixie.app?subject=Flixie%20Feedback');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     }
@@ -212,7 +216,7 @@ class _SettingsGroup extends StatelessWidget {
 
 /// Log out button shown at the bottom of Settings.
 class _LogOutButton extends StatelessWidget {
-  const _LogOutButton({super.key});
+  const _LogOutButton();
 
   @override
   Widget build(BuildContext context) {

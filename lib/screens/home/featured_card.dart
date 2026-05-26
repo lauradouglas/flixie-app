@@ -18,8 +18,13 @@ class FeaturedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    // Keep cards compact enough on phones so the next card peeks in,
+    // making horizontal swipe affordance obvious.
+    final cardWidth = (screenWidth * 0.42).clamp(156.0, 176.0);
+
     return SizedBox(
-      width: 185,
+      width: cardWidth,
       child: Card(
         clipBehavior: Clip.antiAlias,
         child: InkWell(

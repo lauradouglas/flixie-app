@@ -788,18 +788,22 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  stops: [0.48, 0.74, 1.0],
+                  stops: [0.0, 0.12, 0.5, 0.72, 0.9, 1.0],
                   colors: [
+                    Color(0x4A000000),
+                    Color(0x14000000),
                     Color(0x00000000),
                     Color(0x73071426),
                     Color(0xD9172B4D),
+                    FlixieColors.background,
                   ],
                 ),
               ),
             ),
             SafeArea(
+              bottom: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -808,16 +812,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                         _heroIconButton(
                           icon: Icons.arrow_back_ios_new_rounded,
                           onTap: () => context.pop(),
-                        ),
-                        const Spacer(),
-                        const Text(
-                          'FLIXIE',
-                          style: TextStyle(
-                            color: FlixieColors.primary,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 1.4,
-                          ),
                         ),
                         const Spacer(),
                         Row(
@@ -949,26 +943,33 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: FlixieColors.primary.withValues(alpha: 0.09),
+        color: const Color(0xB0141B2A),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color: FlixieColors.primary.withValues(alpha: 0.65),
+          color: const Color(0xCCBFD2FF),
           width: 1,
         ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x66000000),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: Text(
         tagline.toUpperCase(),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(
-          color: FlixieColors.primary,
+          color: FlixieColors.white,
           fontSize: 14,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.3,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.5,
           shadows: [
             Shadow(
-              color: Color(0xA0000000),
-              blurRadius: 5,
+              color: Color(0xCC000000),
+              blurRadius: 7,
               offset: Offset(0, 1),
             ),
           ],
@@ -985,19 +986,21 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final rating = _contentRating(movie);
     final meta =
         [year, runtime, rating].where((s) => s.isNotEmpty).join('  •  ');
+    final width = MediaQuery.sizeOf(context).width;
+    final titleSize = width < 380 ? 40.0 : 44.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           movie.title.toUpperCase(),
-          style: const TextStyle(
+          style: TextStyle(
             color: FlixieColors.white,
-            fontSize: 56,
+            fontSize: titleSize,
             fontWeight: FontWeight.w900,
-            height: 0.98,
+            height: 1.0,
             letterSpacing: 0.1,
-            shadows: [
+            shadows: const [
               Shadow(
                 color: Color(0xC0000000),
                 blurRadius: 10,
@@ -1373,12 +1376,12 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   iconColor: FlixieColors.light,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               SizedBox(
-                width: 132,
+                width: 116,
                 child: OutlinedButton.icon(
                   onPressed: _isWatched ? () => _showLogWatchSheet() : null,
-                  icon: const Icon(Icons.replay_rounded, size: 18),
+                  icon: const Icon(Icons.replay_rounded, size: 16),
                   label: const Text('Rewatch'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: FlixieColors.primary,
@@ -1387,7 +1390,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                           ? FlixieColors.primary
                           : FlixieColors.medium.withValues(alpha: 0.4),
                     ),
-                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    padding: const EdgeInsets.symmetric(vertical: 9),
                   ),
                 ),
               ),
