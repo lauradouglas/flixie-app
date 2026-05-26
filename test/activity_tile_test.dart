@@ -52,7 +52,7 @@ void main() {
     expect(find.text('Rated'), findsOneWidget);
   });
 
-  testWidgets('supports compact mode without crashing', (tester) async {
+  testWidgets('renders compact watchlist activity with notes', (tester) async {
     final item = _item(
       type: ActivityListType.movieWatchlist,
       notes: 'Can’t wait to watch this one.',

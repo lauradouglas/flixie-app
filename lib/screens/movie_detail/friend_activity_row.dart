@@ -120,8 +120,6 @@ class FriendActivityRow extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const Icon(Icons.more_vert_rounded,
-                          size: 16, color: FlixieColors.medium),
                     ],
                   ),
                   if (badges.isNotEmpty) ...[

@@ -90,7 +90,7 @@ class ActivityTile extends StatelessWidget {
       case ActivityListType.favoriteMovie:
       case ActivityListType.favoriteShow:
       case ActivityListType.favoritePerson:
-        return 'added to favourites';
+        return 'added to favorites';
       case ActivityListType.watchRequest:
       case ActivityListType.watchRequestAccepted:
       case ActivityListType.watchRequestSent:
@@ -117,7 +117,7 @@ class ActivityTile extends StatelessWidget {
       case ActivityListType.favoriteMovie:
       case ActivityListType.favoriteShow:
       case ActivityListType.favoritePerson:
-        return 'Favourite';
+        return 'Favorite';
       case ActivityListType.watchRequest:
       case ActivityListType.watchRequestAccepted:
       case ActivityListType.watchRequestSent:
@@ -153,7 +153,7 @@ class ActivityTile extends StatelessWidget {
       case ActivityListType.favoriteMovie:
       case ActivityListType.favoriteShow:
       case ActivityListType.favoritePerson:
-        return 'One of your favourites';
+        return 'One of your favorites';
       case ActivityListType.movieWatched:
       case ActivityListType.showWatched:
         return 'You’ve watched this';
@@ -235,6 +235,19 @@ class ActivityTile extends StatelessWidget {
     );
   }
 
+  bool _shouldShowUsername(String displayName, String username) {
+    return username.isNotEmpty &&
+        username.toLowerCase() != displayName.toLowerCase();
+  }
+
+  String? _mediaRoute() {
+    final isPerson = item.type == ActivityListType.favoritePerson;
+    if (isPerson && item.personId != null) return '/people/${item.personId}';
+    if (item.movieId != null) return '/movies/${item.movieId}';
+    if (item.showId != null) return '/shows/${item.showId}';
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final displayName = _displayName();
@@ -243,7 +256,7 @@ class ActivityTile extends StatelessWidget {
     final dateStr = _formatDate(item.timestamp);
     final notes = (item.notes ?? '').trim();
     final isPerson = item.type == ActivityListType.favoritePerson;
-    final navId = isPerson ? item.personId : (item.movieId ?? item.showId);
+    final mediaRoute = _mediaRoute();
     final isReview = item.type == ActivityListType.movieReview ||
         item.type == ActivityListType.showReview;
     final rawPoster = item.mediaPosterPath;
@@ -308,9 +321,7 @@ class ActivityTile extends StatelessWidget {
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          if (username.isNotEmpty &&
-                              username.toLowerCase() !=
-                                  displayName.toLowerCase()) ...[
+                          if (_shouldShowUsername(displayName, username)) ...[
                             const SizedBox(height: 1),
                             Text(
                               '@$username',
@@ -335,14 +346,6 @@ class ActivityTile extends StatelessWidget {
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
-                  ),
-                  IconButton(
-                    onPressed: () {},
-                    icon: const Icon(Icons.more_vert_rounded,
-                        color: FlixieColors.medium, size: 18),
-                    visualDensity: VisualDensity.compact,
-                    splashRadius: 18,
-                    tooltip: 'More',
                   ),
                 ],
               ),
@@ -372,7 +375,7 @@ class ActivityTile extends StatelessWidget {
               if (showMoviePreview && !isPerson) ...[
                 const SizedBox(height: 10),
                 InkWell(
-                  onTap: navId != null ? () => context.push('/movies/$navId') : null,
+                  onTap: mediaRoute != null ? () => context.push(mediaRoute) : null,
                   borderRadius: BorderRadius.circular(12),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
