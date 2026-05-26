@@ -16,9 +16,7 @@ class RecommendationSourceMovie {
   factory RecommendationSourceMovie.fromJson(Map<String, dynamic> json) {
     final idValue = json['id'];
     return RecommendationSourceMovie(
-      id: idValue is int
-          ? idValue
-          : int.tryParse(idValue?.toString() ?? ''),
+      id: idValue is int ? idValue : int.tryParse(idValue?.toString() ?? ''),
       title: (json['title'] ?? json['name'] ?? '') as String,
       rating: (json['rating'] as num?)?.toDouble(),
     );
@@ -43,9 +41,8 @@ class RecommendationFromHighlyRatedResponse {
         .toList();
 
     return RecommendationFromHighlyRatedResponse(
-      sourceMovie: source == null
-          ? null
-          : RecommendationSourceMovie.fromJson(source),
+      sourceMovie:
+          source == null ? null : RecommendationSourceMovie.fromJson(source),
       recommendations: recs,
     );
   }
@@ -61,9 +58,14 @@ class RecommendationService {
   }
 
   static Future<RecommendationFromHighlyRatedResponse?>
-      getRecommendationsFromHighlyRated() async {
-    apiLogger.d('GET /recommendations/from-highly-rated');
-    final data = await ApiClient.get('/recommendations/from-highly-rated');
+      getRecommendationsFromHighlyRated({String? userId}) async {
+    final isAuthDisabled = ApiClient.getToken() == null;
+    final queryParams =
+        (isAuthDisabled && userId != null) ? {'userId': userId} : null;
+    apiLogger.d(
+        'GET /recommendations/from-highly-rated${queryParams != null ? "?userId=$userId" : ""}');
+    final data = await ApiClient.get('/recommendations/from-highly-rated',
+        queryParams: queryParams);
     if (data == null) return null;
 
     if (data is Map<String, dynamic>) {

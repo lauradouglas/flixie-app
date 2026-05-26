@@ -1,4 +1,5 @@
 import '../models/movie_list.dart';
+import '../models/movie_friend_list_entry.dart';
 import '../models/movie_list_movie.dart';
 import '../models/movie_watch_entry.dart';
 import '../models/movie_wrapped.dart';
@@ -11,18 +12,45 @@ class MovieFeaturesRepository {
     return UserService.getMovieLists(userId);
   }
 
-  Future<MovieList> createMovieList(String userId, String name) {
+  Future<MovieList> createMovieList(
+    String userId,
+    String name, {
+    String? description,
+    String visibility = ListVisibility.private,
+    String? coverImageUrl,
+    String whoCanAddMovies = 'owner',
+  }) {
     return UserService.createMovieList(
       userId,
-      CreateMovieListRequest(name: name),
+      CreateMovieListRequest(
+        name: name,
+        description: description,
+        visibility: visibility,
+        coverImageUrl: coverImageUrl,
+        whoCanAddMovies: whoCanAddMovies,
+      ),
     );
   }
 
-  Future<MovieList> renameMovieList(String userId, String listId, String name) {
+  Future<MovieList> renameMovieList(
+    String userId,
+    String listId,
+    String name, {
+    String? description,
+    String? visibility,
+    String? coverImageUrl,
+    String? whoCanAddMovies,
+  }) {
     return UserService.renameMovieList(
       userId,
       listId,
-      UpdateMovieListRequest(name: name),
+      UpdateMovieListRequest(
+        name: name,
+        description: description,
+        visibility: visibility,
+        coverImageUrl: coverImageUrl,
+        whoCanAddMovies: whoCanAddMovies,
+      ),
     );
   }
 
@@ -44,6 +72,17 @@ class MovieFeaturesRepository {
 
   Future<void> removeMovieFromList(String userId, String listId, int movieId) {
     return UserService.removeMovieFromList(userId, listId, movieId);
+  }
+
+  Future<List<MovieList>> getMyListsContainingMovie(String userId, int movieId) {
+    return UserService.getMyListsContainingMovie(userId, movieId);
+  }
+
+  Future<List<MovieFriendListEntry>> getFriendsListsContainingMovie(
+    String userId,
+    int movieId,
+  ) {
+    return UserService.getFriendsListsContainingMovie(userId, movieId);
   }
 
   Future<MovieWatchEntry> logMovieWatch(

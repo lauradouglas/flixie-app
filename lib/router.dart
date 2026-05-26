@@ -150,6 +150,7 @@ GoRouter buildRouter(AuthProvider authProvider) {
             builder: (context, state) => MovieListDetailScreen(
               listId: state.pathParameters['id'] ?? '',
               listName: state.uri.queryParameters['name'] ?? 'List',
+              ownerUserId: state.uri.queryParameters['owner'],
             ),
           ),
           GoRoute(

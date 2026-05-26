@@ -14,14 +14,18 @@ class MovieListDetailScreen extends StatelessWidget {
     super.key,
     required this.listId,
     required this.listName,
+    this.ownerUserId,
   });
 
   final String listId;
   final String listName;
+  final String? ownerUserId;
 
   @override
   Widget build(BuildContext context) {
-    final userId = context.read<AuthProvider>().dbUser?.id;
+    final userId = (ownerUserId?.isNotEmpty ?? false)
+        ? ownerUserId
+        : context.read<AuthProvider>().dbUser?.id;
     if (userId == null) {
       return const Scaffold(
         body: Center(child: Text('Sign in to view list')),

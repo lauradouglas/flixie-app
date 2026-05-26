@@ -15,6 +15,7 @@ import 'profile/favorite_movies_section.dart';
 import 'profile/favorite_people_section.dart';
 import 'profile/friends_row.dart';
 import 'profile/movie_taste_badge.dart';
+import 'profile/lists_preview_section.dart';
 import 'profile/profile_header.dart';
 import 'profile/profile_stats_row.dart';
 import 'profile/ratings_section.dart';
@@ -210,6 +211,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final email = dbUser?.email ?? firebaseUser?.email ?? '';
     final bio = dbUser?.bio;
     final photoUrl = firebaseUser?.photoURL;
+    final userId = dbUser?.id;
 
     final favoriteMovies = dbUser?.favoriteMovies ?? [];
     final favoritePeople = dbUser?.favoritePeople ?? [];
@@ -285,9 +287,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ],
 
                     const SizedBox(height: 24),
-                    const Divider(),
-                    const SizedBox(height: 16),
-
                     // Friends row
                     FriendsRow(
                       data: _friendsData ??
@@ -306,6 +305,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
 
                     const SizedBox(height: 24),
+
+                    // Favorite Movies
+                    if (userId != null) ...[
+                      ListsPreviewSection(
+                        userId: userId,
+                        title: 'Your Lists',
+                        emptyMessage: "You haven't created any lists yet.",
+                        allowManage: true,
+                        embedded: true,
+                      ),
+                      const SizedBox(height: 16),
+                    ],
 
                     // Favorite Movies
                     if (favoriteMovies.isNotEmpty) ...[
@@ -330,99 +341,81 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       const SizedBox(height: 16),
                     ],
 
-                    const Divider(),
-                    const SizedBox(height: 10),
-
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-                      decoration: BoxDecoration(
-                        color: FlixieColors.tabBarBackgroundFocused,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: FlixieColors.tabBarBorder),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                'Your activity',
-                                style: textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  color: FlixieColors.light,
-                                ),
-                              ),
-                              const Spacer(),
-                              if (_activity.isNotEmpty)
-                                Text(
-                                  '${_activity.length}',
-                                  style: const TextStyle(
-                                    color: FlixieColors.medium,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                            ],
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Text(
+                          'Your activity',
+                          style: textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: FlixieColors.light,
                           ),
-                          const SizedBox(height: 10),
-                          if (_activityLoading)
-                            const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 16),
-                              child: Center(child: CircularProgressIndicator()),
-                            )
-                          else if (_activity.isEmpty)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              child: Text(
-                                'No activity yet.',
-                                style: textTheme.bodySmall
-                                    ?.copyWith(color: FlixieColors.medium),
-                              ),
-                            )
-                          else ...[
-                            ListView.separated(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: visibleActivity.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(height: 10),
-                              itemBuilder: (_, i) =>
-                                  ActivityTile(item: visibleActivity[i]),
+                        ),
+                        const Spacer(),
+                        if (_activity.isNotEmpty)
+                          Text(
+                            '${_activity.length}',
+                            style: const TextStyle(
+                              color: FlixieColors.medium,
+                              fontSize: 12,
                             ),
-                            if (_activity.length > _initialActivityCount) ...[
-                              const SizedBox(height: 12),
-                              SizedBox(
-                                width: double.infinity,
-                                child: OutlinedButton(
-                                  onPressed: () => setState(
-                                      () => _showAllActivity = !_showAllActivity),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: FlixieColors.light,
-                                    side: const BorderSide(
-                                        color: FlixieColors.tabBarBorder),
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 13),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    _showAllActivity
-                                        ? 'SHOW LESS'
-                                        : 'VIEW ALL ACTIVITY',
-                                    style: const TextStyle(
-                                      letterSpacing: 1.1,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ],
-                      ),
+                          ),
+                      ],
                     ),
+                    const SizedBox(height: 10),
+                    if (_activityLoading)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else if (_activity.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Text(
+                          'No activity yet.',
+                          style: textTheme.bodySmall
+                              ?.copyWith(color: FlixieColors.medium),
+                        ),
+                      )
+                    else ...[
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: visibleActivity.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        itemBuilder: (_, i) =>
+                            ActivityTile(item: visibleActivity[i]),
+                      ),
+                      if (_activity.length > _initialActivityCount) ...[
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            onPressed: () => setState(
+                                () => _showAllActivity = !_showAllActivity),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: FlixieColors.light,
+                              side: const BorderSide(
+                                  color: FlixieColors.tabBarBorder),
+                              padding: const EdgeInsets.symmetric(vertical: 13),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Text(
+                              _showAllActivity
+                                  ? 'SHOW LESS'
+                                  : 'VIEW ALL ACTIVITY',
+                              style: const TextStyle(
+                                letterSpacing: 1.1,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
 
                     const SizedBox(height: 16),
                     const Divider(),

@@ -197,99 +197,101 @@ class ActivityTile extends StatelessWidget {
         ? '$_posterBase${item.mediaPosterPath}'
         : null;
 
-    final tile = Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-        gradient: LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: [
-            const Color(0xFF10345A).withValues(alpha: 0.9),
-            const Color(0xFF061D3B).withValues(alpha: 0.95),
-          ],
+    final tile = ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          gradient: LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [
+              const Color(0xFF10345A).withValues(alpha: 0.9),
+              const Color(0xFF061D3B).withValues(alpha: 0.95),
+            ],
+          ),
         ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 4,
-            height: 112,
-            decoration: BoxDecoration(
-              color: _accentColor,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                bottomLeft: Radius.circular(16),
+        child: Row(
+          children: [
+            Container(
+              width: 4,
+              height: 112,
+              decoration: BoxDecoration(
+                color: _accentColor,
+                borderRadius: const BorderRadius.horizontal(
+                  left: Radius.circular(16),
+                ),
               ),
             ),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  GestureDetector(
-                    onTap: () => context.push('/friends/${item.userId}'),
-                    child: _buildAvatar(),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '$displayName ${_actionVerb()} $title',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            height: 1.15,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          dateStr,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: FlixieColors.light,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        if (notes.isNotEmpty) ...[
-                          const SizedBox(height: 6),
+            Expanded(
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    GestureDetector(
+                      onTap: () => context.push('/friends/${item.userId}'),
+                      child: _buildAvatar(),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            notes,
-                            maxLines: 1,
+                            '$displayName ${_actionVerb()} $title',
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.78),
-                              fontSize: 14,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              height: 1.15,
                             ),
                           ),
+                          const SizedBox(height: 4),
+                          Text(
+                            dateStr,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: FlixieColors.light,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          if (notes.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              notes,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.78),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  GestureDetector(
-                    onTap: navId != null
-                        ? () => context.push(
-                            isPerson ? '/people/$navId' : '/movies/$navId')
-                        : null,
-                    child: _buildRightVisual(
-                        isPerson: isPerson, posterUrl: posterUrl),
-                  ),
-                ],
+                    const SizedBox(width: 10),
+                    GestureDetector(
+                      onTap: navId != null
+                          ? () => context.push(
+                              isPerson ? '/people/$navId' : '/movies/$navId')
+                          : null,
+                      child: _buildRightVisual(
+                          isPerson: isPerson, posterUrl: posterUrl),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
 

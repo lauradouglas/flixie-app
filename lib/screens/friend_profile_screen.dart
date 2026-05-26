@@ -13,6 +13,7 @@ import 'friend_profile/mini_stats.dart';
 import 'friend_profile/taste_compatibility_card.dart';
 import 'my_reviews_screen.dart';
 import 'profile/favorite_movies_section.dart';
+import 'profile/lists_preview_section.dart';
 import 'profile/movie_taste_badge.dart';
 import 'profile/profile_stats_row.dart';
 import 'wrapped/friend_wrapped_section.dart';
@@ -582,6 +583,14 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                     watched: watchedCount,
                     watchlist: watchlistCount,
                     favorites: favoritesCount,
+                  ),
+
+                  const SizedBox(height: 16),
+                  ListsPreviewSection(
+                    userId: widget.userId,
+                    title: "${_user?.username ?? 'Friend'}'s Lists",
+                    emptyMessage:
+                        "No visible lists yet or this friend hasn't created one.",
                   ),
 
                   // Taste compatibility

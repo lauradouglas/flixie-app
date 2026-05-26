@@ -34,9 +34,22 @@ class MovieListsProvider extends ChangeNotifier {
     }
   }
 
-  Future<MovieList?> createList(String name) async {
+  Future<MovieList?> createList(
+    String name, {
+    String? description,
+    String visibility = ListVisibility.private,
+    String? coverImageUrl,
+    String whoCanAddMovies = 'owner',
+  }) async {
     try {
-      final created = await repository.createMovieList(userId, name);
+      final created = await repository.createMovieList(
+        userId,
+        name,
+        description: description,
+        visibility: visibility,
+        coverImageUrl: coverImageUrl,
+        whoCanAddMovies: whoCanAddMovies,
+      );
       lists = [...lists, created]
         ..sort((a, b) => (a.createdAt ?? '').compareTo(b.createdAt ?? ''));
       notifyListeners();
@@ -48,9 +61,24 @@ class MovieListsProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> renameList(String listId, String name) async {
+  Future<bool> renameList(
+    String listId,
+    String name, {
+    String? description,
+    String? visibility,
+    String? coverImageUrl,
+    String? whoCanAddMovies,
+  }) async {
     try {
-      final updated = await repository.renameMovieList(userId, listId, name);
+      final updated = await repository.renameMovieList(
+        userId,
+        listId,
+        name,
+        description: description,
+        visibility: visibility,
+        coverImageUrl: coverImageUrl,
+        whoCanAddMovies: whoCanAddMovies,
+      );
       lists = lists.map((l) => l.id == listId ? updated : l).toList();
       notifyListeners();
       return true;
@@ -117,6 +145,20 @@ class MovieListsProvider extends ChangeNotifier {
       error = _friendlyError(e);
       notifyListeners();
       return false;
+    }
+  }
+
+  Future<List<MovieList>> getListsContainingMovie(int movieId) async {
+    try {
+      final containing = await repository.getMyListsContainingMovie(
+        userId,
+        movieId,
+      );
+      return containing.where((list) => !list.removed).toList(growable: false);
+    } catch (e) {
+      error = _friendlyError(e);
+      notifyListeners();
+      return const <MovieList>[];
     }
   }
 
