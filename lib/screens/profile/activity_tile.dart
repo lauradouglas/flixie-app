@@ -10,9 +10,16 @@ import '../../theme/app_theme.dart';
 import '../movie_detail/review_card.dart';
 
 class ActivityTile extends StatelessWidget {
-  const ActivityTile({super.key, required this.item});
+  const ActivityTile({
+    super.key,
+    required this.item,
+    this.compact = false,
+    this.showMoviePreview = true,
+  });
 
   final ActivityListItem item;
+  final bool compact;
+  final bool showMoviePreview;
 
   static const String _posterBase = 'https://image.tmdb.org/t/p/w342';
 
@@ -70,7 +77,7 @@ class ActivityTile extends StatelessWidget {
     switch (item.type) {
       case ActivityListType.movieWatchlist:
       case ActivityListType.showWatchlist:
-        return 'added';
+        return 'added to watchlist';
       case ActivityListType.movieWatched:
       case ActivityListType.showWatched:
         return 'watched';
@@ -83,7 +90,7 @@ class ActivityTile extends StatelessWidget {
       case ActivityListType.favoriteMovie:
       case ActivityListType.favoriteShow:
       case ActivityListType.favoritePerson:
-        return 'favorited';
+        return 'added to favourites';
       case ActivityListType.watchRequest:
       case ActivityListType.watchRequestAccepted:
       case ActivityListType.watchRequestSent:
@@ -93,67 +100,112 @@ class ActivityTile extends StatelessWidget {
     }
   }
 
+  String _statusLabel() {
+    switch (item.type) {
+      case ActivityListType.movieWatchlist:
+      case ActivityListType.showWatchlist:
+        return 'Watchlist';
+      case ActivityListType.movieWatched:
+      case ActivityListType.showWatched:
+        return 'Watched';
+      case ActivityListType.movieRating:
+      case ActivityListType.showRating:
+        return 'Rated';
+      case ActivityListType.movieReview:
+      case ActivityListType.showReview:
+        return 'Review';
+      case ActivityListType.favoriteMovie:
+      case ActivityListType.favoriteShow:
+      case ActivityListType.favoritePerson:
+        return 'Favourite';
+      case ActivityListType.watchRequest:
+      case ActivityListType.watchRequestAccepted:
+      case ActivityListType.watchRequestSent:
+        return 'Request';
+      case ActivityListType.unknown:
+        return 'Activity';
+    }
+  }
+
   Widget _buildAvatar() {
     final initial = _displayName().substring(0, 1).toUpperCase();
     return CircleAvatar(
-      radius: 22,
-      backgroundColor: FlixieColors.primary.withValues(alpha: 0.25),
+      radius: compact ? 18 : 20,
+      backgroundColor: FlixieColors.primary.withValues(alpha: 0.22),
       child: Text(
         initial,
         style: const TextStyle(
           color: Colors.white,
-          fontSize: 16,
+          fontSize: 14,
           fontWeight: FontWeight.w700,
         ),
       ),
     );
   }
 
-  Widget _buildRightVisual(
-      {required bool isPerson, required String? posterUrl}) {
-    if (posterUrl == null) {
-      final icon = item.type == ActivityListType.movieWatchlist ||
-              item.type == ActivityListType.showWatchlist
-          ? Icons.bookmark_outline_rounded
-          : (isPerson ? Icons.person_outline : Icons.movie_outlined);
-      final iconColor = item.type == ActivityListType.movieWatchlist ||
-              item.type == ActivityListType.showWatchlist
-          ? const Color(0xFFFFD446)
-          : FlixieColors.light;
-      return Container(
-        width: 80,
-        height: 80,
-        decoration: BoxDecoration(
-          color: const Color(0xFF1C3558).withValues(alpha: 0.86),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(icon, color: iconColor, size: 30),
-      );
+  String? _contextBadgeText(BuildContext context) {
+    final currentUserId = context.read<AuthProvider?>()?.dbUser?.id;
+    if (currentUserId != item.userId || item.userId.isEmpty) return null;
+    switch (item.type) {
+      case ActivityListType.movieWatchlist:
+      case ActivityListType.showWatchlist:
+        return 'In your watchlist';
+      case ActivityListType.favoriteMovie:
+      case ActivityListType.favoriteShow:
+      case ActivityListType.favoritePerson:
+        return 'One of your favourites';
+      case ActivityListType.movieWatched:
+      case ActivityListType.showWatched:
+        return 'You’ve watched this';
+      case ActivityListType.movieRating:
+      case ActivityListType.showRating:
+        if (item.mediaRating != null) {
+          return 'You rated this ${item.mediaRating!.round()}/10';
+        }
+        return 'You rated this';
+      case ActivityListType.movieReview:
+      case ActivityListType.showReview:
+        return 'You reviewed this';
+      case ActivityListType.watchRequest:
+      case ActivityListType.watchRequestAccepted:
+      case ActivityListType.watchRequestSent:
+      case ActivityListType.unknown:
+        return null;
     }
+  }
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: SizedBox(
-        width: 80,
-        height: 80,
-        child: CachedNetworkImage(
-          imageUrl: posterUrl,
-          fit: BoxFit.cover,
-          errorWidget: (_, __, ___) => Container(
-            color: const Color(0xFF1C3558),
-            child: Icon(
-              isPerson ? Icons.person_outline : Icons.movie_outlined,
-              color: FlixieColors.light,
-              size: 28,
+  Widget _buildChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
             ),
           ),
-        ),
+        ],
       ),
     );
   }
 
   void _openReviewSheet(BuildContext context, Review review) {
-    final currentUserId = context.read<AuthProvider>().dbUser?.id;
+    final currentUserId = context.read<AuthProvider?>()?.dbUser?.id;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -186,111 +238,259 @@ class ActivityTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final displayName = _displayName();
+    final username = item.username.trim();
     final title = item.mediaTitle ?? 'something';
     final dateStr = _formatDate(item.timestamp);
     final notes = (item.notes ?? '').trim();
     final isPerson = item.type == ActivityListType.favoritePerson;
-    final navId = isPerson ? item.personId : item.movieId;
+    final navId = isPerson ? item.personId : (item.movieId ?? item.showId);
     final isReview = item.type == ActivityListType.movieReview ||
         item.type == ActivityListType.showReview;
-    final posterUrl = item.mediaPosterPath != null
-        ? '$_posterBase${item.mediaPosterPath}'
-        : null;
+    final rawPoster = item.mediaPosterPath;
+    final posterUrl = rawPoster == null || rawPoster.isEmpty
+        ? null
+        : rawPoster.startsWith('http')
+            ? rawPoster
+            : '$_posterBase$rawPoster';
+    final contextText = _contextBadgeText(context);
 
     final tile = ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: Container(
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          color: FlixieColors.surface.withValues(alpha: 0.92),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
           gradient: LinearGradient(
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
             colors: [
-              const Color(0xFF10345A).withValues(alpha: 0.9),
-              const Color(0xFF061D3B).withValues(alpha: 0.95),
+              FlixieColors.surfaceElevated.withValues(alpha: 0.7),
+              FlixieColors.surface.withValues(alpha: 0.96),
             ],
           ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 4,
-              height: 112,
-              decoration: BoxDecoration(
-                color: _accentColor,
-                borderRadius: const BorderRadius.horizontal(
-                  left: Radius.circular(16),
-                ),
-              ),
+          boxShadow: [
+            BoxShadow(
+              color: FlixieColors.primary.withValues(alpha: 0.08),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
             ),
-            Expanded(
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    GestureDetector(
-                      onTap: () => context.push('/friends/${item.userId}'),
-                      child: _buildAvatar(),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
+          ],
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(compact ? 10 : 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  GestureDetector(
+                    onTap: item.userId.isEmpty
+                        ? null
+                        : () => context.push('/friends/${item.userId}'),
+                    child: _buildAvatar(),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: item.userId.isEmpty
+                          ? null
+                          : () => context.push('/friends/${item.userId}'),
                       child: Column(
-                        mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '$displayName ${_actionVerb()} $title',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              height: 1.15,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            dateStr,
+                            displayName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: FlixieColors.light,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: compact ? 14 : 16,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                          if (notes.isNotEmpty) ...[
-                            const SizedBox(height: 6),
+                          if (username.isNotEmpty &&
+                              username.toLowerCase() !=
+                                  displayName.toLowerCase()) ...[
+                            const SizedBox(height: 1),
                             Text(
-                              notes,
+                              '@$username',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.78),
-                                fontSize: 14,
+                              style: const TextStyle(
+                                color: FlixieColors.medium,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],
                         ],
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    GestureDetector(
-                      onTap: navId != null
-                          ? () => context.push(
-                              isPerson ? '/people/$navId' : '/movies/$navId')
-                          : null,
-                      child: _buildRightVisual(
-                          isPerson: isPerson, posterUrl: posterUrl),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    dateStr,
+                    style: const TextStyle(
+                      color: FlixieColors.medium,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () {},
+                    icon: const Icon(Icons.more_vert_rounded,
+                        color: FlixieColors.medium, size: 18),
+                    visualDensity: VisualDensity.compact,
+                    splashRadius: 18,
+                    tooltip: 'More',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text.rich(
+                TextSpan(
+                  style: TextStyle(
+                    color: FlixieColors.light,
+                    fontSize: compact ? 13 : 14,
+                    fontWeight: FontWeight.w500,
+                    height: 1.35,
+                  ),
+                  children: [
+                    TextSpan(text: '$displayName ${_actionVerb()} '),
+                    TextSpan(
+                      text: title,
+                      style: const TextStyle(
+                        color: FlixieColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ],
                 ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-          ],
+              if (showMoviePreview && !isPerson) ...[
+                const SizedBox(height: 10),
+                InkWell(
+                  onTap: navId != null ? () => context.push('/movies/$navId') : null,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: SizedBox(
+                          width: compact ? 72 : 86,
+                          height: compact ? 96 : 114,
+                          child: posterUrl == null
+                              ? Container(
+                                  color: FlixieColors.surfaceElevated,
+                                  alignment: Alignment.center,
+                                  child: const Icon(
+                                    Icons.movie_outlined,
+                                    color: FlixieColors.light,
+                                  ),
+                                )
+                              : CachedNetworkImage(
+                                  imageUrl: posterUrl,
+                                  fit: BoxFit.cover,
+                                  errorWidget: (_, __, ___) => Container(
+                                    color: FlixieColors.surfaceElevated,
+                                    alignment: Alignment.center,
+                                    child: const Icon(
+                                      Icons.movie_outlined,
+                                      color: FlixieColors.light,
+                                    ),
+                                  ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: compact ? 14 : 18,
+                                fontWeight: FontWeight.w700,
+                                height: 1.15,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: [
+                                _buildChip(
+                                  icon: Icons.local_activity_outlined,
+                                  label: _statusLabel(),
+                                  color: _accentColor,
+                                ),
+                                if (item.mediaRating != null)
+                                  _buildChip(
+                                    icon: Icons.star_rounded,
+                                    label: '${item.mediaRating!.toStringAsFixed(1)}/10',
+                                    color: FlixieColors.tertiary,
+                                  ),
+                              ],
+                            ),
+                            if (notes.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 9, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: FlixieColors.surface.withValues(alpha: 0.8),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.08),
+                                  ),
+                                ),
+                                child: Text(
+                                  notes,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: FlixieColors.light,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ] else if (notes.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  notes,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: FlixieColors.light,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+              if (contextText != null) ...[
+                const SizedBox(height: 10),
+                _buildChip(
+                  icon: Icons.person_outline_rounded,
+                  label: contextText,
+                  color: FlixieColors.primary,
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
