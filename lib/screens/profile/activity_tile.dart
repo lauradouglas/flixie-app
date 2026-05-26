@@ -160,7 +160,7 @@ class ActivityTile extends StatelessWidget {
       case ActivityListType.movieRating:
       case ActivityListType.showRating:
         if (item.mediaRating != null) {
-          return 'You rated this ${item.mediaRating!.round()}/10';
+          return 'You rated this ${item.mediaRating!.toStringAsFixed(1)}/10';
         }
         return 'You rated this';
       case ActivityListType.movieReview:
