@@ -2142,7 +2142,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     if (_isFavorite) {
       badges.add(_buildYourActivityChip(
         icon: Icons.favorite,
-        label: 'In favourites',
+        label: 'In favorites',
         color: Colors.redAccent,
       ));
     }

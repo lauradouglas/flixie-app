@@ -67,7 +67,8 @@ class ActivityTile extends StatelessWidget {
   }
 
   String _displayName() {
-    if (item.username.trim().isNotEmpty) return item.username.trim();
+    final username = item.username.trim();
+    if (username.isNotEmpty) return username;
     final full = '${item.firstName} ${item.lastName}'.trim();
     if (full.isNotEmpty) return full;
     return 'Friend';
@@ -143,8 +144,7 @@ class ActivityTile extends StatelessWidget {
     );
   }
 
-  String? _contextBadgeText(BuildContext context) {
-    final currentUserId = context.read<AuthProvider?>()?.dbUser?.id;
+  String? _contextBadgeText(String? currentUserId) {
     if (currentUserId != item.userId || item.userId.isEmpty) return null;
     switch (item.type) {
       case ActivityListType.movieWatchlist:
@@ -174,8 +174,7 @@ class ActivityTile extends StatelessWidget {
     }
   }
 
-  String _activitySubject(BuildContext context, String displayName) {
-    final currentUserId = context.read<AuthProvider?>()?.dbUser?.id;
+  String _activitySubject(String displayName, String? currentUserId) {
     if (currentUserId == item.userId && item.userId.isNotEmpty) return 'You';
     return displayName;
   }
@@ -210,8 +209,8 @@ class ActivityTile extends StatelessWidget {
     );
   }
 
-  void _openReviewSheet(BuildContext context, Review review) {
-    final currentUserId = context.read<AuthProvider?>()?.dbUser?.id;
+  void _openReviewSheet(
+      BuildContext context, Review review, String? currentUserId) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -256,8 +255,9 @@ class ActivityTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final currentUserId = context.read<AuthProvider?>()?.dbUser?.id;
     final displayName = _displayName();
-    final activitySubject = _activitySubject(context, displayName);
+    final activitySubject = _activitySubject(displayName, currentUserId);
     final username = item.username.trim();
     final title = item.mediaTitle ?? 'something';
     final dateStr = _formatDate(item.timestamp);
@@ -272,7 +272,7 @@ class ActivityTile extends StatelessWidget {
         : rawPoster.startsWith('http')
             ? rawPoster
             : '$_posterBase$rawPoster';
-    final contextText = _contextBadgeText(context);
+    final contextText = _contextBadgeText(currentUserId);
 
     final tile = ClipRRect(
       borderRadius: BorderRadius.circular(16),
@@ -507,7 +507,7 @@ class ActivityTile extends StatelessWidget {
 
     if (isReview && item.reviewData != null) {
       return GestureDetector(
-        onTap: () => _openReviewSheet(context, item.reviewData!),
+        onTap: () => _openReviewSheet(context, item.reviewData!, currentUserId),
         child: tile,
       );
     }
