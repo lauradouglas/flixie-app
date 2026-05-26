@@ -25,9 +25,7 @@ class FriendActivityRow extends StatelessWidget {
       if (value != null) avatarColor = Color(value);
     }
 
-    final displayName = activity.firstName?.isNotEmpty == true
-        ? '${activity.username} (${activity.firstName})'
-        : activity.username;
+    final displayName = activity.username;
     final initial =
         activity.username.isNotEmpty ? activity.username[0].toUpperCase() : '?';
 

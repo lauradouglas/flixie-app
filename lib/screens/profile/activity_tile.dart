@@ -67,9 +67,9 @@ class ActivityTile extends StatelessWidget {
   }
 
   String _displayName() {
+    if (item.username.trim().isNotEmpty) return item.username.trim();
     final full = '${item.firstName} ${item.lastName}'.trim();
     if (full.isNotEmpty) return full;
-    if (item.username.trim().isNotEmpty) return item.username.trim();
     return 'Friend';
   }
 
@@ -174,6 +174,12 @@ class ActivityTile extends StatelessWidget {
     }
   }
 
+  String _activitySubject(BuildContext context, String displayName) {
+    final currentUserId = context.read<AuthProvider?>()?.dbUser?.id;
+    if (currentUserId == item.userId && item.userId.isNotEmpty) return 'You';
+    return displayName;
+  }
+
   Widget _buildChip({
     required IconData icon,
     required String label,
@@ -251,6 +257,7 @@ class ActivityTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final displayName = _displayName();
+    final activitySubject = _activitySubject(context, displayName);
     final username = item.username.trim();
     final title = item.mediaTitle ?? 'something';
     final dateStr = _formatDate(item.timestamp);
@@ -359,7 +366,7 @@ class ActivityTile extends StatelessWidget {
                     height: 1.35,
                   ),
                   children: [
-                    TextSpan(text: '$displayName ${_actionVerb()} '),
+                    TextSpan(text: '$activitySubject ${_actionVerb()} '),
                     TextSpan(
                       text: title,
                       style: const TextStyle(
