@@ -1,46 +1,47 @@
 import 'package:flutter/material.dart';
 
-/// Flixie color palette derived from the Ionic app color scheme.
+/// Flixie color palette — cinematic dark theme.
 class FlixieColors {
-  // Primary – purple
-  static const Color primary = Color(0xFF947AF1);
-  static const Color primaryShade = Color(0xFF826BD4);
-  static const Color primaryTint = Color(0xFF9F87F2);
+  // Primary – neon purple
+  static const Color primary = Color(0xFF9B6BFF);
+  static const Color primaryShade = Color(0xFF7C4DFF);
+  static const Color primaryTint = Color(0xFFB388FF);
 
-  // Secondary – teal
-  static const Color secondary = Color(0xFF08A391);
-  static const Color secondaryShade = Color(0xFF078F80);
-  static const Color secondaryTint = Color(0xFF21AC9C);
+  // Secondary – cyan accent
+  static const Color secondary = Color(0xFF00D1C7);
+  static const Color secondaryShade = Color(0xFF00B8AF);
+  static const Color secondaryTint = Color(0xFF26D9D0);
 
   // Tertiary – peach/orange
   static const Color tertiary = Color(0xFFF1A77A);
   static const Color tertiaryShade = Color(0xFFD4936B);
   static const Color tertiaryTint = Color(0xFFF2B087);
 
-  // Success – green
-  static const Color success = Color(0xFF30C48D);
-  static const Color successShade = Color(0xFF2AAC7C);
-  static const Color successTint = Color(0xFF45CA98);
+  // Success – vivid green
+  static const Color success = Color(0xFF00D97E);
+  static const Color successShade = Color(0xFF00C070);
+  static const Color successTint = Color(0xFF26E090);
 
-  // Warning – yellow
-  static const Color warning = Color(0xFFFFD166);
-  static const Color warningShade = Color(0xFFE0B85A);
-  static const Color warningTint = Color(0xFFFFD675);
+  // Warning – gold (bookmark / favourite)
+  static const Color warning = Color(0xFFFFC857);
+  static const Color warningShade = Color(0xFFE0B04C);
+  static const Color warningTint = Color(0xFFFFD066);
 
   // Danger – red
   static const Color danger = Color(0xFFE57373);
   static const Color dangerShade = Color(0xFFCA6565);
   static const Color dangerTint = Color(0xFFE88181);
 
-  // Light – light blue-grey
-  static const Color light = Color(0xFFC1CCDF);
-  static const Color lightShade = Color(0xFFAAB4C4);
+  // Text hierarchy
+  static const Color textPrimary = Color(0xFFF5F7FA);
+  static const Color light = Color(0xFFB7C2D0);   // secondary text
+  static const Color lightShade = Color(0xFFA0ACBD);
   static const Color lightTint = Color(0xFFC7D1E2);
 
-  // Medium – grey-blue
-  static const Color medium = Color(0xFF6C7A89);
-  static const Color mediumShade = Color(0xFF5F6B79);
-  static const Color mediumTint = Color(0xFF7B8795);
+  // Muted text
+  static const Color medium = Color(0xFF7F91A8);
+  static const Color mediumShade = Color(0xFF6C7D93);
+  static const Color mediumTint = Color(0xFF8E9FB5);
 
   // Dark – deep navy
   static const Color dark = Color(0xFF1C3391);
@@ -48,14 +49,14 @@ class FlixieColors {
   static const Color darkTint = Color(0xFF33479C);
 
   // Background / navigation
-  static const Color background = Color(0xFF061625);
-  static const Color surface = Color(0xFF0B2035);
-  static const Color surfaceElevated = Color(0xFF12345A);
-  static const Color navy = Color(0xFF04101D);
+  static const Color background = Color(0xFF061826);
+  static const Color surface = Color(0xFF0B2340);
+  static const Color surfaceElevated = Color(0xFF102B4A);
+  static const Color navy = Color(0xFF040F1C);
   static const Color white = Color(0xFFFFFFFF);
-  static const Color tabBarBackground = background;
+  static const Color tabBarBackground = Color(0xFF0A1828);
   static const Color tabBarBackgroundFocused = surface;
-  static const Color tabBarBorder = Color(0xFF1F3A59);
+  static const Color tabBarBorder = Color(0xFF1A3352);
 }
 
 /// Builds the app-wide [ThemeData] using the Flixie color palette.

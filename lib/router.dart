@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -240,7 +242,7 @@ class MainNavigationShell extends StatelessWidget {
     final selectedIndex = _indexFromLocation(location);
 
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
@@ -295,44 +297,43 @@ class _FlixieNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: FlixieColors.tabBarBackground,
-        boxShadow: [
-          BoxShadow(
-            color: FlixieColors.primary.withValues(alpha: 0.08),
-            blurRadius: 20,
-            spreadRadius: 0,
-            offset: const Offset(0, -4),
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: FlixieColors.tabBarBackground.withValues(alpha: 0.92),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.5),
+                blurRadius: 20,
+                offset: const Offset(0, -4),
+              ),
+            ],
+            border: Border(
+              top: BorderSide(
+                color: Colors.white.withValues(alpha: 0.05),
+                width: 0.5,
+              ),
+            ),
           ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.4),
-            blurRadius: 12,
-            offset: const Offset(0, -2),
-          ),
-        ],
-        border: Border(
-          top: BorderSide(
-            color: FlixieColors.primary.withValues(alpha: 0.2),
-            width: 0.5,
-          ),
-        ),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: List.generate(_destinations.length, (i) {
-              final dest = _destinations[i];
-              final isSelected = i == selectedIndex;
-              return _NavItem(
-                dest: dest,
-                isSelected: isSelected,
-                onTap: () => onDestinationSelected(i),
-              );
-            }),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: List.generate(_destinations.length, (i) {
+                  final dest = _destinations[i];
+                  final isSelected = i == selectedIndex;
+                  return _NavItem(
+                    dest: dest,
+                    isSelected: isSelected,
+                    onTap: () => onDestinationSelected(i),
+                  );
+                }),
+              ),
+            ),
           ),
         ),
       ),
@@ -375,15 +376,15 @@ class _NavItem extends StatelessWidget {
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 5),
                 decoration: isSelected
                     ? BoxDecoration(
-                        color: FlixieColors.primary.withValues(alpha: 0.15),
+                        color: FlixieColors.primary,
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
-                            color: FlixieColors.primary.withValues(alpha: 0.25),
-                            blurRadius: 12,
+                            color: FlixieColors.primary.withValues(alpha: 0.45),
+                            blurRadius: 14,
                             spreadRadius: 0,
                           ),
                         ],
@@ -392,7 +393,7 @@ class _NavItem extends StatelessWidget {
                 child: Icon(
                   isSelected ? dest.activeIcon : dest.icon,
                   size: 22,
-                  color: isSelected ? FlixieColors.primary : FlixieColors.medium,
+                  color: isSelected ? Colors.white : FlixieColors.medium,
                 ),
               ),
               const SizedBox(height: 2),
