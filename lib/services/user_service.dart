@@ -16,9 +16,7 @@ import 'api_client.dart';
 
 class UserService {
   static const List<String> _movieWatchlistSuffixCandidates = [
-    '/movies/watchlist',
     '/movie/watchlist',
-    '/movie/watchlists',
   ];
   static String? _resolvedMovieWatchlistSuffix;
 
@@ -27,8 +25,7 @@ class UserService {
     Future<T> Function(String basePath) action,
   ) async {
     final suffixes = <String>[
-      if (_resolvedMovieWatchlistSuffix != null)
-        _resolvedMovieWatchlistSuffix!,
+      if (_resolvedMovieWatchlistSuffix != null) _resolvedMovieWatchlistSuffix!,
       ..._movieWatchlistSuffixCandidates
           .where((s) => s != _resolvedMovieWatchlistSuffix),
     ];
@@ -57,9 +54,8 @@ class UserService {
   }
 
   static const List<String> _movieListSuffixCandidates = [
-    '/movies/lists',
-    '/movie/watchlists/lists',
     '/movie/lists',
+    '/movies/lists',
   ];
   static String? _resolvedMovieListSuffix;
 
@@ -405,6 +401,22 @@ class UserService {
           .toList();
       apiLogger.i('[Watchlist] Parsed ${watchlist.length} items');
       return watchlist;
+    } on ApiException catch (e) {
+      if (e.statusCode != 404) {
+        apiLogger.e('[Watchlist] Error fetching watchlist: $e');
+        rethrow;
+      }
+      apiLogger.w(
+          '[Watchlist] Endpoint unavailable (404). Falling back to /users/:id payload.');
+      try {
+        final userData = await ApiClient.get('/users/$userId');
+        final user = User.fromJson(userData as Map<String, dynamic>);
+        return user.movieWatchlist ?? const <WatchlistMovie>[];
+      } catch (fallbackError) {
+        apiLogger
+            .e('[Watchlist] Fallback via /users/:id failed: $fallbackError');
+        rethrow;
+      }
     } catch (e) {
       apiLogger.e('[Watchlist] Error fetching watchlist: $e');
       rethrow;

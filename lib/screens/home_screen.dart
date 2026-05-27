@@ -8,8 +8,8 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/movie_short.dart';
-import '../models/group.dart';
 import '../models/activity_list_item.dart';
+import '../models/trending_groups.dart';
 import '../models/watchlist_movie.dart';
 import '../services/friend_service.dart';
 import '../services/group_service.dart';
@@ -24,6 +24,7 @@ import '../utils/skeleton.dart';
 import 'home/featured_card.dart';
 import 'home/greeting_header.dart';
 import 'home/section_header.dart';
+import 'home/trending_groups_section.dart';
 import 'profile/activity_tile.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -39,13 +40,14 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   static const int _maxSourceTitleLength = 18;
   static const double _defaultQuickRating = 5;
   static const int _recentTheatreDays = 45;
-  static const String _defaultGroupInitial = 'G';
 
   List<MovieShort> _featuredMovies = [];
   List<MovieShort> _nowPlayingMovies = [];
   List<MovieShort> _forYouMovies = [];
   List<ActivityListItem> _friendsActivity = [];
-  List<Group> _userGroups = [];
+  TrendingGroupsResponse? _trendingGroups;
+  bool _isTrendingGroupsLoading = true;
+  String? _trendingGroupsError;
   RecommendationFromHighlyRatedResponse? _highlyRatedRecommendations;
   final Set<int> _watchlistUpdatesInFlight = <int>{};
   Set<int> _watchlistMovieIds = {};
@@ -109,6 +111,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     setState(() {
       _isLoading = true;
       _error = null;
+      _isTrendingGroupsLoading = true;
+      _trendingGroupsError = null;
     });
     final auth = context.read<AuthProvider>();
     // Re-fetch user + all cached data (notifications, friends, reviews, etc.)
@@ -139,10 +143,6 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         else
           Future.value(<MovieShort>[]),
         if (user != null)
-          GroupService.getUserGroups(user.id).catchError((_) => <Group>[])
-        else
-          Future.value(<Group>[]),
-        if (user != null)
           UserService.getUserWatchlist(user.id)
               .catchError((_) => <WatchlistMovie>[])
         else
@@ -164,14 +164,16 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   .isNotEmpty
               ? (_highlyRatedRecommendations!.recommendations).take(20).toList()
               : fallbackForYou.take(20).toList();
-          _userGroups = results.length > 5 ? results[5] as List<Group> : [];
-          final watchlist = results.length > 6
-              ? results[6] as List<WatchlistMovie>
+          final watchlist = results.length > 5
+              ? results[5] as List<WatchlistMovie>
               : <WatchlistMovie>[];
           _watchlistMovieIds = watchlist.map((w) => w.movieId).toSet();
           _loadedForUserId = user?.id;
           _isLoading = false;
         });
+      }
+      if (mounted) {
+        await _loadTrendingGroups();
       }
     } catch (e) {
       logger.e('[HomeScreen] load error: $e');
@@ -179,6 +181,46 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         setState(() {
           _isLoading = false;
           _error = 'Couldn\'t load content. Check your connection.';
+        });
+      }
+    }
+  }
+
+  Future<void> _loadTrendingGroups() async {
+    if (!mounted) return;
+    final user = context.read<AuthProvider>().dbUser;
+    if (user == null) {
+      if (mounted) {
+        setState(() {
+          _trendingGroups = null;
+          _trendingGroupsError = null;
+          _isTrendingGroupsLoading = false;
+        });
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isTrendingGroupsLoading = true;
+        _trendingGroupsError = null;
+      });
+    }
+
+    try {
+      final response = await GroupService.getTrendingGroups();
+      if (mounted) {
+        setState(() {
+          _trendingGroups = response;
+          _isTrendingGroupsLoading = false;
+        });
+      }
+    } catch (e) {
+      logger.e('[HomeScreen] trending groups load error: $e');
+      if (mounted) {
+        setState(() {
+          _trendingGroupsError = 'Couldn’t load group trends';
+          _isTrendingGroupsLoading = false;
         });
       }
     }
@@ -384,7 +426,18 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                         _buildWatchlistSection(context),
                         _buildBecauseYouRatedSection(context),
                         _buildFriendActivitySection(context),
-                        _buildTrendingGroupsSection(context),
+                        TrendingGroupsSection(
+                          isLoading: _isTrendingGroupsLoading,
+                          response: _trendingGroups,
+                          errorMessage: _trendingGroupsError,
+                          onRetry: _loadTrendingGroups,
+                          onSeeAll: () => context.go('/social'),
+                          onExploreGroups: () => context.go('/social'),
+                          onOpenGroup: (groupId) =>
+                              context.push('/groups/$groupId'),
+                          onOpenMovie: (movieId) =>
+                              context.push('/movies/$movieId'),
+                        ),
                       ],
                     ),
                   ),
@@ -832,109 +885,6 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 const SizedBox(height: 10),
               ],
             ],
-          ),
-        ),
-        const SizedBox(height: 20),
-      ],
-    );
-  }
-
-  Widget _buildTrendingGroupsSection(BuildContext context) {
-    final groupsWithIds = _userGroups
-        .where((group) => group.id != null && group.id!.isNotEmpty)
-        .take(10)
-        .toList();
-    if (groupsWithIds.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        HomeSectionHeader(
-          title: 'Trending In Your Groups',
-          onSeeAll: () => context.go('/social'),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 132,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: groupsWithIds.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
-            itemBuilder: (context, index) {
-              final group = groupsWithIds[index];
-              final trimmedName = group.name.trim();
-              final initials = trimmedName.isNotEmpty
-                  ? trimmedName.characters.first.toUpperCase()
-                  : _defaultGroupInitial;
-              return InkWell(
-                borderRadius: BorderRadius.circular(14),
-                onTap: () => context.push('/groups/${group.id}'),
-                child: Ink(
-                  width: 210,
-                  decoration: BoxDecoration(
-                    color: FlixieColors.tabBarBackgroundFocused,
-                    borderRadius: BorderRadius.circular(14),
-                    border:
-                        Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        CircleAvatar(
-                          radius: 18,
-                          backgroundColor:
-                              FlixieColors.primary.withValues(alpha: 0.2),
-                          child: Text(
-                            initials,
-                            style: const TextStyle(
-                              color: FlixieColors.light,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                group.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: FlixieColors.white,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${group.memberCount ?? 0} members',
-                                style: const TextStyle(
-                                  color: FlixieColors.medium,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              const Spacer(),
-                              const Text(
-                                'Most active this week',
-                                style: TextStyle(
-                                  color: FlixieColors.primary,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
           ),
         ),
         const SizedBox(height: 20),

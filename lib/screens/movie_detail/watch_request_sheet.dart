@@ -136,7 +136,8 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
             // Friend / Group toggle
             Container(
               decoration: BoxDecoration(
-                color: const Color(0xFF0F2033),
+                color: FlixieColors.surfaceElevated,
+                border: Border.all(color: FlixieColors.tabBarBorder),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
@@ -318,14 +319,16 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                 hintStyle:
                     const TextStyle(color: FlixieColors.medium, fontSize: 13),
                 filled: true,
-                fillColor: const Color(0xFF0F2033),
+                fillColor: FlixieColors.surfaceElevated,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: Color(0xFF1E2D40)),
+                  borderSide:
+                      const BorderSide(color: FlixieColors.tabBarBorder),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: Color(0xFF1E2D40)),
+                  borderSide:
+                      const BorderSide(color: FlixieColors.tabBarBorder),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),

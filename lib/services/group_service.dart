@@ -1,6 +1,7 @@
 import '../models/activity_list_item.dart';
 import '../models/group.dart';
 import '../models/group_member.dart';
+import '../models/trending_groups.dart';
 import '../models/group_watch_request.dart';
 import '../utils/app_logger.dart';
 import 'api_client.dart';
@@ -24,6 +25,22 @@ class GroupService {
     return (data as List<dynamic>)
         .map((e) => Group.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  static Future<TrendingGroupsResponse> getTrendingGroups({
+    int limit = 5,
+    int movieLimit = 4,
+    String timeWindow = 'week',
+  }) async {
+    final data = await ApiClient.get(
+      '/groups/trending',
+      queryParams: {
+        'limit': '$limit',
+        'movieLimit': '$movieLimit',
+        'timeWindow': timeWindow,
+      },
+    );
+    return TrendingGroupsResponse.fromJson(data as Map<String, dynamic>);
   }
 
   static Future<Group> updateGroup(

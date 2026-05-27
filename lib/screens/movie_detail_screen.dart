@@ -903,11 +903,12 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                       ],
                     ),
                     const Spacer(),
-                    if ((movie.tagline ?? '').isNotEmpty)
-                      _buildTaglineChip(movie.tagline ?? ''),
-                    const SizedBox(height: 14),
                     _buildTitleBlock(context, movie),
                     const SizedBox(height: 12),
+                    if ((movie.tagline ?? '').isNotEmpty) ...[
+                      _buildTaglineChip(movie.tagline ?? ''),
+                      const SizedBox(height: 8),
+                    ],
                     _buildGenrePills(movie),
                   ],
                 ),
@@ -941,38 +942,24 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   Widget _buildTaglineChip(String tagline) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xB0141B2A),
-        borderRadius: BorderRadius.circular(999),
+        color: FlixieColors.secondary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: const Color(0xCCBFD2FF),
+          color: FlixieColors.secondary.withValues(alpha: 0.45),
           width: 1,
         ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x66000000),
-            blurRadius: 12,
-            offset: Offset(0, 4),
-          ),
-        ],
       ),
       child: Text(
         tagline.toUpperCase(),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(
-          color: FlixieColors.white,
-          fontSize: 14,
-          fontWeight: FontWeight.w800,
+          color: FlixieColors.secondary,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
           letterSpacing: 0.5,
-          shadows: [
-            Shadow(
-              color: Color(0xCC000000),
-              blurRadius: 7,
-              offset: Offset(0, 1),
-            ),
-          ],
         ),
       ),
     );
@@ -1324,15 +1311,19 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         children: [
           Row(
             children: [
-              Text(
-                hasHistory ? "You've watched this movie" : 'Track this movie',
-                style: const TextStyle(
-                  color: FlixieColors.white,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
+              Expanded(
+                child: Text(
+                  hasHistory ? "You've watched this movie" : 'Track this movie',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: FlixieColors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               if (watchCount > 0)
                 Container(
                   padding:
@@ -1353,48 +1344,69 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _watchSummaryItem(
-                  title: 'Your rating',
-                  value: ratingLabel,
-                  icon: Icons.star_rounded,
-                  iconColor: Colors.orangeAccent,
-                ),
-              ),
-              Container(
-                width: 1,
-                height: 52,
-                color: Colors.white.withValues(alpha: 0.08),
-              ),
-              Expanded(
-                child: _watchSummaryItem(
-                  title: 'Last watched',
-                  value: watchDate,
-                  icon: Icons.schedule_rounded,
-                  iconColor: FlixieColors.light,
-                ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 116,
-                child: OutlinedButton.icon(
-                  onPressed: _isWatched ? () => _showLogWatchSheet() : null,
-                  icon: const Icon(Icons.replay_rounded, size: 16),
-                  label: const Text('Rewatch'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: FlixieColors.primary,
-                    side: BorderSide(
-                      color: _isWatched
-                          ? FlixieColors.primary
-                          : FlixieColors.medium.withValues(alpha: 0.4),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 430;
+
+              final summaryRow = Row(
+                children: [
+                  Expanded(
+                    child: _watchSummaryItem(
+                      title: 'Your rating',
+                      value: ratingLabel,
+                      icon: Icons.star_rounded,
+                      iconColor: Colors.orangeAccent,
                     ),
-                    padding: const EdgeInsets.symmetric(vertical: 9),
                   ),
+                  Container(
+                    width: 1,
+                    height: 52,
+                    color: Colors.white.withValues(alpha: 0.08),
+                  ),
+                  Expanded(
+                    child: _watchSummaryItem(
+                      title: 'Last watched',
+                      value: watchDate,
+                      icon: Icons.schedule_rounded,
+                      iconColor: FlixieColors.light,
+                    ),
+                  ),
+                ],
+              );
+
+              final rewatchButton = OutlinedButton.icon(
+                onPressed: _isWatched ? () => _showLogWatchSheet() : null,
+                icon: const Icon(Icons.replay_rounded, size: 16),
+                label: const Text('Rewatch'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: FlixieColors.primary,
+                  side: BorderSide(
+                    color: _isWatched
+                        ? FlixieColors.primary
+                        : FlixieColors.medium.withValues(alpha: 0.4),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 9),
                 ),
-              ),
-            ],
+              );
+
+              if (compact) {
+                return Column(
+                  children: [
+                    summaryRow,
+                    const SizedBox(height: 10),
+                    SizedBox(width: double.infinity, child: rewatchButton),
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(child: summaryRow),
+                  const SizedBox(width: 8),
+                  SizedBox(width: 116, child: rewatchButton),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -1705,33 +1717,76 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (isLoading)
-              SizedBox(
-                width: 15,
-                height: 15,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(iconColor),
-                ),
-              )
-            else
-              Icon(icon, size: 22, color: iconColor),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: labelColor,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 120;
+          return Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: compact ? 6 : 8,
+              vertical: compact ? 8 : 10,
             ),
-          ],
-        ),
+            child: compact
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isLoading)
+                        SizedBox(
+                          width: 15,
+                          height: 15,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(iconColor),
+                          ),
+                        )
+                      else
+                        Icon(icon, size: 20, color: iconColor),
+                      const SizedBox(height: 4),
+                      Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: labelColor,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (isLoading)
+                        SizedBox(
+                          width: 15,
+                          height: 15,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(iconColor),
+                          ),
+                        )
+                      else
+                        Icon(icon, size: 22, color: iconColor),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: labelColor,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+          );
+        },
       ),
     );
   }
@@ -1884,38 +1939,58 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (hasAnyActivity)
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: _activityColumn(
-                        title: 'Watch count',
-                        value: '$_watchCount',
-                        icon: Icons.replay_circle_filled_rounded,
-                        color: FlixieColors.primary,
-                      ),
-                    ),
-                    _verticalDivider(),
-                    Expanded(
-                      child: _activityColumn(
-                        title: 'Your rating',
-                        value: _userRating != null ? '${_userRating!}/10' : '—',
-                        icon: Icons.star_rounded,
-                        color: FlixieColors.warning,
-                      ),
-                    ),
-                    _verticalDivider(),
-                    Expanded(
-                      child: _activityColumn(
-                        title: 'Last watched',
-                        value: lastWatch != null
-                            ? _formatReadableDate(lastWatch.watchedAt)
-                            : '—',
-                        icon: Icons.check_circle_outline,
-                        color: FlixieColors.success,
-                      ),
-                    ),
-                  ],
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final compact = constraints.maxWidth < 460;
+
+                    final watchCountItem = _activityColumn(
+                      title: 'Watch count',
+                      value: '$_watchCount',
+                      icon: Icons.replay_circle_filled_rounded,
+                      color: FlixieColors.primary,
+                    );
+                    final ratingItem = _activityColumn(
+                      title: 'Your rating',
+                      value: _userRating != null ? '${_userRating!}/10' : '—',
+                      icon: Icons.star_rounded,
+                      color: FlixieColors.warning,
+                    );
+                    final lastWatchedItem = _activityColumn(
+                      title: 'Last watched',
+                      value: lastWatch != null
+                          ? _formatReadableDate(lastWatch.watchedAt)
+                          : '—',
+                      icon: Icons.check_circle_outline,
+                      color: FlixieColors.success,
+                    );
+
+                    if (compact) {
+                      return Column(
+                        children: [
+                          watchCountItem,
+                          const SizedBox(height: 10),
+                          const Divider(color: FlixieColors.tabBarBorder),
+                          const SizedBox(height: 10),
+                          ratingItem,
+                          const SizedBox(height: 10),
+                          const Divider(color: FlixieColors.tabBarBorder),
+                          const SizedBox(height: 10),
+                          lastWatchedItem,
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: watchCountItem),
+                        _verticalDivider(),
+                        Expanded(child: ratingItem),
+                        _verticalDivider(),
+                        Expanded(child: lastWatchedItem),
+                      ],
+                    );
+                  },
                 )
               else
                 const Text(
@@ -1976,12 +2051,16 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             children: [
               Icon(icon, size: 14, color: color),
               const SizedBox(width: 5),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: FlixieColors.light,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: FlixieColors.light,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],

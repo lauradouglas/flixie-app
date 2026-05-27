@@ -263,8 +263,9 @@ class ReviewCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: FlixieColors.tabBarBackgroundFocused,
+          color: FlixieColors.surface,
           borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: FlixieColors.tabBarBorder),
         ),
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -304,7 +305,7 @@ class ReviewCard extends StatelessWidget {
                       Text(
                         '${review.rating}/10',
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: FlixieColors.textPrimary,
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
@@ -345,7 +346,7 @@ class ReviewCard extends StatelessWidget {
                 Text(
                   formattedDate,
                   style: const TextStyle(
-                    color: Colors.grey,
+                    color: FlixieColors.medium,
                     fontSize: 11,
                   ),
                 ),
@@ -356,7 +357,7 @@ class ReviewCard extends StatelessWidget {
             Text(
               review.title,
               style: const TextStyle(
-                color: Colors.white,
+                color: FlixieColors.textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
@@ -368,7 +369,7 @@ class ReviewCard extends StatelessWidget {
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                color: Colors.grey,
+                color: FlixieColors.light,
                 fontSize: 14,
                 height: 1.5,
               ),
@@ -400,7 +401,7 @@ class ReviewCard extends StatelessWidget {
                               Text(
                                 '${e.value}',
                                 style: const TextStyle(
-                                    color: Colors.grey, fontSize: 11),
+                                    color: FlixieColors.medium, fontSize: 11),
                               ),
                             ],
                           ),

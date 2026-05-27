@@ -31,7 +31,8 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
   @override
   void initState() {
     super.initState();
-    _watchedAt = DateTime.tryParse(widget.initial?.watchedAt ?? '') ?? DateTime.now();
+    _watchedAt =
+        DateTime.tryParse(widget.initial?.watchedAt ?? '') ?? DateTime.now();
     final existingRating = widget.initial?.rating;
     _rating = existingRating != null ? existingRating.round() : null;
     _notesController = TextEditingController(text: widget.initial?.notes ?? '');
@@ -47,7 +48,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFF0D1B2A),
+        color: FlixieColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.only(
@@ -87,7 +88,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
               ],
             ),
           ),
-          const Divider(color: Color(0xFF1E2D40), height: 1),
+          const Divider(color: FlixieColors.tabBarBorder, height: 1),
           // Form body
           Flexible(
             child: SingleChildScrollView(
@@ -119,8 +120,9 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 14, vertical: 14),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1B2E42),
+                        color: FlixieColors.surfaceElevated,
                         borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: FlixieColors.tabBarBorder),
                       ),
                       child: Row(
                         children: [
@@ -129,8 +131,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                           const SizedBox(width: 10),
                           Text(
                             '${_watchedAt.day}/${_watchedAt.month}/${_watchedAt.year}',
-                            style:
-                                const TextStyle(color: FlixieColors.light),
+                            style: const TextStyle(color: FlixieColors.light),
                           ),
                         ],
                       ),
@@ -159,9 +160,8 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                           padding: const EdgeInsets.only(right: 4),
                           child: Icon(
                             isSelected ? Icons.star : Icons.star_border,
-                            color: isSelected
-                                ? Colors.amber
-                                : FlixieColors.medium,
+                            color:
+                                isSelected ? Colors.amber : FlixieColors.medium,
                             size: 28,
                           ),
                         ),
@@ -194,7 +194,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                       hintText: 'Notes (optional)',
                       hintStyle: const TextStyle(color: FlixieColors.medium),
                       filled: true,
-                      fillColor: const Color(0xFF1B2E42),
+                      fillColor: FlixieColors.surfaceElevated,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: BorderSide.none,

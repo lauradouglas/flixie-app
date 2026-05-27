@@ -203,10 +203,10 @@ class _SettingsGroup extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1D3A68),
+        color: FlixieColors.surface,
         borderRadius: BorderRadius.circular(kSettingsCornerRadius),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.06),
+          color: FlixieColors.tabBarBorder,
         ),
       ),
       child: Column(children: children),
@@ -242,7 +242,7 @@ class _LogOutButton extends StatelessWidget {
           final confirmed = await showDialog<bool>(
             context: context,
             builder: (ctx) => AlertDialog(
-              backgroundColor: const Color(0xFF1D3A68),
+              backgroundColor: FlixieColors.surface,
               title: const Text(
                 'Log Out',
                 style: TextStyle(color: Colors.white),
