@@ -49,9 +49,9 @@ class FlixieColors {
   static const Color darkTint = Color(0xFF33479C);
 
   // Background / navigation
-  static const Color background = Color(0xFF061826);
-  static const Color surface = Color(0xFF0B2340);
-  static const Color surfaceElevated = Color(0xFF102B4A);
+  static const Color background = Color(0xFF061625);
+  static const Color surface = Color(0xFF0B2035);
+  static const Color surfaceElevated = Color(0xFF12345A);
   static const Color navy = Color(0xFF040F1C);
   static const Color white = Color(0xFFFFFFFF);
   static const Color tabBarBackground = Color(0xFF0A1828);
