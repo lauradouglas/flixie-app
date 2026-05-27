@@ -15,6 +15,86 @@ import '../utils/app_logger.dart';
 import 'api_client.dart';
 
 class UserService {
+  static const List<String> _movieWatchlistSuffixCandidates = [
+    '/movies/watchlist',
+    '/movie/watchlist',
+    '/movie/watchlists',
+  ];
+  static String? _resolvedMovieWatchlistSuffix;
+
+  static Future<T> _withMovieWatchlistBasePath<T>(
+    String userId,
+    Future<T> Function(String basePath) action,
+  ) async {
+    final suffixes = <String>[
+      if (_resolvedMovieWatchlistSuffix != null)
+        _resolvedMovieWatchlistSuffix!,
+      ..._movieWatchlistSuffixCandidates
+          .where((s) => s != _resolvedMovieWatchlistSuffix),
+    ];
+
+    ApiException? last404;
+    for (final suffix in suffixes) {
+      final basePath = '/users/$userId$suffix';
+      try {
+        final result = await action(basePath);
+        _resolvedMovieWatchlistSuffix = suffix;
+        return result;
+      } on ApiException catch (e) {
+        if (e.statusCode == 404) {
+          last404 = e;
+          continue;
+        }
+        rethrow;
+      }
+    }
+
+    throw last404 ??
+        const ApiException(
+          statusCode: 404,
+          message: 'Movie watchlist endpoint not found for this backend.',
+        );
+  }
+
+  static const List<String> _movieListSuffixCandidates = [
+    '/movies/lists',
+    '/movie/watchlists/lists',
+    '/movie/lists',
+  ];
+  static String? _resolvedMovieListSuffix;
+
+  static Future<T> _withMovieListsBasePath<T>(
+    String userId,
+    Future<T> Function(String basePath) action,
+  ) async {
+    final suffixes = <String>[
+      if (_resolvedMovieListSuffix != null) _resolvedMovieListSuffix!,
+      ..._movieListSuffixCandidates.where((s) => s != _resolvedMovieListSuffix),
+    ];
+
+    ApiException? last404;
+    for (final suffix in suffixes) {
+      final basePath = '/users/$userId$suffix';
+      try {
+        final result = await action(basePath);
+        _resolvedMovieListSuffix = suffix;
+        return result;
+      } on ApiException catch (e) {
+        if (e.statusCode == 404) {
+          last404 = e;
+          continue;
+        }
+        rethrow;
+      }
+    }
+
+    throw last404 ??
+        const ApiException(
+          statusCode: 404,
+          message: 'Movie lists endpoint not found for this backend.',
+        );
+  }
+
   static Future<User> createUser(Map<String, dynamic> body) async {
     final data = await ApiClient.post('/users', body: body);
     return User.fromJson(data as Map<String, dynamic>);
@@ -116,10 +196,12 @@ class UserService {
 
   static Future<WatchlistMovie> addToWatchlist(
       String userId, int movieId) async {
-    apiLogger.d('POST /users/$userId/movie/watchlist/$movieId');
-    final data = await ApiClient.post(
-      '/users/$userId/movie/watchlist/$movieId',
-      body: {},
+    final data = await _withMovieWatchlistBasePath(
+      userId,
+      (basePath) => ApiClient.post(
+        '$basePath/$movieId',
+        body: {},
+      ),
     );
 
     if (data == null) {
@@ -130,9 +212,10 @@ class UserService {
 
   static Future<WatchlistMovie> removeFromWatchlist(
       String userId, int movieId) async {
-    apiLogger.d('DELETE /users/$userId/movie/watchlist/$movieId');
-    final data =
-        await ApiClient.delete('/users/$userId/movie/watchlist/$movieId');
+    final data = await _withMovieWatchlistBasePath(
+      userId,
+      (basePath) => ApiClient.delete('$basePath/$movieId'),
+    );
 
     if (data == null) {
       throw Exception('API returned null response');
@@ -312,9 +395,11 @@ class UserService {
   // ---- Watchlist -------------------------------------------------------------
 
   static Future<List<WatchlistMovie>> getUserWatchlist(String userId) async {
-    apiLogger.d('GET /users/$userId/movies/watchlist');
     try {
-      final data = await ApiClient.get('/users/$userId/movies/watchlist');
+      final data = await _withMovieWatchlistBasePath(
+        userId,
+        (basePath) => ApiClient.get(basePath),
+      );
       final watchlist = (data as List<dynamic>)
           .map((e) => WatchlistMovie.fromJson(e as Map<String, dynamic>))
           .toList();
@@ -329,7 +414,10 @@ class UserService {
   // ---- Movie Lists (custom folders) -----------------------------------------
 
   static Future<List<MovieList>> getMovieLists(String userId) async {
-    final data = await ApiClient.get('/users/$userId/movies/lists');
+    final data = await _withMovieListsBasePath(
+      userId,
+      (basePath) => ApiClient.get(basePath),
+    );
     final lists = (data as List<dynamic>)
         .whereType<Map<String, dynamic>>()
         .map(MovieList.fromJson)
@@ -343,9 +431,12 @@ class UserService {
     String userId,
     CreateMovieListRequest request,
   ) async {
-    final data = await ApiClient.post(
-      '/users/$userId/movies/lists',
-      body: request.toJson(),
+    final data = await _withMovieListsBasePath(
+      userId,
+      (basePath) => ApiClient.post(
+        basePath,
+        body: request.toJson(),
+      ),
     );
     return MovieList.fromJson(data as Map<String, dynamic>);
   }
@@ -355,23 +446,31 @@ class UserService {
     String listId,
     UpdateMovieListRequest request,
   ) async {
-    final data = await ApiClient.patch(
-      '/users/$userId/movies/lists/$listId',
-      body: request.toJson(),
+    final data = await _withMovieListsBasePath(
+      userId,
+      (basePath) => ApiClient.patch(
+        '$basePath/$listId',
+        body: request.toJson(),
+      ),
     );
     return MovieList.fromJson(data as Map<String, dynamic>);
   }
 
   static Future<void> deleteMovieList(String userId, String listId) async {
-    await ApiClient.delete('/users/$userId/movies/lists/$listId');
+    await _withMovieListsBasePath(
+      userId,
+      (basePath) => ApiClient.delete('$basePath/$listId'),
+    );
   }
 
   static Future<List<MovieListMovie>> getMovieListMovies(
     String userId,
     String listId,
   ) async {
-    final data =
-        await ApiClient.get('/users/$userId/movies/lists/$listId/movies');
+    final data = await _withMovieListsBasePath(
+      userId,
+      (basePath) => ApiClient.get('$basePath/$listId/movies'),
+    );
     // Response shape: { list: { id, name }, movies: [...] }
     final raw = data as Map<String, dynamic>;
     final moviesList = raw['movies'] as List<dynamic>? ?? [];
@@ -389,9 +488,12 @@ class UserService {
     String listId,
     int movieId,
   ) async {
-    final data = await ApiClient.post(
-      '/users/$userId/movies/lists/$listId/movies/$movieId',
-      body: {},
+    final data = await _withMovieListsBasePath(
+      userId,
+      (basePath) => ApiClient.post(
+        '$basePath/$listId/movies/$movieId',
+        body: {},
+      ),
     );
     return MovieListMovie.fromJson(data as Map<String, dynamic>);
   }
@@ -401,9 +503,12 @@ class UserService {
     String listId,
     List<int> movieIds,
   ) async {
-    final data = await ApiClient.post(
-      '/users/$userId/movies/lists/$listId/movies',
-      body: {'movieIds': movieIds},
+    final data = await _withMovieListsBasePath(
+      userId,
+      (basePath) => ApiClient.post(
+        '$basePath/$listId/movies',
+        body: {'movieIds': movieIds},
+      ),
     );
     final raw = data as Map<String, dynamic>;
     final movies = raw['movies'] as List<dynamic>? ?? [];
@@ -418,8 +523,10 @@ class UserService {
     String listId,
     int movieId,
   ) async {
-    await ApiClient.delete(
-        '/users/$userId/movies/lists/$listId/movies/$movieId');
+    await _withMovieListsBasePath(
+      userId,
+      (basePath) => ApiClient.delete('$basePath/$listId/movies/$movieId'),
+    );
   }
 
   static Future<List<MovieList>> getMyListsContainingMovie(
