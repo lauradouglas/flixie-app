@@ -1,3 +1,6 @@
+const _tmdbImageBaseUrl = 'https://image.tmdb.org/t/p';
+const _tmdbImageSize = 'w342';
+
 class TrendingGroupsResponse {
   final TrendingSummary summary;
   final List<TrendingGroup> groups;
@@ -120,7 +123,7 @@ class TrendingMovie {
     final nestedMovie = json['movie'] as Map<String, dynamic>?;
     return TrendingMovie(
       id: _toStringOrNull(_firstValue(json, const ['id', 'movieId'])) ?? '',
-      tmdbId: _toInt(_firstValue(json, const ['tmdbId', 'tmdb_id', 'movieId'])) ??
+      tmdbId: _toInt(_firstValue(json, const ['tmdbId', 'tmdb_id'])) ??
           _toInt(_firstValue(nestedMovie, const ['id', 'tmdbId', 'tmdb_id'])),
       title: (_firstValue(
                 json,
@@ -190,8 +193,8 @@ String? _toImageUrl(dynamic value) {
   final raw = _toStringOrNull(value);
   if (raw == null) return null;
   if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
-  if (raw.startsWith('/')) return 'https://image.tmdb.org/t/p/w342$raw';
-  return 'https://image.tmdb.org/t/p/w342/$raw';
+  if (raw.startsWith('/')) return '$_tmdbImageBaseUrl/$_tmdbImageSize$raw';
+  return '$_tmdbImageBaseUrl/$_tmdbImageSize/$raw';
 }
 
 String _buildInitialsFromName(String name) {
