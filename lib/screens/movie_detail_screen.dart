@@ -2014,6 +2014,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   Widget _buildFriendsActivitySection(BuildContext context) {
     final filtered = _filteredFriendsActivity();
+    final yourActivityBadges = _buildYourActivityBadges();
+    final showYourActivityFooter = yourActivityBadges.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2069,8 +2071,11 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
           ),
-          child: filtered.isEmpty
-              ? Text(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (filtered.isEmpty)
+                Text(
                   _friendsActivity.isEmpty
                       ? 'No friend activity yet for this movie.'
                       : _friendsActivityTab == FriendActivityTab.lists
@@ -2078,11 +2083,36 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                           : 'No ${_friendTabLabel(_friendsActivityTab).toLowerCase()} activity yet.',
                   style: const TextStyle(color: FlixieColors.medium),
                 )
-              : Column(
+              else
+                Column(
                   children: filtered
                       .map((a) => FriendActivityRow(activity: a))
                       .toList(growable: false),
                 ),
+              if (showYourActivityFooter) ...[
+                if (filtered.isNotEmpty) const SizedBox(height: 4),
+                const Divider(
+                  height: 20,
+                  thickness: 1,
+                  color: FlixieColors.tabBarBorder,
+                ),
+                const Text(
+                  'Your activity',
+                  style: TextStyle(
+                    color: FlixieColors.light,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: yourActivityBadges,
+                ),
+              ],
+            ],
+          ),
         ),
       ],
     );
@@ -2105,6 +2135,69 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           return false;
       }
     }).toList(growable: false);
+  }
+
+  List<Widget> _buildYourActivityBadges() {
+    final badges = <Widget>[];
+    if (_isFavorite) {
+      badges.add(_buildYourActivityChip(
+        icon: Icons.favorite,
+        label: 'In favorites',
+        color: Colors.redAccent,
+      ));
+    }
+    if (_isWatched) {
+      badges.add(_buildYourActivityChip(
+        icon: Icons.check_circle,
+        label: 'Watched',
+        color: FlixieColors.success,
+      ));
+    }
+    if (_inWatchlist) {
+      badges.add(_buildYourActivityChip(
+        icon: Icons.bookmark,
+        label: 'In watchlist',
+        color: FlixieColors.warning,
+      ));
+    }
+    if (_userRating != null) {
+      badges.add(_buildYourActivityChip(
+        icon: Icons.star_rounded,
+        label: '${_userRating!}/10',
+        color: FlixieColors.tertiary,
+      ));
+    }
+    return badges;
+  }
+
+  Widget _buildYourActivityChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildFriendsRatingsSection(BuildContext context) {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../models/movie_friend_activity.dart';
 import '../../theme/app_theme.dart';
@@ -24,9 +25,7 @@ class FriendActivityRow extends StatelessWidget {
       if (value != null) avatarColor = Color(value);
     }
 
-    final displayName = activity.firstName?.isNotEmpty == true
-        ? '${activity.username} (${activity.firstName})'
-        : activity.username;
+    final displayName = activity.username;
     final initial =
         activity.username.isNotEmpty ? activity.username[0].toUpperCase() : '?';
 
@@ -66,46 +65,74 @@ class FriendActivityRow extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          // Avatar
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: avatarColor.withValues(alpha: 0.25),
-            child: Text(
-              initial,
-              style: TextStyle(
-                color: avatarColor,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              FlixieColors.surfaceElevated.withValues(alpha: 0.62),
+              FlixieColors.surface.withValues(alpha: 0.92),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  displayName,
-                  style: const TextStyle(
-                    color: FlixieColors.light,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        ),
+        child: Row(
+          children: [
+            GestureDetector(
+              onTap: () => context.push('/friends/${activity.userId}'),
+              child: CircleAvatar(
+                radius: 20,
+                backgroundColor: avatarColor.withValues(alpha: 0.25),
+                child: Text(
+                  initial,
+                  style: TextStyle(
+                    color: avatarColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
                   ),
                 ),
-                if (badges.isNotEmpty) ...[
-                  const SizedBox(height: 5),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: badges,
-                  ),
-                ],
-              ],
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => context.push('/friends/${activity.userId}'),
+                          child: Text(
+                            displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: FlixieColors.light,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (badges.isNotEmpty) ...[
+                    const SizedBox(height: 7),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: badges,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

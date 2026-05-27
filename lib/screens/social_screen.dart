@@ -16,6 +16,7 @@ import '../services/group_service.dart';
 import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_logger.dart';
+import 'profile/activity_tile.dart';
 import 'social/group_card.dart';
 import 'social/group_avatar.dart';
 import 'social/invitation_card.dart';
@@ -289,8 +290,7 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: _activity.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (_, i) =>
-                    _FriendActivityFeedCard(item: _activity[i]),
+                itemBuilder: (_, i) => ActivityTile(item: _activity[i]),
               ),
             const SizedBox(height: 24),
           ],
@@ -385,143 +385,6 @@ class _FriendStoryStrip extends StatelessWidget {
             ),
           );
         },
-      ),
-    );
-  }
-}
-
-class _FriendActivityFeedCard extends StatelessWidget {
-  const _FriendActivityFeedCard({required this.item});
-
-  final ActivityListItem item;
-
-  String _timeAgo() {
-    try {
-      final dt = DateTime.parse(item.timestamp);
-      final diff = DateTime.now().difference(dt);
-      if (diff.inHours < 1) return '${diff.inMinutes}m';
-      if (diff.inHours < 24) return '${diff.inHours}h';
-      return '${diff.inDays}d';
-    } catch (_) {
-      return '';
-    }
-  }
-
-  String _subtitle() {
-    switch (item.type) {
-      case ActivityListType.movieReview:
-      case ActivityListType.showReview:
-        return 'reviewed ${item.mediaTitle ?? 'a title'}';
-      case ActivityListType.movieWatchlist:
-      case ActivityListType.showWatchlist:
-        return 'added ${item.mediaTitle ?? 'a title'} to watchlist';
-      case ActivityListType.movieWatched:
-      case ActivityListType.showWatched:
-        return 'watched ${item.mediaTitle ?? 'a title'}';
-      default:
-        return item.mediaTitle ?? 'posted activity';
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final poster = item.mediaPosterPath;
-    final posterUrl = poster == null || poster.isEmpty
-        ? null
-        : 'https://image.tmdb.org/t/p/w500$poster';
-    final username = item.username.isNotEmpty ? item.username : 'Friend';
-    final rating = item.mediaRating;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: FlixieColors.tabBarBackgroundFocused,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ListTile(
-            dense: true,
-            leading: CircleAvatar(
-              radius: 16,
-              backgroundColor: FlixieColors.primary.withValues(alpha: 0.25),
-              child: Text(
-                username[0].toUpperCase(),
-                style: const TextStyle(
-                  color: FlixieColors.light,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            title: Text(
-              username,
-              style: const TextStyle(
-                color: FlixieColors.light,
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-              ),
-            ),
-            subtitle: Text(
-              _subtitle(),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: FlixieColors.medium, fontSize: 12),
-            ),
-            trailing: Text(
-              _timeAgo(),
-              style: const TextStyle(color: FlixieColors.medium, fontSize: 12),
-            ),
-          ),
-          if (posterUrl != null)
-            GestureDetector(
-              onTap: () {
-                final id = item.movieId;
-                if (id != null) context.push('/movies/$id');
-              },
-              child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  bottom: Radius.circular(14),
-                ),
-                child: Stack(
-                  alignment: Alignment.bottomLeft,
-                  children: [
-                    Image.network(
-                      posterUrl,
-                      width: double.infinity,
-                      height: 170,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        height: 170,
-                        color: FlixieColors.tabBarBorder,
-                        alignment: Alignment.center,
-                        child: const Icon(Icons.movie_outlined,
-                            color: FlixieColors.medium),
-                      ),
-                    ),
-                    if (rating != null)
-                      Container(
-                        margin: const EdgeInsets.all(10),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.55),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '★ ${rating.toStringAsFixed(1)}',
-                          style: const TextStyle(
-                            color: FlixieColors.primary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-        ],
       ),
     );
   }

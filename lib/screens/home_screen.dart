@@ -828,7 +828,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
           child: Column(
             children: [
               for (final item in items) ...[
-                ActivityTile(item: item),
+                ActivityTile(item: item, compact: true),
                 const SizedBox(height: 10),
               ],
             ],

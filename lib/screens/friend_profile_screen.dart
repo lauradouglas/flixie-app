@@ -536,17 +536,6 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                           _user?.username ?? '',
                           style: textTheme.headlineSmall,
                         ),
-                        if ((_user?.firstName != null ||
-                                _user?.lastName != null) &&
-                            '${_user?.firstName ?? ''} ${_user?.lastName ?? ''}'
-                                .trim()
-                                .isNotEmpty)
-                          Text(
-                            '${_user?.firstName ?? ''} ${_user?.lastName ?? ''}'
-                                .trim(),
-                            style: textTheme.bodySmall
-                                ?.copyWith(color: FlixieColors.medium),
-                          ),
                         if (_user?.bio case final bioText
                             when bioText != null && bioText.isNotEmpty) ...[
                           const SizedBox(height: 8),
