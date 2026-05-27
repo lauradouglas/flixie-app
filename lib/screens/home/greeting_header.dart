@@ -33,7 +33,7 @@ class GreetingHeader extends StatelessWidget {
           child: Ink(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: const Color(0xFF112845).withValues(alpha: 0.78),
+              color: FlixieColors.surfaceElevated.withValues(alpha: 0.78),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: Colors.white.withValues(alpha: 0.09),

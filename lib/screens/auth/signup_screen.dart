@@ -218,9 +218,9 @@ class _SignupScreenState extends State<SignupScreen> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Color(0xFF0D1B2A),
-                  Color(0xFF172B4D),
-                  Color(0xFF1A1040),
+                  FlixieColors.navy,
+                  FlixieColors.background,
+                  FlixieColors.surface,
                 ],
               ),
             ),

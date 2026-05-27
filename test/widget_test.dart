@@ -45,19 +45,19 @@ class _FakeAuthService extends Fake implements AuthService {
 void main() {
   group('FlixieColors', () {
     test('primary color has correct value', () {
-      expect(FlixieColors.primary, const Color(0xFF947AF1));
+      expect(FlixieColors.primary, const Color(0xFF9B6BFF));
     });
 
     test('secondary color has correct value', () {
-      expect(FlixieColors.secondary, const Color(0xFF08A391));
+      expect(FlixieColors.secondary, const Color(0xFF00D1C7));
     });
 
     test('background color has correct value', () {
-      expect(FlixieColors.background, const Color(0xFF061625));
+      expect(FlixieColors.background, const Color(0xFF120A24));
     });
 
     test('surface color has correct value', () {
-      expect(FlixieColors.surface, const Color(0xFF0B2035));
+      expect(FlixieColors.surface, const Color(0xFF1A1033));
     });
 
     test('danger color has correct value', () {
@@ -65,7 +65,7 @@ void main() {
     });
 
     test('warning color has correct value', () {
-      expect(FlixieColors.warning, const Color(0xFFFFD166));
+      expect(FlixieColors.warning, const Color(0xFFFFC857));
     });
   });
 
