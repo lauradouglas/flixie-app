@@ -367,11 +367,22 @@ class AuthProvider extends ChangeNotifier {
 
   void clearError() => _setError(null);
 
-  /// Signs in with email and password. Returns `true` on success.
-  Future<bool> signIn(String email, String password) async {
+  /// Signs in with email or username and password. Returns `true` on success.
+  Future<bool> signIn(String emailOrUsername, String password) async {
     _setLoading(true);
     _setError(null);
     try {
+      final identifier = emailOrUsername.trim();
+      if (identifier.isEmpty) {
+        _errorMessage = 'Please enter your email or username.';
+        _setLoading(false);
+        return false;
+      }
+
+      final email = identifier.contains('@')
+          ? identifier
+          : (await UserService.getUserByUsername(identifier)).email;
+
       await _authService.signIn(email, password);
       // Force a one-time sync of auth-dependent state right after sign-in.
       // This avoids a stuck loading/login screen if authStateChanges callback
@@ -385,6 +396,10 @@ class AuthProvider extends ChangeNotifier {
         notifyListeners();
       }
       return true;
+    } on ApiException catch (_) {
+      _errorMessage = 'Invalid email or username.';
+      _setLoading(false);
+      return false;
     } on firebase_auth.FirebaseAuthException catch (e) {
       _errorMessage = AuthService.messageFromAuthException(e);
       _setLoading(false);
