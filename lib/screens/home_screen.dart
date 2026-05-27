@@ -21,6 +21,7 @@ import '../services/user_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_logger.dart';
 import '../utils/skeleton.dart';
+import '../widgets/flixie_wordmark.dart';
 import 'home/featured_card.dart';
 import 'home/greeting_header.dart';
 import 'home/section_header.dart';
@@ -304,30 +305,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         surfaceTintColor: Colors.transparent,
         iconTheme: const IconThemeData(color: FlixieColors.light),
         actionsIconTheme: const IconThemeData(color: FlixieColors.light),
-        title: RichText(
-          text: const TextSpan(
-            children: [
-              TextSpan(
-                text: 'fli',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              TextSpan(
-                text: 'xie',
-                style: TextStyle(
-                  color: FlixieColors.primary,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
-                ),
-              ),
-            ],
-          ),
-        ),
+        title: const FlixieWordmark(),
         actions: [
           IconButton(
             icon: const Icon(

@@ -11,6 +11,8 @@ import '../../services/reference_data_service.dart';
 import '../../services/user_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/app_logger.dart';
+import '../../widgets/flixie_wordmark.dart';
+import 'auth_ui.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -31,27 +33,20 @@ class _SignupScreenState extends State<SignupScreen> {
 
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
-
-  // Dropdown touched tracking
   bool _languageTouched = false;
   bool _countryTouched = false;
   bool _submitAttempted = false;
-
-  // Username availability
   bool _checkingUsername = false;
-  bool? _usernameAvailable; // null = not checked yet
-
-  // Reference data
-  List<Language> _languages = [];
-  List<Country> _countries = [];
+  bool? _usernameAvailable;
   bool _loadingRefData = true;
   bool _refDataError = false;
 
+  List<Language> _languages = [];
+  List<Country> _countries = [];
+  List<Genre> _genres = [];
+
   Language? _selectedLanguage;
   Country? _selectedCountry;
-
-  // Genre multi-select
-  List<Genre> _genres = [];
   final Set<int> _selectedGenreIds = {};
 
   @override
@@ -62,34 +57,33 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Future<void> _loadReferenceData() async {
     if (mounted && _refDataError) {
-      // Reset error state before retrying.
       setState(() {
         _loadingRefData = true;
         _refDataError = false;
       });
     }
+
     try {
       final results = await Future.wait([
         ReferenceDataService.getLanguages(),
         ReferenceDataService.getCountries(),
         ReferenceDataService.getGenres(),
       ]);
-      if (mounted) {
-        setState(() {
-          _languages = results[0] as List<Language>;
-          _countries = results[1] as List<Country>;
-          _genres = results[2] as List<Genre>;
-          _loadingRefData = false;
-        });
-      }
-    } catch (e) {
-      logger.e('Failed to load reference data: $e');
-      if (mounted) {
-        setState(() {
-          _loadingRefData = false;
-          _refDataError = true;
-        });
-      }
+
+      if (!mounted) return;
+      setState(() {
+        _languages = results[0] as List<Language>;
+        _countries = results[1] as List<Country>;
+        _genres = filterSupportedGenres(results[2] as List<Genre>);
+        _loadingRefData = false;
+      });
+    } catch (error) {
+      logger.e('Failed to load reference data: $error');
+      if (!mounted) return;
+      setState(() {
+        _loadingRefData = false;
+        _refDataError = true;
+      });
     }
   }
 
@@ -104,32 +98,27 @@ class _SignupScreenState extends State<SignupScreen> {
 
     try {
       final exists = await UserService.usernameExists(username);
-      if (mounted) {
-        setState(() {
-          _usernameAvailable = !exists;
-          _checkingUsername = false;
-        });
-      }
-    } catch (e) {
-      logger.e('Username check failed: $e');
-      if (mounted) {
-        setState(() {
-          _usernameAvailable = null;
-          _checkingUsername = false;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _usernameAvailable = !exists;
+        _checkingUsername = false;
+      });
+    } catch (error) {
+      logger.e('Username check failed: $error');
+      if (!mounted) return;
+      setState(() {
+        _usernameAvailable = null;
+        _checkingUsername = false;
+      });
     }
   }
 
   Future<void> _submit() async {
-    // Re-validate form (also triggers username field validator).
     setState(() => _submitAttempted = true);
     if (!_formKey.currentState!.validate()) return;
 
-    // Capture messenger before any await so it's safe after navigation
     final messenger = ScaffoldMessenger.of(context);
 
-    // Ensure username availability has been confirmed.
     if (_usernameAvailable != true) {
       await _checkUsernameAvailability();
       if (!mounted) return;
@@ -193,539 +182,384 @@ class _SignupScreenState extends State<SignupScreen> {
     final textTheme = Theme.of(context).textTheme;
     final isLoading = context.select<AuthProvider, bool>((p) => p.isLoading);
 
-    final inputBorder = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide.none,
-    );
-    final inputEnabledBorder = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
-    );
-    final inputFocusedBorder = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: const BorderSide(color: FlixieColors.primary, width: 1.5),
-    );
-    final inputFill = Colors.white.withOpacity(0.06);
-    const inputStyle = TextStyle(color: Colors.white);
-
-    return Scaffold(
-      body: Stack(
-        children: [
-          // Background gradient
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  FlixieColors.navy,
-                  FlixieColors.background,
-                  FlixieColors.surface,
-                ],
-              ),
-            ),
+    return AuthScaffold(
+      topLabel: 'Create Account',
+      title: Text.rich(
+        TextSpan(
+          style: textTheme.displaySmall?.copyWith(
+            color: FlixieColors.textPrimary,
+            fontWeight: FontWeight.w800,
           ),
-          // Subtle purple glow top-right
-          Positioned(
-            top: -80,
-            right: -60,
-            child: Container(
-              width: 280,
-              height: 280,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: FlixieColors.primary.withOpacity(0.10),
-              ),
+          children: [
+            const TextSpan(text: 'Join '),
+            flixieWordmarkSpan(
+              fontSize: textTheme.displaySmall?.fontSize ?? 36,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.4,
             ),
-          ),
-          SafeArea(
-            child: Column(
+          ],
+        ),
+        textAlign: TextAlign.center,
+      ),
+      subtitle: 'Create your account to get started',
+      onBack: () => context.pop(),
+      cardPadding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
+      cardChild: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
               children: [
-                // AppBar-style header
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 4),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back,
-                            color: FlixieColors.light),
-                        onPressed: () => context.pop(),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Create Account',
-                        style: textTheme.titleLarge?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                Expanded(
+                  child: AuthTextField(
+                    controller: _firstNameController,
+                    label: 'First Name',
+                    prefixIcon: Icons.person_outline_rounded,
+                    keyboardType: TextInputType.name,
+                    textCapitalization: TextCapitalization.words,
+                    textInputAction: TextInputAction.next,
+                    autofillHints: const [AutofillHints.givenName],
+                    validator: _requiredNameValidator,
                   ),
                 ),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // Header
-                          Text(
-                            'Join Flixie',
-                            style: textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Create your account to get started',
-                            style: textTheme.bodyMedium?.copyWith(
-                              color: FlixieColors.light.withOpacity(0.65),
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 24),
-
-                          // Card
-                          Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.05),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.08),
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                // First & Last name row
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: TextFormField(
-                                        controller: _firstNameController,
-                                        keyboardType: TextInputType.name,
-                                        textCapitalization:
-                                            TextCapitalization.words,
-                                        textInputAction: TextInputAction.next,
-                                        style: inputStyle,
-                                        decoration: InputDecoration(
-                                          labelText: 'First Name',
-                                          filled: true,
-                                          fillColor: inputFill,
-                                          border: inputBorder,
-                                          enabledBorder: inputEnabledBorder,
-                                          focusedBorder: inputFocusedBorder,
-                                        ),
-                                        validator: (v) {
-                                          if (v == null || v.trim().isEmpty) {
-                                            return 'Required';
-                                          }
-                                          return null;
-                                        },
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: TextFormField(
-                                        controller: _lastNameController,
-                                        keyboardType: TextInputType.name,
-                                        textCapitalization:
-                                            TextCapitalization.words,
-                                        textInputAction: TextInputAction.next,
-                                        style: inputStyle,
-                                        decoration: InputDecoration(
-                                          labelText: 'Last Name',
-                                          filled: true,
-                                          fillColor: inputFill,
-                                          border: inputBorder,
-                                          enabledBorder: inputEnabledBorder,
-                                          focusedBorder: inputFocusedBorder,
-                                        ),
-                                        validator: (v) {
-                                          if (v == null || v.trim().isEmpty) {
-                                            return 'Required';
-                                          }
-                                          return null;
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 14),
-
-                                // Username
-                                Focus(
-                                  onFocusChange: (hasFocus) {
-                                    if (!hasFocus) _checkUsernameAvailability();
-                                  },
-                                  child: TextFormField(
-                                    controller: _usernameController,
-                                    textInputAction: TextInputAction.next,
-                                    style: inputStyle,
-                                    decoration: InputDecoration(
-                                      labelText: 'Username',
-                                      prefixIcon: const Icon(
-                                          Icons.alternate_email,
-                                          size: 20),
-                                      suffixIcon: _buildUsernameSuffix(),
-                                      filled: true,
-                                      fillColor: inputFill,
-                                      border: inputBorder,
-                                      enabledBorder: inputEnabledBorder,
-                                      focusedBorder: inputFocusedBorder,
-                                    ),
-                                    onChanged: (_) {
-                                      if (_usernameAvailable != null) {
-                                        setState(
-                                            () => _usernameAvailable = null);
-                                      }
-                                    },
-                                    validator: (v) {
-                                      if (v == null || v.trim().isEmpty) {
-                                        return 'Please enter a username.';
-                                      }
-                                      if (v.trim().length < 3) {
-                                        return 'Username must be at least 3 characters.';
-                                      }
-                                      if (_usernameAvailable == false) {
-                                        return 'This username is already taken.';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(height: 14),
-
-                                // Email
-                                TextFormField(
-                                  controller: _emailController,
-                                  keyboardType: TextInputType.emailAddress,
-                                  textInputAction: TextInputAction.next,
-                                  style: inputStyle,
-                                  decoration: InputDecoration(
-                                    labelText: 'Email',
-                                    prefixIcon: const Icon(
-                                        Icons.email_outlined,
-                                        size: 20),
-                                    filled: true,
-                                    fillColor: inputFill,
-                                    border: inputBorder,
-                                    enabledBorder: inputEnabledBorder,
-                                    focusedBorder: inputFocusedBorder,
-                                  ),
-                                  validator: (v) {
-                                    if (v == null || v.trim().isEmpty) {
-                                      return 'Please enter your email.';
-                                    }
-                                    if (!v.contains('@')) {
-                                      return 'Please enter a valid email.';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                const SizedBox(height: 14),
-
-                                // Password
-                                TextFormField(
-                                  controller: _passwordController,
-                                  obscureText: _obscurePassword,
-                                  textInputAction: TextInputAction.next,
-                                  style: inputStyle,
-                                  decoration: InputDecoration(
-                                    labelText: 'Password',
-                                    prefixIcon: const Icon(Icons.lock_outlined,
-                                        size: 20),
-                                    suffixIcon: IconButton(
-                                      icon: Icon(
-                                        _obscurePassword
-                                            ? Icons.visibility_outlined
-                                            : Icons.visibility_off_outlined,
-                                        size: 20,
-                                      ),
-                                      onPressed: () => setState(() =>
-                                          _obscurePassword = !_obscurePassword),
-                                    ),
-                                    filled: true,
-                                    fillColor: inputFill,
-                                    border: inputBorder,
-                                    enabledBorder: inputEnabledBorder,
-                                    focusedBorder: inputFocusedBorder,
-                                  ),
-                                  validator: (v) {
-                                    if (v == null || v.isEmpty) {
-                                      return 'Please enter a password.';
-                                    }
-                                    if (v.length < 6) {
-                                      return 'Password must be at least 6 characters.';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                const SizedBox(height: 14),
-
-                                // Confirm password
-                                TextFormField(
-                                  controller: _confirmPasswordController,
-                                  obscureText: _obscureConfirm,
-                                  textInputAction: TextInputAction.next,
-                                  style: inputStyle,
-                                  decoration: InputDecoration(
-                                    labelText: 'Confirm Password',
-                                    prefixIcon: const Icon(Icons.lock_outlined,
-                                        size: 20),
-                                    suffixIcon: IconButton(
-                                      icon: Icon(
-                                        _obscureConfirm
-                                            ? Icons.visibility_outlined
-                                            : Icons.visibility_off_outlined,
-                                        size: 20,
-                                      ),
-                                      onPressed: () => setState(() =>
-                                          _obscureConfirm = !_obscureConfirm),
-                                    ),
-                                    filled: true,
-                                    fillColor: inputFill,
-                                    border: inputBorder,
-                                    enabledBorder: inputEnabledBorder,
-                                    focusedBorder: inputFocusedBorder,
-                                  ),
-                                  validator: (v) {
-                                    if (v == null || v.isEmpty) {
-                                      return 'Please confirm your password.';
-                                    }
-                                    if (v != _passwordController.text) {
-                                      return 'Passwords do not match.';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                const SizedBox(height: 20),
-
-                                // Language / Country / Genres
-                                if (_loadingRefData)
-                                  const Center(
-                                      child: CircularProgressIndicator())
-                                else if (_refDataError)
-                                  _buildRefDataErrorRow(
-                                      onRetry: _loadReferenceData)
-                                else
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      DropdownFlutter<Language>(
-                                        items: _languages,
-                                        initialItem: _selectedLanguage,
-                                        hintText: 'Select Language',
-                                        onChanged: (l) => setState(() {
-                                          _selectedLanguage = l;
-                                          _languageTouched = true;
-                                        }),
-                                        headerBuilder: (ctx, item, _) =>
-                                            Text(item.name),
-                                        listItemBuilder:
-                                            (ctx, item, isSelected, _) =>
-                                                Text(item.name),
-                                        decoration: CustomDropdownDecoration(
-                                          closedFillColor: Theme.of(context)
-                                              .inputDecorationTheme
-                                              .fillColor,
-                                          expandedFillColor: Theme.of(context)
-                                              .scaffoldBackgroundColor,
-                                          closedBorder: Border.all(
-                                            color: FlixieColors.primary
-                                                .withValues(alpha: 0.4),
-                                          ),
-                                          expandedBorder: Border.all(
-                                              color: FlixieColors.primary),
-                                        ),
-                                      ),
-                                      if (_selectedLanguage == null &&
-                                          (_languageTouched || _submitAttempted))
-                                        Padding(
-                                          padding: const EdgeInsets.only(
-                                              top: 6, left: 12),
-                                          child: Text(
-                                            'Please select a language.',
-                                            style: TextStyle(
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .error,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ),
-                                      const SizedBox(height: 14),
-                                      DropdownFlutter<Country>.search(
-                                        items: _countries,
-                                        initialItem: _selectedCountry,
-                                        hintText: 'Select Country',
-                                        onChanged: (c) => setState(() {
-                                          _selectedCountry = c;
-                                          _countryTouched = true;
-                                        }),
-                                        headerBuilder: (ctx, item, _) =>
-                                            Text(item.name),
-                                        listItemBuilder:
-                                            (ctx, item, isSelected, _) =>
-                                                Text(item.name),
-                                        decoration: CustomDropdownDecoration(
-                                          closedFillColor: Theme.of(context)
-                                              .inputDecorationTheme
-                                              .fillColor,
-                                          expandedFillColor: Theme.of(context)
-                                              .scaffoldBackgroundColor,
-                                          closedBorder: Border.all(
-                                            color: FlixieColors.primary
-                                                .withValues(alpha: 0.4),
-                                          ),
-                                          expandedBorder: Border.all(
-                                              color: FlixieColors.primary),
-                                          searchFieldDecoration:
-                                              SearchFieldDecoration(
-                                            fillColor: Theme.of(context)
-                                                .inputDecorationTheme
-                                                .fillColor,
-                                          ),
-                                        ),
-                                      ),
-                                      if (_selectedCountry == null &&
-                                          (_countryTouched || _submitAttempted))
-                                        Padding(
-                                          padding: const EdgeInsets.only(
-                                              top: 6, left: 12),
-                                          child: Text(
-                                            'Please select a country.',
-                                            style: TextStyle(
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .error,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ),
-                                      if (_genres.isNotEmpty) ...[
-                                        const SizedBox(height: 14),
-                                        ..._buildGenrePicker(textTheme),
-                                      ],
-                                    ],
-                                  ),
-
-                                const SizedBox(height: 20),
-
-                                // Create account button
-                                DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    gradient: const LinearGradient(
-                                      colors: [
-                                        FlixieColors.primary,
-                                        Color(0xFF6B5BD6),
-                                      ],
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: FlixieColors.primary
-                                            .withOpacity(0.35),
-                                        blurRadius: 12,
-                                        offset: const Offset(0, 4),
-                                      ),
-                                    ],
-                                  ),
-                                  child: ElevatedButton(
-                                    onPressed: isLoading ? null : _submit,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.transparent,
-                                      shadowColor: Colors.transparent,
-                                      minimumSize:
-                                          const Size.fromHeight(50),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(12),
-                                      ),
-                                    ),
-                                    child: isLoading
-                                        ? const SizedBox(
-                                            height: 20,
-                                            width: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: Colors.white,
-                                            ),
-                                          )
-                                        : const Text(
-                                            'Create Account',
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // Sign in link
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                'Already have an account?',
-                                style: textTheme.bodySmall?.copyWith(
-                                  color: FlixieColors.light.withOpacity(0.6),
-                                ),
-                              ),
-                              TextButton(
-                                onPressed: () => context.pop(),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: FlixieColors.primary,
-                                ),
-                                child: const Text(
-                                  'Sign In',
-                                  style: TextStyle(fontWeight: FontWeight.w600),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
+                  child: AuthTextField(
+                    controller: _lastNameController,
+                    label: 'Last Name',
+                    prefixIcon: Icons.person_outline_rounded,
+                    keyboardType: TextInputType.name,
+                    textCapitalization: TextCapitalization.words,
+                    textInputAction: TextInputAction.next,
+                    autofillHints: const [AutofillHints.familyName],
+                    validator: _requiredNameValidator,
                   ),
                 ),
               ],
             ),
-          ),
-        ],
+            const SizedBox(height: 14),
+            Focus(
+              onFocusChange: (hasFocus) {
+                if (!hasFocus) {
+                  _checkUsernameAvailability();
+                }
+              },
+              child: AuthTextField(
+                controller: _usernameController,
+                label: 'Username',
+                prefixIcon: Icons.alternate_email_rounded,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.username],
+                onChanged: (_) {
+                  if (_usernameAvailable != null) {
+                    setState(() => _usernameAvailable = null);
+                  }
+                },
+                suffixIcon: _buildUsernameSuffix(),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter a username.';
+                  }
+                  if (value.trim().length < 3) {
+                    return 'Username must be at least 3 characters.';
+                  }
+                  if (_usernameAvailable == false) {
+                    return 'This username is already taken.';
+                  }
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(height: 14),
+            AuthTextField(
+              controller: _emailController,
+              label: 'Email',
+              prefixIcon: Icons.mail_outline_rounded,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              autofillHints: const [AutofillHints.email],
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Please enter your email.';
+                }
+                if (!value.contains('@')) {
+                  return 'Please enter a valid email.';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 14),
+            AuthTextField(
+              controller: _passwordController,
+              label: 'Password',
+              prefixIcon: Icons.lock_outline_rounded,
+              obscureText: _obscurePassword,
+              textInputAction: TextInputAction.next,
+              autofillHints: const [AutofillHints.newPassword],
+              suffixIcon: IconButton(
+                tooltip: _obscurePassword ? 'Show password' : 'Hide password',
+                onPressed: () => setState(
+                  () => _obscurePassword = !_obscurePassword,
+                ),
+                icon: Icon(
+                  _obscurePassword
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                  color: FlixieColors.light,
+                ),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter a password.';
+                }
+                if (value.length < 6) {
+                  return 'Password must be at least 6 characters.';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 14),
+            AuthTextField(
+              controller: _confirmPasswordController,
+              label: 'Confirm Password',
+              prefixIcon: Icons.lock_outline_rounded,
+              obscureText: _obscureConfirm,
+              textInputAction: TextInputAction.done,
+              autofillHints: const [AutofillHints.newPassword],
+              onFieldSubmitted: (_) => _submit(),
+              suffixIcon: IconButton(
+                tooltip: _obscureConfirm ? 'Show password' : 'Hide password',
+                onPressed: () => setState(
+                  () => _obscureConfirm = !_obscureConfirm,
+                ),
+                icon: Icon(
+                  _obscureConfirm
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                  color: FlixieColors.light,
+                ),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please confirm your password.';
+                }
+                if (value != _passwordController.text) {
+                  return 'Passwords do not match.';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 18),
+            if (_loadingRefData)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_refDataError)
+              _buildRefDataErrorRow(onRetry: _loadReferenceData)
+            else ...[
+              _buildDropdownField<Language>(
+                items: _languages,
+                selectedItem: _selectedLanguage,
+                hintText: 'Select Language',
+                itemLabel: (language) => language.name,
+                onChanged: (language) => setState(() {
+                  _selectedLanguage = language;
+                  _languageTouched = true;
+                }),
+                errorText: _selectedLanguage == null &&
+                        (_languageTouched || _submitAttempted)
+                    ? 'Please select a language.'
+                    : null,
+              ),
+              const SizedBox(height: 14),
+              _buildDropdownField<Country>(
+                items: _countries,
+                selectedItem: _selectedCountry,
+                hintText: 'Select Country',
+                itemLabel: (country) => country.name,
+                searchable: true,
+                onChanged: (country) => setState(() {
+                  _selectedCountry = country;
+                  _countryTouched = true;
+                }),
+                errorText: _selectedCountry == null &&
+                        (_countryTouched || _submitAttempted)
+                    ? 'Please select a country.'
+                    : null,
+              ),
+              if (_genres.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                ..._buildGenrePicker(textTheme),
+              ],
+            ],
+            const SizedBox(height: 22),
+            AuthPrimaryButton(
+              label: 'Create Account',
+              isLoading: isLoading,
+              onPressed: isLoading ? null : _submit,
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Already have an account?',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: FlixieColors.light,
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => context.pop(),
+                  style: TextButton.styleFrom(
+                    foregroundColor: FlixieColors.primaryTint,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                  child: const Text(
+                    'Sign In',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildRefDataErrorRow({required VoidCallback onRetry}) {
-    return Row(
-      children: [
-        const Icon(Icons.error_outline, color: FlixieColors.danger, size: 20),
-        const SizedBox(width: 8),
-        const Expanded(
-          child: Text(
-            'Failed to load options.',
-            style: TextStyle(color: FlixieColors.danger),
+  String? _requiredNameValidator(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Required';
+    }
+    return null;
+  }
+
+  Widget _buildDropdownField<T>({
+    required List<T> items,
+    required T? selectedItem,
+    required String hintText,
+    required String Function(T item) itemLabel,
+    required ValueChanged<T?> onChanged,
+    String? errorText,
+    bool searchable = false,
+  }) {
+    final fillColor =
+        FlixieColors.tabBarBackgroundFocused.withValues(alpha: 0.9);
+    final textStyle = const TextStyle(
+      color: FlixieColors.textPrimary,
+      fontSize: 16,
+    );
+    final hintStyle = TextStyle(
+      color: FlixieColors.light.withValues(alpha: 0.86),
+      fontSize: 16,
+      fontWeight: FontWeight.w500,
+    );
+
+    final decoration = CustomDropdownDecoration(
+      closedFillColor: fillColor,
+      expandedFillColor: FlixieColors.surfaceElevated.withValues(alpha: 0.96),
+      closedBorder: Border.all(
+        color: FlixieColors.tabBarBorder.withValues(alpha: 0.9),
+      ),
+      expandedBorder: Border.all(color: FlixieColors.primary),
+      searchFieldDecoration: SearchFieldDecoration(fillColor: fillColor),
+    );
+
+    Widget dropdown;
+    if (searchable) {
+      dropdown = DropdownFlutter<T>.search(
+        items: items,
+        initialItem: selectedItem,
+        hintText: hintText,
+        onChanged: onChanged,
+        headerBuilder: (context, item, _) => Text(
+          itemLabel(item),
+          style: textStyle,
+        ),
+        listItemBuilder: (context, item, isSelected, _) => Text(
+          itemLabel(item),
+          style: textStyle.copyWith(
+            color: isSelected ? FlixieColors.primary : FlixieColors.textPrimary,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
           ),
         ),
-        TextButton(
-          onPressed: onRetry,
-          child: const Text('Retry'),
+        decoration: decoration,
+      );
+    } else {
+      dropdown = DropdownFlutter<T>(
+        items: items,
+        initialItem: selectedItem,
+        hintText: hintText,
+        onChanged: onChanged,
+        headerBuilder: (context, item, _) => Text(
+          itemLabel(item),
+          style: textStyle,
         ),
+        listItemBuilder: (context, item, isSelected, _) => Text(
+          itemLabel(item),
+          style: textStyle.copyWith(
+            color: isSelected ? FlixieColors.primary : FlixieColors.textPrimary,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+          ),
+        ),
+        decoration: decoration,
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Theme(
+          data: Theme.of(context).copyWith(
+            textTheme: Theme.of(context).textTheme.apply(
+                  bodyColor: FlixieColors.textPrimary,
+                  displayColor: FlixieColors.textPrimary,
+                ),
+            hintColor: hintStyle.color,
+          ),
+          child: dropdown,
+        ),
+        if (errorText != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, left: 12),
+            child: Text(
+              errorText,
+              style: const TextStyle(
+                color: FlixieColors.danger,
+                fontSize: 12,
+              ),
+            ),
+          ),
       ],
+    );
+  }
+
+  Widget _buildRefDataErrorRow({required VoidCallback onRetry}) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: FlixieColors.danger.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: FlixieColors.danger.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, color: FlixieColors.danger, size: 20),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Failed to load options.',
+              style: TextStyle(color: FlixieColors.danger),
+            ),
+          ),
+          TextButton(
+            onPressed: onRetry,
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -733,21 +567,29 @@ class _SignupScreenState extends State<SignupScreen> {
     return [
       Row(
         children: [
-          Text('Favourite Genres', style: textTheme.titleSmall),
+          Text(
+            'Favourite Genres',
+            style: textTheme.titleMedium?.copyWith(
+              color: FlixieColors.textPrimary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const SizedBox(width: 6),
           Text(
             '(optional)',
-            style: textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
+            style: textTheme.bodySmall?.copyWith(color: FlixieColors.light),
           ),
         ],
       ),
-      const SizedBox(height: 10),
+      const SizedBox(height: 12),
       Wrap(
-        spacing: 8,
-        runSpacing: 8,
+        spacing: 10,
+        runSpacing: 10,
         children: _genres.map((genre) {
           final selected = _selectedGenreIds.contains(genre.id);
-          return GestureDetector(
+          return AuthChip(
+            label: genre.name,
+            selected: selected,
             onTap: () => setState(() {
               if (selected) {
                 _selectedGenreIds.remove(genre.id);
@@ -755,42 +597,6 @@ class _SignupScreenState extends State<SignupScreen> {
                 _selectedGenreIds.add(genre.id);
               }
             }),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: selected
-                    ? FlixieColors.primary.withValues(alpha: 0.2)
-                    : FlixieColors.tabBarBackgroundFocused,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: selected
-                      ? FlixieColors.primary
-                      : FlixieColors.tabBarBorder,
-                  width: selected ? 1.5 : 1,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (selected) ...[
-                    const Icon(Icons.check_rounded,
-                        size: 14, color: FlixieColors.primary),
-                    const SizedBox(width: 4),
-                  ],
-                  Text(
-                    genre.name,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color:
-                          selected ? FlixieColors.primary : FlixieColors.light,
-                      fontWeight:
-                          selected ? FontWeight.w600 : FontWeight.normal,
-                    ),
-                  ),
-                ],
-              ),
-            ),
           );
         }).toList(),
       ),
