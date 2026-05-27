@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/flixie_wordmark.dart';
 import 'auth_ui.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -62,7 +63,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return AuthScaffold(
       topLabel: 'Welcome Back',
-      title: const AuthGradientBrand('FLIXIE'),
+      title: const FlixieWordmark(
+        fontSize: 46,
+        textAlign: TextAlign.center,
+      ),
       subtitle: 'Sign in to continue to your account',
       onBack: () => Navigator.of(context).maybePop(),
       cardChild: Form(
@@ -164,11 +168,22 @@ class _LoginScreenState extends State<LoginScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  'New to Flixie?',
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: FlixieColors.light,
+                Text.rich(
+                  TextSpan(
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: FlixieColors.light,
+                    ),
+                    children: [
+                      const TextSpan(text: 'New to '),
+                      flixieWordmarkSpan(
+                        fontSize: (textTheme.bodyMedium?.fontSize ?? 14),
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
+                      ),
+                      const TextSpan(text: '?'),
+                    ],
                   ),
+                  textAlign: TextAlign.center,
                 ),
                 TextButton(
                   onPressed: () => context.push('/auth/signup'),

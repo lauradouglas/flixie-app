@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../models/watched_movie.dart';
 import '../../models/watchlist_movie.dart';
 import '../../theme/app_theme.dart';
 import 'genre_tag.dart';
@@ -7,17 +8,18 @@ import 'profile_chip.dart';
 
 class FriendMiniStats extends StatelessWidget {
   const FriendMiniStats({super.key, required this.watchedMovies});
-  final List<dynamic> watchedMovies;
+  final List<WatchedMovie> watchedMovies;
 
   List<WatchlistMovieDetails> get _movies {
     final out = <WatchlistMovieDetails>[];
-    for (final m in watchedMovies.whereType<Map<String, dynamic>>()) {
-      if (m['removed'] == true) continue;
-      if (m['movie'] != null) {
-        try {
-          out.add(WatchlistMovieDetails.fromJson(
-              m['movie'] as Map<String, dynamic>));
-        } catch (_) {}
+    for (final watched in watchedMovies) {
+      if (watched.removed == true) continue;
+      final movie = watched.movie;
+      if (movie == null) continue;
+      try {
+        out.add(WatchlistMovieDetails.fromJson(movie));
+      } catch (_) {
+        // Ignore malformed movie entries and continue with valid ones.
       }
     }
     return out;

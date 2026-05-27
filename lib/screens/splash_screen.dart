@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../widgets/flixie_wordmark.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -66,14 +67,9 @@ class _SplashScreenState extends State<SplashScreen>
               const SizedBox(height: 20),
 
               // App name
-              const Text(
-                'Flixie',
-                style: TextStyle(
-                  color: FlixieColors.white,
-                  fontSize: 32,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.2,
-                ),
+              const FlixieWordmark(
+                fontSize: 32,
+                textAlign: TextAlign.center,
               ),
 
               const SizedBox(height: 8),

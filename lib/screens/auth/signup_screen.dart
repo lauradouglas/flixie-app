@@ -11,6 +11,7 @@ import '../../services/reference_data_service.dart';
 import '../../services/user_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/app_logger.dart';
+import '../../widgets/flixie_wordmark.dart';
 import 'auth_ui.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -183,11 +184,20 @@ class _SignupScreenState extends State<SignupScreen> {
 
     return AuthScaffold(
       topLabel: 'Create Account',
-      title: Text(
-        'Join Flixie',
-        style: textTheme.displaySmall?.copyWith(
-          color: FlixieColors.textPrimary,
-          fontWeight: FontWeight.w800,
+      title: Text.rich(
+        TextSpan(
+          style: textTheme.displaySmall?.copyWith(
+            color: FlixieColors.textPrimary,
+            fontWeight: FontWeight.w800,
+          ),
+          children: [
+            const TextSpan(text: 'Join '),
+            flixieWordmarkSpan(
+              fontSize: textTheme.displaySmall?.fontSize ?? 36,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.4,
+            ),
+          ],
         ),
         textAlign: TextAlign.center,
       ),
@@ -435,7 +445,8 @@ class _SignupScreenState extends State<SignupScreen> {
     String? errorText,
     bool searchable = false,
   }) {
-    final fillColor = const Color(0xFF0E1E35).withValues(alpha: 0.86);
+    final fillColor =
+        FlixieColors.tabBarBackgroundFocused.withValues(alpha: 0.9);
     final textStyle = const TextStyle(
       color: FlixieColors.textPrimary,
       fontSize: 16,
@@ -448,9 +459,11 @@ class _SignupScreenState extends State<SignupScreen> {
 
     final decoration = CustomDropdownDecoration(
       closedFillColor: fillColor,
-      expandedFillColor: FlixieColors.surfaceElevated,
-      closedBorder: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-      expandedBorder: Border.all(color: FlixieColors.primaryTint),
+      expandedFillColor: FlixieColors.surfaceElevated.withValues(alpha: 0.96),
+      closedBorder: Border.all(
+        color: FlixieColors.tabBarBorder.withValues(alpha: 0.9),
+      ),
+      expandedBorder: Border.all(color: FlixieColors.primary),
       searchFieldDecoration: SearchFieldDecoration(fillColor: fillColor),
     );
 
@@ -468,8 +481,7 @@ class _SignupScreenState extends State<SignupScreen> {
         listItemBuilder: (context, item, isSelected, _) => Text(
           itemLabel(item),
           style: textStyle.copyWith(
-            color:
-                isSelected ? FlixieColors.primaryTint : FlixieColors.textPrimary,
+            color: isSelected ? FlixieColors.primary : FlixieColors.textPrimary,
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
           ),
         ),
@@ -488,8 +500,7 @@ class _SignupScreenState extends State<SignupScreen> {
         listItemBuilder: (context, item, isSelected, _) => Text(
           itemLabel(item),
           style: textStyle.copyWith(
-            color:
-                isSelected ? FlixieColors.primaryTint : FlixieColors.textPrimary,
+            color: isSelected ? FlixieColors.primary : FlixieColors.textPrimary,
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
           ),
         ),

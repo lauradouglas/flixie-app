@@ -50,8 +50,11 @@ class AuthScaffold extends StatelessWidget {
     final size = MediaQuery.sizeOf(context);
     final textTheme = Theme.of(context).textTheme;
     final viewInsets = MediaQuery.viewInsetsOf(context);
-    final horizontalPadding =
-        size.width > 700 ? size.width * 0.24 : size.width > 500 ? 36.0 : 20.0;
+    final horizontalPadding = size.width > 700
+        ? size.width * 0.24
+        : size.width > 500
+            ? 36.0
+            : 20.0;
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
@@ -112,8 +115,8 @@ class AuthScaffold extends StatelessWidget {
                               Text(
                                 subtitle,
                                 style: textTheme.titleMedium?.copyWith(
-                                  color:
-                                      FlixieColors.light.withValues(alpha: 0.92),
+                                  color: FlixieColors.light
+                                      .withValues(alpha: 0.92),
                                   height: 1.35,
                                 ),
                                 textAlign: TextAlign.center,
@@ -158,23 +161,23 @@ class AuthCard extends StatelessWidget {
         child: Container(
           padding: padding,
           decoration: BoxDecoration(
-            color: const Color(0xFF102B4A).withValues(alpha: 0.5),
+            color: FlixieColors.surfaceElevated.withValues(alpha: 0.84),
             borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+            border: Border.all(
+              color: FlixieColors.tabBarBorder.withValues(alpha: 0.7),
+            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.24),
-                blurRadius: 28,
-                offset: const Offset(0, 16),
-              ),
-              BoxShadow(
-                color: FlixieColors.primary.withValues(alpha: 0.1),
-                blurRadius: 28,
-                spreadRadius: 1,
+                color: Colors.black.withValues(alpha: 0.34),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
               ),
             ],
           ),
-          child: child,
+          child: Material(
+            type: MaterialType.transparency,
+            child: child,
+          ),
         ),
       ),
     );
@@ -311,14 +314,16 @@ InputDecoration buildAuthInputDecoration({
       fontSize: 16,
     ),
     filled: true,
-    fillColor: (isFocused ? const Color(0xFF132949) : const Color(0xFF0E1E35))
-        .withValues(alpha: 0.86),
+    fillColor: (isFocused
+            ? FlixieColors.surfaceElevated
+            : FlixieColors.tabBarBackgroundFocused)
+        .withValues(alpha: 0.9),
     prefixIcon: prefixIcon == null
         ? null
         : Icon(
             prefixIcon,
             size: 22,
-            color: isFocused ? FlixieColors.primaryTint : FlixieColors.light,
+            color: isFocused ? FlixieColors.primaryTint : FlixieColors.medium,
           ),
     suffixIcon: suffixIcon,
     contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
@@ -328,13 +333,15 @@ InputDecoration buildAuthInputDecoration({
     ),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(18),
-      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+      borderSide: BorderSide(
+        color: FlixieColors.tabBarBorder.withValues(alpha: 0.9),
+      ),
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(18),
       borderSide: const BorderSide(
-        color: FlixieColors.primaryTint,
-        width: 1.4,
+        color: FlixieColors.primary,
+        width: 1.6,
       ),
     ),
     errorBorder: OutlineInputBorder(
@@ -467,19 +474,19 @@ class AuthChip extends StatelessWidget {
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
               color: selected
-                  ? FlixieColors.primaryTint
-                  : Colors.white.withValues(alpha: 0.12),
+                  ? FlixieColors.primary
+                  : FlixieColors.tabBarBorder.withValues(alpha: 0.9),
               width: selected ? 1.4 : 1,
             ),
             color: selected
-                ? FlixieColors.primary.withValues(alpha: 0.18)
-                : const Color(0xFF0E1E35).withValues(alpha: 0.86),
+                ? FlixieColors.primary.withValues(alpha: 0.16)
+                : FlixieColors.tabBarBackgroundFocused.withValues(alpha: 0.9),
             boxShadow: [
               if (selected)
                 BoxShadow(
-                  color: FlixieColors.primary.withValues(alpha: 0.18),
-                  blurRadius: 18,
-                  spreadRadius: 1,
+                  color: FlixieColors.primary.withValues(alpha: 0.14),
+                  blurRadius: 14,
+                  spreadRadius: 0.5,
                 ),
             ],
           ),

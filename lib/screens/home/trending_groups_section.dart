@@ -276,7 +276,8 @@ class TrendingMoviePosterStrip extends StatelessWidget {
                           ? CachedNetworkImage(
                               imageUrl: movie.posterUrl!,
                               fit: BoxFit.cover,
-                              errorWidget: (_, __, ___) => _PosterFallback(movie),
+                              errorWidget: (_, __, ___) =>
+                                  _PosterFallback(movie),
                             )
                           : _PosterFallback(movie),
                     ),

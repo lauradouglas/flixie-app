@@ -481,8 +481,8 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     final visibleReviews = _showAllReviews
         ? _reviews
         : _reviews.take(_initialReviewCount).toList();
-    final watchedCount =
-        (_user?.watchedMovies?.length ?? 0) + (_user?.watchedShows?.length ?? 0);
+    final watchedCount = (_user?.watchedMovies?.length ?? 0) +
+        (_user?.watchedShows?.length ?? 0);
     final watchlistCount = (_user?.movieWatchlist?.length ?? 0) +
         (_user?.showWatchlist?.length ?? 0);
     final favoritesCount = (_user?.favoriteMovies?.length ?? 0) +
@@ -510,9 +510,14 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                       gradient: const LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [Color(0xFF123D72), Color(0xFF0A2248)],
+                        colors: [
+                          FlixieColors.surfaceElevated,
+                          FlixieColors.surface,
+                        ],
                       ),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                      border: Border.all(
+                        color: FlixieColors.tabBarBorder.withValues(alpha: 0.9),
+                      ),
                     ),
                     child: Column(
                       children: [
@@ -565,7 +570,8 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                   ),
 
                   const SizedBox(height: 14),
-                  SizedBox(width: double.infinity, child: _buildFriendshipButton()),
+                  SizedBox(
+                      width: double.infinity, child: _buildFriendshipButton()),
                   const SizedBox(height: 16),
 
                   ProfileStatsRow(
@@ -600,7 +606,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                   ],
 
                   // Mini stats
-                  if ((_user?.watchedMovies?.isNotEmpty ?? false)) ...[
+                  if (_user?.watchedMovies != null) ...[
                     const SizedBox(height: 24),
                     FriendMiniStats(watchedMovies: _user!.watchedMovies!),
                   ],
