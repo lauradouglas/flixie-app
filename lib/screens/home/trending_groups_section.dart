@@ -265,18 +265,34 @@ class TrendingMoviePosterStrip extends StatelessWidget {
                 final movieId = movie.tmdbId;
                 if (movieId != null) onOpenMovie(movieId);
               },
-              child: AspectRatio(
-                aspectRatio: 0.74,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: movie.posterUrl != null
-                      ? CachedNetworkImage(
-                          imageUrl: movie.posterUrl!,
-                          fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) => _PosterFallback(movie),
-                        )
-                      : _PosterFallback(movie),
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AspectRatio(
+                    aspectRatio: 0.74,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: movie.posterUrl != null
+                          ? CachedNetworkImage(
+                              imageUrl: movie.posterUrl!,
+                              fit: BoxFit.cover,
+                              errorWidget: (_, __, ___) => _PosterFallback(movie),
+                            )
+                          : _PosterFallback(movie),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    movie.title.isEmpty ? 'Unknown title' : movie.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: FlixieColors.light,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
