@@ -120,8 +120,9 @@ class _ReviewCardState extends State<ReviewCard> {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: const Color(0xFF1B2E42),
+          color: FlixieColors.surface,
           borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: FlixieColors.tabBarBorder),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -204,19 +205,21 @@ class _ReviewCardState extends State<ReviewCard> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
+                  color: FlixieColors.warning.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.withOpacity(0.35)),
+                  border: Border.all(
+                    color: FlixieColors.warning.withValues(alpha: 0.45),
+                  ),
                 ),
                 child: const Row(
                   children: [
                     Icon(Icons.warning_amber_rounded,
-                        color: Colors.orange, size: 15),
+                        color: FlixieColors.warning, size: 15),
                     SizedBox(width: 6),
                     Text(
                       'Contains spoilers — tap to read',
                       style: TextStyle(
-                        color: Colors.orange,
+                        color: FlixieColors.warning,
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),

@@ -45,9 +45,9 @@ class _FilmographySheetState extends State<FilmographySheet> {
   }
 
   Widget _posterFallback() => Container(
-        color: const Color(0xFF1B2E42),
+        color: FlixieColors.surfaceElevated,
         child: const Icon(Icons.movie_outlined,
-            color: Color(0xFF2E4057), size: 20),
+            color: FlixieColors.medium, size: 20),
       );
 
   @override
@@ -66,7 +66,7 @@ class _FilmographySheetState extends State<FilmographySheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: const Color(0xFF1E2D40),
+                color: FlixieColors.tabBarBorder,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -115,15 +115,17 @@ class _FilmographySheetState extends State<FilmographySheet> {
                         )
                       : null,
                   filled: true,
-                  fillColor: const Color(0xFF0F2033),
+                  fillColor: FlixieColors.surfaceElevated,
                   contentPadding: const EdgeInsets.symmetric(vertical: 10),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFF1E2D40)),
+                    borderSide:
+                        const BorderSide(color: FlixieColors.tabBarBorder),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFF1E2D40)),
+                    borderSide:
+                        const BorderSide(color: FlixieColors.tabBarBorder),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -135,7 +137,7 @@ class _FilmographySheetState extends State<FilmographySheet> {
             ),
             const SizedBox(height: 8),
 
-            const Divider(color: Color(0xFF1E2D40), height: 1),
+            const Divider(color: FlixieColors.tabBarBorder, height: 1),
 
             // List
             Expanded(
@@ -152,7 +154,7 @@ class _FilmographySheetState extends State<FilmographySheet> {
                           horizontal: 16, vertical: 8),
                       itemCount: _filtered.length,
                       separatorBuilder: (_, __) => const Divider(
-                        color: Color(0xFF1E2D40),
+                        color: FlixieColors.tabBarBorder,
                         height: 1,
                       ),
                       itemBuilder: (context, i) {

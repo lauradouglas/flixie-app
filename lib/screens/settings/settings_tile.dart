@@ -22,6 +22,7 @@ class SettingsTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+
   /// When [true] the bottom divider is hidden (last item in a group).
   final bool isLast;
   final Widget? trailing;
@@ -47,7 +48,10 @@ class SettingsTile extends StatelessWidget {
                     width: _kTileIconSize,
                     height: _kTileIconSize,
                     decoration: BoxDecoration(
-                      color: FlixieColors.primary.withValues(alpha: 0.12),
+                      color: FlixieColors.surfaceElevated,
+                      border: Border.all(
+                        color: FlixieColors.tabBarBorder,
+                      ),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(icon, color: FlixieColors.primary, size: 18),
@@ -57,7 +61,7 @@ class SettingsTile extends StatelessWidget {
                     child: Text(
                       label,
                       style: const TextStyle(
-                        color: FlixieColors.light,
+                        color: FlixieColors.textPrimary,
                         fontSize: 15,
                         fontWeight: FontWeight.w500,
                       ),
@@ -77,7 +81,7 @@ class SettingsTile extends StatelessWidget {
             child: Divider(
               height: 1,
               thickness: 0.5,
-              color: Colors.white.withValues(alpha: 0.07),
+              color: FlixieColors.tabBarBorder,
             ),
           ),
       ],

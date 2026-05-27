@@ -335,6 +335,7 @@ class _AddToListSheetBodyState extends State<_AddToListSheetBody> {
     final created = await showModalBottomSheet<MovieList>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: FlixieColors.background,
       builder: (_) => ChangeNotifierProvider<MovieListsProvider>.value(
         value: provider,

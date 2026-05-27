@@ -169,9 +169,9 @@ class _FriendPreviewCard extends StatelessWidget {
       width: 92,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF142E55),
+        color: FlixieColors.surfaceElevated,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        border: Border.all(color: FlixieColors.tabBarBorder),
       ),
       child: Column(
         children: [

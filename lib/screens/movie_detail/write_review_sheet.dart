@@ -94,7 +94,7 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFF0D1B2A),
+        color: FlixieColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.only(bottom: bottomInset),
@@ -132,7 +132,7 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
               ],
             ),
           ),
-          const Divider(color: Color(0xFF1E2D40), height: 1),
+          const Divider(color: FlixieColors.tabBarBorder, height: 1),
           // Form
           Flexible(
             child: SingleChildScrollView(
@@ -195,7 +195,7 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
                         hintText: 'Give your review a title',
                         hintStyle: const TextStyle(color: FlixieColors.medium),
                         filled: true,
-                        fillColor: const Color(0xFF1B2E42),
+                        fillColor: FlixieColors.surfaceElevated,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                           borderSide: BorderSide.none,
@@ -222,7 +222,7 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
                         hintText: 'Share your thoughts about the movie...',
                         hintStyle: const TextStyle(color: FlixieColors.medium),
                         filled: true,
-                        fillColor: const Color(0xFF1B2E42),
+                        fillColor: FlixieColors.surfaceElevated,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                           borderSide: BorderSide.none,
@@ -334,8 +334,9 @@ class _ToggleTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFF1B2E42),
+        color: FlixieColors.surfaceElevated,
         borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: FlixieColors.tabBarBorder),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
