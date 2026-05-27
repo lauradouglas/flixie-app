@@ -130,6 +130,6 @@ The app uses the current Flixie dark palette:
 | Success | Green | `#00D97E` |
 | Warning | Gold | `#FFC857` |
 | Danger | Red | `#E57373` |
-| Background | Deep Navy | `#061625` |
-| Surface | Navy | `#0B2035` |
-| Surface Elevated | Navy Elevated | `#12345A` |
+| Background | Deep Plum | `#120A24` |
+| Surface | Plum | `#1A1033` |
+| Surface Elevated | Plum Elevated | `#27194A` |

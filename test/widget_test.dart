@@ -53,11 +53,11 @@ void main() {
     });
 
     test('background color has correct value', () {
-      expect(FlixieColors.background, const Color(0xFF061625));
+      expect(FlixieColors.background, const Color(0xFF120A24));
     });
 
     test('surface color has correct value', () {
-      expect(FlixieColors.surface, const Color(0xFF0B2035));
+      expect(FlixieColors.surface, const Color(0xFF1A1033));
     });
 
     test('danger color has correct value', () {
