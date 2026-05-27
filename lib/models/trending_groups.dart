@@ -1,3 +1,6 @@
+const _tmdbImageBaseUrl = 'https://image.tmdb.org/t/p';
+const _tmdbImageSize = 'w342';
+
 class TrendingGroupsResponse {
   final TrendingSummary summary;
   final List<TrendingGroup> groups;
@@ -72,7 +75,11 @@ class TrendingGroup {
     return TrendingGroup(
       id: (json['id'] as String?) ?? '',
       name: name,
-      avatarUrl: _toStringOrNull(json['avatarUrl']),
+      avatarUrl: _toImageUrl(_firstValue(json, const [
+        'avatarUrl',
+        'avatar_url',
+        'avatar',
+      ])),
       initials: (initials == null || initials.isEmpty)
           ? _buildInitialsFromName(name)
           : initials,
@@ -81,7 +88,9 @@ class TrendingGroup {
       trendLabel: (json['trendLabel'] as String?) ?? '',
       activityCount: _toInt(json['activityCount']) ?? 0,
       trendingMovies:
-          (json['trendingMovies'] as List<dynamic>? ?? const <dynamic>[])
+          (_firstValue(json, const ['trendingMovies', 'trending_movies'])
+                  as List<dynamic>? ??
+              const <dynamic>[])
               .whereType<Map<String, dynamic>>()
               .map(TrendingMovie.fromJson)
               .toList(),
@@ -111,15 +120,43 @@ class TrendingMovie {
   });
 
   factory TrendingMovie.fromJson(Map<String, dynamic> json) {
+    final nestedMovie = json['movie'] as Map<String, dynamic>?;
     return TrendingMovie(
-      id: (json['id'] as String?) ?? '',
-      tmdbId: _toInt(json['tmdbId']),
-      title: (json['title'] as String?) ?? '',
-      posterUrl: _toStringOrNull(json['posterUrl']),
-      backdropUrl: _toStringOrNull(json['backdropUrl']),
+      id: _toStringOrNull(_firstValue(json, const ['id', 'movieId'])) ?? '',
+      tmdbId: _toInt(_firstValue(json, const ['tmdbId', 'tmdb_id'])) ??
+          _toInt(_firstValue(nestedMovie, const ['id', 'tmdbId', 'tmdb_id'])),
+      title: (_firstValue(
+                json,
+                const ['title', 'name', 'movieTitle'],
+              ) as String?) ??
+          (_firstValue(nestedMovie, const ['title', 'name']) as String?) ??
+          '',
+      posterUrl: _toImageUrl(_firstValue(json, const [
+            'posterUrl',
+            'poster',
+            'posterPath',
+            'poster_path',
+            'moviePosterPath',
+          ])) ??
+          _toImageUrl(_firstValue(nestedMovie, const [
+            'posterUrl',
+            'poster',
+            'posterPath',
+            'poster_path',
+          ])),
+      backdropUrl: _toImageUrl(_firstValue(json, const [
+            'backdropUrl',
+            'backdropPath',
+            'backdrop_path',
+          ])) ??
+          _toImageUrl(_firstValue(nestedMovie, const [
+            'backdropUrl',
+            'backdropPath',
+            'backdrop_path',
+          ])),
       year: _toInt(json['year']),
-      activityCount: _toInt(json['activityCount']) ?? 0,
-      averageRating: _toDouble(json['averageRating']),
+      activityCount: _toInt(_firstValue(json, const ['activityCount', 'activity_count'])) ?? 0,
+      averageRating: _toDouble(_firstValue(json, const ['averageRating', 'average_rating'])),
     );
   }
 }
@@ -142,6 +179,22 @@ String? _toStringOrNull(dynamic value) {
   if (value == null) return null;
   final result = value.toString().trim();
   return result.isEmpty ? null : result;
+}
+
+dynamic _firstValue(Map<String, dynamic>? json, List<String> keys) {
+  if (json == null) return null;
+  for (final key in keys) {
+    if (json.containsKey(key)) return json[key];
+  }
+  return null;
+}
+
+String? _toImageUrl(dynamic value) {
+  final raw = _toStringOrNull(value);
+  if (raw == null) return null;
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  if (raw.startsWith('/')) return '$_tmdbImageBaseUrl/$_tmdbImageSize$raw';
+  return '$_tmdbImageBaseUrl/$_tmdbImageSize/$raw';
 }
 
 String _buildInitialsFromName(String name) {

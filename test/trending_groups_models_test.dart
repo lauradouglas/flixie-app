@@ -61,5 +61,35 @@ void main() {
       expect(response.groups.first.memberCount, 0);
       expect(response.groups.first.activityCount, 0);
     });
+
+    test('parses snake_case movie keys and normalizes poster paths', () {
+      final response = TrendingGroupsResponse.fromJson({
+        'summary': {},
+        'groups': [
+          {
+            'id': 'group-3',
+            'name': 'Movie Club',
+            'trendLabel': 'Hot now',
+            'trending_movies': [
+              {
+                'id': 'movie-3',
+                'tmdb_id': 603,
+                'title': 'The Matrix',
+                'poster_path': '/f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg',
+                'activity_count': 4,
+              },
+            ],
+          },
+        ],
+      });
+
+      final movie = response.groups.first.trendingMovies.first;
+      expect(movie.tmdbId, 603);
+      expect(
+        movie.posterUrl,
+        'https://image.tmdb.org/t/p/w342/f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg',
+      );
+      expect(movie.activityCount, 4);
+    });
   });
 }
