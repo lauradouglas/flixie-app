@@ -27,10 +27,10 @@ class ActivityTile extends StatelessWidget {
     switch (item.type) {
       case ActivityListType.movieWatched:
       case ActivityListType.showWatched:
-        return const Color(0xFF30C48D);
+        return FlixieColors.success;
       case ActivityListType.movieWatchlist:
       case ActivityListType.showWatchlist:
-        return const Color(0xFFFFD166);
+        return FlixieColors.warning;
       case ActivityListType.favoriteMovie:
       case ActivityListType.favoriteShow:
       case ActivityListType.favoritePerson:

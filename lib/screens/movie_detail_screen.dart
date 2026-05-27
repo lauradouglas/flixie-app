@@ -794,7 +794,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                     Color(0x14000000),
                     Color(0x00000000),
                     Color(0x73071426),
-                    Color(0xD9172B4D),
+                    Color(0xD9061625),
                     FlixieColors.background,
                   ],
                 ),

@@ -197,7 +197,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF0D1B2A), Color(0xFF172B4D), Color(0xFF1A1040)],
+            colors: [
+              FlixieColors.navy,
+              FlixieColors.background,
+              FlixieColors.surface
+            ],
           ),
         ),
         child: SafeArea(

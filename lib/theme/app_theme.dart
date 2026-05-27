@@ -59,7 +59,7 @@ class FlixieColors {
   static const Color tabBarBorder = Color(0xFF1A3352);
 
   // Watchlist card gradient colours
-  static const Color cardGradientTop = Color(0xF2102B4A);    // rgba(16,43,74,0.95)
+  static const Color cardGradientTop = Color(0xF212345A);    // rgba(18,52,90,0.95)
   static const Color cardGradientBottom = Color(0xFA081727); // rgba(8,23,39,0.98)
 }
 

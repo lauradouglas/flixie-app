@@ -120,14 +120,16 @@ Unauthenticated users are automatically redirected to `/auth/login`.
 
 ## Colour Scheme
 
-The app uses a dark theme derived from the original Ionic colour palette:
+The app uses the current Flixie dark palette:
 
 | Token | Colour | Hex |
 |---|---|---|
-| Primary | Purple | `#947AF1` |
-| Secondary | Teal | `#08A391` |
+| Primary | Purple | `#9B6BFF` |
+| Secondary | Cyan | `#00D1C7` |
 | Tertiary | Peach | `#F1A77A` |
-| Success | Green | `#30C48D` |
-| Warning | Yellow | `#FFD166` |
+| Success | Green | `#00D97E` |
+| Warning | Gold | `#FFC857` |
 | Danger | Red | `#E57373` |
-| Background | Deep Navy | `#172B4D` |
+| Background | Deep Navy | `#061625` |
+| Surface | Navy | `#0B2035` |
+| Surface Elevated | Navy Elevated | `#12345A` |
