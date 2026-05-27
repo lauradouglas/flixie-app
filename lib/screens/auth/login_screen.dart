@@ -39,6 +39,11 @@ class _LoginScreenState extends State<LoginScreen> {
       _passwordController.text,
     );
 
+    if (!_rememberMe) {
+      _emailController.clear();
+      _passwordController.clear();
+    }
+
     if (!mounted) return;
     if (!success) {
       messenger.showSnackBar(

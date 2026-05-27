@@ -540,7 +540,7 @@ class _SignupScreenState extends State<SignupScreen> {
           const Expanded(
             child: Text(
               'Failed to load options.',
-              style: TextStyle(color: FlixieColors.textPrimary),
+              style: TextStyle(color: FlixieColors.danger),
             ),
           ),
           TextButton(

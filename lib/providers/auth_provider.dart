@@ -367,6 +367,29 @@ class AuthProvider extends ChangeNotifier {
 
   void clearError() => _setError(null);
 
+  bool _looksLikeEmail(String value) =>
+      value.contains('@') && value.substring(value.indexOf('@')).contains('.');
+
+  Future<String> _resolveSignInEmail(String identifier) async {
+    if (_looksLikeEmail(identifier)) {
+      return identifier;
+    }
+
+    try {
+      return (await UserService.getUserByUsername(identifier)).email;
+    } on ApiException catch (error) {
+      logger.w('Failed to resolve username during sign-in: $error');
+      _errorMessage = error.statusCode == 404
+          ? 'Username not found.'
+          : 'Unable to verify username right now. Please try again.';
+      rethrow;
+    } catch (error) {
+      logger.w('Unexpected username lookup failure during sign-in: $error');
+      _errorMessage = 'Unable to verify username right now. Please try again.';
+      rethrow;
+    }
+  }
+
   /// Signs in with email or username and password. Returns `true` on success.
   Future<bool> signIn(String emailOrUsername, String password) async {
     _setLoading(true);
@@ -379,11 +402,9 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
 
-      final email = identifier.contains('@')
-          ? identifier
-          : (await UserService.getUserByUsername(identifier)).email;
-
+      final email = await _resolveSignInEmail(identifier);
       await _authService.signIn(email, password);
+
       // Force a one-time sync of auth-dependent state right after sign-in.
       // This avoids a stuck loading/login screen if authStateChanges callback
       // arrives late on some devices.
@@ -396,8 +417,7 @@ class AuthProvider extends ChangeNotifier {
         notifyListeners();
       }
       return true;
-    } on ApiException catch (_) {
-      _errorMessage = 'Invalid email or username.';
+    } on ApiException {
       _setLoading(false);
       return false;
     } on firebase_auth.FirebaseAuthException catch (e) {
