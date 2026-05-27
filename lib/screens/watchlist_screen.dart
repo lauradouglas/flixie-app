@@ -1058,13 +1058,13 @@ class WatchlistMovieRow extends StatelessWidget {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Color(0xF2102B4A), // rgba(16,43,74,0.95)
-                Color(0xFA081727), // rgba(8,23,39,0.98)
+                FlixieColors.cardGradientTop,
+                FlixieColors.cardGradientBottom,
               ],
             ),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: Color(0x1F9B6BFF), // rgba(155,107,255,0.12)
+              color: FlixieColors.primary.withValues(alpha: 0.12),
               width: 1,
             ),
             boxShadow: [
@@ -1317,10 +1317,10 @@ class _WatchlistStatusPill extends StatelessWidget {
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        children: const [
-          Icon(Icons.bookmark_rounded, size: 13, color: FlixieColors.primary),
-          SizedBox(width: 5),
-          Text(
+        children: [
+          const Icon(Icons.bookmark_rounded, size: 13, color: FlixieColors.primary),
+          const SizedBox(width: 5),
+          const Text(
             'In your watchlist',
             style: TextStyle(
               color: FlixieColors.primaryTint,

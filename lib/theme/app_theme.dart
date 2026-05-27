@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 /// Flixie color palette — cinematic dark theme.
 class FlixieColors {
-  // Primary – neon purple
+  // Primary – vivid purple
   static const Color primary = Color(0xFF9B6BFF);
   static const Color primaryShade = Color(0xFF7C4DFF);
   static const Color primaryTint = Color(0xFFB388FF);
@@ -57,6 +57,10 @@ class FlixieColors {
   static const Color tabBarBackground = Color(0xFF0A1828);
   static const Color tabBarBackgroundFocused = surface;
   static const Color tabBarBorder = Color(0xFF1A3352);
+
+  // Watchlist card gradient colours
+  static const Color cardGradientTop = Color(0xF2102B4A);    // rgba(16,43,74,0.95)
+  static const Color cardGradientBottom = Color(0xFA081727); // rgba(8,23,39,0.98)
 }
 
 /// Builds the app-wide [ThemeData] using the Flixie color palette.
