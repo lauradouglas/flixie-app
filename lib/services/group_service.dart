@@ -1,5 +1,6 @@
 import '../models/activity_list_item.dart';
 import '../models/group.dart';
+import '../models/group_insights.dart';
 import '../models/group_member.dart';
 import '../models/trending_groups.dart';
 import '../models/group_watch_request.dart';
@@ -330,5 +331,21 @@ class GroupService {
         .map((e) => ActivityListItem.fromJson(e as Map<String, dynamic>))
         .toList();
     return rankActivitiesForFeed(activities);
+  }
+
+  static Future<GroupInsightsResponse> getGroupInsights(
+    String groupId, {
+    String? timeWindow,
+    int? limit,
+  }) async {
+    final queryParams = <String, String>{
+      if (timeWindow != null && timeWindow.isNotEmpty) 'timeWindow': timeWindow,
+      if (limit != null) 'limit': '$limit',
+    };
+    final data = await ApiClient.get(
+      '/groups/$groupId/insights',
+      queryParams: queryParams.isEmpty ? null : queryParams,
+    );
+    return GroupInsightsResponse.fromJson(data as Map<String, dynamic>);
   }
 }

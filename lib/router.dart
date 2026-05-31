@@ -96,9 +96,11 @@ GoRouter buildRouter(AuthProvider authProvider) {
               groupId: state.pathParameters['id'] ?? '',
               initialTab: state.uri.queryParameters['tab'] == 'requests'
                   ? 2
-                  : state.uri.queryParameters['tab'] == 'chat'
-                      ? 0
-                      : null,
+                  : state.uri.queryParameters['tab'] == 'insights'
+                      ? 3
+                      : state.uri.queryParameters['tab'] == 'chat'
+                          ? 0
+                          : null,
             ),
           ),
           GoRoute(

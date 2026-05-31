@@ -15,6 +15,7 @@ import '../utils/app_logger.dart';
 import '../utils/skeleton.dart';
 import 'group_detail/activity_tab.dart';
 import 'group_detail/chat_tab.dart';
+import 'group_detail/insights_tab.dart';
 import 'group_detail/requests_tab.dart';
 
 class GroupDetailScreen extends StatefulWidget {
@@ -22,7 +23,7 @@ class GroupDetailScreen extends StatefulWidget {
 
   final String groupId;
 
-  /// 0=Chat, 1=Activity, 2=Requests. Defaults to 1 (Activity).
+  /// 0=Chat, 1=Activity, 2=Requests, 3=Insights. Defaults to 1 (Activity).
   final int? initialTab;
 
   @override
@@ -68,7 +69,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
   void initState() {
     super.initState();
     _tabController = TabController(
-      length: 3,
+      length: 4,
       vsync: this,
       initialIndex: widget.initialTab ?? 1,
     );
@@ -252,6 +253,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                       ],
                     ),
                   ),
+                  const Tab(text: 'Insights'),
                 ],
               ),
       ),
@@ -295,6 +297,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                         }
                       },
                     ),
+                    GroupInsightsTab(groupId: widget.groupId),
                   ],
                 ),
     );
