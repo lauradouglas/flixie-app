@@ -1,3 +1,5 @@
+import '../models/friend_recommendation.dart';
+import '../models/friend_summary.dart';
 import '../models/movie.dart';
 import '../models/movie_credits.dart';
 import '../models/movie_friend_activity.dart';
@@ -169,6 +171,19 @@ class MovieService {
     return (data as List<dynamic>)
         .map((e) => MovieShort.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  Future<FriendRecommendationResponse> getFriendRecommendation(
+      int movieId) async {
+    apiLogger.d('Fetching friend recommendation for movie $movieId');
+    final data = await ApiClient.get('/movies/$movieId/friend-recommendation');
+    return FriendRecommendationResponse.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<FriendSummaryResponse> getFriendSummary(int movieId) async {
+    apiLogger.d('Fetching friend summary for movie $movieId');
+    final data = await ApiClient.get('/movies/$movieId/friend-summary');
+    return FriendSummaryResponse.fromJson(data as Map<String, dynamic>);
   }
 
   // ---- Cache management ----
