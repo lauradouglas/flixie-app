@@ -267,7 +267,6 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: FlixieColors.tabBarBackgroundFocused,
         title: const Text('Remove Friend'),
         content:
             Text('Remove ${_user?.username ?? 'this user'} from your friends?'),

@@ -174,7 +174,6 @@ class _MovieListsView extends StatelessWidget {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.tabBarBackgroundFocused,
       builder: (ctx) {
         return Padding(
           padding: EdgeInsets.only(

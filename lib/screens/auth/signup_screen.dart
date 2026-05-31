@@ -473,9 +473,12 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
     return Container(
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
-      decoration: const BoxDecoration(
-        color: Color(0xFF1B3258),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: FlixieColors.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        border: Border.all(
+          color: FlixieColors.tabBarBorder.withValues(alpha: 0.85),
+        ),
       ),
       child: SafeArea(
         top: false,
@@ -497,7 +500,7 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
             const Text(
               'Select Country',
               style: TextStyle(
-                color: Colors.white,
+                color: FlixieColors.textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
@@ -507,17 +510,32 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
               controller: _searchController,
               onChanged: _onSearch,
               autofocus: true,
-              style: const TextStyle(color: Colors.white),
+              style: const TextStyle(color: FlixieColors.textPrimary),
               decoration: InputDecoration(
                 hintText: 'Search countries...',
                 hintStyle: const TextStyle(color: FlixieColors.medium),
                 prefixIcon:
                     const Icon(Icons.search, color: FlixieColors.medium),
                 filled: true,
-                fillColor: FlixieColors.tabBarBackgroundFocused,
+                fillColor: FlixieColors.surfaceElevated,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+                  borderSide: BorderSide(
+                    color: FlixieColors.tabBarBorder.withValues(alpha: 0.85),
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: FlixieColors.tabBarBorder.withValues(alpha: 0.85),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                    color: FlixieColors.primary,
+                    width: 1.6,
+                  ),
                 ),
               ),
             ),
@@ -530,11 +548,12 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
                   final country = _filtered[index];
                   final isSelected = country.id == widget.selected?.id;
                   return ListTile(
+                    tileColor: Colors.transparent,
                     title: Text(
                       country.name,
                       style: TextStyle(
                         color: isSelected
-                            ? FlixieColors.primaryTint
+                            ? FlixieColors.primary
                             : FlixieColors.textPrimary,
                         fontWeight: isSelected
                             ? FontWeight.w700
@@ -543,7 +562,7 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
                     ),
                     trailing: isSelected
                         ? const Icon(Icons.check_rounded,
-                            color: FlixieColors.primaryTint)
+                            color: FlixieColors.primary)
                         : null,
                     onTap: () => Navigator.of(context).pop(country),
                   );

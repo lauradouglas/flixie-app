@@ -100,7 +100,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final movie = await showModalBottomSheet<MovieShort>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF10355E),
+      backgroundColor: FlixieColors.surface,
       builder: (sheetContext) => Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
@@ -414,9 +414,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF10355E).withValues(alpha: 0.7),
+        color: FlixieColors.surfaceElevated.withValues(alpha: 0.82),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        border: Border.all(
+          color: FlixieColors.tabBarBorder.withValues(alpha: 0.8),
+        ),
       ),
       child: Row(
         children: [

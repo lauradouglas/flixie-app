@@ -244,7 +244,6 @@ class _LogOutButton extends StatelessWidget {
           final confirmed = await showDialog<bool>(
             context: context,
             builder: (ctx) => AlertDialog(
-              backgroundColor: FlixieColors.surface,
               title: const Text(
                 'Log Out',
                 style: TextStyle(color: Colors.white),

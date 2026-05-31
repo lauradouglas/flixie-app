@@ -317,7 +317,6 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         final markWatched = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            backgroundColor: FlixieColors.tabBarBackgroundFocused,
             title: const Text('Did you watch it?',
                 style: TextStyle(color: FlixieColors.light)),
             content: Text(
@@ -431,7 +430,6 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.tabBarBackgroundFocused,
       builder: (_) => AddToListSheet(movieId: item.movieId),
     );
   }
@@ -445,7 +443,6 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
