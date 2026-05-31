@@ -49,8 +49,11 @@ class ActivityListItem {
   final String? mediaPosterPath;
   final double? mediaRating;
   final String? watchedAt;
+  final int? watchCount;
+  final bool isRewatch;
   final String? notes;
   final Review? reviewData;
+  final int activityScore;
 
   String get timestamp {
     if (watchedAt != null && watchedAt!.isNotEmpty) return watchedAt!;
@@ -75,8 +78,11 @@ class ActivityListItem {
     this.mediaPosterPath,
     this.mediaRating,
     this.watchedAt,
+    this.watchCount,
+    this.isRewatch = false,
     this.notes,
     this.reviewData,
+    this.activityScore = 0,
   });
 
   factory ActivityListItem.fromJson(Map<String, dynamic> json) {
@@ -87,7 +93,15 @@ class ActivityListItem {
     final show = json['show'] as Map<String, dynamic>?;
     final person = json['person'] as Map<String, dynamic>?;
     final review = json['review'] as Map<String, dynamic>?;
-    final type = ActivityListType.fromString(json['type'] as String?);
+    final rawType = json['type'] as String?;
+    final type = _resolveActivityType(rawType);
+    final parsedWatchCount =
+        _parseInt(json['watchCount'] ?? json['totalWatchCount']);
+    final normalizedType = rawType?.toLowerCase().replaceAll('_', '-');
+    final isRewatch = json['isRewatch'] == true ||
+        json['rewatch'] == true ||
+        normalizedType == 'rewatched' ||
+        (parsedWatchCount != null && parsedWatchCount > 1);
     final userId = user?['id'] as String? ??
         json['userId'] as String? ??
         json['requesterId'] as String? ??
@@ -150,9 +164,36 @@ class ActivityListItem {
       mediaRating: (json['rating'] as num?)?.toDouble() ??
           (review?['rating'] as num?)?.toDouble(),
       watchedAt: json['watchedAt'] as String?,
+      watchCount: parsedWatchCount,
+      isRewatch: isRewatch,
       notes: json['notes'] as String?,
       reviewData: reviewData,
+      activityScore: _parseInt(json['activityScore']) ?? 0,
     );
+  }
+}
+
+ActivityListType _resolveActivityType(String? rawType) {
+  final resolved = ActivityListType.fromString(rawType);
+  if (resolved != ActivityListType.unknown) return resolved;
+
+  final normalized = rawType?.toLowerCase().replaceAll('_', '-');
+  switch (normalized) {
+    case 'added-review':
+      return ActivityListType.movieReview;
+    case 'rewatched':
+    case 'watched':
+      return ActivityListType.movieWatched;
+    case 'added-to-favourites':
+    case 'added-to-favorites':
+      return ActivityListType.favoriteMovie;
+    case 'added-to-watchlist':
+      return ActivityListType.movieWatchlist;
+    case 'rated':
+    case 'rated-9-plus':
+      return ActivityListType.movieRating;
+    default:
+      return ActivityListType.unknown;
   }
 }
 

@@ -4,6 +4,7 @@ import '../models/group_member.dart';
 import '../models/trending_groups.dart';
 import '../models/group_watch_request.dart';
 import '../utils/app_logger.dart';
+import '../utils/activity_feed_ranking.dart';
 import 'api_client.dart';
 
 export '../models/group_watch_request.dart'
@@ -325,8 +326,9 @@ class GroupService {
 
   static Future<List<ActivityListItem>> getGroupActivity(String groupId) async {
     final data = await ApiClient.get('/groups/$groupId/activity');
-    return (data as List<dynamic>)
+    final activities = (data as List<dynamic>)
         .map((e) => ActivityListItem.fromJson(e as Map<String, dynamic>))
         .toList();
+    return rankActivitiesForFeed(activities);
   }
 }

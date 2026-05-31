@@ -74,33 +74,6 @@ class ActivityTile extends StatelessWidget {
     return 'Friend';
   }
 
-  String _actionVerb() {
-    switch (item.type) {
-      case ActivityListType.movieWatchlist:
-      case ActivityListType.showWatchlist:
-        return 'added to watchlist';
-      case ActivityListType.movieWatched:
-      case ActivityListType.showWatched:
-        return 'watched';
-      case ActivityListType.movieRating:
-      case ActivityListType.showRating:
-        return 'rated';
-      case ActivityListType.movieReview:
-      case ActivityListType.showReview:
-        return 'reviewed';
-      case ActivityListType.favoriteMovie:
-      case ActivityListType.favoriteShow:
-      case ActivityListType.favoritePerson:
-        return 'added to favorites';
-      case ActivityListType.watchRequest:
-      case ActivityListType.watchRequestAccepted:
-      case ActivityListType.watchRequestSent:
-        return 'shared';
-      case ActivityListType.unknown:
-        return 'activity on';
-    }
-  }
-
   String _statusLabel() {
     switch (item.type) {
       case ActivityListType.movieWatchlist:
@@ -108,17 +81,17 @@ class ActivityTile extends StatelessWidget {
         return 'Watchlist';
       case ActivityListType.movieWatched:
       case ActivityListType.showWatched:
-        return 'Watched';
+        return item.isRewatch ? 'Rewatched' : 'Watched';
       case ActivityListType.movieRating:
       case ActivityListType.showRating:
-        return 'Rated';
+        return (item.mediaRating ?? 0) >= 9 ? 'Rated 9+/10' : 'Rated';
       case ActivityListType.movieReview:
       case ActivityListType.showReview:
         return 'Review';
       case ActivityListType.favoriteMovie:
       case ActivityListType.favoriteShow:
       case ActivityListType.favoritePerson:
-        return 'Favorite';
+        return 'Favourites';
       case ActivityListType.watchRequest:
       case ActivityListType.watchRequestAccepted:
       case ActivityListType.watchRequestSent:
@@ -126,6 +99,59 @@ class ActivityTile extends StatelessWidget {
       case ActivityListType.unknown:
         return 'Activity';
     }
+  }
+
+  String _formatRating(double? rating) {
+    if (rating == null) return '';
+    final rounded = rating.roundToDouble();
+    if (rounded == rating) return rounded.toStringAsFixed(0);
+    return rating.toStringAsFixed(1);
+  }
+
+  String _headlineText(String subject, String title) {
+    switch (item.type) {
+      case ActivityListType.movieRating:
+      case ActivityListType.showRating:
+        final rating = item.mediaRating;
+        if (rating != null) {
+          return '$subject rated $title ${_formatRating(rating)}/10';
+        }
+        return '$subject rated $title';
+      case ActivityListType.movieReview:
+      case ActivityListType.showReview:
+        return '$subject reviewed $title';
+      case ActivityListType.movieWatched:
+      case ActivityListType.showWatched:
+        if (item.isRewatch) {
+          final count = item.watchCount;
+          if (count != null && count > 1) {
+            return '$subject rewatched $title ($count times)';
+          }
+          return '$subject rewatched $title';
+        }
+        return '$subject watched $title';
+      case ActivityListType.favoriteMovie:
+      case ActivityListType.favoriteShow:
+      case ActivityListType.favoritePerson:
+        return '$subject added $title to favourites';
+      case ActivityListType.movieWatchlist:
+      case ActivityListType.showWatchlist:
+        return '$subject added $title to watchlist';
+      case ActivityListType.watchRequest:
+      case ActivityListType.watchRequestAccepted:
+      case ActivityListType.watchRequestSent:
+        return '$subject shared $title';
+      case ActivityListType.unknown:
+        return '$subject activity on $title';
+    }
+  }
+
+  String? _reviewSnippet() {
+    final reviewBody = item.reviewData?.body.trim();
+    if (reviewBody != null && reviewBody.isNotEmpty) return reviewBody;
+    final noteBody = item.notes?.trim();
+    if (noteBody != null && noteBody.isNotEmpty) return noteBody;
+    return null;
   }
 
   Widget _buildAvatar() {
@@ -153,7 +179,7 @@ class ActivityTile extends StatelessWidget {
       case ActivityListType.favoriteMovie:
       case ActivityListType.favoriteShow:
       case ActivityListType.favoritePerson:
-        return 'One of your favorites';
+        return 'One of your favourites';
       case ActivityListType.movieWatched:
       case ActivityListType.showWatched:
         return null;
@@ -262,6 +288,7 @@ class ActivityTile extends StatelessWidget {
     final title = item.mediaTitle ?? 'something';
     final dateStr = _formatDate(item.timestamp);
     final notes = (item.notes ?? '').trim();
+    final reviewSnippet = _reviewSnippet();
     final isPerson = item.type == ActivityListType.favoritePerson;
     final mediaRoute = _mediaRoute();
     final isReview = item.type == ActivityListType.movieReview ||
@@ -357,24 +384,13 @@ class ActivityTile extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 4),
-              Text.rich(
-                TextSpan(
-                  style: TextStyle(
-                    color: FlixieColors.light,
-                    fontSize: compact ? 13 : 14,
-                    fontWeight: FontWeight.w500,
-                    height: 1.35,
-                  ),
-                  children: [
-                    TextSpan(text: '$activitySubject ${_actionVerb()} '),
-                    TextSpan(
-                      text: title,
-                      style: const TextStyle(
-                        color: FlixieColors.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
+              Text(
+                _headlineText(activitySubject, title),
+                style: TextStyle(
+                  color: FlixieColors.light,
+                  fontSize: compact ? 13 : 14,
+                  fontWeight: FontWeight.w500,
+                  height: 1.35,
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -382,7 +398,9 @@ class ActivityTile extends StatelessWidget {
               if (showMoviePreview && !isPerson) ...[
                 const SizedBox(height: 10),
                 InkWell(
-                  onTap: mediaRoute != null ? () => context.push(mediaRoute) : null,
+                  onTap: mediaRoute != null
+                      ? () => context.push(mediaRoute)
+                      : null,
                   borderRadius: BorderRadius.circular(12),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -444,26 +462,28 @@ class ActivityTile extends StatelessWidget {
                                 if (item.mediaRating != null)
                                   _buildChip(
                                     icon: Icons.star_rounded,
-                                    label: '${item.mediaRating!.toStringAsFixed(1)}/10',
+                                    label:
+                                        '${item.mediaRating!.toStringAsFixed(1)}/10',
                                     color: FlixieColors.tertiary,
                                   ),
                               ],
                             ),
-                            if (notes.isNotEmpty) ...[
+                            if (notes.isNotEmpty || reviewSnippet != null) ...[
                               const SizedBox(height: 8),
                               Container(
                                 width: double.infinity,
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 9, vertical: 7),
                                 decoration: BoxDecoration(
-                                  color: FlixieColors.surface.withValues(alpha: 0.8),
+                                  color: FlixieColors.surface
+                                      .withValues(alpha: 0.8),
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
                                     color: Colors.white.withValues(alpha: 0.08),
                                   ),
                                 ),
                                 child: Text(
-                                  notes,
+                                  reviewSnippet ?? notes,
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
@@ -479,10 +499,10 @@ class ActivityTile extends StatelessWidget {
                     ],
                   ),
                 ),
-              ] else if (notes.isNotEmpty) ...[
+              ] else if (notes.isNotEmpty || reviewSnippet != null) ...[
                 const SizedBox(height: 8),
                 Text(
-                  notes,
+                  reviewSnippet ?? notes,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(

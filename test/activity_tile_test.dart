@@ -14,11 +14,14 @@ ActivityListItem _item({
   String? title,
   double? rating,
   String? notes,
+  String username = '',
+  bool isRewatch = false,
+  int? watchCount,
 }) {
   return ActivityListItem(
     id: 'a1',
     userId: 'u1',
-    username: 'dougasaur',
+    username: username,
     firstName: 'Doug',
     lastName: '',
     movieId: 101,
@@ -28,6 +31,8 @@ ActivityListItem _item({
     type: type,
     mediaTitle: title ?? 'Jurassic Park',
     mediaRating: rating,
+    isRewatch: isRewatch,
+    watchCount: watchCount,
     notes: notes,
   );
 }
@@ -49,7 +54,7 @@ void main() {
     await tester.pumpWidget(_wrap(ActivityTile(item: item)));
 
     expect(find.text('9.0/10'), findsOneWidget);
-    expect(find.text('Rated'), findsOneWidget);
+    expect(find.text('Rated 9+/10'), findsOneWidget);
   });
 
   testWidgets('renders compact watchlist activity with notes', (tester) async {
@@ -59,7 +64,20 @@ void main() {
     );
     await tester.pumpWidget(_wrap(ActivityTile(item: item, compact: true)));
 
-    expect(find.textContaining('added to watchlist'), findsOneWidget);
+    expect(find.textContaining('to watchlist'), findsOneWidget);
     expect(find.text('Can’t wait to watch this one.'), findsOneWidget);
+  });
+
+  testWidgets('renders rewatch headline with watch count', (tester) async {
+    final item = _item(
+      type: ActivityListType.movieWatched,
+      isRewatch: true,
+      watchCount: 3,
+    );
+    await tester.pumpWidget(_wrap(ActivityTile(item: item)));
+
+    expect(find.textContaining('rewatched Jurassic Park (3 times)'),
+        findsOneWidget);
+    expect(find.text('Rewatched'), findsOneWidget);
   });
 }

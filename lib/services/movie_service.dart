@@ -7,6 +7,7 @@ import '../models/movie_short.dart';
 import '../models/top_rated_movie.dart';
 import '../models/watch_provider.dart';
 import '../utils/app_logger.dart';
+import '../utils/activity_feed_ranking.dart';
 import 'api_client.dart';
 import 'movie_cache_service.dart';
 
@@ -146,9 +147,10 @@ class MovieService {
     apiLogger.d('Fetching friends activity for movie $movieId');
     final data = await ApiClient.get('/movies/id/$movieId/friends-activity',
         queryParams: {'userId': userId});
-    return (data as List<dynamic>)
+    final activities = (data as List<dynamic>)
         .map((e) => MovieFriendActivity.fromJson(e as Map<String, dynamic>))
         .toList();
+    return rankMovieFriendActivities(activities);
   }
 
   Future<List<MovieShort>> getTopRatedMovies({String region = 'US'}) async {

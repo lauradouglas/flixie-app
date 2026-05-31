@@ -12,6 +12,7 @@ import '../models/watchlist_movie.dart';
 import '../models/watched_movie.dart';
 import '../models/movie_rating.dart';
 import '../utils/app_logger.dart';
+import '../utils/activity_feed_ranking.dart';
 import 'api_client.dart';
 
 class UserService {
@@ -160,9 +161,10 @@ class UserService {
 
   static Future<List<ActivityListItem>> getUserActivity(String userId) async {
     final data = await ApiClient.get('/users/$userId/activity');
-    return (data as List<dynamic>)
+    final activities = (data as List<dynamic>)
         .map((e) => ActivityListItem.fromJson(e as Map<String, dynamic>))
         .toList();
+    return rankActivitiesForFeed(activities);
   }
 
   static Future<User> updateIconColor(String userId, int iconColorId) async {

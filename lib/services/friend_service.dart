@@ -1,6 +1,7 @@
 import '../models/friend.dart';
 import '../models/friendship.dart';
 import '../models/activity_list_item.dart';
+import '../utils/activity_feed_ranking.dart';
 import 'api_client.dart';
 import 'request_service.dart';
 
@@ -47,8 +48,9 @@ class FriendService {
   static Future<List<ActivityListItem>> getFriendsActivityLists(
       String userId) async {
     final data = await ApiClient.get('/friends/$userId/activity-lists');
-    return (data as List<dynamic>)
+    final activities = (data as List<dynamic>)
         .map((e) => ActivityListItem.fromJson(e as Map<String, dynamic>))
         .toList();
+    return rankActivitiesForFeed(activities);
   }
 }
