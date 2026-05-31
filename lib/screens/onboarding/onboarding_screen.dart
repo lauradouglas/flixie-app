@@ -243,7 +243,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         _buildGenreSection(),
         const SizedBox(height: 22),
         PrimaryButton(
-          label: 'Create Account',
+          label: 'Continue',
           isLoading: _saving,
           onPressed: _saving ? null : _savePreferences,
         ),
