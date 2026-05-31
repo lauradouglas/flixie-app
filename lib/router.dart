@@ -278,13 +278,9 @@ class _FlixieNavBar extends StatelessWidget {
         activeIcon: Icons.bookmark,
         label: 'Watchlist'),
     _NavDest(
-        icon: Icons.people_outline,
-        activeIcon: Icons.people,
-        label: 'Social'),
+        icon: Icons.people_outline, activeIcon: Icons.people, label: 'Social'),
     _NavDest(
-        icon: Icons.person_outline,
-        activeIcon: Icons.person,
-        label: 'Profile'),
+        icon: Icons.person_outline, activeIcon: Icons.person, label: 'Profile'),
     _NavDest(
         icon: Icons.settings_outlined,
         activeIcon: Icons.settings,
@@ -399,8 +395,7 @@ class _NavItem extends StatelessWidget {
                   color:
                       isSelected ? FlixieColors.primary : FlixieColors.medium,
                   fontSize: 10,
-                  fontWeight:
-                      isSelected ? FontWeight.w700 : FontWeight.normal,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
                 ),
                 child: Text(dest.label),
               ),
