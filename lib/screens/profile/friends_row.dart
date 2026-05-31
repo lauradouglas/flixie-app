@@ -31,7 +31,6 @@ class _FriendsRowState extends State<FriendsRow> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.tabBarBackgroundFocused,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -47,7 +46,6 @@ class _FriendsRowState extends State<FriendsRow> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.tabBarBackgroundFocused,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),

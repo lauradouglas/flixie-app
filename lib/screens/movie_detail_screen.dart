@@ -273,7 +273,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             final markWatched = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
-                backgroundColor: FlixieColors.tabBarBackgroundFocused,
                 title: const Text('Did you watch it?',
                     style: TextStyle(color: FlixieColors.light)),
                 content: const Text('Want to add this to your watched list?',
@@ -428,7 +427,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.tabBarBackgroundFocused,
       builder: (_) => AddToListSheet(
         movieId: movieId,
         movieTitle: _movie?.title,
@@ -494,7 +492,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 final remove = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    backgroundColor: FlixieColors.tabBarBackgroundFocused,
                     title: const Text('Remove from Watchlist?',
                         style: TextStyle(color: FlixieColors.light)),
                     content: const Text(
@@ -1083,7 +1080,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   void _showRatingSheet() {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: FlixieColors.tabBarBackgroundFocused,
       clipBehavior: Clip.antiAlias,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -1459,7 +1455,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: FlixieColors.surface,
         title: const Text(
           'FLIXSCORE',
           style: TextStyle(
@@ -1616,7 +1611,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),

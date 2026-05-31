@@ -115,7 +115,6 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: FlixieColors.tabBarBackgroundFocused,
         title: const Text('Transfer Ownership',
             style: TextStyle(color: FlixieColors.light)),
         content: Text(
@@ -160,7 +159,6 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: FlixieColors.tabBarBackgroundFocused,
         title: const Text('Remove Member',
             style: TextStyle(color: FlixieColors.light)),
         content: Text(
@@ -200,7 +198,6 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.tabBarBackgroundFocused,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -222,7 +219,6 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: FlixieColors.tabBarBackgroundFocused,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),

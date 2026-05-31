@@ -1,8 +1,10 @@
 import 'dart:ui';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/genre.dart';
+import '../../models/movie_short.dart';
 import '../../theme/app_theme.dart';
 
 const Set<String> _unsupportedGenreNames = {
@@ -16,6 +18,7 @@ const Set<String> _unsupportedGenreNames = {
   'tv movie',
   'war & politics',
 };
+final _emailPattern = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
 
 List<Genre> filterSupportedGenres(List<Genre> genres) {
   return genres
@@ -25,6 +28,24 @@ List<Genre> filterSupportedGenres(List<Genre> genres) {
         ),
       )
       .toList(growable: false);
+}
+
+enum PasswordStrengthLevel { weak, medium, strong }
+
+PasswordStrengthLevel evaluatePasswordStrength(String password) {
+  var score = 0;
+  if (password.length >= 8) score++;
+  if (RegExp(r'[A-Z]').hasMatch(password)) score++;
+  if (RegExp(r'[0-9]').hasMatch(password)) score++;
+  if (RegExp(r'[^A-Za-z0-9]').hasMatch(password)) score++;
+
+  if (score >= 3) return PasswordStrengthLevel.strong;
+  if (score >= 2) return PasswordStrengthLevel.medium;
+  return PasswordStrengthLevel.weak;
+}
+
+bool isValidEmailFormat(String value) {
+  return _emailPattern.hasMatch(value.trim());
 }
 
 class AuthScaffold extends StatelessWidget {
@@ -246,6 +267,166 @@ class AuthTextField extends StatefulWidget {
 
   @override
   State<AuthTextField> createState() => _AuthTextFieldState();
+}
+
+class AppTextField extends StatelessWidget {
+  const AppTextField({
+    super.key,
+    required this.controller,
+    required this.label,
+    this.prefixIcon,
+    this.suffixIcon,
+    this.validator,
+    this.onChanged,
+    this.onFieldSubmitted,
+    this.keyboardType,
+    this.textInputAction,
+    this.obscureText = false,
+    this.autofillHints,
+    this.textCapitalization = TextCapitalization.none,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final IconData? prefixIcon;
+  final Widget? suffixIcon;
+  final FormFieldValidator<String>? validator;
+  final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onFieldSubmitted;
+  final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
+  final bool obscureText;
+  final Iterable<String>? autofillHints;
+  final TextCapitalization textCapitalization;
+
+  @override
+  Widget build(BuildContext context) {
+    return AuthTextField(
+      controller: controller,
+      label: label,
+      prefixIcon: prefixIcon,
+      suffixIcon: suffixIcon,
+      validator: validator,
+      onChanged: onChanged,
+      onFieldSubmitted: onFieldSubmitted,
+      keyboardType: keyboardType,
+      textInputAction: textInputAction,
+      obscureText: obscureText,
+      autofillHints: autofillHints,
+      textCapitalization: textCapitalization,
+    );
+  }
+}
+
+class PasswordStrengthBar extends StatelessWidget {
+  const PasswordStrengthBar({
+    super.key,
+    required this.password,
+  });
+
+  final String password;
+
+  @override
+  Widget build(BuildContext context) {
+    final strength = evaluatePasswordStrength(password);
+    final activeSegments = switch (strength) {
+      PasswordStrengthLevel.weak => 1,
+      PasswordStrengthLevel.medium => 2,
+      PasswordStrengthLevel.strong => 4,
+    };
+    final label = switch (strength) {
+      PasswordStrengthLevel.weak => 'Weak',
+      PasswordStrengthLevel.medium => 'Medium',
+      PasswordStrengthLevel.strong => 'Strong',
+    };
+    final color = switch (strength) {
+      PasswordStrengthLevel.weak => FlixieColors.danger,
+      PasswordStrengthLevel.medium => FlixieColors.warning,
+      PasswordStrengthLevel.strong => FlixieColors.success,
+    };
+
+    return Row(
+      children: [
+        Expanded(
+          child: Row(
+            children: List.generate(4, (index) {
+              final active = index < activeSegments && password.isNotEmpty;
+              return Expanded(
+                child: Container(
+                  margin: EdgeInsets.only(right: index == 3 ? 0 : 4),
+                  height: 6,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(999),
+                    color: active
+                        ? color
+                        : FlixieColors.tabBarBorder.withValues(alpha: 0.8),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          password.isEmpty ? 'Weak' : label,
+          style: TextStyle(
+            color: password.isEmpty ? FlixieColors.light : color,
+            fontWeight: FontWeight.w600,
+            fontSize: 12,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class PasswordField extends StatefulWidget {
+  const PasswordField({
+    super.key,
+    required this.controller,
+    this.label = 'Password',
+    this.validator,
+    this.onChanged,
+    this.textInputAction,
+    this.onFieldSubmitted,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final FormFieldValidator<String>? validator;
+  final ValueChanged<String>? onChanged;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onFieldSubmitted;
+
+  @override
+  State<PasswordField> createState() => _PasswordFieldState();
+}
+
+class _PasswordFieldState extends State<PasswordField> {
+  bool _obscure = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppTextField(
+      controller: widget.controller,
+      label: widget.label,
+      prefixIcon: Icons.lock_outline_rounded,
+      obscureText: _obscure,
+      textInputAction: widget.textInputAction,
+      autofillHints: const [AutofillHints.password],
+      onFieldSubmitted: widget.onFieldSubmitted,
+      onChanged: widget.onChanged,
+      validator: widget.validator,
+      suffixIcon: IconButton(
+        tooltip: _obscure ? 'Show password' : 'Hide password',
+        onPressed: () => setState(() => _obscure = !_obscure),
+        icon: Icon(
+          _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+          color: FlixieColors.light,
+        ),
+      ),
+    );
+  }
 }
 
 class _AuthTextFieldState extends State<AuthTextField> {
@@ -505,6 +686,261 @@ class AuthChip extends StatelessWidget {
   }
 }
 
+class GenreChip extends StatelessWidget {
+  const GenreChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return AuthChip(label: label, selected: selected, onTap: onTap);
+  }
+}
+
+class MovieSelectionCard extends StatelessWidget {
+  const MovieSelectionCard({
+    super.key,
+    required this.movie,
+    required this.onRemove,
+    this.posterBaseUrl = 'https://image.tmdb.org/t/p/w185',
+  });
+
+  final MovieShort movie;
+  final VoidCallback onRemove;
+  final String posterBaseUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: SizedBox(
+            width: 82,
+            height: 122,
+            child: movie.poster == null
+                ? Container(
+                    color: FlixieColors.surfaceElevated,
+                    child:
+                        const Icon(Icons.movie_outlined, color: FlixieColors.light),
+                  )
+                : CachedNetworkImage(
+                    imageUrl: '$posterBaseUrl${movie.poster}',
+                    fit: BoxFit.cover,
+                    errorWidget: (_, __, ___) => Container(
+                      color: FlixieColors.surfaceElevated,
+                      child: const Icon(Icons.movie_outlined,
+                          color: FlixieColors.light),
+                    ),
+                  ),
+          ),
+        ),
+        Positioned(
+          right: 4,
+          top: 4,
+          child: InkWell(
+            onTap: onRemove,
+            borderRadius: BorderRadius.circular(999),
+            child: Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.65),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.close, size: 14, color: Colors.white),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class MovieSearchSheet extends StatefulWidget {
+  const MovieSearchSheet({
+    super.key,
+    required this.searchMovies,
+    this.title = 'Search for movies',
+  });
+
+  final Future<List<MovieShort>> Function(String query) searchMovies;
+  final String title;
+
+  @override
+  State<MovieSearchSheet> createState() => _MovieSearchSheetState();
+}
+
+class _MovieSearchSheetState extends State<MovieSearchSheet> {
+  final _controller = TextEditingController();
+  List<MovieShort> _results = [];
+  bool _loading = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _search(String value) async {
+    final query = value.trim();
+    if (query.length < 2) {
+      setState(() => _results = []);
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      final movies = await widget.searchMovies(query);
+      if (!mounted) return;
+      setState(() => _results = movies);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 22),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              widget.title,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: FlixieColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            const SizedBox(height: 14),
+            AppTextField(
+              controller: _controller,
+              label: 'Search for movies...',
+              prefixIcon: Icons.search_rounded,
+              onChanged: _search,
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 320,
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView.separated(
+                      itemCount: _results.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final movie = _results[index];
+                        return ListTile(
+                          title: Text(
+                            movie.name,
+                            style:
+                                const TextStyle(color: FlixieColors.textPrimary),
+                          ),
+                          onTap: () => Navigator.of(context).pop(movie),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class OnboardingProgressIndicator extends StatelessWidget {
+  const OnboardingProgressIndicator({
+    super.key,
+    required this.currentStep,
+    required this.totalSteps,
+  });
+
+  final int currentStep;
+  final int totalSteps;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: List.generate(totalSteps, (index) {
+        final active = index <= currentStep;
+        return Expanded(
+          child: Container(
+            margin: EdgeInsets.only(right: index == totalSteps - 1 ? 0 : 8),
+            height: 6,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(999),
+              gradient: active
+                  ? const LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [Color(0xFF9B6DFF), Color(0xFFB58DFF)],
+                    )
+                  : null,
+              color: active
+                  ? null
+                  : FlixieColors.tabBarBorder.withValues(alpha: 0.75),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+class PrimaryButton extends StatelessWidget {
+  const PrimaryButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.isLoading = false,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final bool isLoading;
+
+  @override
+  Widget build(BuildContext context) {
+    return AuthPrimaryButton(
+      label: label,
+      onPressed: onPressed,
+      isLoading: isLoading,
+    );
+  }
+}
+
+class SecondaryButton extends StatelessWidget {
+  const SecondaryButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: FlixieColors.textPrimary,
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.25)),
+        minimumSize: const Size.fromHeight(52),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+      ),
+      child: Text(label),
+    );
+  }
+}
+
 class _AuthBackButton extends StatelessWidget {
   const _AuthBackButton({this.onPressed});
 
@@ -546,9 +982,9 @@ class _AuthBackground extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF061625),
-            FlixieColors.background,
-            Color(0xFF08111F),
+            Color(0xFF031B33),
+            Color(0xFF08284A),
+            Color(0xFF031628),
           ],
         ),
       ),

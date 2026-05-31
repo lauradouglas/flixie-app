@@ -451,8 +451,8 @@ class AuthProvider extends ChangeNotifier {
     required String firstName,
     required String lastName,
     required String username,
-    required int languageId,
-    required int countryId,
+    int? languageId,
+    int? countryId,
     List<int> genreIds = const [],
   }) async {
     _setLoading(true);
@@ -467,16 +467,22 @@ class AuthProvider extends ChangeNotifier {
       final uid = credential.user!.uid;
 
       // Register in the backend database.
-      _dbUser = await UserService.createUser({
+      final createUserBody = <String, dynamic>{
         'externalId': uid,
         'firstName': firstName.trim(),
         'lastName': lastName.trim(),
         'email': email.trim(),
         'username': username.trim(),
         'bio': '',
-        'languageId': languageId,
-        'countryId': countryId,
-      });
+      };
+      if (languageId != null) {
+        createUserBody['languageId'] = languageId;
+      }
+      if (countryId != null) {
+        createUserBody['countryId'] = countryId;
+      }
+
+      _dbUser = await UserService.createUser(createUserBody);
 
       // Save favourite genres if any were selected
       if (genreIds.isNotEmpty && _dbUser?.id != null) {
