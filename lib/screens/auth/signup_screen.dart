@@ -136,7 +136,7 @@ class _SignupScreenState extends State<SignupScreen> {
       return const Icon(Icons.check_circle, color: FlixieColors.success);
     }
     if (_usernameAvailable == false) {
-      return const Icon(Icons.cancel_rounded, color: FlixieColors.danger);
+      return const Icon(Icons.cancel, color: FlixieColors.danger);
     }
     return null;
   }
