@@ -165,6 +165,25 @@ class AppTheme {
         ),
       ),
 
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: FlixieColors.surface,
+        surfaceTintColor: Colors.transparent,
+        modalBackgroundColor: FlixieColors.surface,
+        modalBarrierColor: Colors.black54,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+      ),
+
+      dialogTheme: DialogThemeData(
+        backgroundColor: FlixieColors.surfaceElevated,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: FlixieColors.tabBarBorder),
+        ),
+      ),
+
       // Elevated buttons
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -392,6 +411,23 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: BorderSide(color: Colors.black.withValues(alpha: 0.07)),
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: _surface,
+        surfaceTintColor: Colors.transparent,
+        modalBackgroundColor: _surface,
+        modalBarrierColor: Colors.black54,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: _outline),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(

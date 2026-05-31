@@ -305,7 +305,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
     final isOwner = _group?.ownerId == currentUserId;
     showModalBottomSheet(
       context: context,
-      backgroundColor: FlixieColors.tabBarBackgroundFocused,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -354,7 +353,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                   final confirm = await showDialog<bool>(
                     context: context,
                     builder: (_) => AlertDialog(
-                      backgroundColor: FlixieColors.tabBarBackgroundFocused,
                       title: const Text('Delete Group',
                           style: TextStyle(color: FlixieColors.light)),
                       content: const Text(
