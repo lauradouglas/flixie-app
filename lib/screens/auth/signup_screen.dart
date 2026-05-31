@@ -19,6 +19,8 @@ class SignupScreen extends StatefulWidget {
 }
 
 class _SignupScreenState extends State<SignupScreen> {
+  static const _usernameDebounceDuration = Duration(milliseconds: 350);
+
   final _formKey = GlobalKey<FormState>();
 
   final _firstNameController = TextEditingController();
@@ -81,7 +83,7 @@ class _SignupScreenState extends State<SignupScreen> {
   void _onUsernameChanged(String _) {
     _usernameDebounce?.cancel();
     setState(() => _usernameAvailable = null);
-    _usernameDebounce = Timer(const Duration(milliseconds: 350), () {
+    _usernameDebounce = Timer(_usernameDebounceDuration, () {
       _checkUsernameAvailability();
     });
   }

@@ -18,7 +18,7 @@ const Set<String> _unsupportedGenreNames = {
   'tv movie',
   'war & politics',
 };
-final _emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+final _emailPattern = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
 
 List<Genre> filterSupportedGenres(List<Genre> genres) {
   return genres
@@ -45,7 +45,7 @@ PasswordStrengthLevel evaluatePasswordStrength(String password) {
 }
 
 bool isValidEmailFormat(String value) {
-  return _emailRegex.hasMatch(value.trim());
+  return _emailPattern.hasMatch(value.trim());
 }
 
 class AuthScaffold extends StatelessWidget {

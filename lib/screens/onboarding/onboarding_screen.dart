@@ -101,27 +101,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: const Color(0xFF10355E),
-      builder: (_) => Padding(
+      builder: (sheetContext) => Padding(
         padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(context).bottom,
+          bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
         ),
         child: MovieSearchSheet(searchMovies: _searchMovies),
       ),
     );
 
     if (!mounted || movie == null) return;
+    final selectedMap = bucket == _MovieBucket.favourites
+        ? _favourites
+        : _recentlyWatched;
     setState(() {
-      if (bucket == _MovieBucket.favourites) {
-        if (!canAddOnboardingMovie(_favourites, movie.id)) {
-          return;
-        }
-        _favourites[movie.id] = movie;
+      if (!canAddOnboardingMovie(selectedMap, movie.id)) {
         return;
       }
-      if (!canAddOnboardingMovie(_recentlyWatched, movie.id)) {
-        return;
-      }
-      _recentlyWatched[movie.id] = movie;
+      selectedMap[movie.id] = movie;
     });
   }
 
