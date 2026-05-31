@@ -32,4 +32,37 @@ void main() {
       expect(filterSupportedGenres(genres), genres);
     });
   });
+
+  group('evaluatePasswordStrength', () {
+    test('returns weak for short lowercase password', () {
+      expect(
+        evaluatePasswordStrength('password'),
+        PasswordStrengthLevel.weak,
+      );
+    });
+
+    test('returns medium for mixed password without symbol', () {
+      expect(
+        evaluatePasswordStrength('Password123'),
+        PasswordStrengthLevel.medium,
+      );
+    });
+
+    test('returns strong for mixed password with symbol', () {
+      expect(
+        evaluatePasswordStrength('Password123!'),
+        PasswordStrengthLevel.strong,
+      );
+    });
+  });
+
+  group('isValidEmailFormat', () {
+    test('accepts valid email', () {
+      expect(isValidEmailFormat('doug@example.com'), isTrue);
+    });
+
+    test('rejects invalid email', () {
+      expect(isValidEmailFormat('doug-example.com'), isFalse);
+    });
+  });
 }

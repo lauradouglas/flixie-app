@@ -1,43 +1,32 @@
-import 'dart:async';
-
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/genre.dart';
 import '../../models/movie_short.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/reference_data_service.dart';
 import '../../services/search_service.dart';
 import '../../services/user_service.dart';
 import '../../theme/app_theme.dart';
+import '../auth/auth_ui.dart';
 
-const _posterBase = 'https://image.tmdb.org/t/p/w185';
+enum _OnboardingStep { preferences, success }
 
-enum _OnboardingStep { favourites, watched, watchlist }
+enum _MovieBucket { favourites, recentlyWatched }
 
-extension _OnboardingStepExt on _OnboardingStep {
-  String get title {
-    switch (this) {
-      case _OnboardingStep.favourites:
-        return 'Your Favourite Movies';
-      case _OnboardingStep.watched:
-        return 'Recently Watched';
-      case _OnboardingStep.watchlist:
-        return 'Your Watchlist';
-    }
-  }
-
-  String get subtitle {
-    switch (this) {
-      case _OnboardingStep.favourites:
-        return 'Add movies you love.';
-      case _OnboardingStep.watched:
-        return 'Movies you\'ve already seen.';
-      case _OnboardingStep.watchlist:
-        return 'Movies you want to watch next.';
-    }
-  }
-}
+const _popularGenres = [
+  'Action',
+  'Sci-Fi',
+  'Drama',
+  'Thriller',
+  'Comedy',
+  'Adventure',
+  'Animation',
+  'Fantasy',
+  'Horror',
+  'Crime',
+];
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -47,481 +36,398 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
-  final _pageController = PageController();
-  _OnboardingStep _currentStep = _OnboardingStep.favourites;
+  _OnboardingStep _step = _OnboardingStep.preferences;
+  bool _saving = false;
 
-  // Selected movies per step, keyed by id
-  final Map<_OnboardingStep, Map<int, MovieShort>> _selected = {
-    _OnboardingStep.favourites: {},
-    _OnboardingStep.watched: {},
-    _OnboardingStep.watchlist: {},
-  };
+  final Map<int, MovieShort> _favourites = {};
+  final Map<int, MovieShort> _recentlyWatched = {};
 
-  // Search state
-  final _searchController = TextEditingController();
-  String _query = '';
-  Timer? _debounce;
-  List<MovieShort> _results = [];
-  bool _isSearching = false;
+  final TextEditingController _genreSearchController = TextEditingController();
+  List<Genre> _genres = [];
+  final Set<int> _selectedGenreIds = {};
+  bool _loadingGenres = true;
 
-  bool _isSaving = false;
+  @override
+  void initState() {
+    super.initState();
+    _loadGenres();
+  }
 
   @override
   void dispose() {
-    _pageController.dispose();
-    _searchController.dispose();
-    _debounce?.cancel();
+    _genreSearchController.dispose();
     super.dispose();
   }
 
-  void _onSearchChanged(String value) {
-    _debounce?.cancel();
-    setState(() => _query = value);
-    if (value.trim().length < 2) {
+  Future<void> _loadGenres() async {
+    try {
+      final genres = await ReferenceDataService.getGenres();
+      if (!mounted) return;
       setState(() {
-        _results = [];
-        _isSearching = false;
+        _genres = filterSupportedGenres(genres);
+        _loadingGenres = false;
       });
-      return;
-    }
-    _debounce = Timer(const Duration(milliseconds: 400), () {
-      _performSearch(value.trim());
-    });
-  }
-
-  Future<void> _performSearch(String query) async {
-    setState(() => _isSearching = true);
-    try {
-      final results = await SearchService.search(query, type: 'movie');
-      final movies = results.results
-          .where((r) => !r.isPerson && r.movie != null)
-          .map((r) => r.movie!)
-          .toList();
-      if (mounted) {
-        setState(() {
-          _results = movies;
-          _isSearching = false;
-        });
-      }
     } catch (_) {
-      if (mounted) setState(() => _isSearching = false);
+      if (!mounted) return;
+      setState(() => _loadingGenres = false);
     }
   }
 
-  void _toggleMovie(MovieShort movie) {
-    setState(() {
-      final map = _selected[_currentStep]!;
-      if (map.containsKey(movie.id)) {
-        map.remove(movie.id);
-      } else {
-        map[movie.id] = movie;
-      }
-    });
+  Future<List<MovieShort>> _searchMovies(String query) async {
+    final results = await SearchService.search(query, type: 'movie');
+    return results.results
+        .where((item) => !item.isPerson && item.movie != null)
+        .map((item) => item.movie!)
+        .toList(growable: false);
   }
 
-  bool _isSelected(int movieId) =>
-      _selected[_currentStep]!.containsKey(movieId);
-
-  void _clearSearch() {
-    _searchController.clear();
-    setState(() {
-      _query = '';
-      _results = [];
-      _isSearching = false;
-    });
-  }
-
-  Future<void> _saveCurrentStep() async {
-    final auth = context.read<AuthProvider>();
-    final userId = auth.dbUser?.id;
-    if (userId == null) return;
-
-    final movies = _selected[_currentStep]!.values.toList();
-    if (movies.isEmpty) return;
-
-    final futures = movies.map((m) async {
-      try {
-        switch (_currentStep) {
-          case _OnboardingStep.favourites:
-            await UserService.addToFavorites(userId, m.id);
-          case _OnboardingStep.watched:
-            await UserService.addToWatched(userId, m.id);
-          case _OnboardingStep.watchlist:
-            await UserService.addToWatchlist(userId, m.id);
-        }
-      } catch (_) {}
-    });
-
-    await Future.wait(futures);
-  }
-
-  Future<void> _advance({required bool skip}) async {
-    if (_isSaving) return;
-    setState(() => _isSaving = true);
-
-    try {
-      if (!skip) {
-        await _saveCurrentStep();
-      }
-
-      final isLast = _currentStep == _OnboardingStep.watchlist;
-
-      if (isLast) {
-        await _finish();
-      } else {
-        _clearSearch();
-        final nextIndex = _currentStep.index + 1;
-        setState(() => _currentStep = _OnboardingStep.values[nextIndex]);
-        _pageController.animateToPage(
-          nextIndex,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
-    }
-  }
-
-  Future<void> _finish() async {
-    final auth = context.read<AuthProvider>();
-    await auth.completeOnboarding();
-    if (mounted) context.go('/');
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              FlixieColors.navy,
-              FlixieColors.background,
-              FlixieColors.surface
-            ],
-          ),
+  Future<void> _pickMovie(_MovieBucket bucket) async {
+    final movie = await showModalBottomSheet<MovieShort>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF10355E),
+      builder: (_) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
         ),
-        child: SafeArea(
-          child: PageView.builder(
-            controller: _pageController,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _OnboardingStep.values.length,
-            itemBuilder: (_, __) => _StepPage(
-              step: _currentStep,
-              searchController: _searchController,
-              query: _query,
-              results: _results,
-              isSearching: _isSearching,
-              isSaving: _isSaving,
-              selected: _selected[_currentStep]!,
-              onSearchChanged: _onSearchChanged,
-              onToggleMovie: _toggleMovie,
-              isMovieSelected: _isSelected,
-              onSkip: () => _advance(skip: true),
-              onContinue: () => _advance(skip: false),
-            ),
-          ),
-        ),
+        child: MovieSearchSheet(searchMovies: _searchMovies),
       ),
     );
+
+    if (!mounted || movie == null) return;
+    setState(() {
+      if (bucket == _MovieBucket.favourites) {
+        if (_favourites.length >= 5 && !_favourites.containsKey(movie.id)) {
+          return;
+        }
+        _favourites[movie.id] = movie;
+        return;
+      }
+      if (_recentlyWatched.length >= 5 &&
+          !_recentlyWatched.containsKey(movie.id)) {
+        return;
+      }
+      _recentlyWatched[movie.id] = movie;
+    });
   }
-}
 
-class _StepPage extends StatelessWidget {
-  const _StepPage({
-    required this.step,
-    required this.searchController,
-    required this.query,
-    required this.results,
-    required this.isSearching,
-    required this.isSaving,
-    required this.selected,
-    required this.onSearchChanged,
-    required this.onToggleMovie,
-    required this.isMovieSelected,
-    required this.onSkip,
-    required this.onContinue,
-  });
+  Future<void> _savePreferences() async {
+    if (_favourites.length < 3 || _favourites.length > 5) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select between 3 and 5 favourite movies.'),
+          backgroundColor: FlixieColors.danger,
+        ),
+      );
+      return;
+    }
+    if (_saving) return;
 
-  final _OnboardingStep step;
-  final TextEditingController searchController;
-  final String query;
-  final List<MovieShort> results;
-  final bool isSearching;
-  final bool isSaving;
-  final Map<int, MovieShort> selected;
-  final ValueChanged<String> onSearchChanged;
-  final ValueChanged<MovieShort> onToggleMovie;
-  final bool Function(int) isMovieSelected;
-  final VoidCallback onSkip;
-  final VoidCallback onContinue;
+    setState(() => _saving = true);
+    final auth = context.read<AuthProvider>();
+    final userId = auth.dbUser?.id;
+    if (userId == null) {
+      if (mounted) setState(() => _saving = false);
+      return;
+    }
+
+    try {
+      await Future.wait(
+        _favourites.keys.map((movieId) => UserService.addToFavorites(userId, movieId)),
+      );
+      if (_recentlyWatched.isNotEmpty) {
+        await Future.wait(
+          _recentlyWatched.keys
+              .map((movieId) => UserService.addToWatched(userId, movieId)),
+        );
+      }
+      if (_selectedGenreIds.isNotEmpty) {
+        await UserService.addFavoriteGenres(userId, _selectedGenreIds.toList());
+      }
+      await auth.completeOnboarding();
+      if (!mounted) return;
+      setState(() => _step = _OnboardingStep.success);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to finish onboarding right now.'),
+          backgroundColor: FlixieColors.danger,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  List<Genre> get _filteredGenres {
+    final query = _genreSearchController.text.trim().toLowerCase();
+    final genres = _genres.where((genre) {
+      if (query.isEmpty) return true;
+      return genre.name.toLowerCase().contains(query);
+    }).toList();
+    genres.sort((a, b) {
+      final aPopular = _popularGenres.contains(a.name);
+      final bPopular = _popularGenres.contains(b.name);
+      if (aPopular != bPopular) return aPopular ? -1 : 1;
+      return a.name.compareTo(b.name);
+    });
+    return genres;
+  }
 
   @override
   Widget build(BuildContext context) {
+    return AuthScaffold(
+      topLabel: _step == _OnboardingStep.preferences ? 'Step 2 of 3' : 'Step 3 of 3',
+      title: Text(
+        _step == _OnboardingStep.preferences
+            ? 'Tell us what you love'
+            : 'Welcome to Flixie! 🎉',
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.displaySmall?.copyWith(
+              color: FlixieColors.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+      ),
+      subtitle: _step == _OnboardingStep.preferences
+          ? 'Add favourites, recent watches, and optional genres.'
+          : 'Your account has been created and your recommendations are ready.',
+      onBack: null,
+      cardPadding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
+      cardChild: _step == _OnboardingStep.preferences
+          ? _buildPreferencesStep()
+          : _buildSuccessStep(),
+    );
+  }
+
+  Widget _buildPreferencesStep() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Step indicators
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-          child: Row(
-            children: List.generate(
-              _OnboardingStep.values.length,
-              (i) => Expanded(
-                child: Container(
-                  height: 3,
-                  margin: EdgeInsets.only(right: i < 2 ? 6 : 0),
-                  decoration: BoxDecoration(
-                    color: i <= step.index
-                        ? FlixieColors.primary
-                        : FlixieColors.medium.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-            ),
-          ),
+        const OnboardingProgressIndicator(currentStep: 1, totalSteps: 3),
+        const SizedBox(height: 18),
+        _buildMovieSection(
+          title: 'Favourite Movies ⭐',
+          subtitle: 'Select 3–5 movies',
+          selected: _favourites,
+          maxCount: 5,
+          onAdd: () => _pickMovie(_MovieBucket.favourites),
+          onRemove: (movieId) => setState(() => _favourites.remove(movieId)),
         ),
-
-        // Title
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 28, 24, 4),
-          child: Text(
-            step.title,
-            style: const TextStyle(
-              color: FlixieColors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+        const SizedBox(height: 18),
+        _buildMovieSection(
+          title: 'Recently Watched 🎬',
+          subtitle: 'Optional (up to 5)',
+          selected: _recentlyWatched,
+          maxCount: 5,
+          onAdd: () => _pickMovie(_MovieBucket.recentlyWatched),
+          onRemove: (movieId) => setState(() => _recentlyWatched.remove(movieId)),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-          child: Text(
-            step.subtitle,
-            style: const TextStyle(
-              color: FlixieColors.light,
-              fontSize: 14,
-            ),
-          ),
-        ),
-
-        // Selected chips
-        if (selected.isNotEmpty)
-          SizedBox(
-            height: 36,
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              scrollDirection: Axis.horizontal,
-              itemCount: selected.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (_, i) {
-                final movie = selected.values.elementAt(i);
-                return InputChip(
-                  label: Text(
-                    movie.name,
-                    style: const TextStyle(
-                        color: FlixieColors.white, fontSize: 12),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  backgroundColor: FlixieColors.primary.withOpacity(0.25),
-                  side: const BorderSide(color: FlixieColors.primary),
-                  deleteIconColor: FlixieColors.light,
-                  onDeleted: () => onToggleMovie(movie),
-                );
-              },
-            ),
-          ),
-
-        if (selected.isNotEmpty) const SizedBox(height: 12),
-
-        // Search bar
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: TextField(
-            controller: searchController,
-            onChanged: onSearchChanged,
-            style: const TextStyle(color: FlixieColors.white),
-            decoration: InputDecoration(
-              hintText: 'Search movies...',
-              hintStyle: TextStyle(color: FlixieColors.light.withOpacity(0.5)),
-              prefixIcon: const Icon(Icons.search, color: FlixieColors.light),
-              suffixIcon: query.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear, color: FlixieColors.light),
-                      onPressed: () => onSearchChanged(''),
-                    )
-                  : null,
-              filled: true,
-              fillColor: Colors.white.withOpacity(0.08),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              contentPadding: const EdgeInsets.symmetric(vertical: 14),
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 12),
-
-        // Results / loading
-        Expanded(
-          child: isSearching
-              ? const Center(
-                  child: CircularProgressIndicator(color: FlixieColors.primary))
-              : query.isEmpty
-                  ? _EmptySearchHint()
-                  : results.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'No results found.',
-                            style: TextStyle(color: FlixieColors.light),
-                          ),
-                        )
-                      : ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: results.length,
-                          itemBuilder: (_, i) => _MovieResultTile(
-                            movie: results[i],
-                            isSelected: isMovieSelected(results[i].id),
-                            onTap: () => onToggleMovie(results[i]),
-                          ),
-                        ),
-        ),
-
-        // Buttons
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: isSaving ? null : onSkip,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: FlixieColors.light,
-                    side:
-                        BorderSide(color: FlixieColors.light.withOpacity(0.4)),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: const Text('Skip'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 2,
-                child: FilledButton(
-                  onPressed: isSaving ? null : onContinue,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: FlixieColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: isSaving
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white))
-                      : Text(
-                          step == _OnboardingStep.watchlist
-                              ? 'Get Started'
-                              : 'Continue',
-                        ),
-                ),
-              ),
-            ],
-          ),
+        const SizedBox(height: 18),
+        _buildGenreSection(),
+        const SizedBox(height: 22),
+        PrimaryButton(
+          label: 'Create Account',
+          isLoading: _saving,
+          onPressed: _saving ? null : _savePreferences,
         ),
       ],
     );
   }
-}
 
-class _MovieResultTile extends StatelessWidget {
-  const _MovieResultTile({
-    required this.movie,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final MovieShort movie;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final year = movie.releaseDate != null && movie.releaseDate!.length >= 4
-        ? movie.releaseDate!.substring(0, 4)
-        : null;
-
-    return ListTile(
-      onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      leading: ClipRRect(
-        borderRadius: BorderRadius.circular(6),
-        child: movie.poster != null
-            ? CachedNetworkImage(
-                imageUrl: '$_posterBase${movie.poster}',
-                width: 40,
-                height: 56,
-                fit: BoxFit.cover,
-                errorWidget: (_, __, ___) => _PosterPlaceholder(),
-              )
-            : _PosterPlaceholder(),
-      ),
-      title: Text(
-        movie.name,
-        style: const TextStyle(
-            color: FlixieColors.white, fontWeight: FontWeight.w500),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: year != null
-          ? Text(year,
-              style: const TextStyle(color: FlixieColors.light, fontSize: 12))
-          : null,
-      trailing: isSelected
-          ? const Icon(Icons.check_circle, color: FlixieColors.primary)
-          : Icon(Icons.add_circle_outline,
-              color: FlixieColors.light.withOpacity(0.5)),
+  Widget _buildSuccessStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const OnboardingProgressIndicator(currentStep: 2, totalSteps: 3),
+        const SizedBox(height: 22),
+        _buildSummaryTile(
+          icon: Icons.star_rounded,
+          label: '${_favourites.length} Favourite Movies',
+          subtitle: 'We’ll recommend movies you’ll love.',
+        ),
+        const SizedBox(height: 12),
+        _buildSummaryTile(
+          icon: Icons.movie_creation_outlined,
+          label: '${_recentlyWatched.length} Recently Watched',
+          subtitle: 'Fresh picks based on what you’ve watched.',
+        ),
+        const SizedBox(height: 12),
+        _buildSummaryTile(
+          icon: Icons.favorite_rounded,
+          label: '${_selectedGenreIds.length} Favourite Genres',
+          subtitle: 'More of what you enjoy.',
+        ),
+        const SizedBox(height: 22),
+        PrimaryButton(
+          label: 'Enter Flixie',
+          onPressed: () => context.go('/'),
+        ),
+      ],
     );
   }
-}
 
-class _PosterPlaceholder extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildMovieSection({
+    required String title,
+    required String subtitle,
+    required Map<int, MovieShort> selected,
+    required int maxCount,
+    required VoidCallback onAdd,
+    required ValueChanged<int> onRemove,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  color: FlixieColors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Text(
+              '${selected.length}/$maxCount',
+              style: const TextStyle(color: FlixieColors.light),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          style: const TextStyle(color: FlixieColors.light),
+        ),
+        const SizedBox(height: 10),
+        if (selected.isEmpty)
+          SecondaryButton(
+            label: 'Search movies',
+            onPressed: onAdd,
+          )
+        else ...[
+          SizedBox(
+            height: 124,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemBuilder: (_, index) {
+                final movie = selected.values.elementAt(index);
+                return MovieSelectionCard(
+                  movie: movie,
+                  onRemove: () => onRemove(movie.id),
+                );
+              },
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemCount: selected.length,
+            ),
+          ),
+          const SizedBox(height: 10),
+          SecondaryButton(
+            label: selected.length >= maxCount ? 'Maximum selected' : 'Add movie',
+            onPressed: selected.length >= maxCount ? null : onAdd,
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildGenreSection() {
+    final genres = _filteredGenres;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Favourite Genres',
+                style: TextStyle(
+                  color: FlixieColors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Text(
+              '${_selectedGenreIds.length} selected',
+              style: const TextStyle(color: FlixieColors.light),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Optional',
+          style: TextStyle(color: FlixieColors.light),
+        ),
+        const SizedBox(height: 10),
+        AppTextField(
+          controller: _genreSearchController,
+          label: 'Search genres',
+          prefixIcon: Icons.search,
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 10),
+        if (_loadingGenres)
+          const Center(child: CircularProgressIndicator())
+        else
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: genres.map((genre) {
+              final selected = _selectedGenreIds.contains(genre.id);
+              return GenreChip(
+                label: genre.name,
+                selected: selected,
+                onTap: () => setState(() {
+                  if (selected) {
+                    _selectedGenreIds.remove(genre.id);
+                  } else {
+                    _selectedGenreIds.add(genre.id);
+                  }
+                }),
+              );
+            }).toList(),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildSummaryTile({
+    required IconData icon,
+    required String label,
+    required String subtitle,
+  }) {
     return Container(
-      width: 40,
-      height: 56,
-      color: FlixieColors.medium.withOpacity(0.3),
-      child: const Icon(Icons.movie, color: FlixieColors.medium, size: 20),
-    );
-  }
-}
-
-class _EmptySearchHint extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF10355E).withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+      ),
+      child: Row(
         children: [
-          Icon(Icons.search,
-              size: 48, color: FlixieColors.light.withOpacity(0.3)),
-          const SizedBox(height: 12),
-          Text(
-            'Search to add movies',
-            style: TextStyle(
-                color: FlixieColors.light.withOpacity(0.5), fontSize: 14),
+          Icon(icon, color: FlixieColors.primaryTint),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: FlixieColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: const TextStyle(color: FlixieColors.light, fontSize: 12),
+                ),
+              ],
+            ),
           ),
         ],
       ),

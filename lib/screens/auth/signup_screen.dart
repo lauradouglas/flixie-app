@@ -1,13 +1,10 @@
-import 'package:dropdown_flutter/custom_dropdown.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../../models/country.dart';
-import '../../models/genre.dart';
-import '../../models/language.dart';
 import '../../providers/auth_provider.dart';
-import '../../services/reference_data_service.dart';
 import '../../services/user_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/app_logger.dart';
@@ -31,65 +28,33 @@ class _SignupScreenState extends State<SignupScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
-  bool _obscurePassword = true;
-  bool _obscureConfirm = true;
-  bool _languageTouched = false;
-  bool _countryTouched = false;
-  bool _submitAttempted = false;
+  Timer? _usernameDebounce;
   bool _checkingUsername = false;
   bool? _usernameAvailable;
-  bool _loadingRefData = true;
-  bool _refDataError = false;
-
-  List<Language> _languages = [];
-  List<Country> _countries = [];
-  List<Genre> _genres = [];
-
-  Language? _selectedLanguage;
-  Country? _selectedCountry;
-  final Set<int> _selectedGenreIds = {};
 
   @override
-  void initState() {
-    super.initState();
-    _loadReferenceData();
-  }
-
-  Future<void> _loadReferenceData() async {
-    if (mounted && _refDataError) {
-      setState(() {
-        _loadingRefData = true;
-        _refDataError = false;
-      });
-    }
-
-    try {
-      final results = await Future.wait([
-        ReferenceDataService.getLanguages(),
-        ReferenceDataService.getCountries(),
-        ReferenceDataService.getGenres(),
-      ]);
-
-      if (!mounted) return;
-      setState(() {
-        _languages = results[0] as List<Language>;
-        _countries = results[1] as List<Country>;
-        _genres = filterSupportedGenres(results[2] as List<Genre>);
-        _loadingRefData = false;
-      });
-    } catch (error) {
-      logger.e('Failed to load reference data: $error');
-      if (!mounted) return;
-      setState(() {
-        _loadingRefData = false;
-        _refDataError = true;
-      });
-    }
+  void dispose() {
+    _usernameDebounce?.cancel();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _usernameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
   }
 
   Future<void> _checkUsernameAvailability() async {
     final username = _usernameController.text.trim();
-    if (username.isEmpty) return;
+    if (username.length < 3) {
+      if (mounted) {
+        setState(() {
+          _checkingUsername = false;
+          _usernameAvailable = null;
+        });
+      }
+      return;
+    }
 
     setState(() {
       _checkingUsername = true;
@@ -100,30 +65,35 @@ class _SignupScreenState extends State<SignupScreen> {
       final exists = await UserService.usernameExists(username);
       if (!mounted) return;
       setState(() {
-        _usernameAvailable = !exists;
         _checkingUsername = false;
+        _usernameAvailable = !exists;
       });
     } catch (error) {
       logger.e('Username check failed: $error');
       if (!mounted) return;
       setState(() {
-        _usernameAvailable = null;
         _checkingUsername = false;
+        _usernameAvailable = null;
       });
     }
   }
 
-  Future<void> _submit() async {
-    setState(() => _submitAttempted = true);
-    if (!_formKey.currentState!.validate()) return;
+  void _onUsernameChanged(String _) {
+    _usernameDebounce?.cancel();
+    setState(() => _usernameAvailable = null);
+    _usernameDebounce = Timer(const Duration(milliseconds: 350), () {
+      _checkUsernameAvailability();
+    });
+  }
 
-    final messenger = ScaffoldMessenger.of(context);
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
 
     if (_usernameAvailable != true) {
       await _checkUsernameAvailability();
       if (!mounted) return;
       if (_usernameAvailable != true) {
-        messenger.showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Please choose an available username.'),
             backgroundColor: FlixieColors.danger,
@@ -133,48 +103,52 @@ class _SignupScreenState extends State<SignupScreen> {
       }
     }
 
-    if (_selectedLanguage == null || _selectedCountry == null) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Please select a language and country.'),
-          backgroundColor: FlixieColors.danger,
-        ),
-      );
-      return;
-    }
-
     final auth = context.read<AuthProvider>();
     final success = await auth.signUp(
-      email: _emailController.text,
+      email: _emailController.text.trim(),
       password: _passwordController.text,
-      firstName: _firstNameController.text,
-      lastName: _lastNameController.text,
-      username: _usernameController.text,
-      languageId: _selectedLanguage!.id,
-      countryId: _selectedCountry!.id,
-      genreIds: _selectedGenreIds.toList(),
+      firstName: _firstNameController.text.trim(),
+      lastName: _lastNameController.text.trim(),
+      username: _usernameController.text.trim(),
     );
 
-    if (!mounted) return;
-    if (!success) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(auth.errorMessage ?? 'Sign up failed.'),
-          backgroundColor: FlixieColors.danger,
+    if (!mounted || success) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(auth.errorMessage ?? 'Sign up failed.'),
+        backgroundColor: FlixieColors.danger,
+      ),
+    );
+  }
+
+  Widget? _buildUsernameSuffix() {
+    if (_checkingUsername) {
+      return const Padding(
+        padding: EdgeInsets.all(12),
+        child: SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(strokeWidth: 2),
         ),
       );
     }
+    if (_usernameAvailable == true) {
+      return const Icon(Icons.check_circle, color: FlixieColors.success);
+    }
+    if (_usernameAvailable == false) {
+      return const Icon(Icons.cancel_rounded, color: FlixieColors.danger);
+    }
+    return null;
   }
 
-  @override
-  void dispose() {
-    _firstNameController.dispose();
-    _lastNameController.dispose();
-    _usernameController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
-    super.dispose();
+  Widget? _buildEmailSuffix() {
+    final value = _emailController.text.trim();
+    if (value.isEmpty) return null;
+    return Icon(
+      isValidEmailFormat(value) ? Icons.check_circle : Icons.error_outline,
+      color:
+          isValidEmailFormat(value) ? FlixieColors.success : FlixieColors.danger,
+    );
   }
 
   @override
@@ -183,7 +157,7 @@ class _SignupScreenState extends State<SignupScreen> {
     final isLoading = context.select<AuthProvider, bool>((p) => p.isLoading);
 
     return AuthScaffold(
-      topLabel: 'Create Account',
+      topLabel: 'Step 1 of 3',
       title: Text.rich(
         TextSpan(
           style: textTheme.displaySmall?.copyWith(
@@ -201,7 +175,7 @@ class _SignupScreenState extends State<SignupScreen> {
         ),
         textAlign: TextAlign.center,
       ),
-      subtitle: 'Create your account to get started',
+      subtitle: 'Secure your account with the basics.',
       onBack: () => context.pop(),
       cardPadding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
       cardChild: Form(
@@ -209,10 +183,12 @@ class _SignupScreenState extends State<SignupScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const OnboardingProgressIndicator(currentStep: 0, totalSteps: 3),
+            const SizedBox(height: 18),
             Row(
               children: [
                 Expanded(
-                  child: AuthTextField(
+                  child: AppTextField(
                     controller: _firstNameController,
                     label: 'First Name',
                     prefixIcon: Icons.person_outline_rounded,
@@ -225,7 +201,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: AuthTextField(
+                  child: AppTextField(
                     controller: _lastNameController,
                     label: 'Last Name',
                     prefixIcon: Icons.person_outline_rounded,
@@ -239,107 +215,67 @@ class _SignupScreenState extends State<SignupScreen> {
               ],
             ),
             const SizedBox(height: 14),
-            Focus(
-              onFocusChange: (hasFocus) {
-                if (!hasFocus) {
-                  _checkUsernameAvailability();
+            AppTextField(
+              controller: _usernameController,
+              label: 'Username',
+              prefixIcon: Icons.alternate_email_rounded,
+              textInputAction: TextInputAction.next,
+              autofillHints: const [AutofillHints.username],
+              onChanged: _onUsernameChanged,
+              suffixIcon: _buildUsernameSuffix(),
+              validator: (value) {
+                final raw = value?.trim() ?? '';
+                if (raw.isEmpty) return 'Please enter a username.';
+                if (raw.length < 3) {
+                  return 'Username must be at least 3 characters.';
                 }
+                if (_usernameAvailable == false) {
+                  return 'This username is already taken.';
+                }
+                return null;
               },
-              child: AuthTextField(
-                controller: _usernameController,
-                label: 'Username',
-                prefixIcon: Icons.alternate_email_rounded,
-                textInputAction: TextInputAction.next,
-                autofillHints: const [AutofillHints.username],
-                onChanged: (_) {
-                  if (_usernameAvailable != null) {
-                    setState(() => _usernameAvailable = null);
-                  }
-                },
-                suffixIcon: _buildUsernameSuffix(),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter a username.';
-                  }
-                  if (value.trim().length < 3) {
-                    return 'Username must be at least 3 characters.';
-                  }
-                  if (_usernameAvailable == false) {
-                    return 'This username is already taken.';
-                  }
-                  return null;
-                },
-              ),
             ),
             const SizedBox(height: 14),
-            AuthTextField(
+            AppTextField(
               controller: _emailController,
-              label: 'Email',
+              label: 'Email Address',
               prefixIcon: Icons.mail_outline_rounded,
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.next,
               autofillHints: const [AutofillHints.email],
+              onChanged: (_) => setState(() {}),
+              suffixIcon: _buildEmailSuffix(),
               validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Please enter your email.';
-                }
-                if (!value.contains('@')) {
-                  return 'Please enter a valid email.';
-                }
+                final raw = value?.trim() ?? '';
+                if (raw.isEmpty) return 'Please enter your email.';
+                if (!isValidEmailFormat(raw)) return 'Please enter a valid email.';
                 return null;
               },
             ),
             const SizedBox(height: 14),
-            AuthTextField(
+            PasswordField(
               controller: _passwordController,
               label: 'Password',
-              prefixIcon: Icons.lock_outline_rounded,
-              obscureText: _obscurePassword,
               textInputAction: TextInputAction.next,
-              autofillHints: const [AutofillHints.newPassword],
-              suffixIcon: IconButton(
-                tooltip: _obscurePassword ? 'Show password' : 'Hide password',
-                onPressed: () => setState(
-                  () => _obscurePassword = !_obscurePassword,
-                ),
-                icon: Icon(
-                  _obscurePassword
-                      ? Icons.visibility_outlined
-                      : Icons.visibility_off_outlined,
-                  color: FlixieColors.light,
-                ),
-              ),
+              onChanged: (_) => setState(() {}),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter a password.';
                 }
-                if (value.length < 6) {
-                  return 'Password must be at least 6 characters.';
+                if (value.length < 8) {
+                  return 'Password must be at least 8 characters.';
                 }
                 return null;
               },
             ),
+            const SizedBox(height: 10),
+            PasswordStrengthBar(password: _passwordController.text),
             const SizedBox(height: 14),
-            AuthTextField(
+            PasswordField(
               controller: _confirmPasswordController,
               label: 'Confirm Password',
-              prefixIcon: Icons.lock_outline_rounded,
-              obscureText: _obscureConfirm,
               textInputAction: TextInputAction.done,
-              autofillHints: const [AutofillHints.newPassword],
               onFieldSubmitted: (_) => _submit(),
-              suffixIcon: IconButton(
-                tooltip: _obscureConfirm ? 'Show password' : 'Hide password',
-                onPressed: () => setState(
-                  () => _obscureConfirm = !_obscureConfirm,
-                ),
-                icon: Icon(
-                  _obscureConfirm
-                      ? Icons.visibility_outlined
-                      : Icons.visibility_off_outlined,
-                  color: FlixieColors.light,
-                ),
-              ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please confirm your password.';
@@ -350,53 +286,9 @@ class _SignupScreenState extends State<SignupScreen> {
                 return null;
               },
             ),
-            const SizedBox(height: 18),
-            if (_loadingRefData)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (_refDataError)
-              _buildRefDataErrorRow(onRetry: _loadReferenceData)
-            else ...[
-              _buildDropdownField<Language>(
-                items: _languages,
-                selectedItem: _selectedLanguage,
-                hintText: 'Select Language',
-                itemLabel: (language) => language.name,
-                onChanged: (language) => setState(() {
-                  _selectedLanguage = language;
-                  _languageTouched = true;
-                }),
-                errorText: _selectedLanguage == null &&
-                        (_languageTouched || _submitAttempted)
-                    ? 'Please select a language.'
-                    : null,
-              ),
-              const SizedBox(height: 14),
-              _buildDropdownField<Country>(
-                items: _countries,
-                selectedItem: _selectedCountry,
-                hintText: 'Select Country',
-                itemLabel: (country) => country.name,
-                searchable: true,
-                onChanged: (country) => setState(() {
-                  _selectedCountry = country;
-                  _countryTouched = true;
-                }),
-                errorText: _selectedCountry == null &&
-                        (_countryTouched || _submitAttempted)
-                    ? 'Please select a country.'
-                    : null,
-              ),
-              if (_genres.isNotEmpty) ...[
-                const SizedBox(height: 18),
-                ..._buildGenrePicker(textTheme),
-              ],
-            ],
             const SizedBox(height: 22),
-            AuthPrimaryButton(
-              label: 'Create Account',
+            PrimaryButton(
+              label: 'Continue',
               isLoading: isLoading,
               onPressed: isLoading ? null : _submit,
             ),
@@ -406,9 +298,7 @@ class _SignupScreenState extends State<SignupScreen> {
               children: [
                 Text(
                   'Already have an account?',
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: FlixieColors.light,
-                  ),
+                  style: textTheme.bodyMedium?.copyWith(color: FlixieColors.light),
                 ),
                 TextButton(
                   onPressed: () => context.pop(),
@@ -432,193 +322,6 @@ class _SignupScreenState extends State<SignupScreen> {
   String? _requiredNameValidator(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Required';
-    }
-    return null;
-  }
-
-  Widget _buildDropdownField<T>({
-    required List<T> items,
-    required T? selectedItem,
-    required String hintText,
-    required String Function(T item) itemLabel,
-    required ValueChanged<T?> onChanged,
-    String? errorText,
-    bool searchable = false,
-  }) {
-    final fillColor =
-        FlixieColors.tabBarBackgroundFocused.withValues(alpha: 0.9);
-    final textStyle = const TextStyle(
-      color: FlixieColors.textPrimary,
-      fontSize: 16,
-    );
-    final hintStyle = TextStyle(
-      color: FlixieColors.light.withValues(alpha: 0.86),
-      fontSize: 16,
-      fontWeight: FontWeight.w500,
-    );
-
-    final decoration = CustomDropdownDecoration(
-      closedFillColor: fillColor,
-      expandedFillColor: FlixieColors.surfaceElevated.withValues(alpha: 0.96),
-      closedBorder: Border.all(
-        color: FlixieColors.tabBarBorder.withValues(alpha: 0.9),
-      ),
-      expandedBorder: Border.all(color: FlixieColors.primary),
-      searchFieldDecoration: SearchFieldDecoration(fillColor: fillColor),
-    );
-
-    Widget dropdown;
-    if (searchable) {
-      dropdown = DropdownFlutter<T>.search(
-        items: items,
-        initialItem: selectedItem,
-        hintText: hintText,
-        onChanged: onChanged,
-        headerBuilder: (context, item, _) => Text(
-          itemLabel(item),
-          style: textStyle,
-        ),
-        listItemBuilder: (context, item, isSelected, _) => Text(
-          itemLabel(item),
-          style: textStyle.copyWith(
-            color: isSelected ? FlixieColors.primary : FlixieColors.textPrimary,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-          ),
-        ),
-        decoration: decoration,
-      );
-    } else {
-      dropdown = DropdownFlutter<T>(
-        items: items,
-        initialItem: selectedItem,
-        hintText: hintText,
-        onChanged: onChanged,
-        headerBuilder: (context, item, _) => Text(
-          itemLabel(item),
-          style: textStyle,
-        ),
-        listItemBuilder: (context, item, isSelected, _) => Text(
-          itemLabel(item),
-          style: textStyle.copyWith(
-            color: isSelected ? FlixieColors.primary : FlixieColors.textPrimary,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-          ),
-        ),
-        decoration: decoration,
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Theme(
-          data: Theme.of(context).copyWith(
-            textTheme: Theme.of(context).textTheme.apply(
-                  bodyColor: FlixieColors.textPrimary,
-                  displayColor: FlixieColors.textPrimary,
-                ),
-            hintColor: hintStyle.color,
-          ),
-          child: dropdown,
-        ),
-        if (errorText != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 6, left: 12),
-            child: Text(
-              errorText,
-              style: const TextStyle(
-                color: FlixieColors.danger,
-                fontSize: 12,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildRefDataErrorRow({required VoidCallback onRetry}) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: FlixieColors.danger.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: FlixieColors.danger.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.error_outline, color: FlixieColors.danger, size: 20),
-          const SizedBox(width: 8),
-          const Expanded(
-            child: Text(
-              'Failed to load options.',
-              style: TextStyle(color: FlixieColors.danger),
-            ),
-          ),
-          TextButton(
-            onPressed: onRetry,
-            child: const Text('Retry'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  List<Widget> _buildGenrePicker(TextTheme textTheme) {
-    return [
-      Row(
-        children: [
-          Text(
-            'Favourite Genres',
-            style: textTheme.titleMedium?.copyWith(
-              color: FlixieColors.textPrimary,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            '(optional)',
-            style: textTheme.bodySmall?.copyWith(color: FlixieColors.light),
-          ),
-        ],
-      ),
-      const SizedBox(height: 12),
-      Wrap(
-        spacing: 10,
-        runSpacing: 10,
-        children: _genres.map((genre) {
-          final selected = _selectedGenreIds.contains(genre.id);
-          return AuthChip(
-            label: genre.name,
-            selected: selected,
-            onTap: () => setState(() {
-              if (selected) {
-                _selectedGenreIds.remove(genre.id);
-              } else {
-                _selectedGenreIds.add(genre.id);
-              }
-            }),
-          );
-        }).toList(),
-      ),
-    ];
-  }
-
-  Widget? _buildUsernameSuffix() {
-    if (_checkingUsername) {
-      return const Padding(
-        padding: EdgeInsets.all(12),
-        child: SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
-      );
-    }
-    if (_usernameAvailable == true) {
-      return const Icon(Icons.check_circle, color: FlixieColors.success);
-    }
-    if (_usernameAvailable == false) {
-      return const Icon(Icons.cancel, color: FlixieColors.danger);
     }
     return null;
   }

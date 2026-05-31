@@ -174,13 +174,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       color: FlixieColors.light,
                     ),
                     children: [
-                      const TextSpan(text: 'New to '),
-                      flixieWordmarkSpan(
-                        fontSize: (textTheme.bodyMedium?.fontSize ?? 14),
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.2,
-                      ),
-                      const TextSpan(text: '?'),
+                      const TextSpan(text: "Don't have an account?"),
                     ],
                   ),
                   textAlign: TextAlign.center,
