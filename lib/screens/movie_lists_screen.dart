@@ -107,7 +107,8 @@ class _MovieListsView extends StatelessWidget {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    _updatedLabel(list.updatedAt ?? list.createdAt),
+                                    _updatedLabel(
+                                        list.updatedAt ?? list.createdAt),
                                     style: const TextStyle(
                                       color: FlixieColors.medium,
                                       fontSize: 12,
@@ -125,7 +126,8 @@ class _MovieListsView extends StatelessWidget {
                                     initialName: list.name,
                                     initialDescription: list.description,
                                     initialVisibility: list.visibility,
-                                    initialWhoCanAddMovies: list.whoCanAddMovies,
+                                    initialWhoCanAddMovies:
+                                        list.whoCanAddMovies,
                                   );
                                   return;
                                 }
@@ -136,15 +138,18 @@ class _MovieListsView extends StatelessWidget {
                                       content: Text(
                                         ok
                                             ? 'List deleted'
-                                            : (provider.error ?? 'Failed to delete list'),
+                                            : (provider.error ??
+                                                'Failed to delete list'),
                                       ),
                                     ),
                                   );
                                 }
                               },
                               itemBuilder: (_) => const [
-                                PopupMenuItem(value: 'edit', child: Text('Edit')),
-                                PopupMenuItem(value: 'delete', child: Text('Delete')),
+                                PopupMenuItem(
+                                    value: 'edit', child: Text('Edit')),
+                                PopupMenuItem(
+                                    value: 'delete', child: Text('Delete')),
                               ],
                             ),
                           ],
@@ -206,7 +211,8 @@ class _MovieListsView extends StatelessWidget {
                 ),
               ),
               StatefulBuilder(
-                builder: (context, setInnerState) => DropdownButtonFormField<String>(
+                builder: (context, setInnerState) =>
+                    DropdownButtonFormField<String>(
                   value: visibility,
                   decoration: const InputDecoration(labelText: 'Privacy'),
                   items: const [
@@ -230,9 +236,11 @@ class _MovieListsView extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               StatefulBuilder(
-                builder: (context, setInnerState) => DropdownButtonFormField<String>(
+                builder: (context, setInnerState) =>
+                    DropdownButtonFormField<String>(
                   value: whoCanAddMovies,
-                  decoration: const InputDecoration(labelText: 'Who can add movies?'),
+                  decoration:
+                      const InputDecoration(labelText: 'Who can add movies?'),
                   items: const [
                     DropdownMenuItem(value: 'owner', child: Text('Only me')),
                     DropdownMenuItem(value: 'friends', child: Text('Friends')),
@@ -258,11 +266,11 @@ class _MovieListsView extends StatelessWidget {
                             whoCanAddMovies: whoCanAddMovies,
                           )
                         : (await provider.createList(
-                            name,
-                            description: descriptionController.text.trim(),
-                            visibility: visibility,
-                            whoCanAddMovies: whoCanAddMovies,
-                          )) !=
+                              name,
+                              description: descriptionController.text.trim(),
+                              visibility: visibility,
+                              whoCanAddMovies: whoCanAddMovies,
+                            )) !=
                             null;
                     if (ctx.mounted) Navigator.pop(ctx);
                     if (context.mounted) {
@@ -327,7 +335,8 @@ class _PosterPreviewStack extends StatelessWidget {
           color: FlixieColors.surfaceElevated,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: const Icon(Icons.local_movies_outlined, color: FlixieColors.medium),
+        child:
+            const Icon(Icons.local_movies_outlined, color: FlixieColors.medium),
       );
     }
     return SizedBox(

@@ -46,6 +46,7 @@ GoRouter buildRouter(AuthProvider authProvider) {
       final status = authProvider.status;
       final isAuthRoute = state.matchedLocation.startsWith('/auth');
       final isSplash = state.matchedLocation == '/splash';
+      final isOnboarding = state.matchedLocation == '/onboarding';
 
       // Show splash only while Firebase resolves initial auth state
       if (status == AuthStatus.unknown) {
@@ -57,13 +58,8 @@ GoRouter buildRouter(AuthProvider authProvider) {
       }
 
       if (status == AuthStatus.authenticated) {
-        final isOnboarding = state.matchedLocation == '/onboarding';
-        final dbUser = authProvider.dbUser;
-        // New user — must complete onboarding first
-        if (dbUser != null && !dbUser.completedSetup) {
-          return isOnboarding ? null : '/onboarding';
-        }
-        // Setup done — bounce away from auth/splash/onboarding
+        // Authenticated users should always land in the app, not auth or
+        // sign-up flow screens restored from a previous session.
         if (isAuthRoute || isSplash || isOnboarding) {
           return '/';
         }
@@ -189,7 +185,7 @@ GoRouter buildRouter(AuthProvider authProvider) {
         ],
       ),
 
-      // Onboarding (authenticated, completedSetup == false)
+      // Onboarding route is kept for explicit navigation only.
       GoRoute(
         path: '/onboarding',
         builder: (context, state) => const OnboardingScreen(),

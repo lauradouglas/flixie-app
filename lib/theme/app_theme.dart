@@ -34,7 +34,7 @@ class FlixieColors {
 
   // Text hierarchy
   static const Color textPrimary = Color(0xFFF5F7FA);
-  static const Color light = Color(0xFFB7C2D0);   // secondary text
+  static const Color light = Color(0xFFB7C2D0); // secondary text
   static const Color lightShade = Color(0xFFA0ACBD);
   static const Color lightTint = Color(0xFFC7D1E2);
 
@@ -59,8 +59,9 @@ class FlixieColors {
   static const Color tabBarBorder = Color(0xFF35245B);
 
   // Watchlist card gradient colours
-  static const Color cardGradientTop = Color(0xF227194A);    // rgba(39,25,74,0.95)
-  static const Color cardGradientBottom = Color(0xFA0A0616); // rgba(10,6,22,0.98)
+  static const Color cardGradientTop = Color(0xF227194A); // rgba(39,25,74,0.95)
+  static const Color cardGradientBottom =
+      Color(0xFA0A0616); // rgba(10,6,22,0.98)
 }
 
 /// Builds the app-wide [ThemeData] using the Flixie color palette.
@@ -146,8 +147,7 @@ class AppTheme {
               fontWeight: FontWeight.w700,
             );
           }
-          return const TextStyle(
-              color: FlixieColors.medium, fontSize: 11);
+          return const TextStyle(color: FlixieColors.medium, fontSize: 11);
         }),
         surfaceTintColor: Colors.transparent,
         elevation: 0,

@@ -927,8 +927,7 @@ class _WatchlistTabs extends StatelessWidget {
         final selected = selectedIndex == index;
         return Expanded(
           child: Padding(
-            padding:
-                EdgeInsets.only(right: index == labels.length - 1 ? 0 : 8),
+            padding: EdgeInsets.only(right: index == labels.length - 1 ? 0 : 8),
             child: GestureDetector(
               onTap: () => onChanged(index),
               child: AnimatedContainer(
@@ -957,8 +956,7 @@ class _WatchlistTabs extends StatelessWidget {
                   labels[index],
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color:
-                        selected ? FlixieColors.white : FlixieColors.medium,
+                    color: selected ? FlixieColors.white : FlixieColors.medium,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1318,7 +1316,8 @@ class _WatchlistStatusPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.bookmark_rounded, size: 13, color: FlixieColors.primary),
+          const Icon(Icons.bookmark_rounded,
+              size: 13, color: FlixieColors.primary),
           const SizedBox(width: 5),
           const Text(
             'In your watchlist',
