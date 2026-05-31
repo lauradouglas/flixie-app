@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/country.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/reference_data_service.dart';
 import '../../services/user_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/app_logger.dart';
@@ -33,6 +35,40 @@ class _SignupScreenState extends State<SignupScreen> {
   Timer? _usernameDebounce;
   bool _checkingUsername = false;
   bool? _usernameAvailable;
+
+  List<Country> _countries = [];
+  Country? _selectedCountry;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCountries();
+  }
+
+  Future<void> _loadCountries() async {
+    try {
+      final countries = await ReferenceDataService.getCountries();
+      if (mounted) {
+        setState(() => _countries = countries);
+      }
+    } catch (_) {
+      // Country list is optional; silently ignore load failures
+    }
+  }
+
+  Future<void> _pickCountry() async {
+    final country = await showModalBottomSheet<Country>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _CountryPickerSheet(
+        countries: _countries,
+        selected: _selectedCountry,
+      ),
+    );
+    if (!mounted || country == null) return;
+    setState(() => _selectedCountry = country);
+  }
 
   @override
   void dispose() {
@@ -112,6 +148,7 @@ class _SignupScreenState extends State<SignupScreen> {
       firstName: _firstNameController.text.trim(),
       lastName: _lastNameController.text.trim(),
       username: _usernameController.text.trim(),
+      countryId: _selectedCountry?.id,
     );
 
     if (!mounted || success) return;
@@ -255,6 +292,11 @@ class _SignupScreenState extends State<SignupScreen> {
               },
             ),
             const SizedBox(height: 14),
+            _CountryPickerField(
+              selected: _selectedCountry,
+              onTap: _countries.isEmpty ? null : _pickCountry,
+            ),
+            const SizedBox(height: 14),
             PasswordField(
               controller: _passwordController,
               label: 'Password',
@@ -326,5 +368,191 @@ class _SignupScreenState extends State<SignupScreen> {
       return 'Required';
     }
     return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Country picker field (tappable, mimics AppTextField style)
+// ---------------------------------------------------------------------------
+
+class _CountryPickerField extends StatelessWidget {
+  const _CountryPickerField({required this.selected, required this.onTap});
+
+  final Country? selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasValue = selected != null;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          color: FlixieColors.tabBarBackgroundFocused.withValues(alpha: 0.9),
+          border: Border.all(
+            color: FlixieColors.tabBarBorder.withValues(alpha: 0.9),
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+        child: Row(
+          children: [
+            Icon(
+              Icons.location_on_outlined,
+              size: 22,
+              color: FlixieColors.medium,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                hasValue ? selected!.name : 'Country (optional)',
+                style: TextStyle(
+                  color: hasValue
+                      ? FlixieColors.textPrimary
+                      : FlixieColors.light.withValues(alpha: 0.86),
+                  fontSize: 16,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.expand_more_rounded,
+              color: FlixieColors.medium,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Country picker bottom sheet
+// ---------------------------------------------------------------------------
+
+class _CountryPickerSheet extends StatefulWidget {
+  const _CountryPickerSheet({required this.countries, this.selected});
+
+  final List<Country> countries;
+  final Country? selected;
+
+  @override
+  State<_CountryPickerSheet> createState() => _CountryPickerSheetState();
+}
+
+class _CountryPickerSheetState extends State<_CountryPickerSheet> {
+  final _searchController = TextEditingController();
+  late List<Country> _filtered;
+
+  @override
+  void initState() {
+    super.initState();
+    _filtered = widget.countries;
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearch(String query) {
+    final q = query.trim().toLowerCase();
+    setState(() {
+      _filtered = q.isEmpty
+          ? widget.countries
+          : widget.countries
+              .where((c) => c.name.toLowerCase().contains(q))
+              .toList();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.viewInsetsOf(context).bottom;
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
+      decoration: const BoxDecoration(
+        color: Color(0xFF1B3258),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: FlixieColors.medium,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Select Country',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _searchController,
+              onChanged: _onSearch,
+              autofocus: true,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Search countries...',
+                hintStyle: const TextStyle(color: FlixieColors.medium),
+                prefixIcon:
+                    const Icon(Icons.search, color: FlixieColors.medium),
+                filled: true,
+                fillColor: FlixieColors.tabBarBackgroundFocused,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 320,
+              child: ListView.builder(
+                itemCount: _filtered.length,
+                itemBuilder: (context, index) {
+                  final country = _filtered[index];
+                  final isSelected = country.id == widget.selected?.id;
+                  return ListTile(
+                    title: Text(
+                      country.name,
+                      style: TextStyle(
+                        color: isSelected
+                            ? FlixieColors.primaryTint
+                            : FlixieColors.textPrimary,
+                        fontWeight: isSelected
+                            ? FontWeight.w700
+                            : FontWeight.normal,
+                      ),
+                    ),
+                    trailing: isSelected
+                        ? const Icon(Icons.check_rounded,
+                            color: FlixieColors.primaryTint)
+                        : null,
+                    onTap: () => Navigator.of(context).pop(country),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

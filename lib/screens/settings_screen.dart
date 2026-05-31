@@ -3,8 +3,10 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../models/country.dart';
 import '../models/user.dart' as user_model;
 import '../providers/auth_provider.dart';
+import '../services/reference_data_service.dart';
 import '../services/user_service.dart';
 import '../theme/app_theme.dart';
 import 'settings/change_password_sheet.dart';
@@ -300,11 +302,48 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
   String? _usernameError;
   DateTime? _lastCheck;
 
+  List<Country> _countries = [];
+  Country? _selectedCountry;
+
   @override
   void initState() {
     super.initState();
     _usernameCtrl = TextEditingController(text: widget.user.username);
     _bioCtrl = TextEditingController(text: widget.user.bio ?? '');
+    _loadCountries();
+  }
+
+  Future<void> _loadCountries() async {
+    try {
+      final countries = await ReferenceDataService.getCountries();
+      if (!mounted) return;
+      Country? current;
+      if (widget.user.countryId != null) {
+        try {
+          current = countries.firstWhere((c) => c.id == widget.user.countryId);
+        } catch (_) {}
+      }
+      setState(() {
+        _countries = countries;
+        _selectedCountry = current;
+      });
+    } catch (_) {
+      // Country list is optional; silently ignore load failures
+    }
+  }
+
+  Future<void> _pickCountry() async {
+    final country = await showModalBottomSheet<Country>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _SettingsCountryPickerSheet(
+        countries: _countries,
+        selected: _selectedCountry,
+      ),
+    );
+    if (!mounted || country == null) return;
+    setState(() => _selectedCountry = country);
   }
 
   @override
@@ -363,6 +402,10 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
       if (bio != (widget.user.bio ?? '')) {
         updated = await UserService.updateUserField(userId, 'bio', bio);
       }
+      if (_selectedCountry?.id != widget.user.countryId) {
+        updated = await UserService.updateUserField(
+            userId, 'countryId', _selectedCountry?.id);
+      }
 
       if (!mounted) return;
       auth.updateCachedUser(updated);
@@ -385,7 +428,8 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
   Widget build(BuildContext context) {
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
     final unchanged = _usernameCtrl.text.trim() == widget.user.username &&
-        _bioCtrl.text.trim() == (widget.user.bio ?? '');
+        _bioCtrl.text.trim() == (widget.user.bio ?? '') &&
+        _selectedCountry?.id == widget.user.countryId;
 
     return Container(
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
@@ -477,6 +521,40 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
                 counterStyle: const TextStyle(color: FlixieColors.medium),
               ),
             ),
+            const SizedBox(height: 14),
+            // Country
+            if (_countries.isNotEmpty)
+              GestureDetector(
+                onTap: _pickCountry,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: FlixieColors.tabBarBackgroundFocused,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.location_on_outlined,
+                          color: FlixieColors.medium, size: 20),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _selectedCountry?.name ?? 'Country (optional)',
+                          style: TextStyle(
+                            color: _selectedCountry != null
+                                ? Colors.white
+                                : FlixieColors.medium,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      const Icon(Icons.expand_more_rounded,
+                          color: FlixieColors.medium),
+                    ],
+                  ),
+                ),
+              ),
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
@@ -497,6 +575,139 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
                             strokeWidth: 2, color: Colors.white),
                       )
                     : const Text('Save Changes'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Country picker bottom sheet (used from Edit Profile in Settings)
+// ---------------------------------------------------------------------------
+
+class _SettingsCountryPickerSheet extends StatefulWidget {
+  const _SettingsCountryPickerSheet(
+      {required this.countries, this.selected});
+
+  final List<Country> countries;
+  final Country? selected;
+
+  @override
+  State<_SettingsCountryPickerSheet> createState() =>
+      _SettingsCountryPickerSheetState();
+}
+
+class _SettingsCountryPickerSheetState
+    extends State<_SettingsCountryPickerSheet> {
+  final _searchController = TextEditingController();
+  late List<Country> _filtered;
+
+  @override
+  void initState() {
+    super.initState();
+    _filtered = widget.countries;
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearch(String query) {
+    final q = query.trim().toLowerCase();
+    setState(() {
+      _filtered = q.isEmpty
+          ? widget.countries
+          : widget.countries
+              .where((c) => c.name.toLowerCase().contains(q))
+              .toList();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.viewInsetsOf(context).bottom;
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
+      decoration: const BoxDecoration(
+        color: Color(0xFF1B3258),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: FlixieColors.medium,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Select Country',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _searchController,
+              onChanged: _onSearch,
+              autofocus: true,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Search countries...',
+                hintStyle: const TextStyle(color: FlixieColors.medium),
+                prefixIcon:
+                    const Icon(Icons.search, color: FlixieColors.medium),
+                filled: true,
+                fillColor: FlixieColors.tabBarBackgroundFocused,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 320,
+              child: ListView.builder(
+                itemCount: _filtered.length,
+                itemBuilder: (context, index) {
+                  final country = _filtered[index];
+                  final isSelected = country.id == widget.selected?.id;
+                  return ListTile(
+                    title: Text(
+                      country.name,
+                      style: TextStyle(
+                        color: isSelected
+                            ? FlixieColors.primaryTint
+                            : FlixieColors.textPrimary,
+                        fontWeight: isSelected
+                            ? FontWeight.w700
+                            : FontWeight.normal,
+                      ),
+                    ),
+                    trailing: isSelected
+                        ? const Icon(Icons.check_rounded,
+                            color: FlixieColors.primaryTint)
+                        : null,
+                    onTap: () => Navigator.of(context).pop(country),
+                  );
+                },
               ),
             ),
           ],
