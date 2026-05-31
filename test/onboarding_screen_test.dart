@@ -26,10 +26,8 @@ void main() {
   });
 
   group('canAddOnboardingMovie', () {
-    const movie = MovieShort(id: 101, name: 'Interstellar');
-
     test('allows adding when list is below max', () {
-      expect(canAddOnboardingMovie({}, movie.id), isTrue);
+      expect(canAddOnboardingMovie({}, 101), isTrue);
     });
 
     test('disallows adding new movie when list is full', () {
