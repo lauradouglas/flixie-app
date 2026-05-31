@@ -686,82 +686,82 @@ class AuthChip extends StatelessWidget {
 }
 
 class GenreChip extends StatelessWidget {
-    const GenreChip({
-      super.key,
-      required this.label,
-      required this.selected,
-      required this.onTap,
-    });
+  const GenreChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
-    final String label;
-    final bool selected;
-    final VoidCallback onTap;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
 
-    @override
-    Widget build(BuildContext context) {
-      return AuthChip(label: label, selected: selected, onTap: onTap);
-    }
+  @override
+  Widget build(BuildContext context) {
+    return AuthChip(label: label, selected: selected, onTap: onTap);
+  }
 }
 
 class MovieSelectionCard extends StatelessWidget {
-    const MovieSelectionCard({
-      super.key,
-      required this.movie,
-      required this.onRemove,
-      this.posterBaseUrl = 'https://image.tmdb.org/t/p/w185',
-    });
+  const MovieSelectionCard({
+    super.key,
+    required this.movie,
+    required this.onRemove,
+    this.posterBaseUrl = 'https://image.tmdb.org/t/p/w185',
+  });
 
-    final MovieShort movie;
-    final VoidCallback onRemove;
-    final String posterBaseUrl;
+  final MovieShort movie;
+  final VoidCallback onRemove;
+  final String posterBaseUrl;
 
-    @override
-    Widget build(BuildContext context) {
-      return Stack(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: SizedBox(
-              width: 82,
-              height: 122,
-              child: movie.poster == null
-                  ? Container(
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: SizedBox(
+            width: 82,
+            height: 122,
+            child: movie.poster == null
+                ? Container(
+                    color: FlixieColors.surfaceElevated,
+                    child:
+                        const Icon(Icons.movie_outlined, color: FlixieColors.light),
+                  )
+                : CachedNetworkImage(
+                    imageUrl: '$posterBaseUrl${movie.poster}',
+                    fit: BoxFit.cover,
+                    errorWidget: (_, __, ___) => Container(
                       color: FlixieColors.surfaceElevated,
                       child: const Icon(Icons.movie_outlined,
                           color: FlixieColors.light),
-                    )
-                  : CachedNetworkImage(
-                      imageUrl: '$posterBaseUrl${movie.poster}',
-                      fit: BoxFit.cover,
-                      errorWidget: (_, __, ___) => Container(
-                        color: FlixieColors.surfaceElevated,
-                        child: const Icon(Icons.movie_outlined,
-                            color: FlixieColors.light),
-                      ),
                     ),
-            ),
+                  ),
           ),
-          Positioned(
-            right: 4,
-            top: 4,
-            child: InkWell(
-              onTap: onRemove,
-              borderRadius: BorderRadius.circular(999),
-              child: Container(
-                width: 22,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.65),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.close, size: 14, color: Colors.white),
+        ),
+        Positioned(
+          right: 4,
+          top: 4,
+          child: InkWell(
+            onTap: onRemove,
+            borderRadius: BorderRadius.circular(999),
+            child: Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.65),
+                shape: BoxShape.circle,
               ),
+              child: const Icon(Icons.close, size: 14, color: Colors.white),
             ),
           ),
-        ],
-      );
-}
+        ),
+      ],
+    );
   }
+}
 
 class MovieSearchSheet extends StatefulWidget {
   const MovieSearchSheet({
@@ -782,75 +782,76 @@ class _MovieSearchSheetState extends State<MovieSearchSheet> {
   List<MovieShort> _results = [];
   bool _loading = false;
 
-    @override
-    void dispose() {
-      _controller.dispose();
-      super.dispose();
-    }
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
-    Future<void> _search(String value) async {
-      final query = value.trim();
-      if (query.length < 2) {
-        setState(() => _results = []);
-        return;
-      }
-      setState(() => _loading = true);
-      try {
-        final movies = await widget.searchMovies(query);
-        if (!mounted) return;
-        setState(() => _results = movies);
-      } finally {
-        if (mounted) setState(() => _loading = false);
-      }
+  Future<void> _search(String value) async {
+    final query = value.trim();
+    if (query.length < 2) {
+      setState(() => _results = []);
+      return;
     }
+    setState(() => _loading = true);
+    try {
+      final movies = await widget.searchMovies(query);
+      if (!mounted) return;
+      setState(() => _results = movies);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
-    @override
-    Widget build(BuildContext context) {
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 18, 16, 22),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                widget.title,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: FlixieColors.textPrimary,
-                      fontWeight: FontWeight.w700,
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 22),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              widget.title,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: FlixieColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            const SizedBox(height: 14),
+            AppTextField(
+              controller: _controller,
+              label: 'Search for movies...',
+              prefixIcon: Icons.search_rounded,
+              onChanged: _search,
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 320,
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView.separated(
+                      itemCount: _results.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final movie = _results[index];
+                        return ListTile(
+                          title: Text(
+                            movie.name,
+                            style:
+                                const TextStyle(color: FlixieColors.textPrimary),
+                          ),
+                          onTap: () => Navigator.of(context).pop(movie),
+                        );
+                      },
                     ),
-              ),
-              const SizedBox(height: 14),
-              AppTextField(
-                controller: _controller,
-                label: 'Search for movies...',
-                prefixIcon: Icons.search_rounded,
-                onChanged: _search,
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 320,
-                child: _loading
-                    ? const Center(child: CircularProgressIndicator())
-                    : ListView.separated(
-                        itemCount: _results.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
-                        itemBuilder: (context, index) {
-                          final movie = _results[index];
-                          return ListTile(
-                            title: Text(
-                              movie.name,
-                              style: const TextStyle(color: FlixieColors.textPrimary),
-                            ),
-                            onTap: () => Navigator.of(context).pop(movie),
-                          );
-                        },
-                      ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
-      );
-    }
+      ),
+    );
+  }
 }
 
 class OnboardingProgressIndicator extends StatelessWidget {
@@ -860,36 +861,36 @@ class OnboardingProgressIndicator extends StatelessWidget {
     required this.totalSteps,
   });
 
-    final int currentStep;
-    final int totalSteps;
+  final int currentStep;
+  final int totalSteps;
 
-    @override
-    Widget build(BuildContext context) {
-      return Row(
-        children: List.generate(totalSteps, (index) {
-          final active = index <= currentStep;
-          return Expanded(
-            child: Container(
-              margin: EdgeInsets.only(right: index == totalSteps - 1 ? 0 : 8),
-              height: 6,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(999),
-                gradient: active
-                    ? const LinearGradient(
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                        colors: [Color(0xFF9B6DFF), Color(0xFFB58DFF)],
-                      )
-                    : null,
-                color: active
-                    ? null
-                    : FlixieColors.tabBarBorder.withValues(alpha: 0.75),
-              ),
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: List.generate(totalSteps, (index) {
+        final active = index <= currentStep;
+        return Expanded(
+          child: Container(
+            margin: EdgeInsets.only(right: index == totalSteps - 1 ? 0 : 8),
+            height: 6,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(999),
+              gradient: active
+                  ? const LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [Color(0xFF9B6DFF), Color(0xFFB58DFF)],
+                    )
+                  : null,
+              color: active
+                  ? null
+                  : FlixieColors.tabBarBorder.withValues(alpha: 0.75),
             ),
-          );
-        }),
-      );
-    }
+          ),
+        );
+      }),
+    );
+  }
 }
 
 class PrimaryButton extends StatelessWidget {
@@ -900,18 +901,18 @@ class PrimaryButton extends StatelessWidget {
     this.isLoading = false,
   });
 
-    final String label;
-    final VoidCallback? onPressed;
-    final bool isLoading;
+  final String label;
+  final VoidCallback? onPressed;
+  final bool isLoading;
 
-    @override
-    Widget build(BuildContext context) {
-      return AuthPrimaryButton(
-        label: label,
-        onPressed: onPressed,
-        isLoading: isLoading,
-      );
-    }
+  @override
+  Widget build(BuildContext context) {
+    return AuthPrimaryButton(
+      label: label,
+      onPressed: onPressed,
+      isLoading: isLoading,
+    );
+  }
 }
 
 class SecondaryButton extends StatelessWidget {
@@ -921,21 +922,21 @@ class SecondaryButton extends StatelessWidget {
     required this.onPressed,
   });
 
-    final String label;
-    final VoidCallback? onPressed;
+  final String label;
+  final VoidCallback? onPressed;
 
-    @override
-    Widget build(BuildContext context) {
-      return OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          foregroundColor: FlixieColors.textPrimary,
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.25)),
-          minimumSize: const Size.fromHeight(52),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-        ),
-        child: Text(label),
-      );
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: FlixieColors.textPrimary,
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.25)),
+        minimumSize: const Size.fromHeight(52),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+      ),
+      child: Text(label),
+    );
   }
 }
 

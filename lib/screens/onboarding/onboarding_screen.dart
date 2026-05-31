@@ -28,6 +28,21 @@ const _popularGenres = [
   'Crime',
 ];
 
+String? validateFavouriteMovieCount(int count) {
+  if (count < 3 || count > 5) {
+    return 'Please select between 3 and 5 favourite movies.';
+  }
+  return null;
+}
+
+bool canAddOnboardingMovie(
+  Map<int, MovieShort> selected,
+  int movieId, {
+  int maxCount = 5,
+}) {
+  return selected.containsKey(movieId) || selected.length < maxCount;
+}
+
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -97,14 +112,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (!mounted || movie == null) return;
     setState(() {
       if (bucket == _MovieBucket.favourites) {
-        if (_favourites.length >= 5 && !_favourites.containsKey(movie.id)) {
+        if (!canAddOnboardingMovie(_favourites, movie.id)) {
           return;
         }
         _favourites[movie.id] = movie;
         return;
       }
-      if (_recentlyWatched.length >= 5 &&
-          !_recentlyWatched.containsKey(movie.id)) {
+      if (!canAddOnboardingMovie(_recentlyWatched, movie.id)) {
         return;
       }
       _recentlyWatched[movie.id] = movie;
@@ -112,10 +126,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<void> _savePreferences() async {
-    if (_favourites.length < 3 || _favourites.length > 5) {
+    final favouriteValidationError =
+        validateFavouriteMovieCount(_favourites.length);
+    if (favouriteValidationError != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select between 3 and 5 favourite movies.'),
+        SnackBar(
+          content: Text(favouriteValidationError),
           backgroundColor: FlixieColors.danger,
         ),
       );
