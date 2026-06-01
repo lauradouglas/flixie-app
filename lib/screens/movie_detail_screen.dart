@@ -15,9 +15,9 @@ import '../models/similar_movie.dart';
 import '../models/watch_provider.dart';
 import '../models/watched_movie.dart';
 import '../models/watchlist_movie.dart';
+import '../presentation/shared/watchlist_actions_controller.dart';
 import '../providers/auth_provider.dart';
 import '../services/movie_service.dart';
-import '../services/user_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_logger.dart';
 import 'movie_detail/cast_card.dart';
@@ -53,6 +53,8 @@ enum ListUpdateType { watchlist, watched, favorite }
 enum FriendActivityTab { all, watched, watchlist, ratings, reviews, lists }
 
 class _MovieDetailScreenState extends State<MovieDetailScreen> {
+  final WatchlistActionsController _watchlistActions =
+      WatchlistActionsController.instance;
   Movie? _movie;
   List<Review> _reviews = [];
   List<SimilarMovie> _similar = [];
@@ -192,7 +194,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     if (!mounted) return;
     setState(() => _watchHistoryLoading = true);
     try {
-      final history = await UserService.getMovieWatchHistory(userId, movieId);
+      final history =
+          await _watchlistActions.getMovieWatchHistory(userId, movieId);
       if (mounted) {
         setState(() {
           _movieWatchHistory = history;
@@ -211,8 +214,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     setState(() => _listsContainingMovieLoading = true);
     try {
       final results = await Future.wait([
-        UserService.getMyListsContainingMovie(userId, movieId),
-        UserService.getFriendsListsContainingMovie(userId, movieId),
+        _watchlistActions.getMyListsContainingMovie(userId, movieId),
+        _watchlistActions.getFriendsListsContainingMovie(userId, movieId),
       ]);
       if (!mounted) return;
       setState(() {
@@ -243,8 +246,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
     try {
       final result = await (_inWatchlist
-          ? UserService.removeFromWatchlist(user.id, movieId)
-          : UserService.addToWatchlist(user.id, movieId));
+          ? _watchlistActions.removeFromWatchlist(user.id, movieId)
+          : _watchlistActions.addToWatchlist(user.id, movieId));
 
       // Successfully updated on server, toggle UI state and update user list
       if (mounted) {
@@ -293,7 +296,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             );
             if (markWatched == true && mounted) {
               final watchedResult =
-                  await UserService.addToWatched(user.id, movieId);
+                  await _watchlistActions.addToWatched(user.id, movieId);
               final updatedWatched =
                   List<WatchedMovie>.from(user.watchedMovies ?? []);
               updatedWatched.removeWhere((item) => item.movieId == movieId);
@@ -339,7 +342,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     setState(() => _currentlyUpdating = ListUpdateType.watched);
 
     try {
-      await UserService.removeFromWatched(user.id, movieId);
+      await _watchlistActions.removeFromWatched(user.id, movieId);
 
       // Successfully updated on server, toggle UI state and update user list
       if (mounted) {
@@ -377,10 +380,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     try {
       final FavoriteMovie? addedFavorite;
       if (_isFavorite) {
-        await UserService.removeFromFavorites(user.id, movieId);
+        await _watchlistActions.removeFromFavorites(user.id, movieId);
         addedFavorite = null;
       } else {
-        addedFavorite = await UserService.addToFavorites(user.id, movieId);
+        addedFavorite = await _watchlistActions.addToFavorites(user.id, movieId);
       }
 
       // Successfully updated on server, toggle UI state and update user list
@@ -460,7 +463,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         }) async {
           try {
             if (entry == null) {
-              await UserService.logMovieWatch(
+              await _watchlistActions.logMovieWatch(
                 userId,
                 LogMovieWatchRequest(
                   movieId: movieId,
@@ -472,7 +475,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               // Also mark the movie as watched in the main watched list and
               // update local user state, then offer to remove from watchlist.
               final watchedResult =
-                  await UserService.addToWatched(userId, movieId);
+                  await _watchlistActions.addToWatched(userId, movieId);
               final authProvider = context.read<AuthProvider>();
               final user = authProvider.dbUser;
               final updatedWatched =
@@ -512,7 +515,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   ),
                 );
                 if (remove == true && mounted) {
-                  await UserService.removeFromWatchlist(userId, movieId);
+                  await _watchlistActions.removeFromWatchlist(userId, movieId);
                   final updatedWatchlist =
                       (authProvider.dbUser?.movieWatchlist ?? [])
                           .where((item) => item.movieId != movieId)
@@ -524,7 +527,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 }
               }
             } else {
-              await UserService.updateMovieWatch(
+              await _watchlistActions.updateMovieWatch(
                 userId,
                 entry.id,
                 UpdateMovieWatchRequest(
@@ -570,7 +573,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final movieId = int.tryParse(widget.movieId);
     if (userId == null || movieId == null) return;
     try {
-      await UserService.deleteMovieWatch(userId, entry.id);
+      await _watchlistActions.deleteMovieWatch(userId, entry.id);
       await _loadWatchHistory(userId, movieId);
       if (mounted) {
         ScaffoldMessenger.of(context)

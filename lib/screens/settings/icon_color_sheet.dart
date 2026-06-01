@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../../models/icon_color.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/reference_data_service.dart';
-import '../../services/user_service.dart';
+import '../../presentation/shared/settings_controller.dart';
 import '../../theme/app_theme.dart';
 
 class IconColorSheet extends StatefulWidget {
@@ -22,6 +22,7 @@ class IconColorSheet extends StatefulWidget {
 }
 
 class _IconColorSheetState extends State<IconColorSheet> {
+  final SettingsController _settingsController = SettingsController.instance;
   List<IconColor> _colors = [];
   late int _selectedId;
   bool _loading = true;
@@ -56,7 +57,7 @@ class _IconColorSheetState extends State<IconColorSheet> {
     setState(() => _savingId = color.id);
     try {
       final updatedUser =
-          await UserService.updateIconColor(widget.userId, color.id);
+          await _settingsController.updateIconColor(widget.userId, color.id);
       if (!mounted) return;
       auth.updateCachedUser(updatedUser);
       setState(() {

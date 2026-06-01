@@ -75,35 +75,29 @@ flutter test
 
 ```
 lib/
-├── main.dart                    # App entry point, Firebase init & GoRouter
-├── firebase_options.dart        # Firebase config (replace placeholders)
-├── providers/
-│   └── auth_provider.dart       # Auth state (ChangeNotifier)
-├── services/
-│   └── auth_service.dart        # Firebase Auth wrapper
-├── theme/
-│   └── app_theme.dart           # Flixie colour palette & ThemeData
-└── screens/
-    ├── auth/
-    │   ├── login_screen.dart        # Sign-in screen
-    │   ├── signup_screen.dart       # Create-account screen
-    │   └── forgot_password_screen.dart # Password-reset screen
-    ├── stats/
-    │   ├── stat_card.dart           # Reusable stats UI card
-    │   ├── monthly_bar_chart.dart   # Reusable monthly chart widget
-    │   ├── genre_bar.dart           # Reusable genre ranking row
-    │   ├── section_header.dart      # Reusable section title row
-    │   └── year_breakdown.dart      # Reusable year breakdown chart
-    ├── stats_screen.dart            # My Stats screen composition
-    ├── home_screen.dart             # Home / featured content
-    ├── search_screen.dart           # Search & genre browsing
-    └── profile_screen.dart          # User profile & sign-out
+├── main.dart
+├── firebase_options.dart
+├── presentation/                # Presentation shared modules/controllers
+├── domain/                      # Use cases and repository contracts
+├── data/                        # Repository implementations
+├── providers/                   # App/session state providers
+├── screens/                     # Feature screens and screen-local widgets
+├── services/                    # External/API/Firebase service clients
+├── widgets/                     # Shared UI scaffolding primitives
+└── theme/                       # Design tokens and ThemeData
 test/
 ├── widget_test.dart                 # Unit & widget tests
 └── stats_widgets_test.dart          # Stats reusable widget tests
 android/                         # Android-specific configuration
 ios/                             # iOS-specific configuration
 ```
+
+## Architecture Rules
+
+- UI flows should go through `presentation` controllers/use-cases/repositories, not direct `UserService` or `FriendService` calls.
+- Dependency direction: `presentation -> domain`, `data -> domain`, `data -> services`.
+- Shared authenticated screen chrome uses `FlixiePageScaffold`, `FlixieTitleAppBar`, and `FlixieSectionHeader`.
+- See `/tmp/workspace/lauradouglas/flixie-app/docs/architecture.md` for conventions, migration status, and PR checklist guardrails.
 
 ## Authentication Flow
 

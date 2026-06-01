@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../models/review.dart';
-import '../../services/user_service.dart';
+import '../../presentation/shared/review_reactions_controller.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/app_logger.dart';
 
@@ -30,6 +30,8 @@ const _kReactions = [
 ];
 
 class _ReviewCardState extends State<ReviewCard> {
+  final ReviewReactionsController _reviewReactions =
+      ReviewReactionsController.instance;
   late Map<String, int> _reactions;
   String? _myReaction;
 
@@ -375,7 +377,7 @@ class _ReviewDetailSheetState extends State<_ReviewDetailSheet> {
       final review = widget.review;
       final mediaType = review.movieId != null ? 'MOVIE' : 'SHOW';
       final mediaId = (review.movieId ?? review.showId)!.toString();
-      final result = await UserService.reactToReview(
+      final result = await _reviewReactions.reactToReview(
         mediaType: mediaType,
         mediaId: mediaId,
         reviewId: review.id,

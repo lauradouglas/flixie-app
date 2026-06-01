@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/review.dart';
-import '../../services/user_service.dart';
+import '../../presentation/shared/review_reactions_controller.dart';
 import '../../theme/app_theme.dart';
 
 class WriteReviewSheet extends StatefulWidget {
@@ -21,6 +21,8 @@ class WriteReviewSheet extends StatefulWidget {
 }
 
 class _WriteReviewSheetState extends State<WriteReviewSheet> {
+  final ReviewReactionsController _reviewReactions =
+      ReviewReactionsController.instance;
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
@@ -61,7 +63,7 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
         updatedAt: DateTime.now().toIso8601String(),
       );
 
-      final created = await UserService.addMovieReview(draft);
+      final created = await _reviewReactions.addMovieReview(draft);
       if (mounted) {
         widget.onSubmitted(created);
         setState(() => _submitted = true);
