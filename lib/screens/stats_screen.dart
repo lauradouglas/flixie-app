@@ -5,6 +5,7 @@ import '../models/watched_movie.dart';
 import '../models/watchlist_movie.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/flixie_page.dart';
 import 'stats/genre_bar.dart';
 import 'stats/monthly_bar_chart.dart';
 import 'stats/section_header.dart';
@@ -272,12 +273,10 @@ class _StatsScreenState extends State<StatsScreen> {
         ? (DateTime.tryParse(user!.createdAt!)?.year ?? currentYear)
         : currentYear;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
+    return FlixiePageScaffold(
+      appBar: const FlixieTitleAppBar(
         backgroundColor: FlixieColors.background,
-        elevation: 0,
-        title: const Text(
+        title: Text(
           'Recap',
           style: TextStyle(
               color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),

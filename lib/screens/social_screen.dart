@@ -16,6 +16,7 @@ import '../services/group_service.dart';
 import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_logger.dart';
+import '../widgets/flixie_page.dart';
 import 'profile/activity_tile.dart';
 import 'social/group_card.dart';
 import 'social/group_avatar.dart';
@@ -37,11 +38,8 @@ class _SocialScreenState extends State<SocialScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+    return FlixiePageScaffold(
+      appBar: FlixieTitleAppBar(
         title: const Text(
           'Social',
           style: TextStyle(

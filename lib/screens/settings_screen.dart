@@ -9,6 +9,7 @@ import '../providers/auth_provider.dart';
 import '../services/reference_data_service.dart';
 import '../services/user_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/flixie_page.dart';
 import 'settings/change_password_sheet.dart';
 import 'settings/constants.dart';
 import 'settings/favorite_genres_sheet.dart';
@@ -20,12 +21,9 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text(
+    return FlixiePageScaffold(
+      appBar: const FlixieTitleAppBar(
+        title: Text(
           'Settings',
           style: TextStyle(
             color: Colors.white,
