@@ -7,15 +7,16 @@ import '../models/friendship.dart';
 import '../models/group.dart';
 import '../models/group_member.dart';
 import '../models/notification.dart';
+import '../presentation/shared/friend_actions_controller.dart';
 import '../providers/auth_provider.dart';
 import '../screens/profile/add_friend_sheet.dart';
 import '../screens/profile/friends_row.dart';
 import '../services/chat_service.dart';
-import '../services/friend_service.dart';
 import '../services/group_service.dart';
 import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_logger.dart';
+import '../widgets/flixie_page.dart';
 import 'profile/activity_tile.dart';
 import 'social/group_card.dart';
 import 'social/group_avatar.dart';
@@ -37,11 +38,8 @@ class _SocialScreenState extends State<SocialScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+    return FlixiePageScaffold(
+      appBar: FlixieTitleAppBar(
         title: const Text(
           'Social',
           style: TextStyle(
@@ -89,6 +87,7 @@ class _FriendsSubView extends StatefulWidget {
 }
 
 class _FriendsSubViewState extends State<_FriendsSubView> {
+  final FriendActionsController _friendActions = FriendActionsController.instance;
   bool _loading = true;
   FriendsData? _friendsData;
   List<ActivityListItem> _activity = [];
@@ -108,8 +107,8 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
     }
     try {
       final results = await Future.wait([
-        FriendService.getFriends(userId),
-        FriendService.getFriendsActivityLists(userId),
+        _friendActions.getFriends(userId),
+        _friendActions.getFriendsActivityLists(userId),
       ]);
       if (mounted) {
         setState(() {
@@ -144,7 +143,7 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
 
   Future<void> _acceptRequest(Friendship friendship) async {
     try {
-      await FriendService.updateRequest(friendship.id, 'ACCEPTED');
+      await _friendActions.acceptRequest(friendship.id);
       if (mounted) {
         final updated = _friendsData!.copyWith(
           pendingFriends: _friendsData!.pendingFriends
@@ -169,7 +168,7 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
         // Repoll friends activity now that we have a new friend.
         final userId = context.read<AuthProvider>().dbUser?.id;
         if (userId != null) {
-          FriendService.getFriendsActivityLists(userId).then((activity) {
+          _friendActions.getFriendsActivityLists(userId).then((activity) {
             if (mounted) setState(() => _activity = activity);
           }).catchError((_) {});
         }
@@ -186,7 +185,7 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
 
   Future<void> _declineRequest(Friendship friendship) async {
     try {
-      await FriendService.updateRequest(friendship.id, 'DECLINED');
+      await _friendActions.declineRequest(friendship.id);
       if (mounted) {
         setState(() {
           _friendsData = _friendsData!.copyWith(
@@ -852,6 +851,7 @@ class _CreateGroupSheet extends StatefulWidget {
 }
 
 class _CreateGroupSheetState extends State<_CreateGroupSheet> {
+  final FriendActionsController _friendActions = FriendActionsController.instance;
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _abbrController = TextEditingController();
@@ -923,7 +923,7 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
   Future<void> _loadFriendsForInvite(String userId) async {
     if (mounted) setState(() => _loadingFriends = true);
     try {
-      final data = await FriendService.getFriends(userId);
+      final data = await _friendActions.getFriends(userId);
       if (mounted) {
         setState(() {
           _friends = data.friendships

@@ -7,6 +7,7 @@ import '../providers/auth_provider.dart';
 import '../providers/movie_lists_provider.dart';
 import '../repositories/movie_features_repository.dart';
 import '../theme/app_theme.dart';
+import '../widgets/flixie_page.dart';
 
 class MovieListsScreen extends StatelessWidget {
   const MovieListsScreen({super.key});
@@ -35,8 +36,8 @@ class _MovieListsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<MovieListsProvider>();
-    return Scaffold(
-      appBar: AppBar(title: const Text('Your Lists')),
+    return FlixiePageScaffold(
+      appBar: const FlixieTitleAppBar(title: Text('Your Lists')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openListEditor(context),
         icon: const Icon(Icons.add),

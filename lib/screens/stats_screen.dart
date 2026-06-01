@@ -5,6 +5,7 @@ import '../models/watched_movie.dart';
 import '../models/watchlist_movie.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/flixie_page.dart';
 import 'stats/genre_bar.dart';
 import 'stats/monthly_bar_chart.dart';
 import 'stats/section_header.dart';
@@ -48,7 +49,8 @@ class _StatsScreenState extends State<StatsScreen> {
   @override
   void initState() {
     super.initState();
-    final raw = context.read<AuthProvider>().dbUser?.watchedMovies ?? <WatchedMovie>[];
+    final raw =
+        context.read<AuthProvider>().dbUser?.watchedMovies ?? <WatchedMovie>[];
     _allEntries = raw.where((entry) => entry.removed != true).map((entry) {
       WatchlistMovieDetails? movie;
       if (entry.movie != null) {
@@ -137,7 +139,8 @@ class _StatsScreenState extends State<StatsScreen> {
             StatsCard(
               label: 'Most Active',
               value: mostActive >= 0 ? _kMonthNames[mostActive] : '—',
-              subtitle: mostActive >= 0 ? '${buckets[mostActive]} movies' : null,
+              subtitle:
+                  mostActive >= 0 ? '${buckets[mostActive]} movies' : null,
               icon: Icons.calendar_month_outlined,
             ),
           ],
@@ -272,12 +275,10 @@ class _StatsScreenState extends State<StatsScreen> {
         ? (DateTime.tryParse(user!.createdAt!)?.year ?? currentYear)
         : currentYear;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
+    return FlixiePageScaffold(
+      appBar: const FlixieTitleAppBar(
         backgroundColor: FlixieColors.background,
-        elevation: 0,
-        title: const Text(
+        title: Text(
           'Recap',
           style: TextStyle(
               color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
@@ -300,6 +301,28 @@ class _StatsScreenState extends State<StatsScreen> {
                   icon: Icon(Icons.auto_graph_outlined),
                 ),
               ],
+              style: ButtonStyle(
+                foregroundColor: WidgetStateProperty.resolveWith((states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return FlixieColors.navy;
+                  }
+                  return FlixieColors.light;
+                }),
+                iconColor: WidgetStateProperty.resolveWith((states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return FlixieColors.navy;
+                  }
+                  return FlixieColors.light;
+                }),
+                textStyle: WidgetStateProperty.resolveWith((states) {
+                  return TextStyle(
+                    fontSize: 15,
+                    fontWeight: states.contains(WidgetState.selected)
+                        ? FontWeight.w700
+                        : FontWeight.w600,
+                  );
+                }),
+              ),
               selected: {_selectedTab},
               showSelectedIcon: false,
               onSelectionChanged: (selection) {

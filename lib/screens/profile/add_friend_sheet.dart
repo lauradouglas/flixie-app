@@ -3,9 +3,9 @@ import 'package:provider/provider.dart';
 
 import '../../models/friendship.dart';
 import '../../models/user.dart';
+import '../../presentation/shared/friend_actions_controller.dart';
+import '../../presentation/shared/profile_lookup_controller.dart';
 import '../../providers/auth_provider.dart';
-import '../../services/friend_service.dart';
-import '../../services/user_service.dart';
 import '../../theme/app_theme.dart';
 
 class AddFriendSheet extends StatefulWidget {
@@ -18,6 +18,8 @@ class AddFriendSheet extends StatefulWidget {
 }
 
 class _AddFriendSheetState extends State<AddFriendSheet> {
+  final FriendActionsController _friendActions = FriendActionsController.instance;
+  final ProfileLookupController _profileLookup = ProfileLookupController.instance;
   final TextEditingController _searchController = TextEditingController();
   bool _searching = false;
   List<User> _results = [];
@@ -48,10 +50,10 @@ class _AddFriendSheetState extends State<AddFriendSheet> {
 
       // Try the search endpoint first; fall back to exact username lookup.
       try {
-        results = await UserService.searchUsers(query);
+        results = await _profileLookup.searchUsers(query);
       } catch (_) {
         try {
-          final user = await UserService.getUserByUsername(query);
+          final user = await _profileLookup.getUserByUsername(query);
           results = [user];
         } catch (_) {
           results = [];
@@ -88,7 +90,7 @@ class _AddFriendSheetState extends State<AddFriendSheet> {
     setState(() => _sentRequests.add(user.id));
 
     try {
-      await FriendService.sendFriendRequest({
+      await _friendActions.sendFriendRequest({
         'requesterId': myId,
         'recipientId': user.id,
         'responderUsername': user.username,

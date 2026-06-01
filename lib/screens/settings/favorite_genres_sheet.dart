@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../../models/genre.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/reference_data_service.dart';
-import '../../services/user_service.dart';
+import '../../presentation/shared/settings_controller.dart';
 import '../../theme/app_theme.dart';
 
 class FavoriteGenresSheet extends StatefulWidget {
@@ -22,6 +22,7 @@ class FavoriteGenresSheet extends StatefulWidget {
 }
 
 class _FavoriteGenresSheetState extends State<FavoriteGenresSheet> {
+  final SettingsController _settingsController = SettingsController.instance;
   List<Genre> _allGenres = [];
   late Set<int> _selectedIds;
   bool _loading = true;
@@ -59,7 +60,7 @@ class _FavoriteGenresSheetState extends State<FavoriteGenresSheet> {
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
-      await UserService.addFavoriteGenres(widget.userId, _selectedIds.toList());
+      await _settingsController.addFavoriteGenres(widget.userId, _selectedIds.toList());
       if (!mounted) return;
       await context.read<AuthProvider>().refreshUserData();
       if (!mounted) return;

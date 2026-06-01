@@ -5,11 +5,12 @@ import 'package:provider/provider.dart';
 import '../models/activity_list_item.dart';
 import '../models/friendship.dart';
 import '../models/movie_rating.dart';
+import '../presentation/shared/friend_actions_controller.dart';
+import '../presentation/shared/profile_lookup_controller.dart';
 import '../providers/auth_provider.dart';
-import '../services/friend_service.dart';
-import '../services/user_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_logger.dart';
+import '../widgets/flixie_page.dart';
 import 'profile/activity_tile.dart';
 import 'profile/favorite_movies_section.dart';
 import 'profile/favorite_people_section.dart';
@@ -42,6 +43,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   static const int _initialActivityCount = 5;
   bool _showAllActivity = false;
   AuthProvider? _authProvider;
+  final FriendActionsController _friendActions = FriendActionsController.instance;
+  final ProfileLookupController _profileLookup = ProfileLookupController.instance;
 
   @override
   void didChangeDependencies() {
@@ -104,7 +107,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     try {
-      final activity = await UserService.getUserActivity(userId);
+      final activity = await _profileLookup.getUserActivity(userId);
       if (mounted) {
         setState(() {
           _activity = activity.take(12).toList();
@@ -136,7 +139,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     try {
-      final data = await FriendService.getFriends(userId);
+      final data = await _friendActions.getFriends(userId);
       if (mounted) {
         setState(() {
           _friendsData = data;
@@ -182,8 +185,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     try {
-      logger.d('[ProfileScreen] Calling UserService.getUserMovieRatings...');
-      final ratings = await UserService.getUserMovieRatings(userId);
+      logger.d('[ProfileScreen] Calling ProfileLookupController.getUserMovieRatings...');
+      final ratings = await _profileLookup.getUserMovieRatings(userId);
       logger.i('[ProfileScreen] Loaded ${ratings.length} ratings');
       if (mounted) {
         setState(() {
@@ -220,8 +223,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ? _activity
         : _activity.take(_initialActivityCount).toList();
 
-    return Scaffold(
-      appBar: AppBar(
+    return FlixiePageScaffold(
+      appBar: FlixieTitleAppBar(
         title: const Text('Profile'),
         actions: [
           IconButton(

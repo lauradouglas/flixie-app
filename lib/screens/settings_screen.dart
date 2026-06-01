@@ -5,10 +5,11 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/country.dart';
 import '../models/user.dart' as user_model;
+import '../presentation/shared/settings_controller.dart';
 import '../providers/auth_provider.dart';
 import '../services/reference_data_service.dart';
-import '../services/user_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/flixie_page.dart';
 import 'settings/change_password_sheet.dart';
 import 'settings/constants.dart';
 import 'settings/favorite_genres_sheet.dart';
@@ -20,12 +21,9 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text(
+    return FlixiePageScaffold(
+      appBar: const FlixieTitleAppBar(
+        title: Text(
           'Settings',
           style: TextStyle(
             color: Colors.white,
@@ -293,6 +291,7 @@ class _SettingsEditProfileSheet extends StatefulWidget {
 }
 
 class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
+  final SettingsController _settingsController = SettingsController.instance;
   late final TextEditingController _usernameCtrl;
   late final TextEditingController _bioCtrl;
 
@@ -366,7 +365,7 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
     await Future.delayed(const Duration(milliseconds: 600));
     if (_lastCheck != stamp || !mounted) return;
     try {
-      final exists = await UserService.usernameExists(trimmed);
+      final exists = await _settingsController.usernameExists(trimmed);
       if (!mounted) return;
       setState(() {
         _checkingUsername = false;
@@ -396,13 +395,13 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
       // Only send changed fields — API takes one field at a time
       if (username != widget.user.username) {
         updated =
-            await UserService.updateUserField(userId, 'username', username);
+            await _settingsController.updateUserField(userId, 'username', username);
       }
       if (bio != (widget.user.bio ?? '')) {
-        updated = await UserService.updateUserField(userId, 'bio', bio);
+        updated = await _settingsController.updateUserField(userId, 'bio', bio);
       }
       if (_selectedCountry?.id != widget.user.countryId) {
-        updated = await UserService.updateUserField(
+        updated = await _settingsController.updateUserField(
             userId, 'countryId', _selectedCountry?.id);
       }
 
