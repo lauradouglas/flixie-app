@@ -13,13 +13,13 @@ import '../models/review.dart';
 import '../models/user.dart' as models;
 import '../models/watched_movie.dart';
 import '../models/watchlist_movie.dart';
+import '../providers/auth/auth_notification_poller.dart';
+import '../providers/auth/auth_prefetch_coordinator.dart';
+import '../providers/auth/auth_prefetch_snapshot.dart';
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
-import '../services/friend_service.dart';
 import '../services/movie_service.dart';
-import '../services/notification_service.dart';
 import '../services/push_notification_service.dart';
-import '../services/trending_service.dart';
 import '../services/user_service.dart';
 import '../utils/app_logger.dart';
 
@@ -34,15 +34,23 @@ class AuthProvider extends ChangeNotifier {
   // Prefetched friends activity for home screen
   List<ActivityListItem>? _cachedFriendsActivity;
   List<ActivityListItem>? get cachedFriendsActivity => _cachedFriendsActivity;
-  AuthProvider(this._authService, this._movieService) {
-    _authService.authStateChanges.listen((user) {
+  AuthProvider(
+    this._authService,
+    this._movieService, {
+    AuthPrefetchCoordinator? prefetchCoordinator,
+  }) : _prefetchCoordinator =
+            prefetchCoordinator ?? AuthPrefetchCoordinator(movieService: _movieService) {
+    _authStateSubscription = _authService.authStateChanges.listen((user) {
       unawaited(_onAuthStateChanged(user));
     });
   }
 
   final AuthService _authService;
   final MovieService _movieService;
+  final AuthPrefetchCoordinator _prefetchCoordinator;
+  final AuthNotificationPoller _notificationPoller = AuthNotificationPoller();
   final _authStatusNotifier = _AuthStatusNotifier();
+  StreamSubscription<firebase_auth.User?>? _authStateSubscription;
 
   AuthStatus _status = AuthStatus.unknown;
   firebase_auth.User? _firebaseUser;
@@ -61,7 +69,6 @@ class AuthProvider extends ChangeNotifier {
   bool _isPrefetching = false;
 
   int _unreadNotificationCount = 0;
-  Timer? _notifPollTimer;
 
   /// Navigator key set by the app root so push notifications can navigate.
   GlobalKey<NavigatorState>? _navigatorKey;
@@ -196,8 +203,7 @@ class AuthProvider extends ChangeNotifier {
         _cachedReviews = null;
         _cachedTrending = null;
         _cachedNowPlaying = null;
-        _notifPollTimer?.cancel();
-        _notifPollTimer = null;
+        _notificationPoller.stop();
         _unreadNotificationCount = 0;
       }
 
@@ -229,37 +235,16 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Fetches activity, friends, ratings, reviews and home content in parallel
-  /// right after login. Screens consume the results to avoid showing spinners.
+  /// Fetches profile/friend/home cache in parallel right after login.
   void _prefetch(String userId, {String region = 'US'}) {
     _isPrefetching = true;
-    Future.wait([
-      UserService.getUserActivity(userId)
-          .then((v) => _cachedActivity = v, onError: (_) {}),
-      FriendService.getFriends(userId)
-          .then((v) => _cachedFriends = v, onError: (_) {}),
-      // Prefetch friends activity for home screen
-      FriendService.getFriendsActivityLists(userId)
-          .then((v) => _cachedFriendsActivity = v, onError: (_) {}),
-      UserService.getUserMovieRatings(userId)
-          .then((v) => _cachedRatings = v, onError: (_) {}),
-      UserService.getUserMovieReviews(userId)
-          .then((v) => _cachedReviews = v, onError: (_) {}),
-      TrendingService.getTrendingMovies()
-          .then((v) => _cachedTrending = v, onError: (_) {}),
-      _movieService
-          .getNowPlayingMovies(region: region)
-          .then((v) => _cachedNowPlaying = v, onError: (_) {}),
-      NotificationService.getNotifications(userId).then(
-          (v) => _unreadNotificationCount = v.where((n) => !n.isRead).length,
-          onError: (_) {}),
-    ]).timeout(const Duration(seconds: 10), onTimeout: () => []).then((_) {
+    _prefetchCoordinator.prefetch(userId, region: region).then((snapshot) {
+      _applyPrefetchSnapshot(snapshot);
       logger.i('[AuthProvider] Prefetch complete for $userId');
       _isPrefetching = false;
-      _notifPollTimer?.cancel();
-      _notifPollTimer = Timer.periodic(
-        const Duration(seconds: 30),
-        (_) => refreshNotificationCount(),
+      _notificationPoller.start(
+        interval: const Duration(seconds: 30),
+        onTick: refreshNotificationCount,
       );
 
       // Initialise push notifications now that we have a valid user and the
@@ -293,6 +278,18 @@ class AuthProvider extends ChangeNotifier {
     });
   }
 
+  void _applyPrefetchSnapshot(AuthPrefetchSnapshot snapshot) {
+    _cachedActivity = snapshot.activity ?? _cachedActivity;
+    _cachedFriends = snapshot.friends ?? _cachedFriends;
+    _cachedFriendsActivity = snapshot.friendsActivity ?? _cachedFriendsActivity;
+    _cachedRatings = snapshot.ratings ?? _cachedRatings;
+    _cachedReviews = snapshot.reviews ?? _cachedReviews;
+    _cachedTrending = snapshot.trending ?? _cachedTrending;
+    _cachedNowPlaying = snapshot.nowPlaying ?? _cachedNowPlaying;
+    _unreadNotificationCount =
+        snapshot.unreadNotificationCount ?? _unreadNotificationCount;
+  }
+
   /// Directly updates the unread count from already-fetched notification data.
   /// Use this to keep the badge in sync without making an extra API call.
   void setUnreadNotificationCount(int count) {
@@ -304,12 +301,10 @@ class AuthProvider extends ChangeNotifier {
   Future<void> refreshNotificationCount() async {
     final userId = _dbUser?.id;
     if (userId == null) return;
-    try {
-      final notifications = await NotificationService.getNotifications(userId);
-      _unreadNotificationCount = notifications.where((n) => !n.isRead).length;
+    final count = await _prefetchCoordinator.fetchUnreadCount(userId);
+    if (count != null) {
+      _unreadNotificationCount = count;
       notifyListeners();
-    } catch (e) {
-      logger.w('[AuthProvider] notification count refresh error: $e');
     }
   }
 
@@ -633,6 +628,14 @@ class AuthProvider extends ChangeNotifier {
       logger.e('Error refreshing database user: $e',
           error: e, stackTrace: stackTrace);
     }
+  }
+
+  @override
+  void dispose() {
+    _notificationPoller.stop();
+    _authStateSubscription?.cancel();
+    _authStatusNotifier.dispose();
+    super.dispose();
   }
 }
 

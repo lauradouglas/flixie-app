@@ -8,6 +8,7 @@ import '../providers/auth_provider.dart';
 import '../services/request_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_logger.dart';
+import '../widgets/flixie_page.dart';
 
 const List<String> _kMonths = [
   'Jan',
@@ -126,11 +127,9 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
+    return FlixiePageScaffold(
+      appBar: FlixieTitleAppBar(
         backgroundColor: FlixieColors.background,
-        elevation: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

@@ -11,16 +11,17 @@ import '../models/movie_short.dart';
 import '../models/activity_list_item.dart';
 import '../models/trending_groups.dart';
 import '../models/watchlist_movie.dart';
-import '../services/friend_service.dart';
+import '../presentation/shared/friend_actions_controller.dart';
+import '../presentation/shared/watchlist_actions_controller.dart';
 import '../services/group_service.dart';
 import '../providers/auth_provider.dart';
 import '../services/movie_service.dart';
 import '../services/recommendation_service.dart';
 import '../services/trending_service.dart';
-import '../services/user_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_logger.dart';
 import '../utils/skeleton.dart';
+import '../widgets/flixie_page.dart';
 import '../widgets/flixie_wordmark.dart';
 import 'home/featured_card.dart';
 import 'home/greeting_header.dart';
@@ -58,6 +59,9 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   String? _loadedForUserId;
   Timer? _greetingTimer;
   AuthProvider? _authProvider;
+  final FriendActionsController _friendActions = FriendActionsController.instance;
+  final WatchlistActionsController _watchlistActions =
+      WatchlistActionsController.instance;
   final PageController _heroPageController = PageController();
   int _heroPage = 0;
 
@@ -129,7 +133,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         TrendingService.getTrendingMovies(),
         movieService.getNowPlayingMovies(region: region),
         if (user != null)
-          FriendService.getFriendsActivityLists(user.id)
+          _friendActions.getFriendsActivityLists(user.id)
         else
           Future.value([]),
         if (user != null)
@@ -144,7 +148,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         else
           Future.value(<MovieShort>[]),
         if (user != null)
-          UserService.getUserWatchlist(user.id)
+          _watchlistActions.getUserWatchlist(user.id)
               .catchError((_) => <WatchlistMovie>[])
         else
           Future.value(<WatchlistMovie>[]),
@@ -247,9 +251,9 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     });
     try {
       if (inWatchlist) {
-        await UserService.removeFromWatchlist(user.id, movieId);
+        await _watchlistActions.removeFromWatchlist(user.id, movieId);
       } else {
-        await UserService.addToWatchlist(user.id, movieId);
+        await _watchlistActions.addToWatchlist(user.id, movieId);
       }
     } catch (e) {
       logger.e('[HomeScreen] watchlist toggle error: $e');
@@ -297,7 +301,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         ? user!.firstName!.trim()
         : user?.username;
 
-    return Scaffold(
+    return FlixiePageScaffold(
       backgroundColor: FlixieColors.background,
       appBar: AppBar(
         backgroundColor: FlixieColors.background,
@@ -886,12 +890,12 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     setState(() => _watchlistUpdatesInFlight.add(movieId));
     try {
       if (currentlyInWatchlist) {
-        await UserService.removeFromWatchlist(userId, movieId);
+        await _watchlistActions.removeFromWatchlist(userId, movieId);
         auth.updateUserList(
           movieWatchlist: existing.where((w) => w.movieId != movieId).toList(),
         );
       } else {
-        await UserService.addToWatchlist(userId, movieId);
+        await _watchlistActions.addToWatchlist(userId, movieId);
         final now = DateTime.now().toIso8601String();
         auth.updateUserList(
           movieWatchlist: [
@@ -1071,9 +1075,9 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
 
     Future<void> commitWatchedEntry() async {
       try {
-        await UserService.addToWatched(userId, movieId);
+        await _watchlistActions.addToWatched(userId, movieId);
         if (isInWatchlist) {
-          await UserService.removeFromWatchlist(userId, movieId);
+          await _watchlistActions.removeFromWatchlist(userId, movieId);
           final currentWatchlist = auth.dbUser?.movieWatchlist ?? [];
           auth.updateUserList(
             movieWatchlist: currentWatchlist

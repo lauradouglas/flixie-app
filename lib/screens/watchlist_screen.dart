@@ -8,6 +8,7 @@ import '../services/user_service.dart';
 import '../models/favorite_movie.dart';
 import '../models/watched_movie.dart';
 import '../models/watchlist_movie.dart';
+import '../widgets/flixie_page.dart';
 import 'movie_detail/add_to_list_sheet.dart';
 import 'movie_detail/watch_request_sheet.dart';
 import 'watchlist/filter_sheet.dart';
@@ -614,12 +615,8 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: false,
+    return FlixiePageScaffold(
+      appBar: FlixieTitleAppBar(
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: const [

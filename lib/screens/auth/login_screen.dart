@@ -19,7 +19,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  bool _obscurePassword = true;
   bool _rememberMe = true;
 
   @override
@@ -74,7 +73,7 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            AuthTextField(
+            AppTextField(
               controller: _emailController,
               label: 'Email or Username',
               prefixIcon: Icons.mail_outline_rounded,
@@ -92,26 +91,11 @@ class _LoginScreenState extends State<LoginScreen> {
               },
             ),
             const SizedBox(height: 16),
-            AuthTextField(
+            PasswordField(
               controller: _passwordController,
               label: 'Password',
-              prefixIcon: Icons.lock_outline_rounded,
               textInputAction: TextInputAction.done,
-              obscureText: _obscurePassword,
-              autofillHints: const [AutofillHints.password],
               onFieldSubmitted: (_) => _submit(),
-              suffixIcon: IconButton(
-                tooltip: _obscurePassword ? 'Show password' : 'Hide password',
-                onPressed: () => setState(
-                  () => _obscurePassword = !_obscurePassword,
-                ),
-                icon: Icon(
-                  _obscurePassword
-                      ? Icons.visibility_outlined
-                      : Icons.visibility_off_outlined,
-                  color: FlixieColors.light,
-                ),
-              ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter your password.';
@@ -159,7 +143,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ],
             ),
             const SizedBox(height: 20),
-            AuthPrimaryButton(
+            PrimaryButton(
               label: 'Sign In',
               isLoading: isLoading,
               onPressed: isLoading ? null : _submit,
