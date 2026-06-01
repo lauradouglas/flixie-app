@@ -97,7 +97,7 @@ ios/                             # iOS-specific configuration
 - UI flows should go through `presentation` controllers/use-cases/repositories, not direct `UserService` or `FriendService` calls.
 - Dependency direction: `presentation -> domain`, `data -> domain`, `data -> services`.
 - Shared authenticated screen chrome uses `FlixiePageScaffold`, `FlixieTitleAppBar`, and `FlixieSectionHeader`.
-- See `/tmp/workspace/lauradouglas/flixie-app/docs/architecture.md` for conventions, migration status, and PR checklist guardrails.
+- See `docs/architecture.md` for conventions, migration status, and PR checklist guardrails.
 
 ## Authentication Flow
 
