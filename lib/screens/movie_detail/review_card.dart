@@ -30,8 +30,6 @@ const _kReactions = [
 ];
 
 class _ReviewCardState extends State<ReviewCard> {
-  final ReviewReactionsController _reviewReactions =
-      ReviewReactionsController.instance;
   late Map<String, int> _reactions;
   String? _myReaction;
 
@@ -330,6 +328,8 @@ class _ReviewDetailSheet extends StatefulWidget {
 }
 
 class _ReviewDetailSheetState extends State<_ReviewDetailSheet> {
+  final ReviewReactionsController _reviewReactions =
+      ReviewReactionsController.instance;
   late Map<String, int> _reactions;
   late String? _myReaction;
   String? _reactingType;

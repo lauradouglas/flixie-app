@@ -49,7 +49,8 @@ class _StatsScreenState extends State<StatsScreen> {
   @override
   void initState() {
     super.initState();
-    final raw = context.read<AuthProvider>().dbUser?.watchedMovies ?? <WatchedMovie>[];
+    final raw =
+        context.read<AuthProvider>().dbUser?.watchedMovies ?? <WatchedMovie>[];
     _allEntries = raw.where((entry) => entry.removed != true).map((entry) {
       WatchlistMovieDetails? movie;
       if (entry.movie != null) {
@@ -138,7 +139,8 @@ class _StatsScreenState extends State<StatsScreen> {
             StatsCard(
               label: 'Most Active',
               value: mostActive >= 0 ? _kMonthNames[mostActive] : '—',
-              subtitle: mostActive >= 0 ? '${buckets[mostActive]} movies' : null,
+              subtitle:
+                  mostActive >= 0 ? '${buckets[mostActive]} movies' : null,
               icon: Icons.calendar_month_outlined,
             ),
           ],
@@ -299,6 +301,28 @@ class _StatsScreenState extends State<StatsScreen> {
                   icon: Icon(Icons.auto_graph_outlined),
                 ),
               ],
+              style: ButtonStyle(
+                foregroundColor: WidgetStateProperty.resolveWith((states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return FlixieColors.navy;
+                  }
+                  return FlixieColors.light;
+                }),
+                iconColor: WidgetStateProperty.resolveWith((states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return FlixieColors.navy;
+                  }
+                  return FlixieColors.light;
+                }),
+                textStyle: WidgetStateProperty.resolveWith((states) {
+                  return TextStyle(
+                    fontSize: 15,
+                    fontWeight: states.contains(WidgetState.selected)
+                        ? FontWeight.w700
+                        : FontWeight.w600,
+                  );
+                }),
+              ),
               selected: {_selectedTab},
               showSelectedIcon: false,
               onSelectionChanged: (selection) {
