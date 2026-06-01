@@ -40,7 +40,7 @@ class AuthProvider extends ChangeNotifier {
     AuthPrefetchCoordinator? prefetchCoordinator,
   }) : _prefetchCoordinator =
             prefetchCoordinator ?? AuthPrefetchCoordinator(movieService: _movieService) {
-    _authService.authStateChanges.listen((user) {
+    _authStateSubscription = _authService.authStateChanges.listen((user) {
       unawaited(_onAuthStateChanged(user));
     });
   }
@@ -50,6 +50,7 @@ class AuthProvider extends ChangeNotifier {
   final AuthPrefetchCoordinator _prefetchCoordinator;
   final AuthNotificationPoller _notificationPoller = AuthNotificationPoller();
   final _authStatusNotifier = _AuthStatusNotifier();
+  StreamSubscription<firebase_auth.User?>? _authStateSubscription;
 
   AuthStatus _status = AuthStatus.unknown;
   firebase_auth.User? _firebaseUser;
@@ -632,6 +633,8 @@ class AuthProvider extends ChangeNotifier {
   @override
   void dispose() {
     _notificationPoller.stop();
+    _authStateSubscription?.cancel();
+    _authStatusNotifier.dispose();
     super.dispose();
   }
 }

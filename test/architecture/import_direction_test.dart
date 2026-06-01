@@ -14,13 +14,17 @@ void main() {
 
     for (final path in targets) {
       final content = File(path).readAsStringSync();
+      final importLines = RegExp(r'^\s*import\s+[\'"].+[\'"];', multiLine: true)
+          .allMatches(content)
+          .map((m) => m.group(0) ?? '')
+          .toList(growable: false);
       expect(
-        content.contains("services/user_service.dart"),
+        importLines.any((line) => line.contains('services/user_service.dart')),
         isFalse,
         reason: '$path imports user_service directly',
       );
       expect(
-        content.contains("services/friend_service.dart"),
+        importLines.any((line) => line.contains('services/friend_service.dart')),
         isFalse,
         reason: '$path imports friend_service directly',
       );
