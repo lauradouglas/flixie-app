@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
-import '../widgets/flixie_wordmark.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -37,67 +36,44 @@ class _SplashScreenState extends State<SplashScreen>
       backgroundColor: FlixieColors.background,
       body: FadeTransition(
         opacity: _fadeIn,
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Logo
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: FlixieColors.primary.withValues(alpha: 0.4),
-                      blurRadius: 32,
-                      spreadRadius: 4,
-                    ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(
+              'assets/splash/splash.jpg',
+              fit: BoxFit.cover,
+            ),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.22),
+                    Colors.black.withValues(alpha: 0.42),
                   ],
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: Image.asset(
-                    'assets/icon/logo_icon.png',
-                    fit: BoxFit.cover,
+              ),
+            ),
+            const SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(bottom: 30),
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        FlixieColors.primary,
+                      ),
+                    ),
                   ),
                 ),
               ),
-
-              const SizedBox(height: 20),
-
-              // App name
-              const FlixieWordmark(
-                fontSize: 32,
-                textAlign: TextAlign.center,
-              ),
-
-              const SizedBox(height: 8),
-
-              const Text(
-                'Your movie world',
-                style: TextStyle(
-                  color: FlixieColors.medium,
-                  fontSize: 14,
-                  letterSpacing: 0.4,
-                ),
-              ),
-
-              const SizedBox(height: 48),
-
-              // Loading indicator
-              SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    FlixieColors.primary.withValues(alpha: 0.8),
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
