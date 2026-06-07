@@ -44,6 +44,7 @@ GoRouter buildRouter(AuthProvider authProvider) {
     initialLocation: '/',
     redirect: (context, state) {
       final status = authProvider.status;
+      final hasCompletedSetup = authProvider.dbUser?.completedSetup ?? false;
       final isAuthRoute = state.matchedLocation.startsWith('/auth');
       final isSplash = state.matchedLocation == '/splash';
       final isOnboarding = state.matchedLocation == '/onboarding';
@@ -58,8 +59,13 @@ GoRouter buildRouter(AuthProvider authProvider) {
       }
 
       if (status == AuthStatus.authenticated) {
-        // Authenticated users should always land in the app, not auth or
-        // sign-up flow screens restored from a previous session.
+        // New users must complete onboarding before entering the app shell.
+        if (!hasCompletedSetup) {
+          if (isOnboarding) return null;
+          return '/onboarding';
+        }
+
+        // Completed users should land in the app shell, not auth/splash/onboarding.
         if (isAuthRoute || isSplash || isOnboarding) {
           return '/';
         }

@@ -92,7 +92,7 @@ class _FavoriteGenresSheetState extends State<FavoriteGenresSheet> {
     return Container(
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
       decoration: const BoxDecoration(
-        color: Color(0xFF1B3258),
+        color: FlixieColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(

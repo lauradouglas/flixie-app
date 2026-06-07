@@ -5,6 +5,7 @@ import 'package:flixie_app/models/movie_list_movie.dart';
 import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'package:flixie_app/models/movie_wrapped.dart';
 import 'package:flixie_app/models/review.dart';
+import 'package:flixie_app/models/watch_provider.dart';
 
 import '../models/user.dart';
 import '../models/favorite_movie.dart';
@@ -637,5 +638,28 @@ class UserService {
   static Future<MovieWrapped> getMovieWrapped(String userId, int year) async {
     final data = await ApiClient.get('/users/$userId/movie/wrapped/$year');
     return MovieWrapped.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<List<WatchProvider>> getUserWatchProviders(
+      String userId) async {
+    final data = await ApiClient.get('/users/$userId/watch-providers');
+
+    final list = data['watchProviders'] as List<dynamic>;
+
+    return list
+        .map((item) => WatchProvider.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  static Future<void> updateUserWatchProviders(
+    String userId,
+    List<int> watchProviderIds,
+  ) async {
+    await ApiClient.put(
+      '/users/$userId/watch-providers',
+      body: {
+        'watchProviderIds': watchProviderIds,
+      },
+    );
   }
 }

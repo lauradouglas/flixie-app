@@ -117,6 +117,14 @@ class User {
   bool isMovieFavorite(int movieId) =>
       favoriteMovies?.any((item) => item.movieId == movieId) ?? false;
 
+  String? get countryAbbreviation => _countryString('abbreviation');
+
+  String? _countryString(String key) {
+    final value = country?[key];
+    if (value is String && value.trim().isNotEmpty) return value;
+    return null;
+  }
+
   bool isPersonFavorite(int personId) {
     if (favoritePeople == null) return false;
     try {

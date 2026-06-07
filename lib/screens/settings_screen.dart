@@ -15,6 +15,7 @@ import 'settings/constants.dart';
 import 'settings/favorite_genres_sheet.dart';
 import 'settings/icon_color_sheet.dart';
 import 'settings/settings_tile.dart';
+import 'settings/watch_providers_sheet.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -74,6 +75,11 @@ class SettingsScreen extends StatelessWidget {
               //   onTap: () {},
               // ),
               SettingsTile(
+                icon: Icons.live_tv_outlined,
+                label: 'Watch Providers',
+                onTap: () => _showWatchProvidersSheet(context),
+              ),
+              SettingsTile(
                 icon: Icons.tune_outlined,
                 label: 'Content Preferences',
                 onTap: () => _showFavoriteGenresSheet(context),
@@ -104,6 +110,12 @@ class SettingsScreen extends StatelessWidget {
                 icon: Icons.info_outline,
                 label: 'About Flixie',
                 onTap: () => _showAboutDialog(context),
+                isLast: true,
+              ),
+              SettingsTile(
+                icon: Icons.privacy_tip_outlined,
+                label: 'Privacy Policy',
+                onTap: () => _showPrivacyPolicySheet(context),
                 isLast: true,
               ),
             ],
@@ -176,6 +188,15 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
+  void _showPrivacyPolicySheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _PrivacyPolicySheet(),
+    );
+  }
+
   Future<void> _sendFeedback() async {
     final uri =
         Uri.parse('mailto:support@flixie.app?subject=Flixie%20Feedback');
@@ -190,6 +211,18 @@ class SettingsScreen extends StatelessWidget {
       applicationName: 'Flixie',
       applicationVersion: '1.0.1',
       applicationLegalese: '© 2024 Flixie',
+    );
+  }
+
+  void _showWatchProvidersSheet(BuildContext context) {
+    final dbUser = context.read<AuthProvider>().dbUser;
+    if (dbUser == null) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => WatchProvidersSheet(userId: dbUser.id),
     );
   }
 }
@@ -394,8 +427,8 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
 
       // Only send changed fields — API takes one field at a time
       if (username != widget.user.username) {
-        updated =
-            await _settingsController.updateUserField(userId, 'username', username);
+        updated = await _settingsController.updateUserField(
+            userId, 'username', username);
       }
       if (bio != (widget.user.bio ?? '')) {
         updated = await _settingsController.updateUserField(userId, 'bio', bio);
@@ -432,7 +465,7 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
     return Container(
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
       decoration: const BoxDecoration(
-        color: Color(0xFF1B3258),
+        color: FlixieColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(
@@ -525,8 +558,8 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
               GestureDetector(
                 onTap: _pickCountry,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 16),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   decoration: BoxDecoration(
                     color: FlixieColors.tabBarBackgroundFocused,
                     borderRadius: BorderRadius.circular(10),
@@ -587,8 +620,7 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
 // ---------------------------------------------------------------------------
 
 class _SettingsCountryPickerSheet extends StatefulWidget {
-  const _SettingsCountryPickerSheet(
-      {required this.countries, this.selected});
+  const _SettingsCountryPickerSheet({required this.countries, this.selected});
 
   final List<Country> countries;
   final Country? selected;
@@ -632,7 +664,7 @@ class _SettingsCountryPickerSheetState
     return Container(
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
       decoration: const BoxDecoration(
-        color: Color(0xFF1B3258),
+        color: FlixieColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(
@@ -694,9 +726,8 @@ class _SettingsCountryPickerSheetState
                         color: isSelected
                             ? FlixieColors.primaryTint
                             : FlixieColors.textPrimary,
-                        fontWeight: isSelected
-                            ? FontWeight.w700
-                            : FontWeight.normal,
+                        fontWeight:
+                            isSelected ? FontWeight.w700 : FontWeight.normal,
                       ),
                     ),
                     trailing: isSelected
@@ -706,6 +737,185 @@ class _SettingsCountryPickerSheetState
                     onTap: () => Navigator.of(context).pop(country),
                   );
                 },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PrivacyPolicySheet extends StatelessWidget {
+  const _PrivacyPolicySheet();
+
+  Widget _section(String title, String body) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            body,
+            style: const TextStyle(
+              color: FlixieColors.light,
+              fontSize: 14,
+              height: 1.6,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.sizeOf(context).height * 0.9,
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+      decoration: const BoxDecoration(
+        color: FlixieColors.surface,
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(20),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: FlixieColors.medium,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Privacy Policy',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(
+                    Icons.close,
+                    color: FlixieColors.medium,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: FlixieColors.tabBarBackgroundFocused,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'Last Updated: 7 June 2026',
+                        style: TextStyle(
+                          color: FlixieColors.medium,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    _section(
+                      'Welcome to Flixie',
+                      'This Privacy Policy explains how Flixie collects, uses, stores, and protects your information when you use the app.',
+                    ),
+                    _section(
+                      'Information We Collect',
+                      'When you create an account, we collect your first name, last name, email address, username, and authentication information through Firebase Authentication.\n\n'
+                          'We may also store information that you choose to add to Flixie including watchlists, watched history, ratings, reviews, favourite movies, favourite TV shows, favourite genres, selected watch providers, profile preferences, friends, groups, and watch requests.',
+                    ),
+                    _section(
+                      'How We Use Your Information',
+                      'We use your information to:\n\n'
+                          '• Create and manage your account\n'
+                          '• Personalise your experience\n'
+                          '• Store your watchlists, ratings and preferences\n'
+                          '• Enable social features such as friends and groups\n'
+                          '• Improve Flixie and develop new features\n'
+                          '• Respond to support requests',
+                    ),
+                    _section(
+                      'TMDB Integration',
+                      'Flixie uses data provided by The Movie Database (TMDB).\n\n'
+                          'When you submit movie or TV ratings through Flixie, ratings may be sent to TMDB using anonymous guest sessions. These ratings are not linked to your personal identity by Flixie when submitted.\n\n'
+                          'Flixie is not endorsed, sponsored, or certified by TMDB.',
+                    ),
+                    _section(
+                      'Third-Party Services',
+                      'Flixie uses trusted third-party services to operate the platform, including:\n\n'
+                          '• Firebase Authentication\n'
+                          '• Firebase Cloud Messaging\n'
+                          '• The Movie Database (TMDB)\n'
+                          '• Hosting and infrastructure providers\n\n'
+                          'These services may process limited information required to provide their functionality.',
+                    ),
+                    _section(
+                      'Sharing of Information',
+                      'We do not sell your personal information.\n\n'
+                          'Information is only shared with third-party providers where necessary to operate Flixie or where required by law.',
+                    ),
+                    _section(
+                      'Data Storage & Security',
+                      'We take reasonable technical and organisational measures to protect your information from unauthorised access, loss, misuse, or disclosure. However, no online service can guarantee absolute security.',
+                    ),
+                    _section(
+                      'Data Retention',
+                      'We retain your information while your account remains active or as necessary to provide Flixie services.\n\n'
+                          'If you request account deletion, personal information will be deleted or anonymised within a reasonable period unless retention is required for legal or operational reasons.',
+                    ),
+                    _section(
+                      'Your Rights',
+                      'Depending on your location, you may have rights to:\n\n'
+                          '• Access your personal information\n'
+                          '• Correct inaccurate information\n'
+                          '• Request deletion of your data\n'
+                          '• Restrict or object to certain processing activities\n'
+                          '• Request a copy of your information',
+                    ),
+                    _section(
+                      'Children\'s Privacy',
+                      'Flixie is not intended for children under the age of 13. We do not knowingly collect personal information from children under 13.',
+                    ),
+                    _section(
+                      'Changes to this Policy',
+                      'We may update this Privacy Policy from time to time. Any updates will be posted within the application and become effective immediately upon publication.',
+                    ),
+                    _section(
+                      'Contact Us',
+                      'If you have any questions regarding this Privacy Policy, please contact:\n\nflixieadmin@gmail.com',
+                    ),
+                  ],
+                ),
               ),
             ),
           ],

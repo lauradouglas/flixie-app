@@ -1,35 +1,39 @@
 class WatchProvider {
-  final String logoPath;
-  final int providerId;
+  final int id;
   final String providerName;
   final int displayPriority;
+  final String logoPath;
+  final bool tvShows;
+  final bool movies;
+  final bool isVisible;
+  final bool supportsGb;
+  final bool supportsUs;
 
   const WatchProvider({
-    required this.logoPath,
-    required this.providerId,
+    required this.id,
     required this.providerName,
     required this.displayPriority,
+    required this.logoPath,
+    required this.tvShows,
+    required this.movies,
+    required this.isVisible,
+    required this.supportsGb,
+    required this.supportsUs,
   });
 
   factory WatchProvider.fromJson(Map<String, dynamic> json) {
     return WatchProvider(
-      logoPath: json['logoPath'] as String,
-      providerId: json['providerId'] is int
-          ? json['providerId']
-          : int.parse(json['providerId'].toString()),
-      providerName: json['providerName'] as String,
-      displayPriority: json['displayPriority'] is int
-          ? json['displayPriority']
-          : int.parse(json['displayPriority'].toString()),
+      id: json['id'],
+      providerName: json['providerName'],
+      displayPriority: json['displayPriority'],
+      logoPath: json['logoPath'],
+      tvShows: json['tvShows'] ?? false,
+      movies: json['movies'] ?? false,
+      isVisible: json['isVisible'] ?? true,
+      supportsGb: json['supportsGb'] ?? false,
+      supportsUs: json['supportsUs'] ?? false,
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'logoPath': logoPath,
-      'providerId': providerId,
-      'providerName': providerName,
-      'displayPriority': displayPriority,
-    };
-  }
+  String get logoUrl => 'https://image.tmdb.org/t/p/w92$logoPath';
 }

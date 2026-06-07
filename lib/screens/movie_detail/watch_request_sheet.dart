@@ -107,9 +107,9 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
     final hasGroups = _groups.isNotEmpty;
 
     return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+      decoration: const BoxDecoration(
+        color: FlixieColors.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Padding(
         padding: EdgeInsets.fromLTRB(
