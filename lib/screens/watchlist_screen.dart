@@ -12,6 +12,8 @@ import '../widgets/flixie_page.dart';
 import 'movie_detail/add_to_list_sheet.dart';
 import 'movie_detail/watch_request_sheet.dart';
 import 'watchlist/filter_sheet.dart';
+import '../models/watch_provider.dart';
+import '../services/movie_service.dart';
 
 class WatchlistScreen extends StatefulWidget {
   const WatchlistScreen({super.key});
@@ -25,17 +27,22 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
 
   List<WatchlistMovie> _allWatchlist = [];
   List<WatchlistMovie> _filteredWatchlist = [];
-  List<dynamic> _showWatchlist = [];
   bool _loading = true;
   String _sortBy =
       'recent'; // recent, titleAsc, titleDesc, ratingDesc, yearAsc, yearDesc
-  int _selectedTab = 0; // 0 = All, 1 = Movies, 2 = Upcoming, 3 = Watched
+  int _selectedTab = 0; // 0 = All, 1 = Watch now, 2 = Upcoming, 3 = Watched
 
   // Active filters
   String? _filterGenre; // null = all genres
   double? _filterMinRating; // null = no min
   int? _filterYear; // null = all years
   int? _filterMaxRuntime; // null = any length, value in minutes
+
+  final Map<int, List<WatchProvider>> _movieWatchProviders = {};
+  final Map<int, bool> _canWatchNowByMovieId = {};
+  Set<int> _userWatchProviderIds = {};
+  bool _loadingWatchProviderAvailability = false;
+  int _watchProviderAvailabilityRequest = 0;
 
   AuthProvider? _authProvider;
 
@@ -71,8 +78,6 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
   void _loadWatchlist() {
     final authProvider = context.read<AuthProvider>();
     final userWatchlist = authProvider.dbUser?.movieWatchlist;
-    _showWatchlist =
-        List<dynamic>.from(authProvider.dbUser?.showWatchlist ?? []);
 
     if (userWatchlist == null) {
       setState(() => _loading = false);
@@ -86,13 +91,84 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
 
       setState(() {
         _allWatchlist = watchlist;
+        _movieWatchProviders.clear();
+        _canWatchNowByMovieId.clear();
         _filterWatchlist();
         _loading = false;
       });
+
+      _loadWatchProviderAvailability(watchlist);
     } catch (e) {
       debugPrint('Error loading watchlist: $e');
       setState(() => _loading = false);
     }
+  }
+
+  Future<void> _loadWatchProviderAvailability(
+      List<WatchlistMovie> watchlist) async {
+    final requestId = ++_watchProviderAvailabilityRequest;
+    final authProvider = context.read<AuthProvider>();
+    final movieService = context.read<MovieService>();
+    final user = authProvider.dbUser;
+    if (user == null || watchlist.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _userWatchProviderIds = {};
+          _movieWatchProviders.clear();
+          _canWatchNowByMovieId.clear();
+          _loadingWatchProviderAvailability = false;
+        });
+      }
+      return;
+    }
+
+    try {
+      setState(() => _loadingWatchProviderAvailability = true);
+      final userProviders = await UserService.getUserWatchProviders(user.id);
+      final userProviderIds = userProviders.map((p) => p.id).toSet();
+      final region = user.countryAbbreviation ?? 'GB';
+      final movieIds = watchlist.map((w) => w.movieId).toSet().toList();
+
+      final results = await Future.wait(movieIds.map((movieId) async {
+        try {
+          final providers =
+              await movieService.getMovieWatchProviders(movieId, region);
+          final canWatchNow = providers
+              .any((p) => p.isStreaming && userProviderIds.contains(p.id));
+          return (movieId, providers, canWatchNow);
+        } catch (_) {
+          return (movieId, <WatchProvider>[], false);
+        }
+      }));
+
+      if (!mounted || requestId != _watchProviderAvailabilityRequest) return;
+
+      setState(() {
+        _userWatchProviderIds = userProviderIds;
+        _movieWatchProviders
+          ..clear()
+          ..addEntries(results.map((r) => MapEntry(r.$1, r.$2)));
+        _canWatchNowByMovieId
+          ..clear()
+          ..addEntries(results.map((r) => MapEntry(r.$1, r.$3)));
+        _loadingWatchProviderAvailability = false;
+      });
+
+      _filterWatchlist();
+    } catch (e) {
+      debugPrint('Error loading watch provider availability: $e');
+      if (!mounted || requestId != _watchProviderAvailabilityRequest) return;
+      setState(() => _loadingWatchProviderAvailability = false);
+    }
+  }
+
+  bool _isAvailableOnUserProviders(int movieId) {
+    final cached = _canWatchNowByMovieId[movieId];
+    if (cached != null) return cached;
+
+    final providers = _movieWatchProviders[movieId] ?? const <WatchProvider>[];
+    return providers.any((provider) =>
+        provider.isStreaming && _userWatchProviderIds.contains(provider.id));
   }
 
   void _filterWatchlist() {
@@ -470,17 +546,6 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     );
   }
 
-  String _totalRuntimeLabel() {
-    final total = _allWatchlist.fold<int>(
-        0, (sum, item) => sum + (item.movie?.runtime ?? 0));
-    if (total == 0) return '';
-    final hours = total ~/ 60;
-    final minutes = total % 60;
-    if (hours == 0) return '${minutes}m total';
-    if (minutes == 0) return '${hours}h total';
-    return '${hours}h ${minutes}m total';
-  }
-
   String _sortByLabel() {
     switch (_sortBy) {
       case 'recent':
@@ -573,7 +638,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
 
   Widget _buildSortFilterRow() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Row(
         children: [
           const Text('Sort by ',
@@ -613,13 +678,52 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     );
   }
 
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      child: TextField(
+        controller: _searchController,
+        style: const TextStyle(color: FlixieColors.textPrimary, fontSize: 15),
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          hintText: 'Search watchlist',
+          hintStyle: const TextStyle(color: FlixieColors.medium),
+          prefixIcon: const Icon(Icons.search_rounded,
+              color: FlixieColors.medium, size: 21),
+          suffixIcon: _searchController.text.isEmpty
+              ? null
+              : IconButton(
+                  tooltip: 'Clear search',
+                  icon: const Icon(Icons.close_rounded,
+                      color: FlixieColors.medium, size: 20),
+                  onPressed: () => _searchController.clear(),
+                ),
+          filled: true,
+          fillColor: FlixieColors.surfaceElevated,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(
+              color: Colors.white.withValues(alpha: 0.08),
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: FlixieColors.primary),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return FlixiePageScaffold(
       appBar: FlixieTitleAppBar(
-        title: Row(
+        title: const Row(
           mainAxisSize: MainAxisSize.min,
-          children: const [
+          children: [
             Icon(Icons.bookmark_border_rounded,
                 color: FlixieColors.primary, size: 26),
             SizedBox(width: 8),
@@ -665,21 +769,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(color: FlixieColors.primary))
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-                  child: _WatchlistTabs(
-                    selectedIndex: _selectedTab,
-                    onChanged: (i) => setState(() => _selectedTab = i),
-                  ),
-                ),
-                if (_allWatchlist.isNotEmpty) _buildStatsRow(),
-                if (_allWatchlist.isNotEmpty) _buildSortFilterRow(),
-                Expanded(child: _buildContent()),
-              ],
-            ),
+          : _buildContent(),
     );
   }
 
@@ -695,214 +785,134 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     }
     if (_selectedTab == 2) {
       final today = DateTime.now();
-      return _filteredWatchlist.where((item) {
+      final upcoming = _filteredWatchlist.where((item) {
         final date = DateTime.tryParse(item.movie?.releaseDate ?? '');
         return date != null && date.isAfter(today);
       }).toList();
+      upcoming.sort((a, b) {
+        final dateA = DateTime.tryParse(a.movie?.releaseDate ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final dateB = DateTime.tryParse(b.movie?.releaseDate ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        return dateA.compareTo(dateB);
+      });
+      return upcoming;
     }
-    // All (0) and Movies (1) show the same list (movie watchlist only; shows are in a separate list)
+    if (_selectedTab == 1) {
+      return _filteredWatchlist
+          .where((item) => _isAvailableOnUserProviders(item.movieId))
+          .toList();
+    }
     return _filteredWatchlist;
   }
 
   Widget _buildContent() {
     final items = _visibleWatchlist();
     final user = context.read<AuthProvider>().dbUser;
+    final hasMovies = _allWatchlist.isNotEmpty;
+
+    final header = <Widget>[
+      _buildSearchBar(),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 0, 10),
+        child: _WatchlistTabs(
+          selectedIndex: _selectedTab,
+          onChanged: (i) => setState(() => _selectedTab = i),
+        ),
+      ),
+      if (hasMovies) _buildStatsRow(),
+      if (hasMovies) _buildSortFilterRow(),
+    ];
 
     if (items.isEmpty) {
       final emptyLabel = switch (_selectedTab) {
+        1 => _loadingWatchProviderAvailability
+            ? 'Checking your providers...'
+            : 'Nothing you can watch right now',
         2 => 'No upcoming titles in your watchlist',
         3 => 'No watched movies in your watchlist',
-        _ => 'Your watchlist is empty',
+        _ => _searchController.text.isNotEmpty
+            ? 'No watchlist matches'
+            : 'Your watchlist is empty',
       };
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              _selectedTab == 3
-                  ? Icons.check_circle_outline
-                  : Icons.movie_outlined,
-              size: 64,
-              color: Colors.grey,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              emptyLabel,
-              style: const TextStyle(color: Colors.grey, fontSize: 16),
-            ),
-            if (_selectedTab == 0) ...[
-              const SizedBox(height: 8),
-              const Text(
-                'Add movies to start building your watchlist',
-                style: TextStyle(color: Colors.grey, fontSize: 14),
-              ),
-            ],
-          ],
-        ),
-      );
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-      itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        final item = items[index];
-        final isWatched = user?.isMovieWatched(item.movieId) ?? false;
-        return WatchlistMovieRow(
-          watchlistItem: item,
-          isWatched: isWatched,
-          onTap: () => context.push('/movies/${item.movieId}'),
-          onMarkAsWatched: () => _markAsWatched(item),
-          onAddToFavourites: () => _addToFavorites(item),
-          onAddToList: () => _showAddToListSheet(item),
-          onRequestToWatch: () => _showWatchRequestSheet(item),
-          onRemove: () => _removeFromWatchlist(item),
-        );
-      },
-    );
-  }
-
-  Widget _buildShowsContent() {
-    final query = _searchController.text.toLowerCase();
-    final shows = _showWatchlist.where((item) {
-      final title = _showTitle(item).toLowerCase();
-      return title.contains(query);
-    }).toList();
-
-    if (shows.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.live_tv_outlined, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
-            Text(
-              'No shows in your watchlist yet',
-              style: TextStyle(color: Colors.grey, fontSize: 16),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-      itemCount: shows.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        final show = shows[index];
-        final title = _showTitle(show);
-        final year = _showYear(show);
-        final posterUrl = _showPosterUrl(show);
-        return InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Show detail navigation is coming soon.'),
-              ),
-            );
-          },
-          child: Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: FlixieColors.tabBarBackgroundFocused,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-            ),
-            child: Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: posterUrl != null
-                      ? CachedNetworkImage(
-                          imageUrl: posterUrl,
-                          width: 60,
-                          height: 86,
-                          fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) => Container(
-                            width: 60,
-                            height: 86,
-                            color: Colors.grey[900],
-                            child:
-                                const Icon(Icons.live_tv, color: Colors.grey),
-                          ),
-                        )
-                      : Container(
-                          width: 60,
-                          height: 86,
-                          color: Colors.grey[900],
-                          child: const Icon(Icons.live_tv, color: Colors.grey),
-                        ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: FlixieColors.light,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        year,
-                        style: const TextStyle(
-                          color: FlixieColors.medium,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
+      return ListView(
+        padding: const EdgeInsets.only(bottom: 24),
+        children: [
+          ...header,
+          SizedBox(
+            height: 320,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    _selectedTab == 3
+                        ? Icons.check_circle_outline
+                        : _selectedTab == 1
+                            ? Icons.play_circle_outline_rounded
+                            : Icons.movie_outlined,
+                    size: 64,
+                    color: Colors.grey,
                   ),
-                ),
-                const Icon(Icons.chevron_right, color: FlixieColors.medium),
-              ],
+                  const SizedBox(height: 16),
+                  Text(
+                    emptyLabel,
+                    style: const TextStyle(color: Colors.grey, fontSize: 16),
+                    textAlign: TextAlign.center,
+                  ),
+                  if (_selectedTab == 0 &&
+                      _searchController.text.isEmpty &&
+                      !hasMovies) ...[
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Add movies to start building your watchlist',
+                      style: TextStyle(color: Colors.grey, fontSize: 14),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
+        ],
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.only(bottom: 20),
+      itemCount: header.length + items.length,
+      separatorBuilder: (context, index) => index < header.length
+          ? const SizedBox.shrink()
+          : const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        if (index < header.length) return header[index];
+
+        final item = items[index - header.length];
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: _buildWatchlistRow(item, user),
         );
       },
     );
   }
 
-  String _showTitle(dynamic item) {
-    if (item is Map<String, dynamic>) {
-      final nested = item['show'] as Map<String, dynamic>?;
-      return (nested?['title'] as String?) ??
-          (item['title'] as String?) ??
-          'Untitled Show';
-    }
-    return 'Untitled Show';
-  }
-
-  String _showYear(dynamic item) {
-    if (item is Map<String, dynamic>) {
-      final nested = item['show'] as Map<String, dynamic>?;
-      final date = (nested?['releaseDate'] as String?) ??
-          (nested?['firstAirDate'] as String?) ??
-          (item['releaseDate'] as String?) ??
-          '';
-      final year = date.split('-').first;
-      if (year.isNotEmpty) return year;
-    }
-    return 'N/A';
-  }
-
-  String? _showPosterUrl(dynamic item) {
-    if (item is Map<String, dynamic>) {
-      final nested = item['show'] as Map<String, dynamic>?;
-      final poster =
-          (nested?['posterPath'] as String?) ?? (item['posterPath'] as String?);
-      if (poster == null || poster.isEmpty) return null;
-      return 'https://image.tmdb.org/t/p/w500$poster';
-    }
-    return null;
+  Widget _buildWatchlistRow(WatchlistMovie item, dynamic user) {
+    final isWatched = user?.isMovieWatched(item.movieId) ?? false;
+    final providers =
+        _movieWatchProviders[item.movieId] ?? const <WatchProvider>[];
+    final canWatchNow = _isAvailableOnUserProviders(item.movieId);
+    return WatchlistMovieRow(
+      watchlistItem: item,
+      isWatched: isWatched,
+      availableProviders: providers,
+      userWatchProviderIds: _userWatchProviderIds,
+      canWatchNow: canWatchNow,
+      onTap: () => context.push('/movies/${item.movieId}'),
+      onMarkAsWatched: () => _markAsWatched(item),
+      onAddToFavourites: () => _addToFavorites(item),
+      onAddToList: () => _showAddToListSheet(item),
+      onRequestToWatch: () => _showWatchRequestSheet(item),
+      onRemove: () => _removeFromWatchlist(item),
+    );
   }
 }
 
@@ -912,29 +922,33 @@ class _WatchlistTabs extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onChanged;
 
-  static const labels = ['All', 'Movies', 'Upcoming', 'Watched'];
+  static const labels = ['All', 'Watch now', 'Upcoming', 'Watched'];
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: List.generate(labels.length, (index) {
-        final selected = selectedIndex == index;
-        return Expanded(
-          child: Padding(
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.only(right: 16),
+      child: Row(
+        children: List.generate(labels.length, (index) {
+          final selected = selectedIndex == index;
+          return Padding(
             padding: EdgeInsets.only(right: index == labels.length - 1 ? 0 : 8),
             child: GestureDetector(
               onTap: () => onChanged(index),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 curve: Curves.easeInOut,
-                padding: const EdgeInsets.symmetric(vertical: 10),
+                constraints: const BoxConstraints(minWidth: 78),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
                   color: selected ? FlixieColors.primary : Colors.transparent,
                   borderRadius: BorderRadius.circular(30),
                   border: Border.all(
                     color: selected
                         ? Colors.transparent
-                        : Colors.white.withValues(alpha: 0.12),
+                        : Colors.white.withValues(alpha: 0.16),
                   ),
                   boxShadow: selected
                       ? [
@@ -957,9 +971,9 @@ class _WatchlistTabs extends StatelessWidget {
                 ),
               ),
             ),
-          ),
-        );
-      }),
+          );
+        }),
+      ),
     );
   }
 }
@@ -967,6 +981,9 @@ class _WatchlistTabs extends StatelessWidget {
 class WatchlistMovieRow extends StatelessWidget {
   final WatchlistMovie watchlistItem;
   final bool isWatched;
+  final List<WatchProvider> availableProviders;
+  final Set<int> userWatchProviderIds;
+  final bool canWatchNow;
   final VoidCallback onTap;
   final VoidCallback onMarkAsWatched;
   final VoidCallback onAddToFavourites;
@@ -978,6 +995,9 @@ class WatchlistMovieRow extends StatelessWidget {
     super.key,
     required this.watchlistItem,
     required this.isWatched,
+    required this.availableProviders,
+    required this.userWatchProviderIds,
+    required this.canWatchNow,
     required this.onTap,
     required this.onMarkAsWatched,
     required this.onAddToFavourites,
@@ -1122,16 +1142,9 @@ class WatchlistMovieRow extends StatelessWidget {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 4),
-                          WatchlistToggleButton(
-                            isInWatchlist: true,
-                            onPressed: onRemove,
-                          ),
                           PopupMenuButton<String>(
                             tooltip: 'More actions',
                             padding: EdgeInsets.zero,
-                            icon: const Icon(Icons.more_horiz_rounded,
-                                color: FlixieColors.medium, size: 20),
                             color: FlixieColors.surfaceElevated,
                             onSelected: (value) {
                               if (value == 'watched') {
@@ -1215,10 +1228,17 @@ class WatchlistMovieRow extends StatelessWidget {
                                 ]),
                               ),
                             ],
+                            child: const SizedBox(
+                              width: 30,
+                              height: 30,
+                              child: Center(
+                                child: Icon(Icons.more_horiz_rounded,
+                                    color: FlixieColors.medium, size: 20),
+                              ),
+                            ),
                           ),
                         ],
                       ),
-                      // Metadata row (year · runtime · genres)
                       if (metaStr.isNotEmpty) ...[
                         const SizedBox(height: 6),
                         Text(
@@ -1232,15 +1252,18 @@ class WatchlistMovieRow extends StatelessWidget {
                           ),
                         ),
                       ],
-                      // Watchlist status pill
-                      const SizedBox(height: 10),
-                      _WatchlistStatusPill(),
+                      const SizedBox(height: 12),
+                      _WatchProvidersInline(
+                        providers: availableProviders,
+                        userWatchProviderIds: userWatchProviderIds,
+                        canWatchNow: canWatchNow,
+                      ),
                       // Added date row
                       if (addedDate.isNotEmpty) ...[
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            Icon(Icons.calendar_today_outlined,
+                            const Icon(Icons.calendar_today_outlined,
                                 size: 13, color: FlixieColors.medium),
                             const SizedBox(width: 5),
                             Text(
@@ -1265,63 +1288,204 @@ class WatchlistMovieRow extends StatelessWidget {
   }
 }
 
-class WatchlistToggleButton extends StatelessWidget {
-  const WatchlistToggleButton({
-    super.key,
-    required this.isInWatchlist,
-    required this.onPressed,
+class _WatchProvidersInline extends StatelessWidget {
+  const _WatchProvidersInline({
+    required this.providers,
+    required this.userWatchProviderIds,
+    required this.canWatchNow,
   });
 
-  final bool isInWatchlist;
-  final VoidCallback onPressed;
+  final List<WatchProvider> providers;
+  final Set<int> userWatchProviderIds;
+  final bool canWatchNow;
 
   @override
   Widget build(BuildContext context) {
-    return IconButton(
-      tooltip: isInWatchlist ? 'Remove from watchlist' : 'Add to watchlist',
-      visualDensity: VisualDensity.compact,
-      iconSize: 22,
-      splashRadius: 20,
-      onPressed: onPressed,
-      icon: Icon(
-        isInWatchlist ? Icons.bookmark_rounded : Icons.bookmark_outline_rounded,
-        color: isInWatchlist ? FlixieColors.warning : FlixieColors.light,
-      ),
+    if (providers.isEmpty) {
+      return const Row(
+        children: [
+          Icon(Icons.tv_off_outlined, size: 13, color: FlixieColors.medium),
+          SizedBox(width: 5),
+          Text(
+            'Not streamable yet',
+            style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+          ),
+        ],
+      );
+    }
+
+    final streamingProviders = providers.where((p) => p.isStreaming).toList();
+    final rentalProviders = providers.where((p) => p.isRental).toList();
+    final displayProviders =
+        streamingProviders.isNotEmpty ? streamingProviders : rentalProviders;
+    final showingRentals =
+        streamingProviders.isEmpty && rentalProviders.isNotEmpty;
+    if (displayProviders.isEmpty) {
+      return const Row(
+        children: [
+          Icon(Icons.tv_off_outlined, size: 13, color: FlixieColors.medium),
+          SizedBox(width: 5),
+          Text(
+            'Not streamable or rentable yet',
+            style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+          ),
+        ],
+      );
+    }
+
+    final sortedProviders = [...displayProviders]..sort((a, b) {
+        final aMatches = userWatchProviderIds.contains(a.id);
+        final bMatches = userWatchProviderIds.contains(b.id);
+        if (aMatches == bMatches) {
+          return a.displayPriority.compareTo(b.displayPriority);
+        }
+        return aMatches ? -1 : 1;
+      });
+    final visibleProviders = sortedProviders.take(8).toList();
+    final overflowCount = sortedProviders.length - visibleProviders.length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          showingRentals
+              ? 'Can rent on:'
+              : canWatchNow
+                  ? 'You can watch on:'
+                  : 'Available on:',
+          style: TextStyle(
+            color: canWatchNow && !showingRentals
+                ? FlixieColors.success
+                : FlixieColors.medium,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            ...visibleProviders.map((provider) {
+              final isUserProvider = userWatchProviderIds.contains(provider.id);
+              return _WatchProviderLogo(
+                provider: provider,
+                isUserProvider: isUserProvider,
+              );
+            }),
+            if (overflowCount > 0)
+              Container(
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: FlixieColors.surfaceElevated,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.08),
+                  ),
+                ),
+                child: Text(
+                  '+$overflowCount',
+                  style: const TextStyle(
+                    color: FlixieColors.medium,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
     );
   }
 }
 
-/// Semi-transparent purple pill showing watchlist status.
-class _WatchlistStatusPill extends StatelessWidget {
-  const _WatchlistStatusPill();
+class _WatchProviderLogo extends StatelessWidget {
+  const _WatchProviderLogo({
+    required this.provider,
+    required this.isUserProvider,
+  });
+
+  final WatchProvider provider;
+  final bool isUserProvider;
+
+  static const _greyscale = ColorFilter.matrix([
+    0.2126,
+    0.7152,
+    0.0722,
+    0,
+    0,
+    0.2126,
+    0.7152,
+    0.0722,
+    0,
+    0,
+    0.2126,
+    0.7152,
+    0.0722,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+  ]);
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: FlixieColors.primary.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: FlixieColors.primary.withValues(alpha: 0.3),
-          width: 0.5,
+    final logo = ClipRRect(
+      borderRadius: BorderRadius.circular(7),
+      child: CachedNetworkImage(
+        imageUrl: provider.logoUrl,
+        width: 30,
+        height: 30,
+        fit: BoxFit.cover,
+        filterQuality: FilterQuality.high,
+        placeholder: (_, __) => Container(
+          width: 30,
+          height: 30,
+          color: FlixieColors.surfaceElevated,
+        ),
+        errorWidget: (_, __, ___) => Container(
+          width: 30,
+          height: 30,
+          color: FlixieColors.surfaceElevated,
+          child: const Icon(Icons.tv_rounded,
+              size: 15, color: FlixieColors.medium),
         ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.bookmark_rounded,
-              size: 13, color: FlixieColors.primary),
-          const SizedBox(width: 5),
-          const Text(
-            'In your watchlist',
-            style: TextStyle(
-              color: FlixieColors.primaryTint,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+    );
+
+    return Tooltip(
+      message: isUserProvider
+          ? provider.providerName
+          : '${provider.providerName} not in your providers',
+      child: Opacity(
+        opacity: isUserProvider ? 1 : 0.42,
+        child: Container(
+          width: 34,
+          height: 34,
+          padding: const EdgeInsets.all(2),
+          decoration: BoxDecoration(
+            color: isUserProvider
+                ? FlixieColors.success.withValues(alpha: 0.16)
+                : FlixieColors.surfaceElevated,
+            borderRadius: BorderRadius.circular(9),
+            border: Border.all(
+              color: isUserProvider
+                  ? FlixieColors.success.withValues(alpha: 0.5)
+                  : Colors.white.withValues(alpha: 0.08),
             ),
           ),
-        ],
+          child: isUserProvider
+              ? logo
+              : ColorFiltered(
+                  colorFilter: _greyscale,
+                  child: logo,
+                ),
+        ),
       ),
     );
   }

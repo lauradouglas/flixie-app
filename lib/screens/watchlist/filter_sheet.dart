@@ -79,6 +79,35 @@ class _WatchlistFilterSheetState extends State<WatchlistFilterSheet> {
                 fontSize: 14)),
       );
 
+  Widget _optionChip({
+    required String label,
+    required bool selected,
+    required VoidCallback onSelected,
+  }) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onSelected(),
+      showCheckmark: true,
+      checkmarkColor: Colors.white,
+      selectedColor: FlixieColors.primary,
+      backgroundColor: Colors.transparent,
+      shape: const StadiumBorder(),
+      side: BorderSide(
+        color: selected
+            ? Colors.transparent
+            : Colors.white.withValues(alpha: 0.16),
+        width: 1,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      labelStyle: TextStyle(
+        color: selected ? Colors.white : FlixieColors.medium,
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
@@ -136,16 +165,10 @@ class _WatchlistFilterSheetState extends State<WatchlistFilterSheet> {
                 runSpacing: 8,
                 children: _sortOptions.map((opt) {
                   final selected = _sort == opt.$1;
-                  return ChoiceChip(
-                    label: Text(opt.$2),
+                  return _optionChip(
+                    label: opt.$2,
                     selected: selected,
-                    onSelected: (_) => setState(() => _sort = opt.$1),
-                    selectedColor: FlixieColors.primary,
-                    backgroundColor: FlixieColors.tabBarBackgroundFocused,
-                    labelStyle: TextStyle(
-                        color: selected ? Colors.white : Colors.grey,
-                        fontSize: 13),
-                    side: BorderSide.none,
+                    onSelected: () => setState(() => _sort = opt.$1),
                   );
                 }).toList(),
               ),
@@ -157,16 +180,10 @@ class _WatchlistFilterSheetState extends State<WatchlistFilterSheet> {
                 runSpacing: 8,
                 children: _runtimeOptions.map((opt) {
                   final selected = _maxRuntime == opt.$1;
-                  return ChoiceChip(
-                    label: Text(opt.$2),
+                  return _optionChip(
+                    label: opt.$2,
                     selected: selected,
-                    onSelected: (_) => setState(() => _maxRuntime = opt.$1),
-                    selectedColor: FlixieColors.primary,
-                    backgroundColor: FlixieColors.tabBarBackgroundFocused,
-                    labelStyle: TextStyle(
-                        color: selected ? Colors.white : Colors.grey,
-                        fontSize: 13),
-                    side: BorderSide.none,
+                    onSelected: () => setState(() => _maxRuntime = opt.$1),
                   );
                 }).toList(),
               ),
@@ -178,16 +195,10 @@ class _WatchlistFilterSheetState extends State<WatchlistFilterSheet> {
                 runSpacing: 8,
                 children: _ratingOptions.map((opt) {
                   final selected = _minRating == opt.$1;
-                  return ChoiceChip(
-                    label: Text(opt.$2),
+                  return _optionChip(
+                    label: opt.$2,
                     selected: selected,
-                    onSelected: (_) => setState(() => _minRating = opt.$1),
-                    selectedColor: FlixieColors.primary,
-                    backgroundColor: FlixieColors.tabBarBackgroundFocused,
-                    labelStyle: TextStyle(
-                        color: selected ? Colors.white : Colors.grey,
-                        fontSize: 13),
-                    side: BorderSide.none,
+                    onSelected: () => setState(() => _minRating = opt.$1),
                   );
                 }).toList(),
               ),
@@ -199,29 +210,17 @@ class _WatchlistFilterSheetState extends State<WatchlistFilterSheet> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    ChoiceChip(
-                      label: const Text('All'),
+                    _optionChip(
+                      label: 'All',
                       selected: _genre == null,
-                      onSelected: (_) => setState(() => _genre = null),
-                      selectedColor: FlixieColors.primary,
-                      backgroundColor: FlixieColors.tabBarBackgroundFocused,
-                      labelStyle: TextStyle(
-                          color: _genre == null ? Colors.white : Colors.grey,
-                          fontSize: 13),
-                      side: BorderSide.none,
+                      onSelected: () => setState(() => _genre = null),
                     ),
                     ...widget.genres.map((g) {
                       final selected = _genre == g;
-                      return ChoiceChip(
-                        label: Text(g),
+                      return _optionChip(
+                        label: g,
                         selected: selected,
-                        onSelected: (_) => setState(() => _genre = g),
-                        selectedColor: FlixieColors.primary,
-                        backgroundColor: FlixieColors.tabBarBackgroundFocused,
-                        labelStyle: TextStyle(
-                            color: selected ? Colors.white : Colors.grey,
-                            fontSize: 13),
-                        side: BorderSide.none,
+                        onSelected: () => setState(() => _genre = g),
                       );
                     }),
                   ],
@@ -235,29 +234,17 @@ class _WatchlistFilterSheetState extends State<WatchlistFilterSheet> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    ChoiceChip(
-                      label: const Text('All'),
+                    _optionChip(
+                      label: 'All',
                       selected: _year == null,
-                      onSelected: (_) => setState(() => _year = null),
-                      selectedColor: FlixieColors.primary,
-                      backgroundColor: FlixieColors.tabBarBackgroundFocused,
-                      labelStyle: TextStyle(
-                          color: _year == null ? Colors.white : Colors.grey,
-                          fontSize: 13),
-                      side: BorderSide.none,
+                      onSelected: () => setState(() => _year = null),
                     ),
                     ...widget.years.map((y) {
                       final selected = _year == y;
-                      return ChoiceChip(
-                        label: Text('$y'),
+                      return _optionChip(
+                        label: '$y',
                         selected: selected,
-                        onSelected: (_) => setState(() => _year = y),
-                        selectedColor: FlixieColors.primary,
-                        backgroundColor: FlixieColors.tabBarBackgroundFocused,
-                        labelStyle: TextStyle(
-                            color: selected ? Colors.white : Colors.grey,
-                            fontSize: 13),
-                        side: BorderSide.none,
+                        onSelected: () => setState(() => _year = y),
                       );
                     }),
                   ],

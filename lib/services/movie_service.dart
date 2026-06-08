@@ -118,12 +118,31 @@ class MovieService {
       int movieId, String region) async {
     apiLogger
         .d('Fetching watch providers for movie $movieId in region $region.');
-    final data =
-        await ApiClient.get('/movies/$movieId/$region/watch/providers');
-    return (data as List<dynamic>)
-        .map((e) => WatchProvider.fromJson(e as Map<String, dynamic>))
-        .where((p) => p.displayPriority <= 50)
-        .toList();
+
+    List<WatchProvider> parseProviders(dynamic data) {
+      final rawList = data is Map<String, dynamic>
+          ? (data['watchProviders'] as List<dynamic>? ?? const [])
+          : (data as List<dynamic>? ?? const []);
+      return rawList
+          .map((e) => WatchProvider.fromJson(e as Map<String, dynamic>))
+          .where((p) => p.displayPriority <= 50)
+          .toList();
+    }
+
+    try {
+      final detailData =
+          await ApiClient.get('/movies/$movieId/$region/watch/providers');
+      return parseProviders(detailData);
+    } catch (detailError) {
+      apiLogger.w(
+        'Detail watch-provider endpoint failed for movie $movieId/$region: $detailError. Trying cache endpoint.',
+      );
+      final cacheData = await ApiClient.get(
+        '/movies/$movieId/watch-providers',
+        queryParams: {'region': region},
+      );
+      return parseProviders(cacheData);
+    }
   }
 
   Future<List<Review>> getMovieReviews(int movieId, {String? userId}) async {

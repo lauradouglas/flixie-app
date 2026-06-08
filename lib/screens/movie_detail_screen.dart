@@ -1211,7 +1211,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   Widget _buildScores(BuildContext context, Movie movie) {
     final score = movie.voteAverage;
-    final voteCount = movie.voteCount;
+    final voteCount = movie.voteCount ?? 0;
+    final hasCommunityRatings = voteCount > 0 && score != null && score > 0;
 
     return Container(
       width: double.infinity,
@@ -1232,7 +1233,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         children: [
           Expanded(
             child: _scoreMetric(
-              value: score != null ? '${score.toStringAsFixed(1)}/10' : 'N/A',
+              value: hasCommunityRatings
+                  ? '${score.toStringAsFixed(1)}/10'
+                  : '- /10',
               label: 'FLIXISCORE',
               valueColor: FlixieColors.white,
               leadingIcon: Icons.star_border_rounded,
@@ -1244,7 +1247,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           _scoreDivider(),
           Expanded(
             child: _scoreMetric(
-              value: voteCount != null ? _formatVoteCount(voteCount) : '0',
+              value: _formatVoteCount(voteCount),
               label: 'RATINGS',
               valueColor: FlixieColors.tertiary,
               showInfo: true,
