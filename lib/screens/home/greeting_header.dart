@@ -10,10 +10,20 @@ String greeting() {
 }
 
 class GreetingHeader extends StatelessWidget {
-  const GreetingHeader({super.key, this.name, required this.onDismiss});
+  const GreetingHeader({
+    super.key,
+    this.name,
+    required this.onSearch,
+    required this.onWatchlist,
+    required this.onInvite,
+    required this.onRequests,
+  });
 
   final String? name;
-  final VoidCallback onDismiss;
+  final VoidCallback onSearch;
+  final VoidCallback onWatchlist;
+  final VoidCallback onInvite;
+  final VoidCallback onRequests;
 
   @override
   Widget build(BuildContext context) {
@@ -25,71 +35,123 @@ class GreetingHeader extends StatelessWidget {
         : 'F';
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: FlixieColors.surfaceElevated.withValues(alpha: 0.84),
           borderRadius: BorderRadius.circular(16),
-          onTap: onDismiss,
-          child: Ink(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: FlixieColors.surfaceElevated.withValues(alpha: 0.78),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.09),
-              ),
-            ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: FlixieColors.tabBarBackgroundFocused,
-                  child: Text(
-                    initial,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.09),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 17,
+                    backgroundColor: FlixieColors.tabBarBackgroundFocused,
+                    child: Text(
+                      initial,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 19,
-                          fontWeight: FontWeight.w700,
-                          height: 1.1,
-                        ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        height: 1.1,
                       ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Ready to watch something amazing?',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: FlixieColors.light,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                          height: 1.1,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 6),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  size: 22,
-                  color: Colors.white70,
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _ActionButton(
+                    icon: Icons.search_rounded,
+                    label: 'Search',
+                    onTap: onSearch,
+                  ),
+                  const SizedBox(width: 8),
+                  _ActionButton(
+                    icon: Icons.bookmark_rounded,
+                    label: 'Watchlist',
+                    onTap: onWatchlist,
+                  ),
+                  const SizedBox(width: 8),
+                  _ActionButton(
+                    icon: Icons.group_add_rounded,
+                    label: 'Invite',
+                    onTap: onInvite,
+                  ),
+                  const SizedBox(width: 8),
+                  _ActionButton(
+                    icon: Icons.local_activity_rounded,
+                    label: 'Requests',
+                    onTap: onRequests,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Material(
+        color: FlixieColors.tabBarBackgroundFocused.withValues(alpha: 0.78),
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 9),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: FlixieColors.primary, size: 19),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: FlixieColors.light,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    height: 1,
+                  ),
                 ),
               ],
             ),

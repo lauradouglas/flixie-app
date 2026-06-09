@@ -12,8 +12,9 @@ class HomeSectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return FlixieSectionHeader(
       title: title,
+      uppercase: false,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      trailingLabel: onSeeAll != null ? 'See all →' : null,
+      trailingLabel: onSeeAll != null ? 'See all' : null,
       trailingColor: FlixieColors.primary,
       onTrailingTap: onSeeAll,
     );

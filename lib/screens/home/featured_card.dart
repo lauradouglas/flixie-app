@@ -9,11 +9,17 @@ class FeaturedCard extends StatelessWidget {
     super.key,
     required this.movie,
     this.onTap,
+    this.onBookmarkTap,
+    this.isBookmarked = false,
+    this.isBookmarkUpdating = false,
     this.showNewBadge = false,
   });
 
   final MovieShort movie;
   final VoidCallback? onTap;
+  final VoidCallback? onBookmarkTap;
+  final bool isBookmarked;
+  final bool isBookmarkUpdating;
   final bool showNewBadge;
 
   @override
@@ -125,9 +131,40 @@ class FeaturedCard extends StatelessWidget {
                     ),
                   ),
                 ),
+              if (onBookmarkTap != null)
+                Positioned(
+                  left: 10,
+                  bottom: 10,
+                  child: Material(
+                    color: Colors.black.withValues(alpha: 0.66),
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: isBookmarkUpdating ? null : onBookmarkTap,
+                      child: SizedBox(
+                        width: 34,
+                        height: 34,
+                        child: Icon(
+                          isBookmarked
+                              ? Icons.bookmark_rounded
+                              : Icons.bookmark_outline_rounded,
+                          color: isBookmarkUpdating
+                              ? FlixieColors.medium
+                              : FlixieColors.primary,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               // Text content
               Padding(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.fromLTRB(
+                  onBookmarkTap != null ? 52 : 12,
+                  12,
+                  12,
+                  12,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.end,

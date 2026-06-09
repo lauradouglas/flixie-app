@@ -1,7 +1,4 @@
-import 'dart:async';
-
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:characters/characters.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -36,10 +33,9 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with RouteAware {
+class _HomeScreenState extends State<HomeScreen> {
   // Keep hero carousel concise so primary CTA and dots remain visible above fold.
   static const int _maxHeroCarouselItems = 6;
-  static const int _maxSourceTitleLength = 18;
   static const double _defaultQuickRating = 5;
   static const int _recentTheatreDays = 45;
 
@@ -55,18 +51,24 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   Set<int> _watchlistMovieIds = {};
   bool _isLoading = true;
   String? _error;
-  bool _showGreeting = true;
   String? _loadedForUserId;
-  Timer? _greetingTimer;
   AuthProvider? _authProvider;
-  final FriendActionsController _friendActions = FriendActionsController.instance;
+  final FriendActionsController _friendActions =
+      FriendActionsController.instance;
   final WatchlistActionsController _watchlistActions =
       WatchlistActionsController.instance;
   final PageController _heroPageController = PageController();
   int _heroPage = 0;
 
-  static final RouteObserver<ModalRoute<void>> _routeObserver =
-      RouteObserver<ModalRoute<void>>();
+  List<MovieShort> get _heroMovies {
+    if (_forYouMovies.isEmpty) return _featuredMovies;
+    final forYouIds = _forYouMovies.map((movie) => movie.id).toSet();
+    final matchingTrending =
+        _featuredMovies.where((movie) => forYouIds.contains(movie.id));
+    final remainingTrending =
+        _featuredMovies.where((movie) => !forYouIds.contains(movie.id));
+    return [...matchingTrending, ...remainingTrending];
+  }
 
   @override
   void didChangeDependencies() {
@@ -81,25 +83,11 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _authProvider?.addListener(_onAuthChanged);
       _loadAll();
-      _greetingTimer = Timer(const Duration(seconds: 10), () {
-        if (mounted && _showGreeting) setState(() => _showGreeting = false);
-      });
-      // Subscribe to route events to dismiss greeting on navigate-away
-      final route = ModalRoute.of(context);
-      if (route != null) _routeObserver.subscribe(this, route);
     });
   }
 
   @override
-  void didPushNext() {
-    // User navigated away — dismiss greeting permanently
-    if (_showGreeting) setState(() => _showGreeting = false);
-  }
-
-  @override
   void dispose() {
-    _greetingTimer?.cancel();
-    _routeObserver.unsubscribe(this);
     _authProvider?.removeListener(_onAuthChanged);
     _heroPageController.dispose();
     super.dispose();
@@ -120,6 +108,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
       _trendingGroupsError = null;
     });
     final auth = context.read<AuthProvider>();
+    final movieService = context.read<MovieService>();
     // Re-fetch user + all cached data (notifications, friends, reviews, etc.)
     await auth.refreshUserData();
     final user = auth.dbUser;
@@ -128,7 +117,6 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     logger.d('[HomeScreen] loading, user=[200b${user?.id}, region=$region');
 
     try {
-      final movieService = context.read<MovieService>();
       final results = await Future.wait([
         TrendingService.getTrendingMovies(),
         movieService.getNowPlayingMovies(region: region),
@@ -148,7 +136,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         else
           Future.value(<MovieShort>[]),
         if (user != null)
-          _watchlistActions.getUserWatchlist(user.id)
+          _watchlistActions
+              .getUserWatchlist(user.id)
               .catchError((_) => <WatchlistMovie>[])
         else
           Future.value(<WatchlistMovie>[]),
@@ -300,6 +289,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     final greetingName = (user?.firstName?.trim().isNotEmpty ?? false)
         ? user!.firstName!.trim()
         : user?.username;
+    final heroMovies = _heroMovies;
 
     return FlixiePageScaffold(
       backgroundColor: FlixieColors.background,
@@ -332,10 +322,11 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
               ),
             ),
             onPressed: () async {
+              final auth = context.read<AuthProvider>();
               await context.push('/notifications');
               // Refresh the badge count once the user returns from the screen
               if (mounted) {
-                context.read<AuthProvider>().refreshNotificationCount();
+                auth.refreshNotificationCount();
               }
             },
           ),
@@ -358,10 +349,20 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (_featuredMovies.isNotEmpty) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8, bottom: 12),
+                          child: GreetingHeader(
+                            name: greetingName,
+                            onSearch: () => context.push('/search'),
+                            onWatchlist: () => context.go('/watchlist'),
+                            onInvite: () => context.go('/social'),
+                            onRequests: () => context.go('/watch-requests'),
+                          ),
+                        ),
+                        if (heroMovies.isNotEmpty) ...[
                           Stack(
                             children: [
-                              _buildHeroCarousel(context),
+                              _buildHeroCarousel(context, heroMovies),
                               Positioned(
                                 top: 0,
                                 left: 0,
@@ -384,29 +385,15 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                                   ),
                                 ),
                               ),
-                              if (_showGreeting)
-                                Positioned(
-                                  top: 12,
-                                  left: 0,
-                                  right: 0,
-                                  child: GreetingHeader(
-                                    name: greetingName,
-                                    onDismiss: () {
-                                      if (mounted) {
-                                        setState(() => _showGreeting = false);
-                                      }
-                                    },
-                                  ),
-                                ),
                             ],
                           ),
                           const SizedBox(height: 10),
-                          _buildCarouselDots(),
+                          _buildCarouselDots(heroMovies),
                           const SizedBox(height: 20),
                         ],
+                        _buildBecauseYouRatedSection(context),
                         _buildJustOutSection(context),
                         _buildWatchlistSection(context),
-                        _buildBecauseYouRatedSection(context),
                         _buildFriendActivitySection(context),
                         TrendingGroupsSection(
                           isLoading: _isTrendingGroupsLoading,
@@ -429,22 +416,21 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
 
   // ── Hero carousel ──────────────────────────────────────────────────────────
 
-  Widget _buildHeroCarousel(BuildContext context) {
-    final count = _featuredMovies.length.clamp(0, _maxHeroCarouselItems);
+  Widget _buildHeroCarousel(BuildContext context, List<MovieShort> movies) {
+    final count = movies.length.clamp(0, _maxHeroCarouselItems);
     return SizedBox(
-      height: 440,
+      height: 390,
       child: PageView.builder(
         controller: _heroPageController,
         onPageChanged: (i) => setState(() => _heroPage = i),
         itemCount: count,
-        itemBuilder: (context, index) =>
-            _buildHeroCard(context, _featuredMovies[index]),
+        itemBuilder: (context, index) => _buildHeroCard(context, movies[index]),
       ),
     );
   }
 
-  Widget _buildCarouselDots() {
-    final count = _featuredMovies.length.clamp(0, _maxHeroCarouselItems);
+  Widget _buildCarouselDots(List<MovieShort> movies) {
+    final count = movies.length.clamp(0, _maxHeroCarouselItems);
     if (count <= 1) return const SizedBox.shrink();
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -467,6 +453,9 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   }
 
   Widget _buildHeroCard(BuildContext context, MovieShort movie) {
+    final inWatchlist = _watchlistMovieIds.contains(movie.id);
+    final isUpdating = _watchlistUpdatesInFlight.contains(movie.id);
+
     return GestureDetector(
       onTap: () => context.push('/movies/${movie.id}'),
       child: Stack(
@@ -514,15 +503,36 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.48),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.16),
+                    ),
+                  ),
+                  child: Text(
+                    _forYouMovies.isNotEmpty
+                        ? 'Trending you might like'
+                        : 'Trending now',
+                    style: const TextStyle(
+                      color: FlixieColors.light,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
                 Text(
-                  movie.name.toUpperCase(),
+                  movie.name,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 24,
+                    fontSize: 23,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: 0.4,
                     height: 1.08,
                   ),
                 ),
@@ -530,13 +540,13 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   const SizedBox(height: 6),
                   Text(
                     movie.overview!,
-                    maxLines: 3,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        color: FlixieColors.light, fontSize: 16, height: 1.35),
+                        color: FlixieColors.light, fontSize: 15, height: 1.32),
                   ),
                 ],
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 Row(
                   children: [
                     Expanded(
@@ -556,30 +566,20 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                       ),
                     ),
                     const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () => _toggleHeroWatchlist(context, movie),
-                        icon: Icon(
-                          _watchlistMovieIds.contains(movie.id)
-                              ? Icons.bookmark
-                              : Icons.bookmark_outline,
-                          size: 18,
-                        ),
-                        label: Text(
-                          _watchlistMovieIds.contains(movie.id)
-                              ? 'On Watchlist'
-                              : 'Watchlist',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: BorderSide(
-                              color: Colors.white.withValues(alpha: 0.55)),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
+                    _HeroIconButton(
+                      tooltip: 'Movie details',
+                      icon: Icons.info_outline_rounded,
+                      onPressed: () => context.push('/movies/${movie.id}'),
+                    ),
+                    const SizedBox(width: 10),
+                    _HeroIconButton(
+                      tooltip:
+                          inWatchlist ? 'Remove from watchlist' : 'Watchlist',
+                      icon: inWatchlist
+                          ? Icons.bookmark_rounded
+                          : Icons.bookmark_outline_rounded,
+                      isBusy: isUpdating,
+                      onPressed: () => _toggleHeroWatchlist(context, movie),
                     ),
                   ],
                 ),
@@ -811,21 +811,12 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
 
   Widget _buildBecauseYouRatedSection(BuildContext context) {
     if (_forYouMovies.isEmpty) return const SizedBox.shrink();
-    final source = _highlyRatedRecommendations?.sourceMovie;
-    final sourceTitle = source?.title ?? '';
-    final compactSourceTitle = sourceTitle.characters.length >
-            _maxSourceTitleLength
-        ? '${sourceTitle.characters.take(_maxSourceTitleLength).toString()}…'
-        : sourceTitle;
-    final title = source != null
-        ? 'Because You Rated $compactSourceTitle'
-        : 'Recommended For You';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         HomeSectionHeader(
-          title: title,
+          title: 'Just for you',
           onSeeAll: () => context.push('/search'),
         ),
         const SizedBox(height: 12),
@@ -887,6 +878,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
 
     if (_watchlistUpdatesInFlight.contains(movieId)) return;
     final existing = auth.dbUser?.movieWatchlist ?? [];
+    final messenger = ScaffoldMessenger.of(context);
     setState(() => _watchlistUpdatesInFlight.add(movieId));
     try {
       if (currentlyInWatchlist) {
@@ -915,7 +907,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         );
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: Text(currentlyInWatchlist
                 ? '$movieTitle removed from watchlist'
@@ -927,7 +919,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     } catch (e) {
       logger.w('[HomeScreen] watchlist toggle failed: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           const SnackBar(content: Text('Could not update watchlist right now')),
         );
       }
@@ -1072,6 +1064,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     bool rewatch = false;
     final notesController = TextEditingController();
     final watchedAt = DateTime.now();
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
 
     Future<void> commitWatchedEntry() async {
       try {
@@ -1086,13 +1080,13 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
           );
         }
         if (mounted) {
-          Navigator.of(context).maybePop();
+          navigator.maybePop();
           final ratingLabel =
               includeRating ? ' • ${rating.toStringAsFixed(0)}/10' : '';
           final noteLabel =
               notesController.text.trim().isNotEmpty ? ' • note saved' : '';
           final rewatchLabel = rewatch ? ' • rewatch' : '';
-          ScaffoldMessenger.of(context).showSnackBar(
+          messenger.showSnackBar(
             SnackBar(
               content: Text(
                 '$movieTitle marked watched$ratingLabel$noteLabel$rewatchLabel',
@@ -1103,7 +1097,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
       } catch (e) {
         logger.w('[HomeScreen] mark watched failed: $e');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          messenger.showSnackBar(
             const SnackBar(
                 content: Text('Could not mark this movie as watched')),
           );
@@ -1222,6 +1216,44 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   void _showComingSoonToast(BuildContext context, String action) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('$action coming soon')),
+    );
+  }
+}
+
+class _HeroIconButton extends StatelessWidget {
+  const _HeroIconButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+    this.isBusy = false,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final bool isBusy;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.black.withValues(alpha: 0.44),
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: isBusy ? null : onPressed,
+          child: SizedBox(
+            width: 48,
+            height: 48,
+            child: Icon(
+              icon,
+              color: isBusy ? FlixieColors.medium : Colors.white,
+              size: 22,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
