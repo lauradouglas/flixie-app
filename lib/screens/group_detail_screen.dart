@@ -184,31 +184,57 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
       appBar: AppBar(
         backgroundColor: FlixieColors.background,
         elevation: 0,
-        leading: _loadingGroup
-            ? null
-            : Padding(
-                padding: const EdgeInsets.all(10),
-                child: CircleAvatar(
-                  backgroundColor: color.withValues(alpha: 0.3),
-                  child: Text(
-                    _group != null ? _groupAbbr(_group!) : '',
-                    style: TextStyle(
-                      color: color,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: FlixieColors.light, size: 20),
+          onPressed: () => context.pop(),
+        ),
+        titleSpacing: 0,
+        title: _loadingGroup
+            ? const Text('Loading...',
+                style: TextStyle(color: FlixieColors.medium))
+            : Row(
+                children: [
+                  CircleAvatar(
+                    radius: 19,
+                    backgroundColor: color.withValues(alpha: 0.24),
+                    child: Text(
+                      _group != null ? _groupAbbr(_group!) : '',
+                      style: TextStyle(
+                        color: color,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
-                ),
-              ),
-        title: _loadingGroup
-            ? const Text('Loading…',
-                style: TextStyle(color: FlixieColors.medium))
-            : Text(
-                _group?.name ?? 'Group',
-                style: const TextStyle(
-                  color: FlixieColors.light,
-                  fontWeight: FontWeight.bold,
-                ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _group?.name ?? 'Group',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: FlixieColors.light,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 18,
+                          ),
+                        ),
+                        Text(
+                          '$_memberCount member${_memberCount == 1 ? '' : 's'}',
+                          style: const TextStyle(
+                            color: FlixieColors.medium,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
         actions: [
           IconButton(
@@ -220,9 +246,26 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
             ? null
             : TabBar(
                 controller: _tabController,
+                padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
+                indicator: BoxDecoration(
+                  color: FlixieColors.primary.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: FlixieColors.primary.withValues(alpha: 0.45),
+                  ),
+                ),
+                indicatorSize: TabBarIndicatorSize.tab,
+                dividerColor: Colors.white.withValues(alpha: 0.08),
                 labelColor: FlixieColors.primary,
                 unselectedLabelColor: FlixieColors.medium,
-                indicatorColor: FlixieColors.primary,
+                labelStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
                 tabs: [
                   const Tab(text: 'Chat'),
                   const Tab(text: 'Activity'),
@@ -303,11 +346,11 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
     );
   }
 
-  void _showGroupOptions(BuildContext context) {
+  void _showGroupOptions(BuildContext sheetContext) {
     final currentUserId = context.read<AuthProvider>().dbUser?.id;
     final isOwner = _group?.ownerId == currentUserId;
     showModalBottomSheet(
-      context: context,
+      context: sheetContext,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -331,8 +374,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
               title: const Text('Members',
                   style: TextStyle(color: FlixieColors.light)),
               onTap: () {
-                Navigator.pop(context);
-                context.push(
+                Navigator.pop(sheetContext);
+                sheetContext.push(
                   '/groups/${widget.groupId}/members',
                   extra: _group?.name ?? 'Group',
                 );
@@ -343,7 +386,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                   const Icon(Icons.info_outline, color: FlixieColors.light),
               title: const Text('Group Info',
                   style: TextStyle(color: FlixieColors.light)),
-              onTap: () => Navigator.pop(context),
+              onTap: () => Navigator.pop(sheetContext),
             ),
             if (isOwner)
               ListTile(
@@ -352,7 +395,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                 title: const Text('Delete Group',
                     style: TextStyle(color: FlixieColors.danger)),
                 onTap: () async {
-                  Navigator.pop(context);
+                  Navigator.pop(sheetContext);
                   final confirm = await showDialog<bool>(
                     context: context,
                     builder: (_) => AlertDialog(

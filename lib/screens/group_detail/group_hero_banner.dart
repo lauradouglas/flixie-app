@@ -39,104 +39,132 @@ class GroupHeroBanner extends StatelessWidget {
     final color = _color;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Left: group identity card
-          Expanded(
-            flex: 3,
-            child: Container(
-              height: 110,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    color.withValues(alpha: 0.35),
-                    FlixieColors.tabBarBackgroundFocused,
-                  ],
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              color.withValues(alpha: 0.22),
+              FlixieColors.tabBarBackgroundFocused,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withValues(alpha: 0.28)),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 28,
+              backgroundColor: color.withValues(alpha: 0.22),
+              child: Text(
+                (group.abbreviation?.isNotEmpty == true
+                        ? group.abbreviation!
+                        : group.name
+                            .substring(0, group.name.length.clamp(1, 2)))
+                    .toUpperCase(),
+                style: TextStyle(
+                  color: color,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
                 ),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(12),
-                  bottomLeft: Radius.circular(12),
-                ),
-                border: Border.all(color: FlixieColors.tabBarBorder),
               ),
-              padding: const EdgeInsets.all(14),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: FlixieColors.tertiary.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text(
-                      'ACTIVE COMMUNITY',
-                      style: TextStyle(
-                        color: FlixieColors.tertiary,
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1,
-                      ),
+                  Text(
+                    group.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: FlixieColors.light,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    group.name.toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
+                  if (group.description != null &&
+                      group.description!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      group.description!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: FlixieColors.medium,
+                        fontSize: 12,
+                      ),
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                  ],
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      _HeroChip(
+                        icon: Icons.people_outline_rounded,
+                        label:
+                            '${_formatCount(memberCount)} member${memberCount == 1 ? '' : 's'}',
+                        color: FlixieColors.primary,
+                      ),
+                      const _HeroChip(
+                        icon: Icons.bolt_rounded,
+                        label: 'Active',
+                        color: FlixieColors.success,
+                      ),
+                      if (group.isPublic)
+                        const _HeroChip(
+                          icon: Icons.public_rounded,
+                          label: 'Public',
+                          color: FlixieColors.secondary,
+                        ),
+                    ],
                   ),
                 ],
               ),
             ),
-          ),
-          // Right: member count card
-          Container(
-            width: 90,
-            height: 110,
-            decoration: const BoxDecoration(
-              color: FlixieColors.tabBarBackgroundFocused,
-              borderRadius: BorderRadius.only(
-                topRight: Radius.circular(12),
-                bottomRight: Radius.circular(12),
-              ),
-              border: Border(
-                top: BorderSide(color: FlixieColors.tabBarBorder),
-                right: BorderSide(color: FlixieColors.tabBarBorder),
-                bottom: BorderSide(color: FlixieColors.tabBarBorder),
-              ),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  _formatCount(memberCount),
-                  style: const TextStyle(
-                    color: FlixieColors.primary,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Text(
-                  'MEMBERS',
-                  style: TextStyle(
-                    color: FlixieColors.medium,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1,
-                  ),
-                ),
-              ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroChip extends StatelessWidget {
+  const _HeroChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.26)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 12),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],

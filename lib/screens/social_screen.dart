@@ -10,7 +10,6 @@ import '../models/notification.dart';
 import '../presentation/shared/friend_actions_controller.dart';
 import '../providers/auth_provider.dart';
 import '../screens/profile/add_friend_sheet.dart';
-import '../screens/profile/friends_row.dart';
 import '../services/chat_service.dart';
 import '../services/group_service.dart';
 import '../services/notification_service.dart';
@@ -36,6 +35,18 @@ class SocialScreen extends StatefulWidget {
 class _SocialScreenState extends State<SocialScreen> {
   int _selectedTab = 0; // 0 = Friends, 1 = Groups
 
+  void _showAddFriendSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: FlixieColors.tabBarBackgroundFocused,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => const AddFriendSheet(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return FlixiePageScaffold(
@@ -50,10 +61,17 @@ class _SocialScreenState extends State<SocialScreen> {
         actions: [
           IconButton(
             onPressed: () {
-              // TODO(laura): wire friend discovery/search flow.
+              if (_selectedTab == 0) {
+                _showAddFriendSheet();
+                return;
+              }
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text('Use Create on the Groups tab for groups.')),
+              );
             },
             icon: const Icon(Icons.person_add_alt_1_outlined),
-            tooltip: 'Find friends',
+            tooltip: _selectedTab == 0 ? 'Find friends' : 'Create group',
           ),
         ],
       ),
@@ -87,15 +105,19 @@ class _FriendsSubView extends StatefulWidget {
 }
 
 class _FriendsSubViewState extends State<_FriendsSubView> {
-  final FriendActionsController _friendActions = FriendActionsController.instance;
+  final FriendActionsController _friendActions =
+      FriendActionsController.instance;
+  final TextEditingController _searchController = TextEditingController();
   bool _loading = true;
   FriendsData? _friendsData;
   List<ActivityListItem> _activity = [];
+  List<Group> _groupsPreview = [];
   String? _error;
 
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(() => setState(() {}));
     _load();
   }
 
@@ -109,11 +131,13 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
       final results = await Future.wait([
         _friendActions.getFriends(userId),
         _friendActions.getFriendsActivityLists(userId),
+        GroupService.getUserGroups(userId).catchError((_) => <Group>[]),
       ]);
       if (mounted) {
         setState(() {
           _friendsData = results[0] as FriendsData;
           _activity = results[1] as List<ActivityListItem>;
+          _groupsPreview = results[2] as List<Group>;
           _loading = false;
           _error = null;
         });
@@ -127,6 +151,12 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
         });
       }
     }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   void _showAddFriendSheet() {
@@ -224,6 +254,19 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
             .whereType<FriendshipUser>()
             .toList() ??
         const <FriendshipUser>[];
+    final query = _searchController.text.trim().toLowerCase();
+    final filteredFriends = query.isEmpty
+        ? friends
+        : friends
+            .where((friend) =>
+                friend.username.toLowerCase().contains(query) ||
+                (friend.firstName ?? '').toLowerCase().contains(query) ||
+                (friend.lastName ?? '').toLowerCase().contains(query))
+            .toList();
+    final authUser = context.read<AuthProvider>().dbUser;
+    final myWatchlistIds =
+        authUser?.movieWatchlist?.map((item) => item.movieId).toSet() ??
+            <int>{};
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -241,11 +284,23 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
               ),
               const SizedBox(height: 14),
             ],
+            _SocialQuickStats(
+              friendCount: friends.length,
+              pendingCount: data?.pendingFriends.length ?? 0,
+              groupCount: _groupsPreview.length,
+              activityCount: _activity.length,
+            ),
+            const SizedBox(height: 14),
+            _FriendSearchField(controller: _searchController),
+            const SizedBox(height: 14),
             // Pending requests section
-            if (data != null && data.pendingFriends.isNotEmpty) ...[
-              SocialSectionHeader(
-                title: 'PENDING REQUESTS',
-                badge: data.pendingFriends.length,
+            if (data != null &&
+                (data.pendingFriends.isNotEmpty ||
+                    data.requestedFriends.isNotEmpty)) ...[
+              _PendingSocialSummary(
+                incomingCount: data.pendingFriends.length,
+                outgoingCount: data.requestedFriends.length,
+                onAddFriend: _showAddFriendSheet,
               ),
               const SizedBox(height: 8),
               ...data.pendingFriends.map(
@@ -264,10 +319,14 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
 
             // Friends section
             if (data != null) ...[
-              FriendsRow(
-                data: data,
-                onFriendsChanged: (updated) =>
-                    setState(() => _friendsData = updated),
+              _EnhancedFriendsSection(
+                friends: filteredFriends,
+                totalCount: friends.length,
+                activity: _activity,
+                myWatchlistIds: myWatchlistIds,
+                searchQuery: query,
+                onAddFriend: _showAddFriendSheet,
+                onRequestWatch: _showRequestWatchHint,
               ),
               const SizedBox(height: 16),
             ],
@@ -276,12 +335,10 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
             const SocialSectionHeader(title: 'FRIEND ACTIVITY'),
             const SizedBox(height: 8),
             if (_activity.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Text(
-                  'No recent activity.',
-                  style: TextStyle(color: FlixieColors.medium),
-                ),
+              _ActivityEmptyState(
+                hasFriends: friends.isNotEmpty,
+                onAddFriend: _showAddFriendSheet,
+                onOpenWatchlist: () => context.push('/watchlist'),
               )
             else
               ListView.separated(
@@ -291,8 +348,22 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
                 itemBuilder: (_, i) => ActivityTile(item: _activity[i]),
               ),
+            if (_groupsPreview.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              _GroupsPreviewSection(groups: _groupsPreview.take(3).toList()),
+            ],
             const SizedBox(height: 24),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _showRequestWatchHint(FriendshipUser friend) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Open a movie and tap Request to watch with ${friend.shortName}.',
         ),
       ),
     );
@@ -389,6 +460,597 @@ class _FriendStoryStrip extends StatelessWidget {
   }
 }
 
+class _SocialQuickStats extends StatelessWidget {
+  const _SocialQuickStats({
+    required this.friendCount,
+    required this.pendingCount,
+    required this.groupCount,
+    required this.activityCount,
+  });
+
+  final int friendCount;
+  final int pendingCount;
+  final int groupCount;
+  final int activityCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _stat(Icons.people_alt_outlined, '$friendCount', 'Friends',
+            FlixieColors.primary),
+        const SizedBox(width: 8),
+        _stat(Icons.notifications_active_outlined, '$pendingCount', 'Pending',
+            FlixieColors.warning),
+        const SizedBox(width: 8),
+        _stat(Icons.groups_2_outlined, '$groupCount', 'Groups',
+            FlixieColors.secondary),
+        const SizedBox(width: 8),
+        _stat(Icons.bolt_rounded, '$activityCount', 'Updates',
+            FlixieColors.tertiary),
+      ],
+    );
+  }
+
+  Widget _stat(IconData icon, String value, String label, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        decoration: BoxDecoration(
+          color: FlixieColors.surfaceElevated,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: const TextStyle(
+                color: FlixieColors.light,
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: FlixieColors.medium,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FriendSearchField extends StatelessWidget {
+  const _FriendSearchField({required this.controller});
+
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      style: const TextStyle(color: FlixieColors.light, fontSize: 14),
+      textInputAction: TextInputAction.search,
+      decoration: InputDecoration(
+        hintText: 'Search friends',
+        hintStyle: const TextStyle(color: FlixieColors.medium),
+        prefixIcon:
+            const Icon(Icons.search_rounded, color: FlixieColors.medium),
+        suffixIcon: controller.text.isEmpty
+            ? null
+            : IconButton(
+                tooltip: 'Clear search',
+                icon:
+                    const Icon(Icons.close_rounded, color: FlixieColors.medium),
+                onPressed: controller.clear,
+              ),
+        filled: true,
+        fillColor: FlixieColors.surfaceElevated,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: FlixieColors.primary),
+        ),
+      ),
+    );
+  }
+}
+
+class _PendingSocialSummary extends StatelessWidget {
+  const _PendingSocialSummary({
+    required this.incomingCount,
+    required this.outgoingCount,
+    required this.onAddFriend,
+  });
+
+  final int incomingCount;
+  final int outgoingCount;
+  final VoidCallback onAddFriend;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: FlixieColors.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: FlixieColors.primary.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.inbox_outlined, color: FlixieColors.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              [
+                if (incomingCount > 0)
+                  '$incomingCount friend request${incomingCount == 1 ? '' : 's'}',
+                if (outgoingCount > 0)
+                  '$outgoingCount sent invite${outgoingCount == 1 ? '' : 's'}',
+              ].join(' · '),
+              style: const TextStyle(
+                color: FlixieColors.light,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: onAddFriend,
+            style: TextButton.styleFrom(
+              foregroundColor: FlixieColors.primary,
+              minimumSize: Size.zero,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            ),
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EnhancedFriendsSection extends StatelessWidget {
+  const _EnhancedFriendsSection({
+    required this.friends,
+    required this.totalCount,
+    required this.activity,
+    required this.myWatchlistIds,
+    required this.searchQuery,
+    required this.onAddFriend,
+    required this.onRequestWatch,
+  });
+
+  final List<FriendshipUser> friends;
+  final int totalCount;
+  final List<ActivityListItem> activity;
+  final Set<int> myWatchlistIds;
+  final String searchQuery;
+  final VoidCallback onAddFriend;
+  final ValueChanged<FriendshipUser> onRequestWatch;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(child: SocialSectionHeader(title: 'FRIENDS')),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: FlixieColors.primary.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '$totalCount',
+                style: const TextStyle(
+                  color: FlixieColors.primary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            TextButton.icon(
+              onPressed: onAddFriend,
+              style: TextButton.styleFrom(
+                foregroundColor: FlixieColors.primary,
+                minimumSize: Size.zero,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              ),
+              icon: const Icon(Icons.add_circle_outline, size: 16),
+              label: const Text('Add'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        if (friends.isEmpty)
+          _NoFriendsCard(
+            isSearching: searchQuery.isNotEmpty,
+            onAddFriend: onAddFriend,
+          )
+        else
+          SizedBox(
+            height: 170,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: friends.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final friend = friends[index];
+                final insights = _FriendInsights.fromActivity(
+                  friend: friend,
+                  activity: activity,
+                  myWatchlistIds: myWatchlistIds,
+                );
+                return _EnhancedFriendCard(
+                  friend: friend,
+                  insights: insights,
+                  onRequestWatch: () => onRequestWatch(friend),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _NoFriendsCard extends StatelessWidget {
+  const _NoFriendsCard({required this.isSearching, required this.onAddFriend});
+
+  final bool isSearching;
+  final VoidCallback onAddFriend;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: FlixieColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isSearching ? Icons.search_off_rounded : Icons.person_add_outlined,
+            color: FlixieColors.primary,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              isSearching
+                  ? 'No friends match your search.'
+                  : 'Add friends to compare watchlists and see activity.',
+              style: const TextStyle(color: FlixieColors.medium, fontSize: 13),
+            ),
+          ),
+          if (!isSearching)
+            TextButton(
+              onPressed: onAddFriend,
+              child: const Text('Add'),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FriendInsights {
+  const _FriendInsights({
+    required this.sharedWatchlistCount,
+    required this.highRatingCount,
+    this.latestActivity,
+  });
+
+  final int sharedWatchlistCount;
+  final int highRatingCount;
+  final ActivityListItem? latestActivity;
+
+  String get primaryLabel {
+    if (sharedWatchlistCount > 0) {
+      return '$sharedWatchlistCount shared watchlist';
+    }
+    if (highRatingCount > 0) return '$highRatingCount strong ratings';
+    return 'Tap for profile';
+  }
+
+  String get secondaryLabel {
+    final item = latestActivity;
+    if (item == null) return 'No activity yet';
+    final title = item.mediaTitle ?? 'a title';
+    switch (item.type) {
+      case ActivityListType.movieWatchlist:
+      case ActivityListType.showWatchlist:
+        return 'Added $title';
+      case ActivityListType.movieWatched:
+      case ActivityListType.showWatched:
+        return 'Watched $title';
+      case ActivityListType.movieRating:
+      case ActivityListType.showRating:
+        return 'Rated $title';
+      case ActivityListType.movieReview:
+      case ActivityListType.showReview:
+        return 'Reviewed $title';
+      case ActivityListType.favoriteMovie:
+      case ActivityListType.favoriteShow:
+      case ActivityListType.favoritePerson:
+        return 'Favourited $title';
+      case ActivityListType.watchRequest:
+      case ActivityListType.watchRequestAccepted:
+      case ActivityListType.watchRequestSent:
+        return 'Shared $title';
+      case ActivityListType.unknown:
+        return 'Recent activity';
+    }
+  }
+
+  static _FriendInsights fromActivity({
+    required FriendshipUser friend,
+    required List<ActivityListItem> activity,
+    required Set<int> myWatchlistIds,
+  }) {
+    final friendActivity = activity
+        .where((item) => item.userId == friend.id)
+        .toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final sharedWatchlist = friendActivity.where((item) {
+      return item.type == ActivityListType.movieWatchlist &&
+          item.movieId != null &&
+          myWatchlistIds.contains(item.movieId);
+    }).length;
+    final highRatings = friendActivity.where((item) {
+      return item.type == ActivityListType.movieRating &&
+          (item.mediaRating ?? 0) >= 8;
+    }).length;
+    return _FriendInsights(
+      sharedWatchlistCount: sharedWatchlist,
+      highRatingCount: highRatings,
+      latestActivity: friendActivity.isEmpty ? null : friendActivity.first,
+    );
+  }
+}
+
+class _EnhancedFriendCard extends StatelessWidget {
+  const _EnhancedFriendCard({
+    required this.friend,
+    required this.insights,
+    required this.onRequestWatch,
+  });
+
+  final FriendshipUser friend;
+  final _FriendInsights insights;
+  final VoidCallback onRequestWatch;
+
+  Color get _avatarColor {
+    final raw =
+        (friend.iconColor?['hexCode'] ?? friend.iconColor?['hex']) as String?;
+    if (raw == null || raw.isEmpty) return FlixieColors.primary;
+    final hex = raw.replaceAll('#', '');
+    return Color(int.tryParse('0xFF$hex') ?? FlixieColors.primary.toARGB32());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = friend.initials ??
+        (friend.username.isNotEmpty ? friend.username[0].toUpperCase() : '?');
+    return GestureDetector(
+      onTap: () => context.push('/friends/${friend.id}'),
+      child: Container(
+        width: 150,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: FlixieColors.surfaceElevated,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: FlixieColors.tabBarBorder),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: _avatarColor.withValues(alpha: 0.25),
+                  child: Text(
+                    initial,
+                    style: TextStyle(
+                      color: _avatarColor,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                PopupMenuButton<String>(
+                  tooltip: 'Friend actions',
+                  padding: EdgeInsets.zero,
+                  color: FlixieColors.surfaceElevated,
+                  onSelected: (value) {
+                    if (value == 'profile') {
+                      context.push('/friends/${friend.id}');
+                    } else if (value == 'request') {
+                      onRequestWatch();
+                    }
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(
+                      value: 'profile',
+                      child: Row(children: [
+                        Icon(Icons.person_outline,
+                            color: FlixieColors.primary, size: 18),
+                        SizedBox(width: 8),
+                        Text('View profile',
+                            style: TextStyle(color: Colors.white)),
+                      ]),
+                    ),
+                    PopupMenuItem(
+                      value: 'request',
+                      child: Row(children: [
+                        Icon(Icons.movie_filter_outlined,
+                            color: FlixieColors.secondary, size: 18),
+                        SizedBox(width: 8),
+                        Text('Request watch',
+                            style: TextStyle(color: Colors.white)),
+                      ]),
+                    ),
+                  ],
+                  child: const Icon(Icons.more_horiz_rounded,
+                      color: FlixieColors.medium, size: 20),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              friend.shortName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: FlixieColors.light,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              insights.primaryLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: FlixieColors.primary,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              insights.secondaryLabel,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: FlixieColors.medium,
+                fontSize: 11,
+                height: 1.25,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ActivityEmptyState extends StatelessWidget {
+  const _ActivityEmptyState({
+    required this.hasFriends,
+    required this.onAddFriend,
+    required this.onOpenWatchlist,
+  });
+
+  final bool hasFriends;
+  final VoidCallback onAddFriend;
+  final VoidCallback onOpenWatchlist;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: FlixieColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'No recent activity yet.',
+            style: TextStyle(
+              color: FlixieColors.light,
+              fontWeight: FontWeight.w800,
+              fontSize: 15,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            hasFriends
+                ? 'Request a watch or add more titles to spark activity.'
+                : 'Add friends to start seeing ratings, watchlists and reviews here.',
+            style: const TextStyle(color: FlixieColors.medium, fontSize: 13),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              FilledButton.tonalIcon(
+                onPressed: hasFriends ? onOpenWatchlist : onAddFriend,
+                icon: Icon(hasFriends
+                    ? Icons.movie_filter_outlined
+                    : Icons.person_add_outlined),
+                label: Text(hasFriends ? 'Pick a movie' : 'Add friends'),
+                style: FilledButton.styleFrom(
+                  foregroundColor: FlixieColors.light,
+                  backgroundColor: FlixieColors.primary.withValues(alpha: 0.2),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GroupsPreviewSection extends StatelessWidget {
+  const _GroupsPreviewSection({required this.groups});
+
+  final List<Group> groups;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(child: SocialSectionHeader(title: 'YOUR GROUPS')),
+            TextButton(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text('Switch to Groups to view all.')),
+                );
+              },
+              child: const Text('View all'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ...groups.map((group) => GroupCard(group: group)),
+      ],
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Groups sub-view
 // ---------------------------------------------------------------------------
@@ -401,6 +1063,7 @@ class _GroupsSubView extends StatefulWidget {
 }
 
 class _GroupsSubViewState extends State<_GroupsSubView> {
+  final TextEditingController _searchController = TextEditingController();
   bool _loading = true;
   List<Group> _groups = [];
   final Map<String, GroupMember> _pendingInvites = {};
@@ -412,7 +1075,14 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(() => setState(() {}));
     _load();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -591,6 +1261,38 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
     );
   }
 
+  int get _totalMembers =>
+      _memberCounts.values.fold<int>(0, (sum, count) => sum + count);
+
+  int get _activeGroups => _groups.where((group) {
+        final updated = DateTime.tryParse(group.updatedAt ?? '');
+        if (updated == null) return false;
+        return DateTime.now().difference(updated).inDays <= 14;
+      }).length;
+
+  List<Group> _sortGroups(List<Group> groups) {
+    return [...groups]..sort((a, b) {
+        final aUpdated = DateTime.tryParse(a.updatedAt ?? '');
+        final bUpdated = DateTime.tryParse(b.updatedAt ?? '');
+        if (aUpdated != null && bUpdated != null) {
+          final byRecent = bUpdated.compareTo(aUpdated);
+          if (byRecent != 0) return byRecent;
+        }
+        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      });
+  }
+
+  List<Group> _filterGroups(List<Group> groups) {
+    final query = _searchController.text.trim().toLowerCase();
+    final sorted = _sortGroups(groups);
+    if (query.isEmpty) return sorted;
+    return sorted.where((group) {
+      return group.name.toLowerCase().contains(query) ||
+          (group.abbreviation ?? '').toLowerCase().contains(query) ||
+          (group.description ?? '').toLowerCase().contains(query);
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -630,21 +1332,37 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
   }
 
   Widget _buildMyGroupsTab(List<Group> pendingGroups, List<Group> myGroups) {
+    final sortedGroups = _sortGroups(myGroups);
+    final displayedGroups = _filterGroups(myGroups);
+    final recentGroups = sortedGroups.take(8).toList();
+    final isSearching = _searchController.text.trim().isNotEmpty;
+
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (myGroups.isNotEmpty) ...[
+          _GroupStatsRow(
+            groupCount: myGroups.length,
+            inviteCount: pendingGroups.length,
+            memberCount: _totalMembers,
+            activeCount: _activeGroups,
+          ),
+          const SizedBox(height: 14),
+          _GroupSearchField(controller: _searchController),
+          const SizedBox(height: 14),
+          if (recentGroups.isNotEmpty) ...[
+            const SocialSectionHeader(title: 'RECENT GROUPS'),
+            const SizedBox(height: 8),
             SizedBox(
-              height: 62,
+              height: 70,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                itemCount: myGroups.length,
+                itemCount: recentGroups.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 10),
                 itemBuilder: (_, i) {
-                  final g = myGroups[i];
+                  final g = recentGroups[i];
                   return GestureDetector(
                     onTap: () => context.push('/groups/${g.id}'),
                     child: Column(
@@ -672,7 +1390,7 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
                 },
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 16),
           ],
           if (pendingGroups.isNotEmpty) ...[
             SocialSectionHeader(
@@ -705,23 +1423,18 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
             ],
           ),
           const SizedBox(height: 8),
-          if (myGroups.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: Text(
-                  "You're not in any groups yet.",
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: FlixieColors.medium),
-                ),
-              ),
+          if (displayedGroups.isEmpty)
+            _NoGroupsCard(
+              isSearching: isSearching,
+              onCreateGroup: _showCreateGroupSheet,
             )
           else
-            ...myGroups.map((g) => GroupCard(
+            ...displayedGroups.map((g) => GroupCard(
                   group: g,
                   memberCount: _memberCounts[g.id],
+                  statusLabel: _pendingInvites.containsKey(g.id)
+                      ? 'Invite pending'
+                      : _groupFreshnessLabel(g),
                 )),
           const SizedBox(height: 24),
         ],
@@ -731,25 +1444,275 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
 
   Widget _buildRequestsTab(List<Group> pendingGroups) {
     if (pendingGroups.isEmpty) {
-      return const Center(
-        child: Text(
-          'No pending invitations',
-          style: TextStyle(color: FlixieColors.medium),
-        ),
+      return SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: _NoGroupInvitesCard(onCreateGroup: _showCreateGroupSheet),
       );
     }
+    final sortedPending = _sortGroups(pendingGroups);
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
-        children: pendingGroups
-            .map((g) => GroupInvitationCard(
-                  group: g,
-                  invitedByUsername: _inviteNotifications[g.id]?.senderName,
-                  onAccept: () => _respondToInvite(g, 'ACCEPTED'),
-                  onDecline: () => _respondToInvite(g, 'DECLINED'),
-                ))
-            .toList(),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _PendingGroupInviteSummary(count: sortedPending.length),
+          const SizedBox(height: 12),
+          ...sortedPending.map((g) => GroupInvitationCard(
+                group: g,
+                invitedByUsername: _inviteNotifications[g.id]?.senderName,
+                onAccept: () => _respondToInvite(g, 'ACCEPTED'),
+                onDecline: () => _respondToInvite(g, 'DECLINED'),
+              )),
+        ],
+      ),
+    );
+  }
+
+  String _groupFreshnessLabel(Group group) {
+    final updated = DateTime.tryParse(group.updatedAt ?? '');
+    if (updated == null) return 'Community';
+    final diff = DateTime.now().difference(updated);
+    if (diff.inHours < 24) return 'Active today';
+    if (diff.inDays < 7) return 'Active this week';
+    return 'Community';
+  }
+}
+
+class _GroupStatsRow extends StatelessWidget {
+  const _GroupStatsRow({
+    required this.groupCount,
+    required this.inviteCount,
+    required this.memberCount,
+    required this.activeCount,
+  });
+
+  final int groupCount;
+  final int inviteCount;
+  final int memberCount;
+  final int activeCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _stat(Icons.groups_2_outlined, '$groupCount', 'Groups',
+            FlixieColors.primary),
+        const SizedBox(width: 8),
+        _stat(Icons.mail_outline_rounded, '$inviteCount', 'Invites',
+            FlixieColors.warning),
+        const SizedBox(width: 8),
+        _stat(Icons.people_outline_rounded, '$memberCount', 'Members',
+            FlixieColors.secondary),
+        const SizedBox(width: 8),
+        _stat(Icons.bolt_rounded, '$activeCount', 'Active',
+            FlixieColors.tertiary),
+      ],
+    );
+  }
+
+  Widget _stat(IconData icon, String value, String label, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        decoration: BoxDecoration(
+          color: FlixieColors.surfaceElevated,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: const TextStyle(
+                color: FlixieColors.light,
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: FlixieColors.medium,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GroupSearchField extends StatelessWidget {
+  const _GroupSearchField({required this.controller});
+
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      style: const TextStyle(color: FlixieColors.light, fontSize: 14),
+      textInputAction: TextInputAction.search,
+      decoration: InputDecoration(
+        hintText: 'Search groups',
+        hintStyle: const TextStyle(color: FlixieColors.medium),
+        prefixIcon:
+            const Icon(Icons.search_rounded, color: FlixieColors.medium),
+        suffixIcon: controller.text.isEmpty
+            ? null
+            : IconButton(
+                tooltip: 'Clear search',
+                icon:
+                    const Icon(Icons.close_rounded, color: FlixieColors.medium),
+                onPressed: controller.clear,
+              ),
+        filled: true,
+        fillColor: FlixieColors.surfaceElevated,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: FlixieColors.primary),
+        ),
+      ),
+    );
+  }
+}
+
+class _NoGroupsCard extends StatelessWidget {
+  const _NoGroupsCard({
+    required this.isSearching,
+    required this.onCreateGroup,
+  });
+
+  final bool isSearching;
+  final VoidCallback onCreateGroup;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: FlixieColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isSearching ? Icons.search_off_rounded : Icons.groups_2_outlined,
+            color: FlixieColors.primary,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              isSearching
+                  ? 'No groups match your search.'
+                  : 'Create a group to plan watches with friends.',
+              style: const TextStyle(color: FlixieColors.medium, fontSize: 13),
+            ),
+          ),
+          if (!isSearching)
+            TextButton(
+              onPressed: onCreateGroup,
+              child: const Text('Create'),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NoGroupInvitesCard extends StatelessWidget {
+  const _NoGroupInvitesCard({required this.onCreateGroup});
+
+  final VoidCallback onCreateGroup;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: FlixieColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'No pending invites',
+            style: TextStyle(
+              color: FlixieColors.light,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Start a group and invite friends to plan what to watch next.',
+            style: TextStyle(color: FlixieColors.medium, fontSize: 13),
+          ),
+          const SizedBox(height: 12),
+          FilledButton.tonalIcon(
+            onPressed: onCreateGroup,
+            icon: const Icon(Icons.add),
+            label: const Text('Create group'),
+            style: FilledButton.styleFrom(
+              foregroundColor: FlixieColors.light,
+              backgroundColor: FlixieColors.primary.withValues(alpha: 0.2),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PendingGroupInviteSummary extends StatelessWidget {
+  const _PendingGroupInviteSummary({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: FlixieColors.warning.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: FlixieColors.warning.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.mail_outline_rounded, color: FlixieColors.warning),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '$count group invite${count == 1 ? '' : 's'} waiting',
+              style: const TextStyle(
+                color: FlixieColors.light,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -851,7 +1814,8 @@ class _CreateGroupSheet extends StatefulWidget {
 }
 
 class _CreateGroupSheetState extends State<_CreateGroupSheet> {
-  final FriendActionsController _friendActions = FriendActionsController.instance;
+  final FriendActionsController _friendActions =
+      FriendActionsController.instance;
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _abbrController = TextEditingController();

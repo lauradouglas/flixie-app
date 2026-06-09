@@ -6,10 +6,16 @@ import '../../theme/app_theme.dart';
 import 'group_avatar.dart';
 
 class GroupCard extends StatelessWidget {
-  const GroupCard({super.key, required this.group, this.memberCount});
+  const GroupCard({
+    super.key,
+    required this.group,
+    this.memberCount,
+    this.statusLabel,
+  });
 
   final Group group;
   final int? memberCount;
+  final String? statusLabel;
 
   static String _formatCount(int count) {
     if (count >= 1000000) return '${(count / 1000000).toStringAsFixed(1)}M';
@@ -34,26 +40,7 @@ class GroupCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                GroupAvatar(group: group, radius: 26),
-                Positioned(
-                  bottom: 1,
-                  right: 1,
-                  child: Container(
-                    width: 11,
-                    height: 11,
-                    decoration: BoxDecoration(
-                      color: FlixieColors.success,
-                      shape: BoxShape.circle,
-                      border:
-                          Border.all(color: FlixieColors.background, width: 2),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            GroupAvatar(group: group, radius: 26),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -67,30 +54,70 @@ class GroupCard extends StatelessWidget {
                       fontSize: 15,
                     ),
                   ),
-                  if (count != null)
-                    Text(
-                      '${_formatCount(count)} MEMBER${count == 1 ? '' : 'S'}',
-                      style: const TextStyle(
-                        color: FlixieColors.primary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      if (count != null)
+                        _GroupInfoChip(
+                          label:
+                              '${_formatCount(count)} member${count == 1 ? '' : 's'}',
+                          color: FlixieColors.primary,
+                        ),
+                      if (statusLabel != null && statusLabel!.isNotEmpty)
+                        _GroupInfoChip(
+                          label: statusLabel!,
+                          color: statusLabel == 'Invite pending'
+                              ? FlixieColors.warning
+                              : FlixieColors.success,
+                        ),
+                    ],
+                  ),
                   if (group.description != null &&
-                      group.description!.isNotEmpty)
+                      group.description!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
                     Text(
                       group.description!,
                       style: const TextStyle(
-                          color: FlixieColors.medium, fontSize: 12),
+                        color: FlixieColors.medium,
+                        fontSize: 12,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                  ],
                 ],
               ),
             ),
             const Icon(Icons.chevron_right, color: FlixieColors.medium),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GroupInfoChip extends StatelessWidget {
+  const _GroupInfoChip({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );

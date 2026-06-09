@@ -58,7 +58,9 @@ class GroupInsightMovie {
   final int discussionCount;
   final double averageRating;
   final int ratingCount;
+  final double ratingSpread;
   final String? latestDiscussionSnippet;
+  final List<String> genres;
   final List<GroupInsightUser> watchers;
 
   const GroupInsightMovie({
@@ -71,7 +73,9 @@ class GroupInsightMovie {
     this.discussionCount = 0,
     this.averageRating = 0,
     this.ratingCount = 0,
+    this.ratingSpread = 0,
     this.latestDiscussionSnippet,
+    this.genres = const [],
     this.watchers = const [],
   });
 
@@ -122,14 +126,42 @@ class GroupInsightMovie {
       averageRating:
           _parseDouble(json['averageRating'] ?? json['avgRating']) ?? 0,
       ratingCount: _parseInt(json['ratingCount'] ?? json['ratingsCount']) ?? 0,
+      ratingSpread: _parseDouble(json['ratingSpread'] ??
+              json['ratingVariance'] ??
+              json['ratingStdDev'] ??
+              json['rating_std_dev']) ??
+          _ratingSpreadFromBounds(json),
       latestDiscussionSnippet:
           (json['latestDiscussionSnippet'] ?? json['latestSnippet']) as String?,
+      genres: _parseGenres(json['genres'] ?? movie?['genres']),
       watchers: (usersRaw ?? const [])
           .whereType<Map<String, dynamic>>()
           .map(GroupInsightUser.fromJson)
           .toList(growable: false),
     );
   }
+}
+
+List<String> _parseGenres(dynamic value) {
+  if (value is! List) return const [];
+  return value
+      .map((genre) {
+        if (genre is String) return genre.trim();
+        if (genre is Map<String, dynamic>) {
+          return (genre['name'] ?? genre['label'] ?? '').toString().trim();
+        }
+        return '';
+      })
+      .where((genre) => genre.isNotEmpty)
+      .toSet()
+      .toList(growable: false);
+}
+
+double _ratingSpreadFromBounds(Map<String, dynamic> json) {
+  final high = _parseDouble(json['maxRating'] ?? json['highestRating']);
+  final low = _parseDouble(json['minRating'] ?? json['lowestRating']);
+  if (high == null || low == null) return 0;
+  return (high - low).abs();
 }
 
 class GroupInsightReview {

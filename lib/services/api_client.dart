@@ -13,20 +13,20 @@ class ApiException implements Exception {
 }
 
 class ApiClient {
-  static const String baseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://192.168.1.127:3000',
-  );
+  // static const String baseUrl = String.fromEnvironment(
+  //   'API_BASE_URL',
+  //   defaultValue: 'http://192.168.1.127:3000',
+  //  );
   // static const String baseUrl = String.fromEnvironment(
   //   'API_BASE_URL',
   //   defaultValue: 'http://192.168.1.203:3000',
   // );
 
-  // static const String baseUrl = String.fromEnvironment(
-  //   'API_BASE_URL',
-  //   defaultValue:
-  //       'https://flixie-api-fmcehvaecwdheccm.northeurope-01.azurewebsites.net',
-  // );
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue:
+        'https://flixie-api-fmcehvaecwdheccm.northeurope-01.azurewebsites.net',
+  );
 
   static const Duration _timeout = Duration(seconds: 15);
 

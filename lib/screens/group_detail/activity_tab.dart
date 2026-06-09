@@ -13,7 +13,8 @@ import 'group_hero_banner.dart';
 import 'pending_request_preview_tile.dart';
 
 class GroupActivityTab extends StatefulWidget {
-  const GroupActivityTab({super.key, 
+  const GroupActivityTab({
+    super.key,
     required this.group,
     required this.memberCount,
     required this.groupId,
@@ -119,7 +120,7 @@ class GroupActivityTabState extends State<GroupActivityTab> {
             if (group != null)
               GroupHeroBanner(group: group, memberCount: widget.memberCount),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
 
             // ---- Search bar -------------------------------------------------
             if (_activity.isNotEmpty || _searchQuery.isNotEmpty)
@@ -131,7 +132,7 @@ class GroupActivityTabState extends State<GroupActivityTab> {
                   style:
                       const TextStyle(color: FlixieColors.light, fontSize: 14),
                   decoration: InputDecoration(
-                    hintText: 'Search activity & requests…',
+                    hintText: 'Search activity',
                     hintStyle: const TextStyle(
                         color: FlixieColors.medium, fontSize: 14),
                     prefixIcon: const Icon(Icons.search,
@@ -147,20 +148,20 @@ class GroupActivityTabState extends State<GroupActivityTab> {
                           )
                         : null,
                     filled: true,
-                    fillColor: FlixieColors.tabBarBackgroundFocused,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    fillColor: FlixieColors.surfaceElevated,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(14),
                       borderSide:
                           const BorderSide(color: FlixieColors.tabBarBorder),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(14),
                       borderSide:
                           const BorderSide(color: FlixieColors.tabBarBorder),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(14),
                       borderSide: const BorderSide(color: FlixieColors.primary),
                     ),
                   ),
@@ -168,7 +169,7 @@ class GroupActivityTabState extends State<GroupActivityTab> {
                 ),
               ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
@@ -191,25 +192,26 @@ class GroupActivityTabState extends State<GroupActivityTab> {
                     ),
                   ),
                   const Spacer(),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: FlixieColors.success.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                          color: FlixieColors.success.withValues(alpha: 0.4)),
-                    ),
-                    child: const Text(
-                      'LIVE',
-                      style: TextStyle(
-                        color: FlixieColors.success,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1,
+                  if (_filteredActivity.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: FlixieColors.success.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: FlixieColors.success.withValues(alpha: 0.4)),
+                      ),
+                      child: Text(
+                        '${_filteredActivity.length}',
+                        style: const TextStyle(
+                          color: FlixieColors.success,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -231,7 +233,7 @@ class GroupActivityTabState extends State<GroupActivityTab> {
                     (item) => Padding(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 4),
-                      child: ActivityTile(item: item),
+                      child: ActivityTile(item: item, compact: true),
                     ),
                   )),
 
