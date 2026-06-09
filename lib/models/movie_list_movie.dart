@@ -22,18 +22,18 @@ class MovieListMovie {
   });
 
   factory MovieListMovie.fromJson(Map<String, dynamic> json) {
+    final movie = json['movie'] is Map<String, dynamic>
+        ? WatchlistMovieDetails.fromJson(json['movie'] as Map<String, dynamic>)
+        : null;
     return MovieListMovie(
       id: json['id']?.toString() ?? '',
       userId: json['userId']?.toString() ?? '',
       listId: json['listId']?.toString() ?? '',
-      movieId: _parseInt(json['movieId']) ?? 0,
+      movieId: _parseInt(json['movieId']) ?? movie?.id ?? 0,
       removed: json['removed'] as bool? ?? false,
       createdAt: json['createdAt']?.toString(),
       updatedAt: json['updatedAt']?.toString(),
-      movie: json['movie'] is Map<String, dynamic>
-          ? WatchlistMovieDetails.fromJson(
-              json['movie'] as Map<String, dynamic>)
-          : null,
+      movie: movie,
     );
   }
 

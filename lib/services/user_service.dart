@@ -554,7 +554,9 @@ class UserService {
     final result = <MovieList>[];
     for (final list in lists) {
       final movies = await getMovieListMovies(userId, list.id);
-      if (movies.any((entry) => entry.movieId == movieId && !entry.removed)) {
+      if (movies.any((entry) =>
+          !entry.removed &&
+          (entry.movieId == movieId || entry.movie?.id == movieId))) {
         result.add(list);
       }
     }

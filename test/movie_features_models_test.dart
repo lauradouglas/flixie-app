@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flixie_app/models/movie_friend_list_entry.dart';
 import 'package:flixie_app/models/movie_list.dart';
+import 'package:flixie_app/models/movie_list_movie.dart';
 import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'package:flixie_app/models/movie_wrapped.dart';
 import 'package:flixie_app/services/recommendation_service.dart';
@@ -70,6 +71,23 @@ void main() {
         'description': 'Updated description',
         'visibility': ListVisibility.friends,
       });
+    });
+
+    test('list movie falls back to nested movie id', () {
+      final model = MovieListMovie.fromJson({
+        'id': 'entry-1',
+        'userId': 'user-1',
+        'listId': 'list-1',
+        'movie': {
+          'id': 550,
+          'title': 'Fight Club',
+          'posterPath': '/poster.jpg',
+        },
+        'removed': false,
+      });
+
+      expect(model.movieId, 550);
+      expect(model.movie?.id, 550);
     });
   });
 
