@@ -9,7 +9,6 @@ import '../models/movie_short.dart';
 import '../models/person.dart';
 import '../models/search_result.dart';
 import '../providers/auth_provider.dart';
-import '../services/movie_service.dart';
 import '../services/search_service.dart';
 import '../services/trending_service.dart';
 import '../theme/app_theme.dart';
@@ -35,30 +34,17 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _controller = TextEditingController();
   String _query = '';
+  _SearchMode _searchMode = _SearchMode.all;
   Timer? _debounce;
   final List<String> _recentSearches = [];
-  static const List<String> _popularSearches = [
-    'New releases',
-    'Marvel',
-    'Christopher Nolan',
-    'Sci-Fi',
-    'Action',
-    'Horror',
-    'Comedy',
-    'Drama',
-    'Animated',
-  ];
 
   // Default view data
   List<MovieShort> _trendingMovies = [];
-  List<MovieShort> _topRatedMovies = [];
   bool _isLoadingDefault = true;
-
-  // Discover section filter
-  final bool _discoverAll = true;
 
   // Search results
   SearchResults? _searchResults;
+  SearchEntityResults? _entityResults;
   bool _isSearching = false;
 
   @override
@@ -76,15 +62,10 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _loadDefaultData() async {
     try {
-      final movieService = context.read<MovieService>();
-      final results = await Future.wait([
-        TrendingService.getTrendingMovies(),
-        movieService.getTopRatedMovies(),
-      ]);
+      final trending = await TrendingService.getTrendingMovies();
       if (mounted) {
         setState(() {
-          _trendingMovies = results[0];
-          _topRatedMovies = results[1];
+          _trendingMovies = trending;
           _isLoadingDefault = false;
         });
       }
@@ -101,6 +82,7 @@ class _SearchScreenState extends State<SearchScreen> {
     if (value.trim().length < 3) {
       setState(() {
         _searchResults = null;
+        _entityResults = null;
         _isSearching = false;
       });
       return;
@@ -113,10 +95,34 @@ class _SearchScreenState extends State<SearchScreen> {
   Future<void> _performSearch(String query) async {
     setState(() => _isSearching = true);
     try {
-      final results = await SearchService.search(query);
+      final SearchResults? results;
+      final SearchEntityResults? entityResults;
+      switch (_searchMode) {
+        case _SearchMode.all:
+          results = await SearchService.search(query);
+          entityResults = null;
+          break;
+        case _SearchMode.movies:
+          results = await SearchService.search(query, type: 'movie');
+          entityResults = null;
+          break;
+        case _SearchMode.people:
+          results = await SearchService.search(query, type: 'person');
+          entityResults = null;
+          break;
+        case _SearchMode.companies:
+          results = null;
+          entityResults = await SearchService.searchCompany(query);
+          break;
+        case _SearchMode.collections:
+          results = null;
+          entityResults = await SearchService.searchCollection(query);
+          break;
+      }
       if (mounted) {
         setState(() {
           _searchResults = results;
+          _entityResults = entityResults;
           _isSearching = false;
           _recentSearches.remove(query);
           _recentSearches.insert(0, query);
@@ -142,9 +148,7 @@ class _SearchScreenState extends State<SearchScreen> {
         title: const Text(
           'Search',
           style: TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold),
+              color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
         ),
         actions: [
           IconButton(
@@ -153,8 +157,8 @@ class _SearchScreenState extends State<SearchScreen> {
               label: Text(unreadCount < 100 ? '$unreadCount' : '99+'),
               backgroundColor: FlixieColors.tertiary,
               textColor: Colors.black,
-              child: const Icon(Icons.notifications_outlined,
-                  color: Colors.white),
+              child:
+                  const Icon(Icons.notifications_outlined, color: Colors.white),
             ),
             onPressed: () => context.push('/notifications'),
           ),
@@ -163,6 +167,7 @@ class _SearchScreenState extends State<SearchScreen> {
       body: Column(
         children: [
           _buildSearchBar(),
+          _buildSearchModeSelector(),
           Expanded(
             child: _query.trim().isEmpty
                 ? _buildDefaultView()
@@ -181,14 +186,14 @@ class _SearchScreenState extends State<SearchScreen> {
         onChanged: _onSearchChanged,
         style: const TextStyle(color: Colors.white),
         decoration: InputDecoration(
-          hintText: 'Search movies, people, genres...',
+          hintText: _searchMode.hintText,
           hintStyle: const TextStyle(color: FlixieColors.medium),
           prefixIcon:
               const Icon(Icons.search_rounded, color: FlixieColors.medium),
           suffixIcon: _query.isNotEmpty
               ? IconButton(
-                  icon:
-                      const Icon(Icons.close_rounded, color: FlixieColors.medium),
+                  icon: const Icon(Icons.close_rounded,
+                      color: FlixieColors.medium),
                   onPressed: () {
                     _controller.clear();
                     _onSearchChanged('');
@@ -199,13 +204,11 @@ class _SearchScreenState extends State<SearchScreen> {
           fillColor: FlixieColors.tabBarBackgroundFocused,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide:
-                BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+            borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide:
-                BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+            borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
@@ -216,6 +219,65 @@ class _SearchScreenState extends State<SearchScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildSearchModeSelector() {
+    final modes = [
+      _SearchMode.all,
+      _SearchMode.movies,
+      _SearchMode.people,
+      _SearchMode.companies,
+      _SearchMode.collections,
+    ];
+
+    return SizedBox(
+      height: 42,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+        itemCount: modes.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final mode = modes[index];
+          final selected = mode == _searchMode;
+          return ChoiceChip(
+            selected: selected,
+            label: Text(mode.label),
+            avatar: Icon(
+              mode.icon,
+              size: 16,
+              color: selected ? Colors.black : FlixieColors.medium,
+            ),
+            selectedColor: FlixieColors.primary,
+            backgroundColor: FlixieColors.tabBarBackgroundFocused,
+            labelStyle: TextStyle(
+              color: selected ? Colors.black : FlixieColors.light,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
+            side: BorderSide(
+              color: selected
+                  ? FlixieColors.primary
+                  : Colors.white.withValues(alpha: 0.08),
+            ),
+            onSelected: (_) => _setSearchMode(mode),
+          );
+        },
+      ),
+    );
+  }
+
+  void _setSearchMode(_SearchMode mode) {
+    if (_searchMode == mode) return;
+    setState(() {
+      _searchMode = mode;
+      _searchResults = null;
+      _entityResults = null;
+    });
+    final query = _controller.text.trim();
+    if (query.length >= 3) {
+      _performSearch(query);
+    }
   }
 
   Widget _buildDefaultView() {
@@ -267,37 +329,6 @@ class _SearchScreenState extends State<SearchScreen> {
                   .toList(),
             ),
           const SizedBox(height: 22),
-          // Popular Searches
-          const _SectionHeader(title: 'Popular searches'),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _popularSearches
-                .map((term) => GestureDetector(
-                      onTap: () {
-                        _controller.text = term;
-                        _onSearchChanged(term);
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: FlixieColors.tabBarBackgroundFocused,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.1)),
-                        ),
-                        child: Text(
-                          term,
-                          style:
-                              const TextStyle(color: FlixieColors.light, fontSize: 13),
-                        ),
-                      ),
-                    ))
-                .toList(),
-          ),
-          const SizedBox(height: 22),
           // Browse By
           const _SectionHeader(title: 'Browse by'),
           const SizedBox(height: 10),
@@ -315,8 +346,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     foregroundColor: FlixieColors.primary,
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                   ),
-                  child:
-                      const Text('See all', style: TextStyle(fontSize: 13)),
+                  child: const Text('See all', style: TextStyle(fontSize: 13)),
                 ),
               ],
             ),
@@ -330,8 +360,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 separatorBuilder: (_, __) => const SizedBox(width: 10),
                 itemBuilder: (context, i) => _TrendingPosterCard(
                   movie: _trendingMovies[i],
-                  onTap: () =>
-                      context.push('/movies/${_trendingMovies[i].id}'),
+                  onTap: () => context.push('/movies/${_trendingMovies[i].id}'),
                 ),
               ),
             ),
@@ -346,27 +375,23 @@ class _SearchScreenState extends State<SearchScreen> {
       _BrowseCategory(
           label: 'Movies',
           icon: Icons.movie_filter_rounded,
-          color: Color(0xFFEF4444)),
-      _BrowseCategory(
-          label: 'Genres',
-          icon: Icons.theater_comedy_outlined,
-          color: Color(0xFF14B8A6)),
+          color: Color(0xFFEF4444),
+          mode: _SearchMode.movies),
       _BrowseCategory(
           label: 'People',
           icon: Icons.person_outline_rounded,
-          color: Color(0xFFF59E0B)),
+          color: Color(0xFFF59E0B),
+          mode: _SearchMode.people),
       _BrowseCategory(
           label: 'Collections',
           icon: Icons.folder_special_outlined,
-          color: Color(0xFF8B5CF6)),
+          color: Color(0xFF8B5CF6),
+          mode: _SearchMode.collections),
       _BrowseCategory(
           label: 'Studios',
           icon: Icons.business_outlined,
-          color: Color(0xFF14B8A6)),
-      _BrowseCategory(
-          label: 'Keywords',
-          icon: Icons.label_outline_rounded,
-          color: Color(0xFF10B981)),
+          color: Color(0xFF14B8A6),
+          mode: _SearchMode.companies),
     ];
     return GridView.count(
       crossAxisCount: 3,
@@ -378,15 +403,19 @@ class _SearchScreenState extends State<SearchScreen> {
       children: categories
           .map((cat) => GestureDetector(
                 onTap: () {
-                  _controller.text = cat.label;
-                  _onSearchChanged(cat.label);
+                  _setSearchMode(cat.mode);
                 },
                 child: Container(
                   decoration: BoxDecoration(
-                    color: FlixieColors.tabBarBackgroundFocused,
+                    color: _searchMode == cat.mode
+                        ? cat.color.withValues(alpha: 0.16)
+                        : FlixieColors.tabBarBackgroundFocused,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.07)),
+                      color: _searchMode == cat.mode
+                          ? cat.color.withValues(alpha: 0.7)
+                          : Colors.white.withValues(alpha: 0.07),
+                    ),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -415,8 +444,10 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     final results = _searchResults?.results ?? [];
+    final entityResults = _entityResults?.results ?? [];
+    final hasSearchResponse = _searchResults != null || _entityResults != null;
 
-    if (_searchResults != null && results.isEmpty) {
+    if (hasSearchResponse && results.isEmpty && entityResults.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -432,8 +463,31 @@ class _SearchScreenState extends State<SearchScreen> {
       );
     }
 
-    if (results.isEmpty) {
+    if (results.isEmpty && entityResults.isEmpty) {
       return const SizedBox.shrink();
+    }
+
+    if (entityResults.isNotEmpty) {
+      return ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        itemCount: entityResults.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 8),
+        itemBuilder: (context, index) {
+          final item = entityResults[index];
+          return _EntityResultTile(
+            result: item,
+            onTap: () {
+              _controller.text = item.name;
+              setState(() {
+                _searchMode = _SearchMode.movies;
+                _searchResults = null;
+                _entityResults = null;
+              });
+              _onSearchChanged(item.name);
+            },
+          );
+        },
+      );
     }
 
     final filtered = results.where((item) {
@@ -516,15 +570,14 @@ class _RecentSearchChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: FlixieColors.tabBarBackgroundFocused,
           borderRadius: BorderRadius.circular(20),
-          border:
-              Border.all(color: Colors.white.withValues(alpha: 0.1)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(term,
-                style: const TextStyle(
-                    color: FlixieColors.light, fontSize: 13)),
+                style:
+                    const TextStyle(color: FlixieColors.light, fontSize: 13)),
             const SizedBox(width: 6),
             GestureDetector(
               onTap: onRemove,
@@ -541,11 +594,51 @@ class _RecentSearchChip extends StatelessWidget {
 // ─── Browse-by category data ─────────────────────────────────────────────────
 
 class _BrowseCategory {
-  const _BrowseCategory(
-      {required this.label, required this.icon, required this.color});
+  const _BrowseCategory({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.mode,
+  });
+
   final String label;
   final IconData icon;
   final Color color;
+  final _SearchMode mode;
+}
+
+enum _SearchMode {
+  all,
+  movies,
+  people,
+  companies,
+  collections,
+}
+
+extension _SearchModeView on _SearchMode {
+  String get label => switch (this) {
+        _SearchMode.all => 'All',
+        _SearchMode.movies => 'Movies',
+        _SearchMode.people => 'People',
+        _SearchMode.companies => 'Studios',
+        _SearchMode.collections => 'Collections',
+      };
+
+  String get hintText => switch (this) {
+        _SearchMode.all => 'Search movies or people...',
+        _SearchMode.movies => 'Search movies...',
+        _SearchMode.people => 'Search people...',
+        _SearchMode.companies => 'Search production companies...',
+        _SearchMode.collections => 'Search collections...',
+      };
+
+  IconData get icon => switch (this) {
+        _SearchMode.all => Icons.search_rounded,
+        _SearchMode.movies => Icons.movie_filter_rounded,
+        _SearchMode.people => Icons.person_outline_rounded,
+        _SearchMode.companies => Icons.business_outlined,
+        _SearchMode.collections => Icons.folder_special_outlined,
+      };
 }
 
 // ─── Trending poster card ────────────────────────────────────────────────────
@@ -629,171 +722,113 @@ class _TrendingPosterCard extends StatelessWidget {
   }
 }
 
-// ─── Top-rated list item ────────────────────────────────────────────────────
+// ─── Search result: entity tile ──────────────────────────────────────────────
 
-class _TopRatedListItem extends StatelessWidget {
-  const _TopRatedListItem({required this.movie, this.onTap});
+class _EntityResultTile extends StatelessWidget {
+  const _EntityResultTile({required this.result, this.onTap});
 
-  final MovieShort movie;
+  final SearchEntityResult result;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final voteAvg = movie.voteAverage;
+    final imagePath =
+        result.posterPath ?? result.logoPath ?? result.backdropPath;
+    final subtitle = switch (result.type) {
+      SearchEntityType.company => [
+          'Production company',
+          if (result.originCountry != null) result.originCountry!,
+        ].join(' · '),
+      SearchEntityType.collection => 'Collection',
+    };
 
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: SizedBox(
-                width: 60,
-                height: 80,
-                child: movie.poster != null
-                    ? CachedNetworkImage(
-                        imageUrl:
-                            'https://image.tmdb.org/t/p/w92${movie.poster}',
-                        fit: BoxFit.cover,
-                        errorWidget: (_, __, ___) => Container(
-                          color: FlixieColors.primary.withValues(alpha: 0.3),
-                          child: const Icon(Icons.movie,
-                              color: FlixieColors.primary),
-                        ),
-                      )
-                    : Container(
-                        color: FlixieColors.primary.withValues(alpha: 0.3),
-                        child: const Icon(Icons.movie,
-                            color: FlixieColors.primary),
-                      ),
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(
+                  width: 52,
+                  height: 52,
+                  child: imagePath != null
+                      ? CachedNetworkImage(
+                          imageUrl: 'https://image.tmdb.org/t/p/w185$imagePath',
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) =>
+                              _EntityIconPlaceholder(type: result.type),
+                        )
+                      : _EntityIconPlaceholder(type: result.type),
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    movie.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyLarge
-                        ?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(Icons.star,
-                          size: 14, color: FlixieColors.warning),
-                      const SizedBox(width: 4),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      result.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyLarge
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: FlixieColors.medium),
+                    ),
+                    if (result.overview != null) ...[
+                      const SizedBox(height: 4),
                       Text(
-                        voteAvg != null ? voteAvg.toStringAsFixed(1) : '—',
+                        result.overview!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: Theme.of(context)
                             .textTheme
                             .bodySmall
-                            ?.copyWith(color: FlixieColors.warning),
+                            ?.copyWith(color: FlixieColors.light),
                       ),
                     ],
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+              const SizedBox(width: 8),
+              const Icon(Icons.search_rounded, color: FlixieColors.medium),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-// ─── Discover grid card ─────────────────────────────────────────────────────
+class _EntityIconPlaceholder extends StatelessWidget {
+  const _EntityIconPlaceholder({required this.type});
 
-class _DiscoverCard extends StatelessWidget {
-  const _DiscoverCard({required this.movie, this.onTap});
-
-  final MovieShort movie;
-  final VoidCallback? onTap;
+  final SearchEntityType type;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (movie.poster != null)
-              CachedNetworkImage(
-                imageUrl: 'https://image.tmdb.org/t/p/w342${movie.poster}',
-                fit: BoxFit.cover,
-                errorWidget: (_, __, ___) => Container(
-                  color: FlixieColors.primary.withValues(alpha: 0.3),
-                  child: const Icon(Icons.movie_outlined, size: 48),
-                ),
-              )
-            else
-              Container(
-                color: FlixieColors.primary.withValues(alpha: 0.3),
-                child: const Icon(Icons.movie_outlined, size: 48),
-              ),
-            // Gradient overlay
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  stops: const [0.5, 1.0],
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: 0.85),
-                  ],
-                ),
-              ),
-            ),
-            // Title and media type
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      movie.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                    if (movie.mediaType != null &&
-                        movie.mediaType!.toLowerCase() == 'tv') ...[
-                      const SizedBox(height: 4),
-                      const Text(
-                        'TV Series',
-                        style: TextStyle(
-                          color: FlixieColors.tertiary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    final icon = switch (type) {
+      SearchEntityType.company => Icons.business_outlined,
+      SearchEntityType.collection => Icons.folder_special_outlined,
+    };
+
+    return Container(
+      color: FlixieColors.primary.withValues(alpha: 0.18),
+      child: Icon(icon, color: FlixieColors.primary),
     );
   }
 }

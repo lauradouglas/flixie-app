@@ -43,6 +43,34 @@ class SearchService {
     );
   }
 
+  static Future<SearchEntityResults> searchCompany(
+    String value, {
+    int page = 1,
+  }) async {
+    final data = await ApiClient.get('/search/company', queryParams: {
+      'value': value,
+      'page': page.toString(),
+    });
+    return SearchEntityResults.fromJson(
+      data as Map<String, dynamic>,
+      type: SearchEntityType.company,
+    );
+  }
+
+  static Future<SearchEntityResults> searchCollection(
+    String value, {
+    int page = 1,
+  }) async {
+    final data = await ApiClient.get('/search/collection', queryParams: {
+      'value': value,
+      'page': page.toString(),
+    });
+    return SearchEntityResults.fromJson(
+      data as Map<String, dynamic>,
+      type: SearchEntityType.collection,
+    );
+  }
+
   static Future<List<Movie>> searchMovies(String query) async {
     final data =
         await ApiClient.get('/search/movies', queryParams: {'query': query});
