@@ -1,12 +1,16 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../models/movie_short.dart';
 import '../models/movie_list_movie.dart';
 import '../providers/auth_provider.dart';
 import '../providers/movie_lists_provider.dart';
 import '../repositories/movie_features_repository.dart';
+import '../services/search_service.dart';
 import '../theme/app_theme.dart';
 
 enum _ListSort { recentlyAdded, title, rating }
@@ -72,6 +76,26 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
     return context.read<MovieListsProvider>().loadListMovies(widget.listId);
   }
 
+  Future<void> _showAddMovieSheet() async {
+    final provider = context.read<MovieListsProvider>();
+    final added = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: FlixieColors.surfaceElevated,
+      builder: (sheetContext) =>
+          ChangeNotifierProvider<MovieListsProvider>.value(
+        value: provider,
+        child: _AddMovieToListSheet(
+          listId: widget.listId,
+          listName: widget.listName,
+        ),
+      ),
+    );
+    if (added == true && mounted) {
+      await _refresh();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<MovieListsProvider>();
@@ -88,8 +112,8 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
         actions: [
           if (widget.isOwner)
             IconButton(
-              tooltip: 'Search movies',
-              onPressed: () => context.push('/search'),
+              tooltip: 'Add movies',
+              onPressed: _showAddMovieSheet,
               icon: const Icon(Icons.add_rounded),
             ),
           PopupMenuButton<String>(
@@ -131,7 +155,7 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                       movieCount: rawMovies.length,
                       posterUrls: _posterUrls(rawMovies),
                       isOwner: widget.isOwner,
-                      onAddMovies: () => context.push('/search'),
+                      onAddMovies: _showAddMovieSheet,
                     ),
                   ),
                   SliverToBoxAdapter(
@@ -148,7 +172,7 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                         isOwner: widget.isOwner,
                         message:
                             provider.error ?? 'No movies in this list yet.',
-                        onAddMovies: () => context.push('/search'),
+                        onAddMovies: _showAddMovieSheet,
                       ),
                     )
                   else
@@ -262,6 +286,365 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
           ok
               ? 'Removed from list'
               : (provider.error ?? 'Unable to remove movie'),
+        ),
+      ),
+    );
+  }
+}
+
+class _AddMovieToListSheet extends StatefulWidget {
+  const _AddMovieToListSheet({
+    required this.listId,
+    required this.listName,
+  });
+
+  final String listId;
+  final String listName;
+
+  @override
+  State<_AddMovieToListSheet> createState() => _AddMovieToListSheetState();
+}
+
+class _AddMovieToListSheetState extends State<_AddMovieToListSheet> {
+  final TextEditingController _controller = TextEditingController();
+  Timer? _debounce;
+  List<MovieShort> _results = const [];
+  bool _searching = false;
+  int? _addingMovieId;
+  String? _error;
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onQueryChanged(String value) {
+    _debounce?.cancel();
+    final query = value.trim();
+    if (query.length < 2) {
+      setState(() {
+        _results = const [];
+        _searching = false;
+        _error = null;
+      });
+      return;
+    }
+    setState(() {
+      _searching = true;
+      _error = null;
+    });
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      _search(query);
+    });
+  }
+
+  Future<void> _search(String query) async {
+    try {
+      final response = await SearchService.search(query, type: 'movie');
+      if (!mounted || _controller.text.trim() != query) return;
+      setState(() {
+        _results = response.results
+            .map((item) => item.movie)
+            .whereType<MovieShort>()
+            .where((movie) => movie.mediaType != 'tv')
+            .toList(growable: false);
+        _searching = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _searching = false;
+        _error = 'Unable to search movies right now.';
+      });
+    }
+  }
+
+  Future<void> _addMovie(MovieShort movie) async {
+    final provider = context.read<MovieListsProvider>();
+    setState(() {
+      _addingMovieId = movie.id;
+      _error = null;
+    });
+    final ok = await provider.addMovieToList(widget.listId, movie.id);
+    if (!mounted) return;
+    setState(() => _addingMovieId = null);
+    if (ok) {
+      final messenger = ScaffoldMessenger.of(context);
+      Navigator.of(context).pop(true);
+      messenger.showSnackBar(SnackBar(content: Text('Added ${movie.name}')));
+    } else {
+      setState(() {
+        _error = provider.error ?? 'Unable to add movie.';
+      });
+    }
+  }
+
+  bool _isAlreadyInList(MovieListsProvider provider, int movieId) {
+    final entries = provider.listMovies[widget.listId] ?? const [];
+    return entries.any((entry) => _entryMovieId(entry) == movieId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<MovieListsProvider>();
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final sheetHeight = MediaQuery.sizeOf(context).height * 0.78;
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, 12, 16, bottomInset + 16),
+        child: SizedBox(
+          height: sheetHeight,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.22),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Add to ${widget.listName}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            color: FlixieColors.white,
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Close',
+                    onPressed: () => Navigator.of(context).pop(false),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _controller,
+                autofocus: true,
+                onChanged: _onQueryChanged,
+                style: const TextStyle(color: FlixieColors.white),
+                decoration: InputDecoration(
+                  hintText: 'Search movies',
+                  hintStyle: const TextStyle(color: FlixieColors.medium),
+                  prefixIcon: const Icon(
+                    Icons.search_rounded,
+                    color: FlixieColors.medium,
+                  ),
+                  suffixIcon: _controller.text.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: 'Clear',
+                          onPressed: () {
+                            _controller.clear();
+                            _onQueryChanged('');
+                          },
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            color: FlixieColors.medium,
+                          ),
+                        ),
+                  filled: true,
+                  fillColor: FlixieColors.tabBarBackgroundFocused,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.1),
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.1),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: FlixieColors.primary),
+                  ),
+                ),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  _error!,
+                  style: const TextStyle(
+                    color: FlixieColors.danger,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              Expanded(
+                child: _buildResults(provider),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResults(MovieListsProvider provider) {
+    if (_searching) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_controller.text.trim().length < 2) {
+      return const Center(
+        child: Text(
+          'Search by title to add a movie.',
+          style: TextStyle(color: FlixieColors.medium),
+        ),
+      );
+    }
+    if (_results.isEmpty) {
+      return const Center(
+        child: Text(
+          'No movies found.',
+          style: TextStyle(color: FlixieColors.medium),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      itemCount: _results.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final movie = _results[index];
+        final alreadyAdded = _isAlreadyInList(provider, movie.id);
+        final isAdding = _addingMovieId == movie.id;
+        return _AddMovieResultTile(
+          movie: movie,
+          alreadyAdded: alreadyAdded,
+          isAdding: isAdding,
+          onAdd: alreadyAdded || isAdding ? null : () => _addMovie(movie),
+        );
+      },
+    );
+  }
+}
+
+class _AddMovieResultTile extends StatelessWidget {
+  const _AddMovieResultTile({
+    required this.movie,
+    required this.alreadyAdded,
+    required this.isAdding,
+    required this.onAdd,
+  });
+
+  final MovieShort movie;
+  final bool alreadyAdded;
+  final bool isAdding;
+  final VoidCallback? onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final posterUrl = movie.poster == null
+        ? null
+        : 'https://image.tmdb.org/t/p/w185${movie.poster}';
+    final year = _extractYear(movie.releaseDate);
+
+    return Material(
+      color: FlixieColors.tabBarBackgroundFocused,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onAdd,
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(
+                  width: 48,
+                  height: 72,
+                  child: posterUrl == null
+                      ? Container(
+                          color: const Color(0xFF1E2D40),
+                          child: const Icon(
+                            Icons.movie_outlined,
+                            color: FlixieColors.medium,
+                          ),
+                        )
+                      : CachedNetworkImage(
+                          imageUrl: posterUrl,
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) => Container(
+                            color: const Color(0xFF1E2D40),
+                            child: const Icon(
+                              Icons.movie_outlined,
+                              color: FlixieColors.medium,
+                            ),
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      movie.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: FlixieColors.white,
+                        fontWeight: FontWeight.w800,
+                        height: 1.15,
+                      ),
+                    ),
+                    if (year != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        year,
+                        style: const TextStyle(
+                          color: FlixieColors.medium,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              if (isAdding)
+                const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else if (alreadyAdded)
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: FlixieColors.primary,
+                )
+              else
+                IconButton.filled(
+                  tooltip: 'Add movie',
+                  onPressed: onAdd,
+                  style: IconButton.styleFrom(
+                    backgroundColor: FlixieColors.primary,
+                    foregroundColor: Colors.black,
+                  ),
+                  icon: const Icon(Icons.add_rounded),
+                ),
+            ],
+          ),
         ),
       ),
     );

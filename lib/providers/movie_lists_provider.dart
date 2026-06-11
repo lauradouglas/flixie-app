@@ -121,7 +121,7 @@ class MovieListsProvider extends ChangeNotifier {
     try {
       final entry = await repository.addMovieToList(userId, listId, movieId);
       final current = List<MovieListMovie>.from(listMovies[listId] ?? []);
-      current.removeWhere((e) => e.movieId == movieId);
+      current.removeWhere((e) => _entryMatchesMovie(e, movieId));
       current.insert(0, entry);
       listMovies[listId] = current;
       notifyListeners();
@@ -137,7 +137,7 @@ class MovieListsProvider extends ChangeNotifier {
     try {
       await repository.removeMovieFromList(userId, listId, movieId);
       final current = List<MovieListMovie>.from(listMovies[listId] ?? []);
-      current.removeWhere((e) => e.movieId == movieId);
+      current.removeWhere((e) => _entryMatchesMovie(e, movieId));
       listMovies[listId] = current;
       notifyListeners();
       return true;
@@ -173,5 +173,9 @@ class MovieListsProvider extends ChangeNotifier {
       return e.message;
     }
     return e.toString();
+  }
+
+  bool _entryMatchesMovie(MovieListMovie entry, int movieId) {
+    return entry.movieId == movieId || entry.movie?.id == movieId;
   }
 }
