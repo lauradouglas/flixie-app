@@ -224,6 +224,29 @@ class _NotificationScreenState extends State<NotificationScreen> {
     }
   }
 
+  Future<void> _markAllAsRead(List<FlixieNotification> unread) async {
+    if (unread.isEmpty) return;
+    try {
+      await Future.wait(
+        unread.where((n) => n.id != null).map(
+              (n) => NotificationService.updateNotification(
+                n.id!,
+                read: true,
+              ),
+            ),
+      );
+      await _load();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to mark all as read.'),
+          backgroundColor: FlixieColors.danger,
+        ),
+      );
+    }
+  }
+
   // ---- Filter helpers -------------------------------------------------------
 
   bool _isRequestType(FlixieNotification n) => n.isRequest;
@@ -259,6 +282,19 @@ class _NotificationScreenState extends State<NotificationScreen> {
           (_isRequestType(n) && !n.isPending))
       .toList();
 
+  List<FlixieNotification> get _unreadNotifications =>
+      _notifications.where((n) => !n.isRead).toList();
+
+  int _countForFilter(_NotificationFilter filter) {
+    return switch (filter) {
+      _NotificationFilter.all => _notifications.length,
+      _NotificationFilter.requests =>
+        _notifications.where(_isRequestType).length,
+      _NotificationFilter.activity =>
+        _notifications.where(_isActivityType).length,
+    };
+  }
+
   // ---- Helpers --------------------------------------------------------------
 
   String _formatDate(String iso) {
@@ -277,6 +313,24 @@ class _NotificationScreenState extends State<NotificationScreen> {
     }
   }
 
+  String _dateSectionLabel(FlixieNotification notification) {
+    final iso = notification.receivedAt;
+    if (iso.isEmpty) return 'Earlier';
+    try {
+      final dt = DateTime.parse(iso);
+      final now = DateTime.now();
+      final local = dt.toLocal();
+      final today = DateTime(now.year, now.month, now.day);
+      final day = DateTime(local.year, local.month, local.day);
+      final diff = today.difference(day).inDays;
+      if (diff == 0) return 'Today';
+      if (diff == 1) return 'Yesterday';
+      return 'Earlier';
+    } catch (_) {
+      return 'Earlier';
+    }
+  }
+
   // ---- Build ----------------------------------------------------------------
 
   @override
@@ -288,6 +342,14 @@ class _NotificationScreenState extends State<NotificationScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        actions: [
+          if (_unreadNotifications.isNotEmpty)
+            IconButton(
+              tooltip: 'Mark all as read',
+              onPressed: () => _markAllAsRead(_unreadNotifications),
+              icon: const Icon(Icons.done_all_rounded),
+            ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: () => _load(),
@@ -360,7 +422,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    label,
+                    '$label ${_countForFilter(f)}',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color:
@@ -387,17 +449,14 @@ class _NotificationScreenState extends State<NotificationScreen> {
       return _buildEmptyState();
     }
     final unreadItems = items.where((n) => !n.isRead).toList();
-    return Column(
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
       children: [
-        Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
-            itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
-            itemBuilder: (context, i) => _buildCard(items[i]),
-          ),
-        ),
-        _buildMarkAllAsReadButton(unreadItems),
+        if (unreadItems.isNotEmpty) ...[
+          _buildInlineUnreadAction(unreadItems),
+          const SizedBox(height: 12),
+        ],
+        ..._buildGroupedByDate(items),
       ],
     );
   }
@@ -410,88 +469,100 @@ class _NotificationScreenState extends State<NotificationScreen> {
     if (pending.isEmpty && newItems.isEmpty && earlier.isEmpty) {
       return _buildEmptyState();
     }
-    final unreadItems = [...pending, ...newItems, ...earlier]
-        .where((n) => !n.isRead)
-        .toList();
+    final unreadItems =
+        [...pending, ...newItems, ...earlier].where((n) => !n.isRead).toList();
 
-    return Column(
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
       children: [
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
-            children: [
-              if (pending.isNotEmpty) ...[
-                _buildSectionHeader('REQUESTS'),
-                const SizedBox(height: 10),
-                ...pending.map((n) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _buildCard(n),
-                    )),
-                const SizedBox(height: 16),
-              ],
-              if (newItems.isNotEmpty) ...[
-                _buildSectionHeader('NEW'),
-                const SizedBox(height: 10),
-                ...newItems.map((n) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _buildCard(n),
-                    )),
-                const SizedBox(height: 16),
-              ],
-              if (earlier.isNotEmpty) ...[
-                _buildSectionHeader('EARLIER'),
-                const SizedBox(height: 10),
-                ...earlier.map((n) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _buildCard(n),
-                    )),
-              ],
-            ],
-          ),
-        ),
-        _buildMarkAllAsReadButton(unreadItems),
+        if (pending.isNotEmpty) ...[
+          _buildInboxSummary(pending.length),
+          const SizedBox(height: 12),
+          _buildSectionHeader('NEEDS RESPONSE'),
+          const SizedBox(height: 10),
+          ...pending.map((n) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _buildCard(n),
+              )),
+          const SizedBox(height: 16),
+        ],
+        if (unreadItems.isNotEmpty) ...[
+          _buildInlineUnreadAction(unreadItems),
+          const SizedBox(height: 14),
+        ],
+        if (newItems.isNotEmpty) ...[
+          _buildSectionHeader('NEW ACTIVITY'),
+          const SizedBox(height: 10),
+          ...newItems.map((n) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _buildCard(n),
+              )),
+          const SizedBox(height: 16),
+        ],
+        ..._buildGroupedByDate(earlier),
       ],
     );
   }
 
-  Widget _buildMarkAllAsReadButton(List<FlixieNotification> unread) {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        child: SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: unread.isEmpty
-                ? null
-                : () async {
-                    try {
-                      await Future.wait(
-                        unread
-                            .where((n) => n.id != null)
-                            .map(
-                              (n) => NotificationService.updateNotification(
-                                n.id!,
-                                read: true,
-                              ),
-                            ),
-                      );
-                      await _load();
-                    } catch (_) {
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Failed to mark all as read.'),
-                          backgroundColor: FlixieColors.danger,
-                        ),
-                      );
-                    }
-                  },
-            child: const Text('Mark all as read'),
+  Widget _buildInboxSummary(int pendingCount) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: FlixieColors.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: FlixieColors.primary.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.inbox_rounded, color: FlixieColors.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '$pendingCount ${pendingCount == 1 ? 'request needs' : 'requests need'} your response',
+              style: const TextStyle(
+                color: FlixieColors.light,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInlineUnreadAction(List<FlixieNotification> unread) {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: TextButton.icon(
+        onPressed: () => _markAllAsRead(unread),
+        icon: const Icon(Icons.done_all_rounded, size: 17),
+        label: Text('Mark ${unread.length} read'),
+        style: TextButton.styleFrom(
+          foregroundColor: FlixieColors.primary,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         ),
       ),
     );
+  }
+
+  List<Widget> _buildGroupedByDate(List<FlixieNotification> items) {
+    final grouped = <String, List<FlixieNotification>>{};
+    for (final item in items) {
+      grouped.putIfAbsent(_dateSectionLabel(item), () => []).add(item);
+    }
+    final widgets = <Widget>[];
+    for (final label in ['Today', 'Yesterday', 'Earlier']) {
+      final sectionItems = grouped[label];
+      if (sectionItems == null || sectionItems.isEmpty) continue;
+      widgets.add(_buildSectionHeader(label.toUpperCase()));
+      widgets.add(const SizedBox(height: 10));
+      widgets.addAll(sectionItems.map((n) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _buildCard(n),
+          )));
+      widgets.add(const SizedBox(height: 8));
+    }
+    return widgets;
   }
 
   Widget _buildEmptyState() {
@@ -511,9 +582,22 @@ class _NotificationScreenState extends State<NotificationScreen> {
                       size: 64,
                       color: FlixieColors.medium.withValues(alpha: 0.6)),
                   const SizedBox(height: 16),
-                  const Text(
-                    'No notifications',
-                    style: TextStyle(color: FlixieColors.medium, fontSize: 16),
+                  Text(
+                    _emptyTitle,
+                    style: const TextStyle(
+                      color: FlixieColors.light,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _emptyBody,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: FlixieColors.medium,
+                      fontSize: 13,
+                    ),
                   ),
                 ],
               ),
@@ -522,6 +606,24 @@ class _NotificationScreenState extends State<NotificationScreen> {
         );
       },
     );
+  }
+
+  String get _emptyTitle {
+    return switch (_filter) {
+      _NotificationFilter.requests => 'No pending requests',
+      _NotificationFilter.activity => 'No activity yet',
+      _NotificationFilter.all => 'No notifications',
+    };
+  }
+
+  String get _emptyBody {
+    return switch (_filter) {
+      _NotificationFilter.requests =>
+        'Watch requests and invites will appear here when someone needs a response.',
+      _NotificationFilter.activity =>
+        'Friend, group, and watch updates will show up here.',
+      _NotificationFilter.all => 'You are all caught up.',
+    };
   }
 
   Widget _buildSectionHeader(String title) {
@@ -541,6 +643,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
       return NotificationRequestCard(
         notification: notification,
         isProcessing: _processingIds.contains(notification.id),
+        formatDate: _formatDate,
         onAccept: () =>
             _respond(notification, FlixieNotification.actionAccepted),
         onDecline: () =>

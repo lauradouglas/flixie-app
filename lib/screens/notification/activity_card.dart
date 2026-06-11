@@ -52,16 +52,22 @@ class NotificationActivityCard extends StatelessWidget {
     final dateStr = notification.receivedAt.isNotEmpty
         ? formatDate(notification.receivedAt)
         : '';
+    final isUnread = !notification.isRead;
 
     return Container(
       decoration: BoxDecoration(
-        color: FlixieColors.tabBarBackgroundFocused,
+        color: isUnread
+            ? FlixieColors.tabBarBackgroundFocused
+            : FlixieColors.tabBarBackgroundFocused.withValues(alpha: 0.68),
         borderRadius: BorderRadius.circular(12),
         border: Border(
-          left: BorderSide(color: _accentColor, width: 3),
+          left: BorderSide(
+            color: isUnread ? _accentColor : Colors.transparent,
+            width: 3,
+          ),
         ),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -104,25 +110,39 @@ class NotificationActivityCard extends StatelessWidget {
                               ),
                             TextSpan(
                               text: notification.message,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: FlixieColors.light,
                                 fontSize: 14,
+                                fontWeight: isUnread
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
                               ),
                             ),
                           ],
                         ),
                       ),
                     ),
-                    // Close icon
-                    IconButton(
-                      icon: const Icon(Icons.close,
-                          size: 20, color: FlixieColors.medium),
-                      tooltip: 'Close',
-                      onPressed: onClose,
+                    PopupMenuButton<String>(
+                      tooltip: 'Notification actions',
+                      color: FlixieColors.tabBarBackgroundFocused,
+                      icon: const Icon(
+                        Icons.more_horiz_rounded,
+                        size: 20,
+                        color: FlixieColors.medium,
+                      ),
+                      onSelected: (value) {
+                        if (value == 'dismiss') onClose();
+                      },
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(
+                          value: 'dismiss',
+                          child: Text('Dismiss'),
+                        ),
+                      ],
                     ),
                     if (!notification.isRead)
                       Padding(
-                        padding: const EdgeInsets.only(left: 8, top: 4),
+                        padding: const EdgeInsets.only(left: 2, top: 8),
                         child: Container(
                           width: 8,
                           height: 8,
@@ -139,8 +159,9 @@ class NotificationActivityCard extends StatelessWidget {
                   Text(
                     dateStr,
                     style: const TextStyle(
-                      color: FlixieColors.light,
+                      color: FlixieColors.medium,
                       fontSize: 12,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],

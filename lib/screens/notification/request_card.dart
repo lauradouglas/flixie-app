@@ -1,9 +1,9 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../models/notification.dart';
 import '../../theme/app_theme.dart';
-import '../../utils/app_logger.dart';
 import '../../utils/color_utils.dart';
 
 class NotificationRequestCard extends StatelessWidget {
@@ -11,6 +11,7 @@ class NotificationRequestCard extends StatelessWidget {
     super.key,
     required this.notification,
     required this.isProcessing,
+    required this.formatDate,
     required this.onAccept,
     required this.onDecline,
     required this.onClose,
@@ -18,6 +19,7 @@ class NotificationRequestCard extends StatelessWidget {
 
   final FlixieNotification notification;
   final bool isProcessing;
+  final String Function(String) formatDate;
   final VoidCallback onAccept;
   final VoidCallback onDecline;
   final VoidCallback onClose;
@@ -26,257 +28,33 @@ class NotificationRequestCard extends StatelessWidget {
       notification.action == FlixieNotification.actionAccepted ||
       notification.action == FlixieNotification.actionDeclined;
 
-  String get _subtitle {
+  String get _requestKind {
     switch (notification.type) {
       case FlixieNotification.groupInvite:
-        final msg = notification.groupInviteMessage;
-        return msg.isNotEmpty ? msg : 'Invited you to join a group';
+        return 'Group invite';
       case FlixieNotification.groupRequest:
-        final movieTitle = notification.groupWatchMovieTitle;
-        final groupName = notification.groupWatchGroupName;
-        logger.d(
-            'Building group request subtitle, movieTitle="$movieTitle", groupName="$groupName"');
-        if (movieTitle != null && movieTitle.isNotEmpty) {
-          final suffix =
-              groupName != null && groupName.isNotEmpty ? ' ($groupName)' : '';
-          return 'wants to watch $movieTitle$suffix';
-        }
-        return 'sent a group watch request';
+        return 'Group watch';
       case FlixieNotification.movieWatchRequest:
-        return 'sent you a watch request for';
+        return 'Watch request';
+      case FlixieNotification.showWatchRequest:
+        return 'Show request';
       case FlixieNotification.friendRequest:
       default:
-        return notification.message.isNotEmpty
-            ? notification.message
-            : 'Sent you a friend request';
+        return 'Friend request';
     }
-  }
-
-  Widget _buildSubtitleWidget(BuildContext context) {
-    // Show accepted/declined message as subtitle if resolved
-    if (_isResolved) {
-      final sender = notification.senderName.isNotEmpty
-          ? notification.senderName
-          : 'Someone';
-      if (notification.type == FlixieNotification.movieWatchRequest) {
-        final title = notification.watchMediaTitle;
-        if (notification.action == FlixieNotification.actionAccepted) {
-          return Text(
-            title != null && title.isNotEmpty
-                ? '$sender accepted your watch request for $title'
-                : '$sender accepted your watch request',
-            style: const TextStyle(color: FlixieColors.light, fontSize: 13),
-          );
-        } else if (notification.action == FlixieNotification.actionDeclined) {
-          return Text(
-            title != null && title.isNotEmpty
-                ? '$sender declined your watch request for $title'
-                : '$sender declined your watch request',
-            style: const TextStyle(color: FlixieColors.light, fontSize: 13),
-          );
-        }
-      } else if (notification.type == FlixieNotification.groupRequest) {
-        final movieTitle = notification.groupWatchMovieTitle;
-        final movieId = notification.groupWatchMovieId;
-        final groupName = notification.groupWatchGroupName;
-        final verb = notification.action == FlixieNotification.actionAccepted
-            ? 'accepted'
-            : 'declined';
-        return RichText(
-          text: TextSpan(
-            style: const TextStyle(color: FlixieColors.light, fontSize: 13),
-            children: [
-              TextSpan(text: '$sender $verb your watch request'),
-              if (movieTitle != null && movieTitle.isNotEmpty) ...[
-                const TextSpan(text: ' for '),
-                WidgetSpan(
-                  alignment: PlaceholderAlignment.baseline,
-                  baseline: TextBaseline.alphabetic,
-                  child: GestureDetector(
-                    onTap: movieId != null
-                        ? () => context.push('/movies/$movieId')
-                        : null,
-                    child: Text(
-                      movieTitle,
-                      style: TextStyle(
-                        color: movieId != null
-                            ? FlixieColors.primary
-                            : FlixieColors.light,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-              if (groupName != null && groupName.isNotEmpty)
-                TextSpan(
-                  text: ' in ',
-                  children: [
-                    TextSpan(
-                      text: groupName,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-            ],
-          ),
-        );
-      } else {
-        final target = () {
-          switch (notification.type) {
-            case FlixieNotification.friendRequest:
-              return 'your friend request';
-            case FlixieNotification.groupInvite:
-              return 'your group invite';
-            default:
-              return 'your request';
-          }
-        }();
-        if (notification.action == FlixieNotification.actionAccepted) {
-          return Text('$sender accepted $target',
-              style: const TextStyle(color: FlixieColors.light, fontSize: 13));
-        } else if (notification.action == FlixieNotification.actionDeclined) {
-          return Text('$sender declined $target',
-              style: const TextStyle(color: FlixieColors.light, fontSize: 13));
-        }
-      }
-      return const SizedBox.shrink();
-    }
-    // Pending state: show original subtitle
-    if (notification.type == FlixieNotification.movieWatchRequest) {
-      final title = notification.watchMediaTitle;
-      final movieId = notification.watchMovieId;
-      return RichText(
-        text: TextSpan(
-          style: const TextStyle(color: FlixieColors.light, fontSize: 13),
-          children: [
-            const TextSpan(text: 'sent you a watch request for '),
-            if (title != null && title.isNotEmpty)
-              WidgetSpan(
-                alignment: PlaceholderAlignment.baseline,
-                baseline: TextBaseline.alphabetic,
-                child: GestureDetector(
-                  onTap: movieId != null
-                      ? () => context.push('/movies/$movieId')
-                      : null,
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      color: movieId != null
-                          ? FlixieColors.primary
-                          : FlixieColors.light,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      decorationColor: FlixieColors.primary,
-                    ),
-                  ),
-                ),
-              )
-            else
-              const TextSpan(text: 'a movie'),
-          ],
-        ),
-      );
-    }
-    return _buildGroupInviteSubtitle() ??
-        _buildGroupRequestSubtitle(context) ??
-        Text(
-          _subtitle,
-          style: const TextStyle(color: FlixieColors.light, fontSize: 13),
-        );
-  }
-
-  Widget? _buildGroupRequestSubtitle(BuildContext context) {
-    if (notification.type != FlixieNotification.groupRequest || _isResolved) {
-      return null;
-    }
-    final movieTitle = notification.groupWatchMovieTitle;
-    final movieId = notification.groupWatchMovieId;
-    final groupName = notification.groupWatchGroupName;
-    if (movieTitle == null || movieTitle.isEmpty) {
-      return const Text(
-        'sent a group watch request',
-        style: TextStyle(color: FlixieColors.light, fontSize: 13),
-      );
-    }
-    return RichText(
-      text: TextSpan(
-        style: const TextStyle(color: FlixieColors.light, fontSize: 13),
-        children: [
-          const TextSpan(text: 'wants to watch '),
-          WidgetSpan(
-            alignment: PlaceholderAlignment.baseline,
-            baseline: TextBaseline.alphabetic,
-            child: GestureDetector(
-              onTap: movieId != null
-                  ? () => context.push('/movies/$movieId')
-                  : null,
-              child: Text(
-                movieTitle,
-                style: TextStyle(
-                  color: movieId != null
-                      ? FlixieColors.primary
-                      : FlixieColors.light,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ),
-          if (groupName != null && groupName.isNotEmpty)
-            TextSpan(
-              text: ' in ',
-              children: [
-                TextSpan(
-                  text: groupName,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget? _buildGroupInviteSubtitle() {
-    if (notification.type != FlixieNotification.groupInvite || _isResolved) {
-      return null;
-    }
-    final msg = _subtitle;
-    const joinPrefix = 'to join ';
-    final idx = msg.indexOf(joinPrefix);
-    if (idx == -1) {
-      return Text(msg,
-          style: const TextStyle(color: FlixieColors.light, fontSize: 13));
-    }
-    final before = msg.substring(0, idx + joinPrefix.length);
-    final groupName = msg.substring(idx + joinPrefix.length);
-    return RichText(
-      text: TextSpan(
-        style: const TextStyle(color: FlixieColors.light, fontSize: 13),
-        children: [
-          TextSpan(text: before),
-          TextSpan(
-            text: groupName,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ],
-      ),
-    );
   }
 
   IconData get _typeIcon {
     switch (notification.type) {
       case FlixieNotification.groupInvite:
       case FlixieNotification.groupRequest:
-        return Icons.group;
+        return Icons.group_outlined;
       case FlixieNotification.movieWatchRequest:
-        // case FlixieNotification.showWatchRequest:
+      case FlixieNotification.showWatchRequest:
         return Icons.play_circle_outline;
       case FlixieNotification.friendRequest:
       default:
-        return Icons.person;
+        return Icons.person_outline_rounded;
     }
   }
 
@@ -286,12 +64,153 @@ class NotificationRequestCard extends StatelessWidget {
       case FlixieNotification.groupRequest:
         return FlixieColors.tertiary;
       case FlixieNotification.movieWatchRequest:
-        // case FlixieNotification.showWatchRequest:
+      case FlixieNotification.showWatchRequest:
         return FlixieColors.primary;
       case FlixieNotification.friendRequest:
       default:
         return FlixieColors.secondary;
     }
+  }
+
+  Widget _buildSubtitleWidget(BuildContext context) {
+    if (_isResolved) {
+      final sender = notification.senderName.isNotEmpty
+          ? notification.senderName
+          : 'Someone';
+      final verb = notification.action == FlixieNotification.actionAccepted
+          ? 'accepted'
+          : 'declined';
+      final target = _targetTitle;
+      final groupName = notification.groupWatchGroupName;
+      return RichText(
+        text: TextSpan(
+          style: const TextStyle(
+            color: FlixieColors.light,
+            fontSize: 13,
+            height: 1.25,
+          ),
+          children: [
+            TextSpan(text: '$sender $verb '),
+            TextSpan(
+              text: _resolvedTargetLabel,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            if (target != null && target.isNotEmpty) ...[
+              const TextSpan(text: ' for '),
+              _linkedTitleSpan(context, target),
+            ],
+            if (groupName != null && groupName.isNotEmpty)
+              TextSpan(
+                text: ' in $groupName',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+          ],
+        ),
+      );
+    }
+
+    if (notification.type == FlixieNotification.movieWatchRequest ||
+        notification.type == FlixieNotification.showWatchRequest) {
+      final title = notification.watchMediaTitle;
+      return RichText(
+        text: TextSpan(
+          style: const TextStyle(
+            color: FlixieColors.light,
+            fontSize: 13,
+            height: 1.25,
+          ),
+          children: [
+            const TextSpan(text: 'sent you a watch request'),
+            if (title != null && title.isNotEmpty) ...[
+              const TextSpan(text: ' for '),
+              _linkedTitleSpan(context, title),
+            ],
+          ],
+        ),
+      );
+    }
+
+    if (notification.type == FlixieNotification.groupRequest) {
+      final title = notification.groupWatchMovieTitle;
+      final groupName = notification.groupWatchGroupName;
+      return RichText(
+        text: TextSpan(
+          style: const TextStyle(
+            color: FlixieColors.light,
+            fontSize: 13,
+            height: 1.25,
+          ),
+          children: [
+            const TextSpan(text: 'wants to watch'),
+            if (title != null && title.isNotEmpty) ...[
+              const TextSpan(text: ' '),
+              _linkedTitleSpan(context, title),
+            ],
+            if (groupName != null && groupName.isNotEmpty)
+              TextSpan(
+                text: ' in $groupName',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+          ],
+        ),
+      );
+    }
+
+    if (notification.type == FlixieNotification.groupInvite) {
+      final groupName = notification.groupInviteGroupName;
+      return Text(
+        groupName == null || groupName.isEmpty
+            ? notification.groupInviteMessage
+            : 'invited you to join $groupName',
+        style: const TextStyle(
+          color: FlixieColors.light,
+          fontSize: 13,
+          height: 1.25,
+        ),
+      );
+    }
+
+    return Text(
+      notification.message.isNotEmpty
+          ? notification.message
+          : 'sent you a friend request',
+      style: const TextStyle(
+        color: FlixieColors.light,
+        fontSize: 13,
+        height: 1.25,
+      ),
+    );
+  }
+
+  InlineSpan _linkedTitleSpan(BuildContext context, String title) {
+    final movieId = notification.watchMovieId ?? notification.groupWatchMovieId;
+    return WidgetSpan(
+      alignment: PlaceholderAlignment.baseline,
+      baseline: TextBaseline.alphabetic,
+      child: GestureDetector(
+        onTap: movieId != null ? () => context.push('/movies/$movieId') : null,
+        child: Text(
+          title,
+          style: TextStyle(
+            color: movieId != null ? FlixieColors.primary : FlixieColors.light,
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String? get _targetTitle {
+    return notification.watchMediaTitle ?? notification.groupWatchMovieTitle;
+  }
+
+  String get _resolvedTargetLabel {
+    return switch (notification.type) {
+      FlixieNotification.friendRequest => 'your friend request',
+      FlixieNotification.groupInvite => 'your group invite',
+      _ => 'your watch request',
+    };
   }
 
   @override
@@ -302,168 +221,257 @@ class NotificationRequestCard extends StatelessWidget {
     final accent = _accentColor;
     final msg = notification.watchRequestMessage;
     final hasMessage = msg.isNotEmpty && notification.action == null;
+    final isUnread = !notification.isRead;
+    final date = notification.receivedAt.isEmpty
+        ? ''
+        : formatDate(notification.receivedAt);
+    final posterPath = notification.watchMediaPosterPath;
+    final posterUrl = posterPath == null
+        ? null
+        : 'https://image.tmdb.org/t/p/w185$posterPath';
 
-    return Stack(
-      children: [
-        Container(
-          clipBehavior: Clip.hardEdge,
-          decoration: BoxDecoration(
-            color: FlixieColors.tabBarBackgroundFocused,
-            borderRadius: BorderRadius.circular(12),
-            border: Border(left: BorderSide(color: accent, width: 3)),
+    return Container(
+      clipBehavior: Clip.hardEdge,
+      decoration: BoxDecoration(
+        color: isUnread
+            ? FlixieColors.tabBarBackgroundFocused
+            : FlixieColors.tabBarBackgroundFocused.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(12),
+        border: Border(
+          left: BorderSide(
+            color: isUnread ? accent : Colors.transparent,
+            width: 3,
           ),
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+        child: Column(
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Left: content
+                _RequestMediaPreview(
+                  posterUrl: posterUrl,
+                  accent: accent,
+                  fallbackIcon: _typeIcon,
+                ),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: Padding(
-                    // Extra right padding so content doesn't sit under the close button
-                    padding: const EdgeInsets.fromLTRB(12, 12, 36, 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 20,
-                              backgroundColor: avatarBg.withValues(alpha: 0.2),
-                              child: initials.isNotEmpty
-                                  ? Text(
-                                      initials,
-                                      style: TextStyle(
-                                        color: avatarBg,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13,
-                                      ),
-                                    )
-                                  : Icon(_typeIcon, color: avatarBg, size: 20),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (name.isNotEmpty)
-                                    Text(
-                                      name,
-                                      style: const TextStyle(
-                                        color: FlixieColors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  const SizedBox(height: 2),
-                                  _buildSubtitleWidget(context),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (hasMessage) ...[
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: accent.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                  color: accent.withValues(alpha: 0.25)),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.chat_bubble_outline,
-                                    size: 12, color: accent),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    msg,
-                                    style: const TextStyle(
-                                      color: FlixieColors.light,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CircleAvatar(
+                            radius: 17,
+                            backgroundColor: avatarBg.withValues(alpha: 0.2),
+                            child: initials.isNotEmpty
+                                ? Text(
+                                    initials,
+                                    style: TextStyle(
+                                      color: avatarBg,
+                                      fontWeight: FontWeight.bold,
                                       fontSize: 12,
-                                      fontStyle: FontStyle.italic,
                                     ),
+                                  )
+                                : Icon(_typeIcon, color: avatarBg, size: 18),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        name.isNotEmpty ? name : _requestKind,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: FlixieColors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                    if (date.isNotEmpty)
+                                      Text(
+                                        date,
+                                        style: const TextStyle(
+                                          color: FlixieColors.medium,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  _requestKind,
+                                  style: TextStyle(
+                                    color: accent,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
                                   ),
                                 ),
                               ],
                             ),
                           ),
                         ],
-                        const SizedBox(height: 10),
-                        if (isProcessing)
-                          const Center(
-                            child: SizedBox(
-                              height: 32,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildSubtitleWidget(context),
+                      if (hasMessage) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: accent.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: accent.withValues(alpha: 0.25),
                             ),
-                          )
-                        else if (!_isResolved)
-                          Row(
+                          ),
+                          child: Row(
                             children: [
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: onDecline,
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: FlixieColors.danger,
-                                    side: BorderSide(
-                                        color: FlixieColors.danger
-                                            .withValues(alpha: 0.45)),
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 8),
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8)),
-                                    minimumSize: Size.zero,
-                                    textStyle: const TextStyle(fontSize: 13),
-                                  ),
-                                  child: const Text('Decline',
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.w600)),
-                                ),
+                              Icon(
+                                Icons.chat_bubble_outline,
+                                size: 12,
+                                color: accent,
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 6),
                               Expanded(
-                                child: ElevatedButton(
-                                  onPressed: onAccept,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: FlixieColors.primary,
-                                    foregroundColor: Colors.black,
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 8),
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8)),
-                                    minimumSize: Size.zero,
-                                    textStyle: const TextStyle(fontSize: 13),
+                                child: Text(
+                                  msg,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: FlixieColors.light,
+                                    fontSize: 12,
+                                    fontStyle: FontStyle.italic,
                                   ),
-                                  child: const Text('Accept',
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.w600)),
                                 ),
                               ),
                             ],
                           ),
+                        ),
                       ],
-                    ),
+                    ],
                   ),
+                ),
+                PopupMenuButton<String>(
+                  tooltip: 'Notification actions',
+                  color: FlixieColors.tabBarBackgroundFocused,
+                  icon: const Icon(
+                    Icons.more_horiz_rounded,
+                    color: FlixieColors.medium,
+                  ),
+                  onSelected: (value) {
+                    if (value == 'dismiss') onClose();
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(
+                      value: 'dismiss',
+                      child: Text('Dismiss'),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ),
+            if (isProcessing) ...[
+              const SizedBox(height: 10),
+              const SizedBox(
+                height: 28,
+                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+              ),
+            ] else if (!_isResolved) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  TextButton.icon(
+                    onPressed: onDecline,
+                    style: TextButton.styleFrom(
+                      foregroundColor: FlixieColors.danger,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                    ),
+                    icon: const Icon(Icons.close_rounded, size: 17),
+                    label: const Text(
+                      'Decline',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  const Spacer(),
+                  FilledButton.icon(
+                    onPressed: onAccept,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: FlixieColors.primary,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      minimumSize: Size.zero,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    icon: const Icon(Icons.check_rounded, size: 17),
+                    label: const Text(
+                      'Accept',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
         ),
-        // Close button always top-right of the card
-        Positioned(
-          top: 4,
-          right: 4,
-          child: IconButton(
-            icon: const Icon(Icons.close, size: 18, color: FlixieColors.light),
-            tooltip: 'Close',
-            onPressed: onClose,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-          ),
-        ),
-      ],
+      ),
+    );
+  }
+}
+
+class _RequestMediaPreview extends StatelessWidget {
+  const _RequestMediaPreview({
+    required this.posterUrl,
+    required this.accent,
+    required this.fallbackIcon,
+  });
+
+  final String? posterUrl;
+  final Color accent;
+  final IconData fallbackIcon;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox(
+        width: 44,
+        height: 64,
+        child: posterUrl == null
+            ? Container(
+                color: accent.withValues(alpha: 0.12),
+                child: Icon(fallbackIcon, color: accent, size: 22),
+              )
+            : CachedNetworkImage(
+                imageUrl: posterUrl!,
+                fit: BoxFit.cover,
+                errorWidget: (_, __, ___) => Container(
+                  color: accent.withValues(alpha: 0.12),
+                  child: Icon(fallbackIcon, color: accent, size: 22),
+                ),
+              ),
+      ),
     );
   }
 }
