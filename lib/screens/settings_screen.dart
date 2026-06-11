@@ -199,7 +199,7 @@ class SettingsScreen extends StatelessWidget {
 
   Future<void> _sendFeedback() async {
     final uri =
-        Uri.parse('mailto:support@flixie.app?subject=Flixie%20Feedback');
+        Uri.parse('mailto:flixieadmin@gmail.com?subject=Flixie%20Feedback');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     }
@@ -210,7 +210,7 @@ class SettingsScreen extends StatelessWidget {
       context: context,
       applicationName: 'Flixie',
       applicationVersion: '1.0.1',
-      applicationLegalese: '© 2024 Flixie',
+      applicationLegalese: '© 2026 Flixie',
     );
   }
 

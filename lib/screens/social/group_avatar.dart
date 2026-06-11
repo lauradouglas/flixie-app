@@ -40,12 +40,21 @@ class GroupAvatar extends StatelessWidget {
     return CircleAvatar(
       radius: radius,
       backgroundColor: _color.withValues(alpha: 0.3),
-      child: Text(
-        _abbr,
-        style: TextStyle(
-          color: _color,
-          fontWeight: FontWeight.bold,
-          fontSize: radius * 0.7,
+      child: SizedBox(
+        width: radius * 1.55,
+        height: radius * 1.55,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            _abbr,
+            maxLines: 1,
+            softWrap: false,
+            style: TextStyle(
+              color: _color,
+              fontWeight: FontWeight.bold,
+              fontSize: radius * (_abbr.length > 3 ? 0.56 : 0.7),
+            ),
+          ),
         ),
       ),
     );

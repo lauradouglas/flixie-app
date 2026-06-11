@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../models/movie_short.dart';
 import '../theme/app_theme.dart';
 import '../providers/auth_provider.dart';
+import '../services/search_service.dart';
 import '../services/user_service.dart';
 import '../models/favorite_movie.dart';
 import '../models/watched_movie.dart';
@@ -268,6 +272,89 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       _filterMinRating != null ||
       _filterYear != null ||
       _filterMaxRuntime != null;
+
+  Future<void> _openAddMovieSheet() async {
+    final authProvider = context.read<AuthProvider>();
+    final user = authProvider.dbUser;
+    if (user == null) return;
+
+    final existingMovieIds = _allWatchlist.map((item) => item.movieId).toSet();
+    final selected = await showModalBottomSheet<MovieShort>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _WatchlistMovieSearchSheet(
+        existingMovieIds: existingMovieIds,
+      ),
+    );
+    if (!mounted || selected == null) return;
+
+    if (existingMovieIds.contains(selected.id)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('${selected.name} is already in your watchlist')),
+      );
+      return;
+    }
+
+    try {
+      final addedResponse =
+          await UserService.addToWatchlist(user.id, selected.id);
+      final added = _entryWithMovieFallback(addedResponse, selected);
+      final currentWatchlist =
+          List<WatchlistMovie>.from(user.movieWatchlist ?? []);
+      currentWatchlist.removeWhere((item) => item.movieId == selected.id);
+      currentWatchlist.add(added);
+
+      authProvider.updateUserList(movieWatchlist: currentWatchlist);
+      authProvider.markActivityChanged();
+      _allWatchlist
+        ..removeWhere((item) => item.movieId == selected.id)
+        ..add(added);
+      _filterWatchlist();
+      _loadWatchProviderAvailability(_allWatchlist);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${selected.name} added to watchlist'),
+            backgroundColor: FlixieColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error adding movie to watchlist: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to add movie to watchlist'),
+          backgroundColor: FlixieColors.danger,
+        ),
+      );
+    }
+  }
+
+  WatchlistMovie _entryWithMovieFallback(
+    WatchlistMovie entry,
+    MovieShort movie,
+  ) {
+    if (entry.movie != null) return entry;
+    return WatchlistMovie(
+      id: entry.id,
+      userId: entry.userId,
+      movieId: entry.movieId,
+      removed: entry.removed,
+      createdAt: entry.createdAt,
+      updatedAt: entry.updatedAt,
+      movie: WatchlistMovieDetails(
+        id: movie.id,
+        title: movie.name,
+        posterPath: movie.poster,
+        releaseDate: movie.releaseDate,
+        voteAverage: movie.voteAverage,
+      ),
+    );
+  }
 
   void _openFilterSheet() {
     showModalBottomSheet(
@@ -738,9 +825,9 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.person_add_outlined, color: Colors.white),
-            tooltip: 'Invite friend',
-            onPressed: () {},
+            icon: const Icon(Icons.add_rounded, color: Colors.white),
+            tooltip: 'Add movie',
+            onPressed: _openAddMovieSheet,
           ),
           Stack(
             children: [
@@ -912,6 +999,340 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       onAddToList: () => _showAddToListSheet(item),
       onRequestToWatch: () => _showWatchRequestSheet(item),
       onRemove: () => _removeFromWatchlist(item),
+    );
+  }
+}
+
+class _WatchlistMovieSearchSheet extends StatefulWidget {
+  const _WatchlistMovieSearchSheet({required this.existingMovieIds});
+
+  final Set<int> existingMovieIds;
+
+  @override
+  State<_WatchlistMovieSearchSheet> createState() =>
+      _WatchlistMovieSearchSheetState();
+}
+
+class _WatchlistMovieSearchSheetState
+    extends State<_WatchlistMovieSearchSheet> {
+  final TextEditingController _controller = TextEditingController();
+  Timer? _debounce;
+  List<MovieShort> _results = [];
+  bool _isSearching = false;
+  String _query = '';
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    final query = value.trim();
+    setState(() => _query = query);
+    if (query.length < 3) {
+      setState(() {
+        _results = [];
+        _isSearching = false;
+      });
+      return;
+    }
+
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      _search(query);
+    });
+  }
+
+  Future<void> _search(String query) async {
+    setState(() => _isSearching = true);
+    try {
+      final response = await SearchService.search(query, type: 'movie');
+      final movies = response.results
+          .where((item) => !item.isPerson && item.movie != null)
+          .map((item) => item.movie!)
+          .toList(growable: false);
+      if (!mounted) return;
+      setState(() {
+        _results = movies;
+        _isSearching = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isSearching = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.82,
+      minChildSize: 0.55,
+      maxChildSize: 0.94,
+      expand: false,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: FlixieColors.background,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: FlixieColors.medium.withValues(alpha: 0.45),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 8, 12),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Add to Watchlist',
+                        style: TextStyle(
+                          color: FlixieColors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded,
+                          color: FlixieColors.light),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: TextField(
+                  controller: _controller,
+                  autofocus: true,
+                  onChanged: _onSearchChanged,
+                  style: const TextStyle(color: FlixieColors.textPrimary),
+                  textInputAction: TextInputAction.search,
+                  decoration: InputDecoration(
+                    hintText: 'Search movies',
+                    hintStyle: const TextStyle(color: FlixieColors.medium),
+                    prefixIcon: const Icon(Icons.search_rounded,
+                        color: FlixieColors.medium),
+                    suffixIcon: _query.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Clear search',
+                            icon: const Icon(Icons.close_rounded,
+                                color: FlixieColors.medium),
+                            onPressed: () {
+                              _controller.clear();
+                              _onSearchChanged('');
+                            },
+                          ),
+                    filled: true,
+                    fillColor: FlixieColors.surfaceElevated,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.08),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.08),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: FlixieColors.primary),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(child: _buildResults(scrollController)),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildResults(ScrollController scrollController) {
+    if (_query.length < 3) {
+      return const Center(
+        child: Text(
+          'Search for a movie to add',
+          style: TextStyle(color: FlixieColors.medium),
+        ),
+      );
+    }
+
+    if (_isSearching) {
+      return const Center(
+        child: CircularProgressIndicator(color: FlixieColors.primary),
+      );
+    }
+
+    if (_results.isEmpty) {
+      return Center(
+        child: Text(
+          'No movies found for "$_query"',
+          style: const TextStyle(color: FlixieColors.medium),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      controller: scrollController,
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+      itemCount: _results.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final movie = _results[index];
+        final isAdded = widget.existingMovieIds.contains(movie.id);
+        return _WatchlistMovieSearchResultTile(
+          movie: movie,
+          isAdded: isAdded,
+          onTap: isAdded ? null : () => Navigator.pop(context, movie),
+        );
+      },
+    );
+  }
+}
+
+class _WatchlistMovieSearchResultTile extends StatelessWidget {
+  const _WatchlistMovieSearchResultTile({
+    required this.movie,
+    required this.isAdded,
+    required this.onTap,
+  });
+
+  final MovieShort movie;
+  final bool isAdded;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final posterUrl = movie.poster == null
+        ? null
+        : 'https://image.tmdb.org/t/p/w185${movie.poster}';
+    final year = _movieYear(movie.releaseDate);
+    final vote = movie.voteAverage;
+
+    return Material(
+      color: FlixieColors.surfaceElevated,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(7),
+                child: SizedBox(
+                  width: 48,
+                  height: 72,
+                  child: posterUrl == null
+                      ? const _MoviePosterPlaceholder()
+                      : CachedNetworkImage(
+                          imageUrl: posterUrl,
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) =>
+                              const _MoviePosterPlaceholder(),
+                        ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      movie.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: FlixieColors.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Row(
+                      children: [
+                        if (year != null)
+                          Text(
+                            year,
+                            style: const TextStyle(
+                              color: FlixieColors.medium,
+                              fontSize: 12,
+                            ),
+                          ),
+                        if (year != null && vote != null && vote > 0)
+                          const Text(
+                            '  •  ',
+                            style: TextStyle(
+                              color: FlixieColors.medium,
+                              fontSize: 12,
+                            ),
+                          ),
+                        if (vote != null && vote > 0) ...[
+                          const Icon(Icons.star_rounded,
+                              color: FlixieColors.tertiary, size: 13),
+                          const SizedBox(width: 2),
+                          Text(
+                            vote.toStringAsFixed(1),
+                            style: const TextStyle(
+                              color: FlixieColors.tertiary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Icon(
+                isAdded
+                    ? Icons.check_circle_rounded
+                    : Icons.add_circle_outline_rounded,
+                color: isAdded ? FlixieColors.success : FlixieColors.primary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static String? _movieYear(String? releaseDate) {
+    if (releaseDate == null || releaseDate.isEmpty) return null;
+    final parsed = DateTime.tryParse(releaseDate);
+    if (parsed != null) return parsed.year.toString();
+    return releaseDate.length >= 4 ? releaseDate.substring(0, 4) : null;
+  }
+}
+
+class _MoviePosterPlaceholder extends StatelessWidget {
+  const _MoviePosterPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: FlixieColors.primary.withValues(alpha: 0.18),
+      child: const Icon(Icons.movie_outlined, color: FlixieColors.primary),
     );
   }
 }

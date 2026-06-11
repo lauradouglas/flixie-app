@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -35,6 +33,13 @@ import 'screens/onboarding/onboarding_screen.dart';
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'root',
 );
+
+Page<void> _calmPage(GoRouterState state, Widget child) {
+  return NoTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+  );
+}
 
 /// Builds the GoRouter, refreshing only when auth status changes (not user data).
 GoRouter buildRouter(AuthProvider authProvider) {
@@ -76,92 +81,120 @@ GoRouter buildRouter(AuthProvider authProvider) {
     routes: [
       GoRoute(
         path: '/splash',
-        builder: (context, state) => const SplashScreen(),
+        pageBuilder: (context, state) => _calmPage(state, const SplashScreen()),
       ),
 
       // Main shell (authenticated)
       ShellRoute(
         builder: (context, state, child) => MainNavigationShell(child: child),
         routes: [
-          GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
+          GoRoute(
+            path: '/',
+            pageBuilder: (context, state) =>
+                _calmPage(state, const HomeScreen()),
+          ),
           GoRoute(
             path: '/search',
-            builder: (context, state) => const SearchScreen(),
+            pageBuilder: (context, state) =>
+                _calmPage(state, const SearchScreen()),
           ),
           GoRoute(
             path: '/watchlist',
-            builder: (context, state) => const WatchlistScreen(),
+            pageBuilder: (context, state) =>
+                _calmPage(state, const WatchlistScreen()),
           ),
           GoRoute(
             path: '/social',
-            builder: (context, state) => const SocialScreen(),
+            pageBuilder: (context, state) =>
+                _calmPage(state, const SocialScreen()),
           ),
           GoRoute(
             path: '/groups/:id',
-            builder: (context, state) => GroupDetailScreen(
-              groupId: state.pathParameters['id'] ?? '',
-              initialTab: state.uri.queryParameters['tab'] == 'requests'
-                  ? 2
-                  : state.uri.queryParameters['tab'] == 'insights'
-                      ? 3
-                      : state.uri.queryParameters['tab'] == 'chat'
-                          ? 0
-                          : null,
+            pageBuilder: (context, state) => _calmPage(
+              state,
+              GroupDetailScreen(
+                groupId: state.pathParameters['id'] ?? '',
+                initialTab: state.uri.queryParameters['tab'] == 'requests'
+                    ? 2
+                    : state.uri.queryParameters['tab'] == 'insights'
+                        ? 3
+                        : state.uri.queryParameters['tab'] == 'chat'
+                            ? 0
+                            : null,
+              ),
             ),
           ),
           GoRoute(
             path: '/groups/:id/members',
-            builder: (context, state) => GroupMembersScreen(
-              groupId: state.pathParameters['id'] ?? '',
-              groupName: state.extra as String? ?? 'Group',
+            pageBuilder: (context, state) => _calmPage(
+              state,
+              GroupMembersScreen(
+                groupId: state.pathParameters['id'] ?? '',
+                groupName: state.extra as String? ?? 'Group',
+              ),
             ),
           ),
           GoRoute(
             path: '/profile',
-            builder: (context, state) => const ProfileScreen(),
+            pageBuilder: (context, state) =>
+                _calmPage(state, const ProfileScreen()),
           ),
           GoRoute(
             path: '/movies/:id',
-            builder: (context, state) =>
-                MovieDetailScreen(movieId: state.pathParameters['id'] ?? '0'),
+            pageBuilder: (context, state) => _calmPage(
+              state,
+              MovieDetailScreen(movieId: state.pathParameters['id'] ?? '0'),
+            ),
           ),
           GoRoute(
             path: '/people/:id',
-            builder: (context, state) =>
-                PersonDetailScreen(personId: state.pathParameters['id'] ?? '0'),
+            pageBuilder: (context, state) => _calmPage(
+              state,
+              PersonDetailScreen(personId: state.pathParameters['id'] ?? '0'),
+            ),
           ),
           GoRoute(
             path: '/my-reviews',
-            builder: (context, state) => const MyReviewsScreen(),
+            pageBuilder: (context, state) =>
+                _calmPage(state, const MyReviewsScreen()),
           ),
           GoRoute(
             path: '/friends/:id',
-            builder: (context, state) =>
-                FriendProfileScreen(userId: state.pathParameters['id'] ?? ''),
+            pageBuilder: (context, state) => _calmPage(
+              state,
+              FriendProfileScreen(userId: state.pathParameters['id'] ?? ''),
+            ),
           ),
           GoRoute(
             path: '/notifications',
-            builder: (context, state) => const NotificationScreen(),
+            pageBuilder: (context, state) =>
+                _calmPage(state, const NotificationScreen()),
           ),
           GoRoute(
             path: '/watch-history',
-            builder: (context, state) => const WatchHistoryScreen(),
+            pageBuilder: (context, state) =>
+                _calmPage(state, const WatchHistoryScreen()),
           ),
           GoRoute(
             path: '/movie-lists',
-            builder: (context, state) => const MovieListsScreen(),
+            pageBuilder: (context, state) =>
+                _calmPage(state, const MovieListsScreen()),
           ),
           GoRoute(
             path: '/movie-lists/:id',
-            builder: (context, state) => MovieListDetailScreen(
-              listId: state.pathParameters['id'] ?? '',
-              listName: state.uri.queryParameters['name'] ?? 'List',
-              ownerUserId: state.uri.queryParameters['owner'],
+            pageBuilder: (context, state) => _calmPage(
+              state,
+              MovieListDetailScreen(
+                listId: state.pathParameters['id'] ?? '',
+                listName: state.uri.queryParameters['name'] ?? 'List',
+                ownerUserId: state.uri.queryParameters['owner'],
+              ),
             ),
           ),
           GoRoute(
             path: '/stats',
-            builder: (context, state) => const StatsScreen(),
+            pageBuilder: (context, state) =>
+                _calmPage(state, const StatsScreen()),
           ),
           GoRoute(
             path: '/wrapped',
@@ -169,15 +202,18 @@ GoRouter buildRouter(AuthProvider authProvider) {
           ),
           GoRoute(
             path: '/watch-requests',
-            builder: (context, state) => const WatchRequestsScreen(),
+            pageBuilder: (context, state) =>
+                _calmPage(state, const WatchRequestsScreen()),
           ),
           GoRoute(
             path: '/help-support',
-            builder: (context, state) => const HelpSupportScreen(),
+            pageBuilder: (context, state) =>
+                _calmPage(state, const HelpSupportScreen()),
           ),
           GoRoute(
             path: '/settings',
-            builder: (context, state) => const SettingsScreen(),
+            pageBuilder: (context, state) =>
+                _calmPage(state, const SettingsScreen()),
           ),
           // Widget deep-link targets
           GoRoute(
@@ -196,21 +232,23 @@ GoRouter buildRouter(AuthProvider authProvider) {
       // Onboarding route is kept for explicit navigation only.
       GoRoute(
         path: '/onboarding',
-        builder: (context, state) => const OnboardingScreen(),
+        pageBuilder: (context, state) =>
+            _calmPage(state, const OnboardingScreen()),
       ),
 
       // Auth routes (unauthenticated)
       GoRoute(
         path: '/auth/login',
-        builder: (context, state) => const LoginScreen(),
+        pageBuilder: (context, state) => _calmPage(state, const LoginScreen()),
       ),
       GoRoute(
         path: '/auth/signup',
-        builder: (context, state) => const SignupScreen(),
+        pageBuilder: (context, state) => _calmPage(state, const SignupScreen()),
       ),
       GoRoute(
         path: '/auth/forgot-password',
-        builder: (context, state) => const ForgotPasswordScreen(),
+        pageBuilder: (context, state) =>
+            _calmPage(state, const ForgotPasswordScreen()),
       ),
     ],
   );
@@ -297,43 +335,38 @@ class _FlixieNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          decoration: BoxDecoration(
-            color: FlixieColors.tabBarBackground.withValues(alpha: 0.92),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.5),
-                blurRadius: 20,
-                offset: const Offset(0, -4),
-              ),
-            ],
-            border: Border(
-              top: BorderSide(
-                color: Colors.white.withValues(alpha: 0.05),
-                width: 0.5,
-              ),
-            ),
+    return Container(
+      decoration: BoxDecoration(
+        color: FlixieColors.tabBarBackground.withValues(alpha: 0.98),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.28),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
           ),
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: List.generate(_destinations.length, (i) {
-                  final dest = _destinations[i];
-                  final isSelected = i == selectedIndex;
-                  return _NavItem(
-                    dest: dest,
-                    isSelected: isSelected,
-                    onTap: () => onDestinationSelected(i),
-                  );
-                }),
-              ),
-            ),
+        ],
+        border: Border(
+          top: BorderSide(
+            color: Colors.white.withValues(alpha: 0.05),
+            width: 0.5,
+          ),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: List.generate(_destinations.length, (i) {
+              final dest = _destinations[i];
+              final isSelected = i == selectedIndex;
+              return _NavItem(
+                dest: dest,
+                isSelected: isSelected,
+                onTap: () => onDestinationSelected(i),
+              );
+            }),
           ),
         ),
       ),
@@ -383,8 +416,8 @@ class _NavItem extends StatelessWidget {
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
-                            color: FlixieColors.primary.withValues(alpha: 0.45),
-                            blurRadius: 14,
+                            color: FlixieColors.primary.withValues(alpha: 0.32),
+                            blurRadius: 8,
                             spreadRadius: 0,
                           ),
                         ],

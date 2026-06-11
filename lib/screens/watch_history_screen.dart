@@ -218,7 +218,7 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
                   padding: const EdgeInsets.all(16),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    childAspectRatio: 0.52,
+                    childAspectRatio: 0.48,
                     crossAxisSpacing: 12,
                     mainAxisSpacing: 12,
                   ),
@@ -308,94 +308,94 @@ class _WatchedMovieCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Poster
-            ClipRRect(
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(12)),
-              child: AspectRatio(
-                aspectRatio: 2 / 3,
-                child: posterUrl != null
-                    ? CachedNetworkImage(
-                        imageUrl: posterUrl,
-                        fit: BoxFit.cover,
-                        placeholder: (_, __) => Container(
-                          color: const Color(0xFF1E2D40),
-                          child: const Center(
-                            child: Icon(Icons.movie_outlined,
-                                color: FlixieColors.medium),
-                          ),
-                        ),
-                        errorWidget: (_, __, ___) => Container(
-                          color: const Color(0xFF1E2D40),
-                          child: const Center(
-                            child: Icon(Icons.movie_outlined,
-                                color: FlixieColors.medium),
-                          ),
-                        ),
-                      )
-                    : Container(
-                        color: const Color(0xFF1E2D40),
-                        child: const Center(
-                          child: Icon(Icons.movie_outlined,
-                              color: FlixieColors.medium),
-                        ),
-                      ),
+            Expanded(
+              child: ClipRRect(
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(12)),
+                child: SizedBox.expand(
+                  child: posterUrl != null
+                      ? CachedNetworkImage(
+                          imageUrl: posterUrl,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => _PosterFallback(),
+                          errorWidget: (_, __, ___) => _PosterFallback(),
+                        )
+                      : _PosterFallback(),
+                ),
               ),
             ),
-            // Info
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    movie.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                    ),
-                  ),
-                  if (formattedDate.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.check_circle,
-                            size: 12, color: FlixieColors.success),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            formattedDate,
-                            style: const TextStyle(
-                              color: FlixieColors.medium,
-                              fontSize: 11,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
+            SizedBox(
+              height: 102,
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      height: 38,
+                      child: Text(
+                        movie.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                          height: 1.24,
                         ),
-                      ],
-                    ),
-                  ],
-                  if (entry.rating != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Your rating: ${entry.rating!.toStringAsFixed(1)}/10',
-                      style: const TextStyle(
-                        color: FlixieColors.tertiary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
+                    if (formattedDate.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(Icons.check_circle,
+                              size: 12, color: FlixieColors.success),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              formattedDate,
+                              style: const TextStyle(
+                                color: FlixieColors.medium,
+                                fontSize: 11,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (entry.rating != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Your rating: ${entry.rating!.toStringAsFixed(1)}/10',
+                        style: const TextStyle(
+                          color: FlixieColors.tertiary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PosterFallback extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFF1E2D40),
+      child: const Center(
+        child: Icon(Icons.movie_outlined, color: FlixieColors.medium),
       ),
     );
   }

@@ -361,7 +361,6 @@ class _CreateListFromMovieSheet extends StatefulWidget {
 class _CreateListFromMovieSheetState extends State<_CreateListFromMovieSheet> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
-  final TextEditingController _coverImageController = TextEditingController();
 
   String _visibility = ListVisibility.friends;
   String _whoCanAddMovies = 'owner';
@@ -371,7 +370,6 @@ class _CreateListFromMovieSheetState extends State<_CreateListFromMovieSheet> {
   void dispose() {
     _nameController.dispose();
     _descriptionController.dispose();
-    _coverImageController.dispose();
     super.dispose();
   }
 
@@ -409,36 +407,6 @@ class _CreateListFromMovieSheetState extends State<_CreateListFromMovieSheet> {
                 ],
               ),
               const SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 26),
-                decoration: BoxDecoration(
-                  color: FlixieColors.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: FlixieColors.tabBarBorder),
-                ),
-                child: Column(
-                  children: const [
-                    Icon(Icons.image_outlined, color: FlixieColors.primary),
-                    SizedBox(height: 8),
-                    Text('Cover Image'),
-                    SizedBox(height: 4),
-                    Text(
-                      'Paste a URL below',
-                      style:
-                          TextStyle(color: FlixieColors.medium, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _coverImageController,
-                decoration: const InputDecoration(
-                  labelText: 'Cover image URL (optional)',
-                ),
-              ),
-              const SizedBox(height: 10),
               TextField(
                 controller: _nameController,
                 maxLength: 50,
@@ -495,7 +463,7 @@ class _CreateListFromMovieSheetState extends State<_CreateListFromMovieSheet> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: _whoCanAddMovies,
+                initialValue: _whoCanAddMovies,
                 decoration:
                     const InputDecoration(labelText: 'Who can add movies?'),
                 items: const [
@@ -533,9 +501,6 @@ class _CreateListFromMovieSheetState extends State<_CreateListFromMovieSheet> {
       name,
       description: _descriptionController.text.trim(),
       visibility: _visibility,
-      coverImageUrl: _coverImageController.text.trim().isEmpty
-          ? null
-          : _coverImageController.text.trim(),
       whoCanAddMovies: _whoCanAddMovies,
     );
     if (!mounted) return;

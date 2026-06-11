@@ -171,42 +171,55 @@ class _FaqTileState extends State<_FaqTile> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: FlixieColors.tabBarBackgroundFocused,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Theme(
-        // Remove the default divider ExpansionTile adds
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-          onExpansionChanged: (v) => setState(() => _expanded = v),
-          trailing: Icon(
-            _expanded ? Icons.remove : Icons.add,
-            color: FlixieColors.primary,
-            size: 20,
-          ),
-          title: Text(
-            widget.question,
-            style: const TextStyle(
-              color: FlixieColors.light,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
+    final borderRadius = BorderRadius.circular(10);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: ClipRRect(
+        borderRadius: borderRadius,
+        child: Material(
+          color: FlixieColors.tabBarBackgroundFocused,
+          shape: RoundedRectangleBorder(borderRadius: borderRadius),
+          clipBehavior: Clip.antiAlias,
+          child: Theme(
+            // Remove the default divider ExpansionTile adds
+            data: Theme.of(context).copyWith(
+              dividerColor: Colors.transparent,
+              splashColor: Colors.transparent,
+              highlightColor: Colors.transparent,
             ),
-          ),
-          children: [
-            Text(
-              widget.answer,
-              style: const TextStyle(
-                color: FlixieColors.medium,
-                fontSize: 14,
-                height: 1.5,
+            child: ExpansionTile(
+              shape: RoundedRectangleBorder(borderRadius: borderRadius),
+              collapsedShape:
+                  RoundedRectangleBorder(borderRadius: borderRadius),
+              tilePadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+              onExpansionChanged: (v) => setState(() => _expanded = v),
+              trailing: Icon(
+                _expanded ? Icons.remove : Icons.add,
+                color: FlixieColors.primary,
+                size: 20,
               ),
+              title: Text(
+                widget.question,
+                style: const TextStyle(
+                  color: FlixieColors.light,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              children: [
+                Text(
+                  widget.answer,
+                  style: const TextStyle(
+                    color: FlixieColors.medium,
+                    fontSize: 14,
+                    height: 1.5,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

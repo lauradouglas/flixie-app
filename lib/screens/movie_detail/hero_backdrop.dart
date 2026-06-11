@@ -17,6 +17,7 @@ class MovieHeroBackdrop extends StatelessWidget {
             ? CachedNetworkImage(
                 imageUrl: imagePath!,
                 fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
                 errorWidget: (_, __, ___) => _placeholder(),
               )
             : _placeholder(),

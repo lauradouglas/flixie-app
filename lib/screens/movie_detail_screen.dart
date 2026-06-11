@@ -769,7 +769,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
+                    _buildMovieIntro(context, movie),
+                    const SizedBox(height: 16),
                     _buildActionButtons(),
                     const SizedBox(height: 24),
                     _buildWhereToWatchSection(context),
@@ -821,7 +823,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   Widget _buildSliverAppBar(BuildContext context, Movie movie) {
     return SliverAppBar(
-      expandedHeight: 460,
+      expandedHeight: 430,
       pinned: false,
       backgroundColor: FlixieColors.background,
       automaticallyImplyLeading: false,
@@ -841,13 +843,12 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  stops: [0.0, 0.12, 0.5, 0.72, 0.9, 1.0],
+                  stops: [0.0, 0.16, 0.66, 0.86, 1.0],
                   colors: [
                     Color(0x4A000000),
-                    Color(0x14000000),
                     Color(0x00000000),
-                    Color(0x730F0921),
-                    Color(0xD9120A24),
+                    Color(0x00120A24),
+                    Color(0x9A120A24),
                     FlixieColors.background,
                   ],
                 ),
@@ -956,13 +957,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                       ],
                     ),
                     const Spacer(),
-                    _buildTitleBlock(context, movie),
-                    const SizedBox(height: 12),
-                    if ((movie.tagline ?? '').isNotEmpty) ...[
-                      _buildTaglineChip(movie.tagline ?? ''),
-                      const SizedBox(height: 8),
-                    ],
-                    _buildGenrePills(movie),
+                    _buildHeroFlixScoreBadge(context, movie),
+                    const SizedBox(height: 18),
                   ],
                 ),
               ),
@@ -988,6 +984,21 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         ),
         icon: Icon(icon, color: FlixieColors.light, size: 21),
       ),
+    );
+  }
+
+  Widget _buildMovieIntro(BuildContext context, Movie movie) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildTitleBlock(context, movie),
+        if ((movie.tagline ?? '').isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _buildTaglineChip(movie.tagline ?? ''),
+        ],
+        const SizedBox(height: 12),
+        _buildGenrePills(movie),
+      ],
     );
   }
 
@@ -1038,15 +1049,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             color: FlixieColors.white,
             fontSize: titleSize,
             fontWeight: FontWeight.w900,
-            height: 1.0,
+            height: 1.02,
             letterSpacing: 0.1,
-            shadows: const [
-              Shadow(
-                color: Color(0xC0000000),
-                blurRadius: 10,
-                offset: Offset(0, 2),
-              ),
-            ],
           ),
         ),
         if (meta.isNotEmpty) ...[
@@ -1057,18 +1061,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               color: FlixieColors.light,
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              shadows: [
-                Shadow(
-                  color: Color(0xAA000000),
-                  blurRadius: 6,
-                  offset: Offset(0, 1),
-                ),
-              ],
             ),
           ),
         ],
-        const SizedBox(height: 10),
-        _buildHeroFlixScoreBadge(context, movie),
       ],
     );
   }
@@ -1518,7 +1513,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   Widget _buildSynopsis(BuildContext context, Movie movie) {
     final text = movie.overview;
     if (text == null || text.isEmpty) return const SizedBox.shrink();
-    final showToggle = text.length > 160;
+    final showToggle = text.length > 250;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1538,7 +1533,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             children: [
               Text(
                 text,
-                maxLines: _showFullSynopsis ? null : 3,
+                maxLines: _showFullSynopsis ? null : 5,
                 overflow: _showFullSynopsis
                     ? TextOverflow.visible
                     : TextOverflow.ellipsis,
@@ -2201,7 +2196,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     if (_isFavorite) {
       badges.add(_buildYourActivityChip(
         icon: Icons.favorite,
-        label: 'In favorites',
+        label: 'In favourites',
         color: Colors.redAccent,
       ));
     }
@@ -2704,7 +2699,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         movieId: movieId,
         userId: user.id,
         onSubmitted: (review) {
+          final auth = context.read<AuthProvider>();
           setState(() => _reviews = [review, ..._reviews]);
+          auth.invalidateCachedReviews();
+          auth.markActivityChanged();
         },
       ),
     );

@@ -36,17 +36,16 @@ class AuthProvider extends ChangeNotifier {
   List<ActivityListItem>? get cachedFriendsActivity => _cachedFriendsActivity;
   AuthProvider(
     this._authService,
-    this._movieService, {
+    MovieService movieService, {
     AuthPrefetchCoordinator? prefetchCoordinator,
-  }) : _prefetchCoordinator =
-            prefetchCoordinator ?? AuthPrefetchCoordinator(movieService: _movieService) {
+  }) : _prefetchCoordinator = prefetchCoordinator ??
+            AuthPrefetchCoordinator(movieService: movieService) {
     _authStateSubscription = _authService.authStateChanges.listen((user) {
       unawaited(_onAuthStateChanged(user));
     });
   }
 
   final AuthService _authService;
-  final MovieService _movieService;
   final AuthPrefetchCoordinator _prefetchCoordinator;
   final AuthNotificationPoller _notificationPoller = AuthNotificationPoller();
   final _authStatusNotifier = _AuthStatusNotifier();
@@ -101,14 +100,27 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Clears the reviews cache so the next reviews screen visit fetches fresh data.
+  void invalidateCachedReviews() {
+    _cachedReviews = null;
+    notifyListeners();
+  }
+
   /// Update the friends cache, e.g. after accepting/declining a request.
   void updateCachedFriends(FriendsData friends) {
     _cachedFriends = friends;
     notifyListeners();
   }
 
+  void invalidateCachedFriends() {
+    _cachedFriends = null;
+    notifyListeners();
+  }
+
   /// Call after adding an item to any list so activity-watching screens can refresh.
   void markActivityChanged() {
+    _cachedActivity = null;
+    _cachedFriendsActivity = null;
     _activityVersion++;
     notifyListeners();
   }

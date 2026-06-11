@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/notification.dart';
+import '../presentation/shared/friend_actions_controller.dart';
 import '../providers/auth_provider.dart';
 import '../services/notification_service.dart';
 import '../services/request_service.dart';
@@ -72,6 +73,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
   bool _isLoading = true;
   String? _error;
   _NotificationFilter _filter = _NotificationFilter.all;
+  final FriendActionsController _friendActions =
+      FriendActionsController.instance;
 
   /// Tracks in-progress accept/decline calls by notification id.
   final Set<String> _processingIds = {};
@@ -159,10 +162,22 @@ class _NotificationScreenState extends State<NotificationScreen> {
     if (id == null) return;
     setState(() => _processingIds.add(id));
     try {
+      final auth = context.read<AuthProvider>();
+      final userId = auth.dbUser?.id;
+      final requestId = notification.linkedRequestId;
+
+      if (notification.type == FlixieNotification.friendRequest &&
+          requestId != null) {
+        if (action == FlixieNotification.actionAccepted) {
+          await _friendActions.acceptRequest(requestId);
+        } else {
+          await _friendActions.declineRequest(requestId);
+        }
+      }
+
       // For watch requests, also update the underlying request record.
       if (notification.type == FlixieNotification.movieWatchRequest ||
           notification.type == FlixieNotification.showWatchRequest) {
-        final requestId = notification.linkedRequestId;
         if (requestId != null) {
           final status = action == FlixieNotification.actionAccepted
               ? 'ACCEPTED'
@@ -174,7 +189,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
       // For group invites and group requests, also update the underlying request record.
       if (notification.type == FlixieNotification.groupInvite ||
           notification.type == FlixieNotification.groupRequest) {
-        final requestId = notification.linkedRequestId;
         if (requestId != null) {
           final status = action == FlixieNotification.actionAccepted
               ? 'ACCEPTED'
@@ -193,6 +207,16 @@ class _NotificationScreenState extends State<NotificationScreen> {
         setState(() {
           _notifications.removeWhere((n) => n.id == id);
         });
+        auth.setUnreadNotificationCount(
+            _notifications.where((n) => !n.isRead).length);
+        if (userId != null &&
+            notification.type == FlixieNotification.friendRequest) {
+          final friends = await _friendActions.getFriends(userId);
+          if (mounted) auth.updateCachedFriends(friends);
+        } else {
+          await auth.refreshUserData();
+        }
+        if (!mounted) return;
         // Show success toast
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

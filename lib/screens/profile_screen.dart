@@ -291,6 +291,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       averageRating: averageRating,
                       recentActivity: _activity.length,
                       onWatchHistory: () => context.push('/watch-history'),
+                      onWatchlist: () => context.push('/watchlist'),
+                      onFavourites: () =>
+                          setState(() => _selectedTab = _ProfileTab.library),
                       onRecap: () => context.push('/stats'),
                     ),
                     const SizedBox(height: 18),
@@ -620,6 +623,8 @@ class _ProfileDashboard extends StatelessWidget {
     required this.averageRating,
     required this.recentActivity,
     required this.onWatchHistory,
+    required this.onWatchlist,
+    required this.onFavourites,
     required this.onRecap,
   });
 
@@ -629,6 +634,8 @@ class _ProfileDashboard extends StatelessWidget {
   final String averageRating;
   final int recentActivity;
   final VoidCallback onWatchHistory;
+  final VoidCallback onWatchlist;
+  final VoidCallback onFavourites;
   final VoidCallback onRecap;
 
   @override
@@ -686,11 +693,13 @@ class _ProfileDashboard extends StatelessWidget {
                 icon: Icons.bookmark_border_rounded,
                 label: 'Watchlist',
                 value: '$watchlist',
+                onTap: onWatchlist,
               ),
               _DashboardMetric(
                 icon: Icons.favorite_border_rounded,
                 label: 'Favourites',
                 value: '$favorites',
+                onTap: onFavourites,
               ),
               _DashboardMetric(
                 icon: Icons.star_border_rounded,

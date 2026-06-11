@@ -185,8 +185,9 @@ class _SignupScreenState extends State<SignupScreen> {
     if (value.isEmpty) return null;
     return Icon(
       isValidEmailFormat(value) ? Icons.check_circle : Icons.error_outline,
-      color:
-          isValidEmailFormat(value) ? FlixieColors.success : FlixieColors.danger,
+      color: isValidEmailFormat(value)
+          ? FlixieColors.success
+          : FlixieColors.danger,
     );
   }
 
@@ -224,34 +225,26 @@ class _SignupScreenState extends State<SignupScreen> {
           children: [
             const OnboardingProgressIndicator(currentStep: 0, totalSteps: 3),
             const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(
-                  child: AppTextField(
-                    controller: _firstNameController,
-                    label: 'First Name',
-                    prefixIcon: Icons.person_outline_rounded,
-                    keyboardType: TextInputType.name,
-                    textCapitalization: TextCapitalization.words,
-                    textInputAction: TextInputAction.next,
-                    autofillHints: const [AutofillHints.givenName],
-                    validator: _requiredNameValidator,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: AppTextField(
-                    controller: _lastNameController,
-                    label: 'Last Name',
-                    prefixIcon: Icons.person_outline_rounded,
-                    keyboardType: TextInputType.name,
-                    textCapitalization: TextCapitalization.words,
-                    textInputAction: TextInputAction.next,
-                    autofillHints: const [AutofillHints.familyName],
-                    validator: _requiredNameValidator,
-                  ),
-                ),
-              ],
+            AppTextField(
+              controller: _firstNameController,
+              label: 'First Name',
+              prefixIcon: Icons.person_outline_rounded,
+              keyboardType: TextInputType.name,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+              autofillHints: const [AutofillHints.givenName],
+              validator: _requiredNameValidator,
+            ),
+            const SizedBox(height: 14),
+            AppTextField(
+              controller: _lastNameController,
+              label: 'Last Name',
+              prefixIcon: Icons.person_outline_rounded,
+              keyboardType: TextInputType.name,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+              autofillHints: const [AutofillHints.familyName],
+              validator: _requiredNameValidator,
             ),
             const SizedBox(height: 14),
             AppTextField(
@@ -287,7 +280,9 @@ class _SignupScreenState extends State<SignupScreen> {
               validator: (value) {
                 final raw = value?.trim() ?? '';
                 if (raw.isEmpty) return 'Please enter your email.';
-                if (!isValidEmailFormat(raw)) return 'Please enter a valid email.';
+                if (!isValidEmailFormat(raw)) {
+                  return 'Please enter a valid email.';
+                }
                 return null;
               },
             ),
@@ -342,7 +337,8 @@ class _SignupScreenState extends State<SignupScreen> {
               children: [
                 Text(
                   'Already have an account?',
-                  style: textTheme.bodyMedium?.copyWith(color: FlixieColors.light),
+                  style:
+                      textTheme.bodyMedium?.copyWith(color: FlixieColors.light),
                 ),
                 TextButton(
                   onPressed: () => context.pop(),
@@ -399,7 +395,7 @@ class _CountryPickerField extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
         child: Row(
           children: [
-            Icon(
+            const Icon(
               Icons.location_on_outlined,
               size: 22,
               color: FlixieColors.medium,
@@ -416,7 +412,7 @@ class _CountryPickerField extends StatelessWidget {
                 ),
               ),
             ),
-            Icon(
+            const Icon(
               Icons.expand_more_rounded,
               color: FlixieColors.medium,
             ),
@@ -555,9 +551,8 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
                         color: isSelected
                             ? FlixieColors.primary
                             : FlixieColors.textPrimary,
-                        fontWeight: isSelected
-                            ? FontWeight.w700
-                            : FontWeight.normal,
+                        fontWeight:
+                            isSelected ? FontWeight.w700 : FontWeight.normal,
                       ),
                     ),
                     trailing: isSelected
