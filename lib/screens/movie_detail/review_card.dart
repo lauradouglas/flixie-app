@@ -414,7 +414,7 @@ class _ReviewDetailSheetState extends State<_ReviewDetailSheet> {
       maxChildSize: 0.95,
       builder: (context, scrollController) => Container(
         decoration: const BoxDecoration(
-          color: Color(0xFF0D1B2A),
+          color: FlixieColors.background,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
@@ -502,7 +502,7 @@ class _ReviewDetailSheetState extends State<_ReviewDetailSheet> {
                 ],
               ),
             ),
-            const Divider(color: Color(0xFF1E2D40), height: 1),
+            const Divider(color: FlixieColors.tabBarBorder, height: 1),
             // Scrollable body
             Expanded(
               child: SingleChildScrollView(
@@ -517,21 +517,22 @@ class _ReviewDetailSheetState extends State<_ReviewDetailSheet> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
-                          color: Colors.orange.withOpacity(0.1),
+                          color: FlixieColors.warning.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                              color: Colors.orange.withOpacity(0.35)),
+                              color:
+                                  FlixieColors.warning.withValues(alpha: 0.35)),
                         ),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.warning_amber_rounded,
-                                color: Colors.orange, size: 15),
+                                color: FlixieColors.warning, size: 15),
                             SizedBox(width: 6),
                             Text(
                               'Contains spoilers',
                               style: TextStyle(
-                                color: Colors.orange,
+                                color: FlixieColors.warning,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -684,7 +685,7 @@ class _ReactionChipState extends State<_ReactionChip>
     const activeColor = FlixieColors.primary;
     final bg = widget.isActive
         ? activeColor.withValues(alpha: 0.18)
-        : const Color(0xFF1E2D40);
+        : FlixieColors.tabBarBorder;
     final border = widget.isActive ? activeColor : Colors.transparent;
 
     return GestureDetector(
@@ -773,7 +774,7 @@ class _ReactionPreview extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isMe
                     ? FlixieColors.primary.withValues(alpha: 0.15)
-                    : const Color(0xFF1E2D40),
+                    : FlixieColors.tabBarBorder,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: isMe ? FlixieColors.primary : Colors.transparent,

@@ -198,12 +198,21 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                   CircleAvatar(
                     radius: 19,
                     backgroundColor: color.withValues(alpha: 0.24),
-                    child: Text(
-                      _group != null ? _groupAbbr(_group!) : '',
-                      style: TextStyle(
-                        color: color,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 12,
+                    child: SizedBox(
+                      width: 27,
+                      height: 27,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          _group != null ? _groupAbbr(_group!) : '',
+                          maxLines: 1,
+                          softWrap: false,
+                          style: TextStyle(
+                            color: color,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                          ),
+                        ),
                       ),
                     ),
                   ),

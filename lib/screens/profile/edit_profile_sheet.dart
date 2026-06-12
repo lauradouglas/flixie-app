@@ -57,11 +57,18 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
     });
 
     try {
-      final updated = await UserService.updateUser({
-        'id': userId,
-        'username': username,
-        'bio': _bioController.text.trim(),
-      });
+      final currentUser = auth.dbUser!;
+      final bio = _bioController.text.trim();
+      var updated = currentUser;
+
+      if (username != currentUser.username) {
+        updated =
+            await UserService.updateUserField(userId, 'username', username);
+      }
+      if (bio != (updated.bio ?? '')) {
+        updated = await UserService.updateUserField(userId, 'bio', bio);
+      }
+
       auth.updateDbUser(updated);
       if (mounted) Navigator.of(context).pop();
     } catch (e) {

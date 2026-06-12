@@ -202,8 +202,12 @@ GoRouter buildRouter(AuthProvider authProvider) {
           ),
           GoRoute(
             path: '/watch-requests',
-            pageBuilder: (context, state) =>
-                _calmPage(state, const WatchRequestsScreen()),
+            pageBuilder: (context, state) => _calmPage(
+              state,
+              WatchRequestsScreen(
+                initialRequestId: state.uri.queryParameters['requestId'],
+              ),
+            ),
           ),
           GoRoute(
             path: '/help-support',

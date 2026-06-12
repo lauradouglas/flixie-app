@@ -133,117 +133,125 @@ class AuthProvider extends ChangeNotifier {
   // getUserByExternalId before the DB user has been created.
   bool _isSigningUp = false;
   bool _isHandlingAuthState = false;
+  Future<void>? _authStateChangeFuture;
 
   Future<void> _onAuthStateChanged(firebase_auth.User? user) async {
     // During sign-up the flow is managed directly in signUp(); skip here.
     if (_isSigningUp) return;
-    if (_isHandlingAuthState) return;
+    if (_isHandlingAuthState && _authStateChangeFuture != null) {
+      return _authStateChangeFuture;
+    }
     _isHandlingAuthState = true;
-
+    _authStateChangeFuture = _handleAuthStateChanged(user);
     try {
-      logger.i('Auth state changed');
-      logger.d(
-          'Firebase user: ${user?.email ?? "null"} (uid: ${user?.uid ?? "null"})');
+      await _authStateChangeFuture;
+    } finally {
+      _authStateChangeFuture = null;
+      _isHandlingAuthState = false;
+    }
+  }
 
-      _firebaseUser = user;
-      final oldStatus = _status;
+  Future<void> _handleAuthStateChanged(firebase_auth.User? user) async {
+    logger.i('Auth state changed');
+    logger.d(
+        'Firebase user: ${user?.email ?? "null"} (uid: ${user?.uid ?? "null"})');
 
-      if (user != null) {
-        // FIRST: Get Firebase ID token and set it in ApiClient.
-        // Try a forced refresh first; on network failure fall back to the cached
-        // token so the app stays authenticated on a flaky connection.
+    _firebaseUser = user;
+    final oldStatus = _status;
+
+    if (user != null) {
+      // FIRST: Get Firebase ID token and set it in ApiClient.
+      // Try a forced refresh first; on network failure fall back to the cached
+      // token so the app stays authenticated on a flaky connection.
+      try {
+        final idToken = await user.getIdToken(true);
+        if (idToken != null) {
+          logger.d('Got Firebase ID token (fresh), setting in ApiClient');
+          ApiClient.setToken(idToken);
+        } else {
+          logger.w('ID token is null');
+        }
+      } catch (e) {
+        logger.w('Failed to get fresh ID token: $e — trying cached token');
         try {
-          final idToken = await user.getIdToken(true);
-          if (idToken != null) {
-            logger.d('Got Firebase ID token (fresh), setting in ApiClient');
-            ApiClient.setToken(idToken);
+          final cachedToken = await user.getIdToken(false);
+          if (cachedToken != null) {
+            logger.d('Got Firebase ID token (cached), setting in ApiClient');
+            ApiClient.setToken(cachedToken);
           } else {
-            logger.w('ID token is null');
+            logger.w(
+                'Cached ID token is also null — API calls will be unauthorized');
           }
-        } catch (e) {
-          logger.w('Failed to get fresh ID token: $e — trying cached token');
-          try {
-            final cachedToken = await user.getIdToken(false);
-            if (cachedToken != null) {
-              logger.d('Got Firebase ID token (cached), setting in ApiClient');
-              ApiClient.setToken(cachedToken);
-            } else {
-              logger.w(
-                  'Cached ID token is also null — API calls will be unauthorized');
-            }
-          } catch (e2) {
-            logger.w('Failed to get cached ID token: $e2');
-          }
+        } catch (e2) {
+          logger.w('Failed to get cached ID token: $e2');
         }
+      }
 
-        // THEN: Fetch the database user using Firebase UID as externalId
-        logger.d('Fetching database user with externalId: ${user.uid}');
-        try {
-          _dbUser = await UserService.getUserByExternalId(user.uid);
-          logger.i(
-              'Database user fetched: ${_dbUser?.username} (id: ${_dbUser?.id})');
-          logger.d('Email: ${_dbUser?.email}');
-          logger.d('Name: ${_dbUser?.firstName} ${_dbUser?.lastName}');
-          _status = AuthStatus.authenticated;
-          // Kick off background prefetch so screens have data ready immediately
-          final region =
-              (_dbUser?.country?['isoCode'] as String?)?.toUpperCase() ?? 'US';
-          if (_dbUser?.id != null) _prefetch(_dbUser!.id, region: region);
-        } catch (e, stackTrace) {
-          logger.e('Error fetching database user: $e',
-              error: e, stackTrace: stackTrace);
-          _dbUser = null;
-          _status = AuthStatus.unauthenticated;
-        }
-      } else {
-        logger.i('User signed out, clearing database user');
-        // Remove FCM token from backend before clearing the auth token so the
-        // API request can still be authenticated. Fire-and-forget is intentional:
-        // we do not want to block the sign-out flow on a network call, and any
-        // failure is tolerable because the token will be re-registered on next
-        // login.
-        if (_dbUser?.id != null && _dbUser!.externalId != null) {
-          unawaited(PushNotificationService.removeToken(_dbUser!.externalId!));
-        }
-        ApiClient.setToken(null);
+      // THEN: Fetch the database user using Firebase UID as externalId
+      logger.d('Fetching database user with externalId: ${user.uid}');
+      try {
+        _dbUser = await UserService.getUserByExternalId(user.uid);
+        logger.i(
+            'Database user fetched: ${_dbUser?.username} (id: ${_dbUser?.id})');
+        logger.d('Email: ${_dbUser?.email}');
+        logger.d('Name: ${_dbUser?.firstName} ${_dbUser?.lastName}');
+        _status = AuthStatus.authenticated;
+        // Kick off background prefetch so screens have data ready immediately
+        final region =
+            (_dbUser?.country?['isoCode'] as String?)?.toUpperCase() ?? 'US';
+        if (_dbUser?.id != null) _prefetch(_dbUser!.id, region: region);
+      } catch (e, stackTrace) {
+        logger.e('Error fetching database user: $e',
+            error: e, stackTrace: stackTrace);
         _dbUser = null;
         _status = AuthStatus.unauthenticated;
-        _isPrefetching = false;
-        _cachedActivity = null;
-        _cachedFriends = null;
-        _cachedRatings = null;
-        _cachedReviews = null;
-        _cachedTrending = null;
-        _cachedNowPlaying = null;
-        _notificationPoller.stop();
-        _unreadNotificationCount = 0;
       }
-
-      logger.d('Final status: $_status');
-
-      // Notify auth status listener only if status actually changed
-      if (oldStatus != _status) {
-        // Defer _authStatusNotifier.notify() to a post-frame callback so that
-        // GoRouter's redirect is scheduled for a *later* frame than the one
-        // where _setLoading(false) marks the current auth screen dirty.  If
-        // both the dirty-marking and the Navigator deactivation land in the
-        // same build scope Flutter throws:
-        //   '_elements.contains(element)': is not true.
-        // By deferring the router notification we guarantee:
-        //   Frame A – _setLoading(false) dirty-mark is processed, screen rebuilds.
-        //   Frame B – GoRouter redirects and deactivates the auth screen (clean).
-        //   Post-frame B – notifyListeners() fires; screen is already inactive so
-        //                  markNeedsBuild() returns early with no crash.
-        SchedulerBinding.instance.addPostFrameCallback((_) {
-          _authStatusNotifier.notify();
-          SchedulerBinding.instance
-              .addPostFrameCallback((_) => notifyListeners());
-        });
-      } else {
-        notifyListeners();
+    } else {
+      logger.i('User signed out, clearing database user');
+      // Remove FCM token from backend before clearing the auth token so the
+      // API request can still be authenticated. Fire-and-forget is intentional:
+      // we do not want to block the sign-out flow on a network call, and any
+      // failure is tolerable because the token will be re-registered on next
+      // login.
+      if (_dbUser?.id != null && _dbUser!.externalId != null) {
+        unawaited(PushNotificationService.removeToken(_dbUser!.externalId!));
       }
-    } finally {
-      _isHandlingAuthState = false;
+      ApiClient.setToken(null);
+      _dbUser = null;
+      _status = AuthStatus.unauthenticated;
+      _isPrefetching = false;
+      _cachedActivity = null;
+      _cachedFriends = null;
+      _cachedRatings = null;
+      _cachedReviews = null;
+      _cachedTrending = null;
+      _cachedNowPlaying = null;
+      _notificationPoller.stop();
+      _unreadNotificationCount = 0;
+    }
+
+    logger.d('Final status: $_status');
+
+    // Notify auth status listener only if status actually changed
+    if (oldStatus != _status) {
+      // Defer _authStatusNotifier.notify() to a post-frame callback so that
+      // GoRouter's redirect is scheduled for a *later* frame than the one
+      // where _setLoading(false) marks the current auth screen dirty.  If
+      // both the dirty-marking and the Navigator deactivation land in the
+      // same build scope Flutter throws:
+      //   '_elements.contains(element)': is not true.
+      // By deferring the router notification we guarantee:
+      //   Frame A – _setLoading(false) dirty-mark is processed, screen rebuilds.
+      //   Frame B – GoRouter redirects and deactivates the auth screen (clean).
+      //   Post-frame B – notifyListeners() fires; screen is already inactive so
+      //                  markNeedsBuild() returns early with no crash.
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        _authStatusNotifier.notify();
+        SchedulerBinding.instance
+            .addPostFrameCallback((_) => notifyListeners());
+      });
+    } else {
+      notifyListeners();
     }
   }
 
@@ -418,6 +426,7 @@ class AuthProvider extends ChangeNotifier {
       final signedInUser = _authService.currentUser;
       if (signedInUser != null) {
         await _onAuthStateChanged(signedInUser);
+        _setLoading(false);
       } else {
         logger.w('Sign-in succeeded but currentUser is null');
         _isLoading = false;

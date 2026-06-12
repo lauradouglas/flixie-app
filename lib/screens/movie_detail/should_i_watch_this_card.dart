@@ -133,9 +133,9 @@ class ShouldIWatchThisCard extends StatelessWidget {
   }
 
   Widget _buildEmpty() {
-    return Column(
+    return const Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: const [
+      children: [
         Text(
           'No friend recommendations yet.',
           style: TextStyle(
@@ -247,7 +247,7 @@ class _FriendRecommendRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = item.displayName ?? item.username;
+    final name = item.username;
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
 
     return Padding(

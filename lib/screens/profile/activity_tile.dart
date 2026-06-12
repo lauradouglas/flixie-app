@@ -69,8 +69,8 @@ class ActivityTile extends StatelessWidget {
   String _displayName() {
     final username = item.username.trim();
     if (username.isNotEmpty) return username;
-    final full = '${item.firstName} ${item.lastName}'.trim();
-    if (full.isNotEmpty) return full;
+    final firstName = item.firstName.trim();
+    if (firstName.isNotEmpty) return firstName;
     return 'Friend';
   }
 
@@ -243,7 +243,7 @@ class ActivityTile extends StatelessWidget {
       backgroundColor: Colors.transparent,
       builder: (_) => Container(
         decoration: const BoxDecoration(
-          color: Color(0xFF0D1B2A),
+          color: FlixieColors.background,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),

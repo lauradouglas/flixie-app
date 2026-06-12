@@ -1,6 +1,7 @@
 /// Status of a watch request in a group or friend conversation.
 enum WatchRequestStatus {
   open,
+  accepted,
   scheduled,
   completed,
   expired,
@@ -9,8 +10,14 @@ enum WatchRequestStatus {
   /// Parse a raw API string to a [WatchRequestStatus], defaulting to [open].
   static WatchRequestStatus fromString(String? value) {
     switch (value?.toLowerCase()) {
+      case 'pending':
+      case 'open':
+        return WatchRequestStatus.open;
+      case 'accepted':
+        return WatchRequestStatus.accepted;
       case 'scheduled':
         return WatchRequestStatus.scheduled;
+      case 'finalised':
       case 'completed':
         return WatchRequestStatus.completed;
       case 'expired':
@@ -18,7 +25,6 @@ enum WatchRequestStatus {
       case 'cancelled':
       case 'canceled':
         return WatchRequestStatus.cancelled;
-      case 'open':
       default:
         return WatchRequestStatus.open;
     }
@@ -28,6 +34,8 @@ enum WatchRequestStatus {
     switch (this) {
       case WatchRequestStatus.open:
         return 'open';
+      case WatchRequestStatus.accepted:
+        return 'accepted';
       case WatchRequestStatus.scheduled:
         return 'scheduled';
       case WatchRequestStatus.completed:
@@ -44,6 +52,8 @@ enum WatchRequestStatus {
     switch (this) {
       case WatchRequestStatus.open:
         return 'Open';
+      case WatchRequestStatus.accepted:
+        return 'Accepted';
       case WatchRequestStatus.scheduled:
         return 'Scheduled';
       case WatchRequestStatus.completed:
@@ -201,8 +211,10 @@ class GroupRequestMemberStatus {
   factory GroupRequestMemberStatus.fromJson(Map<String, dynamic> json) {
     return GroupRequestMemberStatus(
       memberId: (json['responderId'] ?? json['memberId'])?.toString() ?? '',
-      status: json['status'] as String? ?? '',
-      response: json['response'] as String?,
+      status: _normalizedResponseStatus(
+        json['status'] ?? json['decision'] ?? json['response'],
+      ),
+      response: json['response']?.toString(),
       username: json['username'] as String?,
     );
   }
@@ -236,7 +248,11 @@ class GroupWatchRequest {
   final int responseCount;
   final String? lastActivityAt;
   final WatchResponseDecision? currentUserResponse;
-
+  final bool? hasCurrentUserAccepted;
+  final bool? hasCurrentUserCompleted;
+  final bool? canSchedule;
+  final bool? canComplete;
+  final bool? canCancel;
 
   const GroupWatchRequest({
     required this.id,
@@ -264,6 +280,11 @@ class GroupWatchRequest {
     this.responseCount = 0,
     this.lastActivityAt,
     this.currentUserResponse,
+    this.hasCurrentUserAccepted,
+    this.hasCurrentUserCompleted,
+    this.canSchedule,
+    this.canComplete,
+    this.canCancel,
   });
 
   factory GroupWatchRequest.fromJson(Map<String, dynamic> json) {
@@ -331,6 +352,11 @@ class GroupWatchRequest {
       responseCount: rawResponse,
       lastActivityAt: json['lastActivityAt'] as String?,
       currentUserResponse: currentUserResponseDecision,
+      hasCurrentUserAccepted: _boolValue(json['hasCurrentUserAccepted']),
+      hasCurrentUserCompleted: _boolValue(json['hasCurrentUserCompleted']),
+      canSchedule: _boolValue(json['canSchedule']),
+      canComplete: _boolValue(json['canComplete']),
+      canCancel: _boolValue(json['canCancel']),
     );
   }
 
@@ -341,6 +367,7 @@ class GroupWatchRequest {
   /// True when the request is open or scheduled (still relevant for planning).
   bool get isActive =>
       status == WatchRequestStatus.open ||
+      status == WatchRequestStatus.accepted ||
       status == WatchRequestStatus.scheduled;
 
   /// True when the request is completed, expired, or cancelled.
@@ -361,6 +388,55 @@ class GroupWatchRequest {
   /// True when members can still respond (request is active and not expired).
   bool get canRespond => isActive && !hasExpired;
 
+  bool canScheduleFor(String userId) =>
+      canSchedule ??
+      ((status == WatchRequestStatus.accepted ||
+              status == WatchRequestStatus.scheduled) &&
+          !hasExpired);
+
+  bool canCompleteFor(String userId) =>
+      canComplete ??
+      ((status == WatchRequestStatus.accepted ||
+              status == WatchRequestStatus.scheduled) &&
+          hasCurrentUserCompleted != true &&
+          _userAccepted(userId));
+
+  bool canCancelFor(String userId) =>
+      canCancel ?? (isActive && userId.isNotEmpty);
+
   /// A user-facing label for the current status.
   String get statusLabel => status.statusLabel;
+
+  bool _userAccepted(String userId) {
+    if (hasCurrentUserAccepted == true) return true;
+    return currentUserResponse == WatchResponseDecision.accepted ||
+        memberStatuses.any(
+          (s) => s.memberId == userId && s.status == 'ACCEPTED',
+        );
+  }
+}
+
+String _normalizedResponseStatus(dynamic value) {
+  final raw = value?.toString().trim().toUpperCase() ?? '';
+  switch (raw) {
+    case 'ACCEPT':
+    case 'ACCEPTED':
+      return 'ACCEPTED';
+    case 'DECLINE':
+    case 'DECLINED':
+      return 'DECLINED';
+    case 'MAYBE':
+      return 'MAYBE';
+    case 'PENDING':
+    case 'OPEN':
+      return 'PENDING';
+    default:
+      return raw;
+  }
+}
+
+bool? _boolValue(dynamic value) {
+  if (value is bool) return value;
+  if (value is String) return bool.tryParse(value);
+  return null;
 }

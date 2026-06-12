@@ -12,21 +12,70 @@ class NotificationRequestCard extends StatelessWidget {
     required this.notification,
     required this.isProcessing,
     required this.formatDate,
+    required this.currentUserId,
     required this.onAccept,
     required this.onDecline,
+    required this.onAcceptSchedule,
+    required this.onDeclineSchedule,
+    required this.onSuggestSchedule,
     required this.onClose,
   });
 
   final FlixieNotification notification;
   final bool isProcessing;
   final String Function(String) formatDate;
+  final String? currentUserId;
   final VoidCallback onAccept;
   final VoidCallback onDecline;
+  final VoidCallback onAcceptSchedule;
+  final VoidCallback onDeclineSchedule;
+  final VoidCallback onSuggestSchedule;
   final VoidCallback onClose;
 
   bool get _isResolved =>
       notification.action == FlixieNotification.actionAccepted ||
       notification.action == FlixieNotification.actionDeclined;
+
+  bool get _canOpenAcceptedWatchRequest =>
+      notification.action == FlixieNotification.actionAccepted &&
+      (notification.type == FlixieNotification.movieWatchRequest ||
+          notification.type == FlixieNotification.showWatchRequest) &&
+      notification.linkedRequestId != null &&
+      !_showsScheduleFlow;
+
+  bool get _isWatchNotification =>
+      notification.type == FlixieNotification.movieWatchRequest ||
+      notification.type == FlixieNotification.showWatchRequest;
+
+  Map<String, dynamic>? get _latestProposal =>
+      notification.latestWatchScheduleProposal;
+
+  String? get _latestProposalStatus =>
+      _latestProposal?['status']?.toString().toUpperCase();
+
+  bool get _isPendingScheduleProposal =>
+      _isWatchNotification &&
+      notification.watchRequestScheduleStatus?.toUpperCase() == 'PROPOSED' &&
+      _latestProposalStatus == 'PENDING';
+
+  bool get _proposedByMe =>
+      currentUserId != null &&
+      currentUserId!.isNotEmpty &&
+      _latestProposal?['proposerId']?.toString() == currentUserId;
+
+  bool get _canRespondToScheduleProposal =>
+      _isPendingScheduleProposal && !_proposedByMe;
+
+  bool get _isAgreedSchedule =>
+      _isWatchNotification &&
+      notification.watchRequestScheduleStatus?.toUpperCase() == 'AGREED';
+
+  bool get _isDeclinedSchedule =>
+      _isWatchNotification &&
+      notification.watchRequestScheduleStatus?.toUpperCase() == 'DECLINED';
+
+  bool get _showsScheduleFlow =>
+      _isPendingScheduleProposal || _isAgreedSchedule || _isDeclinedSchedule;
 
   String get _requestKind {
     switch (notification.type) {
@@ -73,7 +122,7 @@ class NotificationRequestCard extends StatelessWidget {
   }
 
   Widget _buildSubtitleWidget(BuildContext context) {
-    if (_isResolved) {
+    if (_isResolved && !_showsScheduleFlow) {
       final sender = notification.senderName.isNotEmpty
           ? notification.senderName
           : 'Someone';
@@ -82,6 +131,127 @@ class NotificationRequestCard extends StatelessWidget {
           : 'declined';
       final target = _targetTitle;
       final groupName = notification.groupWatchGroupName;
+      final scheduleLabel = _acceptedScheduleLabel;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          RichText(
+            text: TextSpan(
+              style: const TextStyle(
+                color: FlixieColors.light,
+                fontSize: 13,
+                height: 1.25,
+              ),
+              children: [
+                TextSpan(text: '$sender $verb '),
+                TextSpan(
+                  text: _resolvedTargetLabel,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                if (target != null && target.isNotEmpty) ...[
+                  const TextSpan(text: ' for '),
+                  _linkedTitleSpan(context, target),
+                ],
+                if (groupName != null && groupName.isNotEmpty)
+                  TextSpan(
+                    text: ' in $groupName',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+              ],
+            ),
+          ),
+          if (scheduleLabel != null) ...[
+            const SizedBox(height: 7),
+            Row(
+              children: [
+                const Icon(
+                  Icons.event_available_outlined,
+                  size: 14,
+                  color: FlixieColors.secondary,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    scheduleLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: FlixieColors.light,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      );
+    }
+
+    final pendingScheduleLabel = _pendingScheduleLabel;
+    if ((notification.type == FlixieNotification.movieWatchRequest ||
+            notification.type == FlixieNotification.showWatchRequest) &&
+        pendingScheduleLabel != null) {
+      final title = notification.watchMediaTitle;
+      final note = _proposalNote;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          RichText(
+            text: TextSpan(
+              style: const TextStyle(
+                color: FlixieColors.light,
+                fontSize: 13,
+                height: 1.25,
+              ),
+              children: [
+                TextSpan(
+                    text: _proposedByMe
+                        ? 'waiting for them to respond'
+                        : 'suggested a watch time'),
+                if (title != null && title.isNotEmpty) ...[
+                  const TextSpan(text: ' for '),
+                  _linkedTitleSpan(context, title),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 7),
+          Row(
+            children: [
+              const Icon(
+                Icons.event_outlined,
+                size: 14,
+                color: FlixieColors.primary,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  pendingScheduleLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: FlixieColors.light,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (note != null) ...[
+            const SizedBox(height: 7),
+            _ScheduleNote(text: note),
+          ],
+        ],
+      );
+    }
+
+    if ((notification.type == FlixieNotification.movieWatchRequest ||
+            notification.type == FlixieNotification.showWatchRequest) &&
+        _isDeclinedSchedule) {
+      final title = notification.watchMediaTitle;
       return RichText(
         text: TextSpan(
           style: const TextStyle(
@@ -90,22 +260,67 @@ class NotificationRequestCard extends StatelessWidget {
             height: 1.25,
           ),
           children: [
-            TextSpan(text: '$sender $verb '),
-            TextSpan(
-              text: _resolvedTargetLabel,
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            if (target != null && target.isNotEmpty) ...[
+            const TextSpan(text: 'time declined'),
+            if (title != null && title.isNotEmpty) ...[
               const TextSpan(text: ' for '),
-              _linkedTitleSpan(context, target),
+              _linkedTitleSpan(context, title),
             ],
-            if (groupName != null && groupName.isNotEmpty)
-              TextSpan(
-                text: ' in $groupName',
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
           ],
         ),
+      );
+    }
+
+    if ((notification.type == FlixieNotification.movieWatchRequest ||
+            notification.type == FlixieNotification.showWatchRequest) &&
+        _isAgreedSchedule) {
+      final title = notification.watchMediaTitle;
+      final scheduledFor = notification.watchRequestScheduledFor ??
+          _proposalDateWithStatus('ACCEPTED');
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          RichText(
+            text: TextSpan(
+              style: const TextStyle(
+                color: FlixieColors.light,
+                fontSize: 13,
+                height: 1.25,
+              ),
+              children: [
+                const TextSpan(text: 'watch time agreed'),
+                if (title != null && title.isNotEmpty) ...[
+                  const TextSpan(text: ' for '),
+                  _linkedTitleSpan(context, title),
+                ],
+              ],
+            ),
+          ),
+          if (scheduledFor != null) ...[
+            const SizedBox(height: 7),
+            Row(
+              children: [
+                const Icon(
+                  Icons.event_available_outlined,
+                  size: 14,
+                  color: FlixieColors.secondary,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Scheduled for ${_formatScheduleDate(scheduledFor)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: FlixieColors.light,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
       );
     }
 
@@ -203,6 +418,60 @@ class NotificationRequestCard extends StatelessWidget {
 
   String? get _targetTitle {
     return notification.watchMediaTitle ?? notification.groupWatchMovieTitle;
+  }
+
+  String? get _acceptedScheduleLabel {
+    if (notification.action != FlixieNotification.actionAccepted) return null;
+    final scheduledFor = notification.watchRequestScheduledFor ??
+        _proposalDateWithStatus('ACCEPTED');
+    if (scheduledFor == null) return null;
+    return 'Scheduled for ${_formatScheduleDate(scheduledFor)}';
+  }
+
+  String? get _pendingScheduleLabel {
+    final proposal = notification.latestWatchScheduleProposal;
+    if (proposal == null) return null;
+    final status = proposal['status']?.toString().toUpperCase();
+    if (status != 'PENDING') return null;
+    final proposedFor = DateTime.tryParse(
+      proposal['proposedFor']?.toString() ?? '',
+    );
+    if (proposedFor == null) return null;
+    return 'Proposed for ${_formatScheduleDate(proposedFor)}';
+  }
+
+  String? get _proposalNote {
+    final note = _latestProposal?['message']?.toString().trim();
+    return note == null || note.isEmpty ? null : note;
+  }
+
+  DateTime? _proposalDateWithStatus(String status) {
+    final proposal = notification.latestWatchScheduleProposal;
+    if (proposal == null) return null;
+    if (proposal['status']?.toString().toUpperCase() != status) return null;
+    return DateTime.tryParse(proposal['proposedFor']?.toString() ?? '');
+  }
+
+  String _formatScheduleDate(DateTime value) {
+    final local = value.toLocal();
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+    final minute = local.minute.toString().padLeft(2, '0');
+    final suffix = local.hour >= 12 ? 'pm' : 'am';
+    return '${local.day} ${months[local.month - 1]}, $hour:$minute$suffix';
   }
 
   String get _resolvedTargetLabel {
@@ -390,7 +659,125 @@ class NotificationRequestCard extends StatelessWidget {
                 height: 28,
                 child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
               ),
-            ] else if (!_isResolved) ...[
+            ] else if (_canRespondToScheduleProposal) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: onAcceptSchedule,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: FlixieColors.primary,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      icon: const Icon(Icons.check_rounded, size: 17),
+                      label: const Text(
+                        'Accept time',
+                        style: TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onDeclineSchedule,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: FlixieColors.light,
+                        side: BorderSide(
+                          color: FlixieColors.medium.withValues(alpha: 0.5),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      icon: const Icon(Icons.close_rounded, size: 17),
+                      label: const Text(
+                        'Decline',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: onSuggestSchedule,
+                  icon: const Icon(Icons.edit_calendar_outlined, size: 16),
+                  label: const Text('Suggest another time'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: FlixieColors.medium,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ),
+            ] else if (_isAgreedSchedule || _isDeclinedSchedule) ...[
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: FilledButton.icon(
+                  onPressed: onSuggestSchedule,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _isAgreedSchedule
+                        ? FlixieColors.primary
+                        : FlixieColors.secondary,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  icon: const Icon(Icons.edit_calendar_outlined, size: 16),
+                  label: Text(
+                    _isAgreedSchedule ? 'Reschedule' : 'Suggest another time',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+            ] else if (_canOpenAcceptedWatchRequest) ...[
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: FilledButton.icon(
+                  onPressed: () => context.push(
+                    '/watch-requests?requestId=${notification.linkedRequestId}',
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: FlixieColors.primary,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  icon: const Icon(Icons.edit_calendar_outlined, size: 16),
+                  label: const Text(
+                    'Schedule watch',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+            ] else if (!_isResolved && !_showsScheduleFlow) ...[
               const SizedBox(height: 10),
               Row(
                 children: [
@@ -471,6 +858,51 @@ class _RequestMediaPreview extends StatelessWidget {
                   child: Icon(fallbackIcon, color: accent, size: 22),
                 ),
               ),
+      ),
+    );
+  }
+}
+
+class _ScheduleNote extends StatelessWidget {
+  const _ScheduleNote({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+      decoration: BoxDecoration(
+        color: FlixieColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: FlixieColors.primary.withValues(alpha: 0.24),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.chat_bubble_outline,
+            size: 13,
+            color: FlixieColors.primary,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: FlixieColors.light,
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+                height: 1.25,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -7,6 +7,21 @@ import '../../theme/app_theme.dart';
 import '../../utils/app_logger.dart';
 import 'request_poster_placeholder.dart';
 
+const List<String> _kRequestMonths = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
 enum _RequestFilter { all, needsResponse, active, completed, byMe }
 
 class GroupRequestsTab extends StatefulWidget {
@@ -276,6 +291,81 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
     }
   }
 
+  Future<void> _scheduleRequest(GroupWatchRequest req,
+      {String? initialIso}) async {
+    final selected = await showModalBottomSheet<DateTime>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _GroupScheduleWatchSheet(
+        initial: DateTime.tryParse(initialIso ?? '')?.toLocal(),
+      ),
+    );
+    if (!mounted || selected == null) return;
+
+    final userId = widget.currentUserId;
+    final convId = widget.conversationId ?? req.groupId;
+    setState(() => _processing[req.id] = true);
+    try {
+      await GroupService.scheduleWatchRequest(
+        convId,
+        req.id,
+        userId: userId,
+        scheduledFor: selected.toUtc().toIso8601String(),
+      );
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Watch scheduled for ${_fullDateTime(selected)}'),
+            backgroundColor: FlixieColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      logger.e('Schedule watch request error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to schedule watch')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _processing.remove(req.id));
+    }
+  }
+
+  Future<void> _unscheduleRequest(GroupWatchRequest req) async {
+    final userId = widget.currentUserId;
+    final convId = widget.conversationId ?? req.groupId;
+    setState(() => _processing[req.id] = true);
+    try {
+      await GroupService.scheduleWatchRequest(
+        convId,
+        req.id,
+        userId: userId,
+        scheduledFor: null,
+      );
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Watch time removed'),
+            backgroundColor: FlixieColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      logger.e('Unschedule watch request error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to unschedule watch')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _processing.remove(req.id));
+    }
+  }
+
   Future<void> _cancelRequest(GroupWatchRequest req) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -395,6 +485,7 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
     switch (status) {
       case WatchRequestStatus.open:
         return FlixieColors.primary;
+      case WatchRequestStatus.accepted:
       case WatchRequestStatus.scheduled:
         return FlixieColors.secondary;
       case WatchRequestStatus.completed:
@@ -679,25 +770,17 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
     }
   }
 
-  String _fullDate(String? iso) {
+  String _fullDateTime(DateTime value) {
+    final local = value.toLocal();
+    final time = TimeOfDay.fromDateTime(local).format(context);
+    return '${local.day} ${_kRequestMonths[local.month - 1]}, $time';
+  }
+
+  String _fullDateTimeString(String? iso) {
     if (iso == null || iso.isEmpty) return '';
     final dt = DateTime.tryParse(iso);
     if (dt == null) return '';
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
+    return _fullDateTime(dt);
   }
 
   Widget _buildSummaryStrip() {
@@ -917,40 +1000,94 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
   }
 
   Widget _manageActions(GroupWatchRequest req) {
-    return Row(
+    final userId = widget.currentUserId;
+    final showScheduling =
+        req.canScheduleFor(userId) || _canScheduleAsParticipant(req);
+    final showComplete = req.canCompleteFor(userId);
+    final showCancel = req.canCancelFor(userId);
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
       children: [
-        Expanded(
-          child: _responseButton(
-            label: 'Mark Watched',
-            icon: Icons.check_circle_outline,
-            color: FlixieColors.success,
-            onPressed: () => _markWatched(req),
+        if (showScheduling)
+          SizedBox(
+            width: req.status == WatchRequestStatus.scheduled ? 150 : 170,
+            child: _responseButton(
+              label: req.status == WatchRequestStatus.scheduled
+                  ? 'Reschedule'
+                  : 'Schedule',
+              icon: Icons.edit_calendar_outlined,
+              color: FlixieColors.primary,
+              onPressed: () => _scheduleRequest(
+                req,
+                initialIso: req.scheduledFor ?? req.proposedDate,
+              ),
+              filled: req.status != WatchRequestStatus.scheduled,
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _responseButton(
-            label: 'Cancel',
-            icon: Icons.cancel_outlined,
-            color: FlixieColors.danger,
-            onPressed: () => _cancelRequest(req),
+        if (req.status == WatchRequestStatus.scheduled && showScheduling)
+          SizedBox(
+            width: 150,
+            child: _responseButton(
+              label: 'Unschedule',
+              icon: Icons.event_busy_outlined,
+              color: FlixieColors.warning,
+              onPressed: () => _unscheduleRequest(req),
+            ),
           ),
-        ),
+        if (showComplete)
+          SizedBox(
+            width: 170,
+            child: _responseButton(
+              label: 'Mark Watched',
+              icon: Icons.check_circle_outline,
+              color: FlixieColors.success,
+              onPressed: () => _markWatched(req),
+            ),
+          ),
+        if (showCancel)
+          SizedBox(
+            width: 130,
+            child: _responseButton(
+              label: 'Cancel',
+              icon: Icons.cancel_outlined,
+              color: FlixieColors.danger,
+              onPressed: () => _cancelRequest(req),
+            ),
+          ),
       ],
     );
+  }
+
+  bool _canScheduleAsParticipant(GroupWatchRequest req) {
+    if (req.status != WatchRequestStatus.accepted &&
+        req.status != WatchRequestStatus.scheduled) {
+      return false;
+    }
+    final currentUserId = widget.currentUserId;
+    if (req.userId == currentUserId) return true;
+    if (req.currentUserResponse != null) return true;
+    return req.memberStatuses.any((s) => s.memberId == currentUserId);
   }
 
   Widget _buildRequestCard(GroupWatchRequest req) {
     final currentUserId = widget.currentUserId;
     final isMyRequest = req.userId == currentUserId;
     final canDelete = isMyRequest || widget.isAdmin;
-    final canManage = isMyRequest || widget.isAdmin;
+    final canManage = isMyRequest ||
+        widget.isAdmin ||
+        req.canScheduleFor(currentUserId) ||
+        req.canCompleteFor(currentUserId) ||
+        req.canCancelFor(currentUserId) ||
+        _canScheduleAsParticipant(req);
     final isProcessing = _processing[req.id] == true;
     final myStatus = _currentUserStatus(req);
     final posterUrl = req.moviePosterPath != null
         ? 'https://image.tmdb.org/t/p/w185${req.moviePosterPath}'
         : null;
-    final proposedDate = _fullDate(req.scheduledFor ?? req.proposedDate);
+    final proposedDate =
+        _fullDateTimeString(req.scheduledFor ?? req.proposedDate);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -1050,7 +1187,9 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
-                                  'Planned for $proposedDate',
+                                  req.scheduledFor != null
+                                      ? 'Scheduled for $proposedDate'
+                                      : 'Proposed for $proposedDate',
                                   style: const TextStyle(
                                     color: FlixieColors.medium,
                                     fontSize: 12,
@@ -1221,6 +1360,182 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _GroupScheduleWatchSheet extends StatefulWidget {
+  const _GroupScheduleWatchSheet({this.initial});
+
+  final DateTime? initial;
+
+  @override
+  State<_GroupScheduleWatchSheet> createState() =>
+      _GroupScheduleWatchSheetState();
+}
+
+class _GroupScheduleWatchSheetState extends State<_GroupScheduleWatchSheet> {
+  late DateTime _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = widget.initial ?? DateTime.now().add(const Duration(hours: 2));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Container(
+        decoration: const BoxDecoration(
+          color: FlixieColors.background,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          14,
+          16,
+          MediaQuery.of(context).viewInsets.bottom + 16,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Schedule watch',
+              style: TextStyle(
+                color: FlixieColors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _QuickScheduleChip(
+                  label: 'Tonight',
+                  onTap: () => setState(() => _selected = _tonight()),
+                ),
+                _QuickScheduleChip(
+                  label: 'Tomorrow',
+                  onTap: () => setState(() => _selected = _tomorrow()),
+                ),
+                _QuickScheduleChip(
+                  label: 'This weekend',
+                  onTap: () => setState(() => _selected = _thisWeekend()),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading:
+                  const Icon(Icons.event_outlined, color: FlixieColors.primary),
+              title: const Text('Date',
+                  style: TextStyle(color: FlixieColors.light)),
+              subtitle: Text(
+                '${_selected.day} ${_kRequestMonths[_selected.month - 1]} ${_selected.year}',
+                style: const TextStyle(color: FlixieColors.medium),
+              ),
+              onTap: _pickDate,
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.schedule_rounded,
+                  color: FlixieColors.primary),
+              title: const Text('Time',
+                  style: TextStyle(color: FlixieColors.light)),
+              subtitle: Text(
+                TimeOfDay.fromDateTime(_selected).format(context),
+                style: const TextStyle(color: FlixieColors.medium),
+              ),
+              onTap: _pickTime,
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context, _selected),
+                child: const Text('Confirm schedule'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selected,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked == null) return;
+    setState(() {
+      _selected = DateTime(
+        picked.year,
+        picked.month,
+        picked.day,
+        _selected.hour,
+        _selected.minute,
+      );
+    });
+  }
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_selected),
+    );
+    if (picked == null) return;
+    setState(() {
+      _selected = DateTime(
+        _selected.year,
+        _selected.month,
+        _selected.day,
+        picked.hour,
+        picked.minute,
+      );
+    });
+  }
+
+  DateTime _tonight() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day, 20);
+  }
+
+  DateTime _tomorrow() {
+    final tomorrow = DateTime.now().add(const Duration(days: 1));
+    return DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 19, 30);
+  }
+
+  DateTime _thisWeekend() {
+    final now = DateTime.now();
+    final daysUntilSaturday = (DateTime.saturday - now.weekday) % 7;
+    final saturday =
+        now.add(Duration(days: daysUntilSaturday == 0 ? 7 : daysUntilSaturday));
+    return DateTime(saturday.year, saturday.month, saturday.day, 20);
+  }
+}
+
+class _QuickScheduleChip extends StatelessWidget {
+  const _QuickScheduleChip({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ActionChip(
+      label: Text(label),
+      onPressed: onTap,
+      backgroundColor: FlixieColors.tabBarBackgroundFocused,
+      labelStyle: const TextStyle(color: FlixieColors.light),
+      side: BorderSide(color: FlixieColors.primary.withValues(alpha: 0.3)),
     );
   }
 }

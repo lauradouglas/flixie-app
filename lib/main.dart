@@ -109,9 +109,18 @@ class _FlixieAppState extends State<FlixieApp> {
       darkTheme: AppTheme.darkTheme,
       themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
       routerConfig: _router,
-      builder: (context, child) => ColoredBox(
-        color: isDark ? FlixieColors.background : const Color(0xFFF5F7FA),
-        child: child ?? const SizedBox.shrink(),
+      builder: (context, child) => GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () {
+          final focus = FocusManager.instance.primaryFocus;
+          if (focus != null && !focus.hasPrimaryFocus) {
+            focus.unfocus();
+          }
+        },
+        child: ColoredBox(
+          color: isDark ? FlixieColors.background : const Color(0xFFF5F7FA),
+          child: child ?? const SizedBox.shrink(),
+        ),
       ),
     );
   }

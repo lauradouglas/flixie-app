@@ -121,6 +121,36 @@ class FlixieNotification {
     return show?['title'] as String?;
   }
 
+  Map<String, dynamic>? get _linkedWatchRequest {
+    final l = link;
+    if (l == null) return null;
+    return l['request'] as Map<String, dynamic>?;
+  }
+
+  DateTime? get watchRequestScheduledFor {
+    final raw = _linkedWatchRequest?['scheduledFor'];
+    if (raw is String && raw.isNotEmpty) return DateTime.tryParse(raw);
+    return null;
+  }
+
+  String? get watchRequestScheduleStatus {
+    return _linkedWatchRequest?['scheduleStatus'] as String?;
+  }
+
+  Map<String, dynamic>? get latestWatchScheduleProposal {
+    final raw = _linkedWatchRequest?['scheduleProposals'];
+    if (raw is! List) return null;
+    final proposals = raw.whereType<Map<String, dynamic>>().toList()
+      ..sort((a, b) {
+        final bDate = DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final aDate = DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        return bDate.compareTo(aDate);
+      });
+    return proposals.isEmpty ? null : proposals.first;
+  }
+
   /// The movie ID embedded in a watch request link, if present.
   /// Reads `request.movieId` first, then falls back to `request.movie.id`.
   int? get watchMovieId {

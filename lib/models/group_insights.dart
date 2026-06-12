@@ -195,12 +195,8 @@ class GroupInsightReview {
     final user = json['user'] as Map<String, dynamic>?;
     final movie = json['movie'] as Map<String, dynamic>?;
 
-    final reviewerName = (json['reviewerName'] ??
-            json['reviewer_name'] ??
-            user?['username'] ??
-            '${user?['firstName'] ?? ''} ${user?['lastName'] ?? ''}'.trim())
-        .toString()
-        .trim();
+    final reviewerName =
+        (user?['username'] ?? user?['firstName'] ?? '').toString().trim();
 
     return GroupInsightReview(
       id: (json['id'] ?? '').toString(),
@@ -263,10 +259,10 @@ class GroupInsightMember {
   factory GroupInsightMember.fromJson(Map<String, dynamic> json) {
     final user = json['user'] as Map<String, dynamic>?;
     final username = (json['username'] ?? user?['username'] ?? '').toString();
-    final resolvedNameRaw = (json['name'] ??
-            '${user?['firstName'] ?? ''} ${user?['lastName'] ?? ''}'.trim())
-        .toString()
-        .trim();
+    final resolvedNameRaw =
+        (username.isNotEmpty ? username : user?['firstName'] ?? '')
+            .toString()
+            .trim();
     final resolvedName = resolvedNameRaw.isEmpty ? username : resolvedNameRaw;
 
     return GroupInsightMember(

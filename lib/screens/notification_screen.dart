@@ -114,9 +114,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
     if (userId == null) return;
     try {
       final fresh = await NotificationService.getNotifications(userId);
+      final visible = _visibleNotificationsForUser(fresh, userId);
       if (mounted) {
-        setState(() => _notifications = fresh);
-        auth.setUnreadNotificationCount(fresh.where((n) => !n.isRead).length);
+        setState(() => _notifications = visible);
+        auth.setUnreadNotificationCount(visible.where((n) => !n.isRead).length);
       }
     } catch (e) {
       // Polling errors are intentionally silent; the user is not disrupted.
@@ -137,14 +138,16 @@ class _NotificationScreenState extends State<NotificationScreen> {
     }
     try {
       final notifications = await NotificationService.getNotifications(userId);
+      final visible = _visibleNotificationsForUser(notifications, userId);
       if (mounted) {
         setState(() {
-          _notifications = notifications;
+          _notifications = visible;
           _isLoading = false;
           _error = null;
         });
-        context.read<AuthProvider>().setUnreadNotificationCount(
-            notifications.where((n) => !n.isRead).length);
+        context
+            .read<AuthProvider>()
+            .setUnreadNotificationCount(visible.where((n) => !n.isRead).length);
       }
     } catch (e) {
       logger.e('[NotificationScreen] load error: $e');
@@ -155,6 +158,71 @@ class _NotificationScreenState extends State<NotificationScreen> {
         });
       }
     }
+  }
+
+  List<FlixieNotification> _visibleNotificationsForUser(
+    List<FlixieNotification> notifications,
+    String userId,
+  ) {
+    final addressedToUser = notifications.where((n) => n.userId == userId);
+    final byScheduleKey = <String, FlixieNotification>{};
+    final visible = <FlixieNotification>[];
+
+    for (final notification in addressedToUser) {
+      final key = _scheduleNotificationKey(notification);
+      if (key == null) {
+        visible.add(notification);
+        continue;
+      }
+
+      final existing = byScheduleKey[key];
+      if (existing == null ||
+          _notificationSortDate(notification).isAfter(
+            _notificationSortDate(existing),
+          )) {
+        byScheduleKey[key] = notification;
+      }
+    }
+
+    visible.addAll(byScheduleKey.values);
+    visible.sort(
+      (a, b) => _notificationSortDate(b).compareTo(_notificationSortDate(a)),
+    );
+    return visible;
+  }
+
+  String? _scheduleNotificationKey(FlixieNotification notification) {
+    if (notification.type != FlixieNotification.movieWatchRequest &&
+        notification.type != FlixieNotification.showWatchRequest) {
+      return null;
+    }
+    final requestId = notification.linkedRequestId;
+    if (requestId == null || requestId.isEmpty) return null;
+    final scheduleStatus =
+        notification.watchRequestScheduleStatus?.toUpperCase();
+    if (scheduleStatus == null ||
+        (scheduleStatus != 'PROPOSED' &&
+            scheduleStatus != 'AGREED' &&
+            scheduleStatus != 'DECLINED')) {
+      return null;
+    }
+    final proposal = notification.latestWatchScheduleProposal;
+    final proposalId = proposal?['id']?.toString();
+    final proposedFor = proposal?['proposedFor']?.toString();
+    return [
+      notification.type,
+      requestId,
+      scheduleStatus,
+      if (proposalId != null && proposalId.isNotEmpty)
+        proposalId
+      else if (proposedFor != null && proposedFor.isNotEmpty)
+        proposedFor,
+    ].join(':');
+  }
+
+  DateTime _notificationSortDate(FlixieNotification notification) {
+    return DateTime.tryParse(notification.receivedAt) ??
+        DateTime.fromMillisecondsSinceEpoch(0);
   }
 
   Future<void> _respond(FlixieNotification notification, String action) async {
@@ -245,6 +313,108 @@ class _NotificationScreenState extends State<NotificationScreen> {
       }
     } finally {
       if (mounted) setState(() => _processingIds.remove(id));
+    }
+  }
+
+  Future<void> _respondToScheduleProposal(
+    FlixieNotification notification,
+    String decision,
+  ) async {
+    final requestId = notification.linkedRequestId;
+    final proposalId =
+        notification.latestWatchScheduleProposal?['id']?.toString();
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    final notificationId = notification.id;
+    if (requestId == null ||
+        proposalId == null ||
+        proposalId.isEmpty ||
+        userId == null) {
+      return;
+    }
+    if (notificationId != null) {
+      setState(() => _processingIds.add(notificationId));
+    }
+    try {
+      await RequestService.respondToWatchScheduleProposal(
+        watchRequestId: requestId,
+        proposalId: proposalId,
+        userId: userId,
+        decision: decision,
+      );
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            decision == 'accepted' ? 'Watch time agreed' : 'Time declined',
+          ),
+          backgroundColor: FlixieColors.success,
+        ),
+      );
+    } catch (e) {
+      logger.e('[NotificationScreen] schedule proposal response error: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to update proposed time. Please try again.'),
+          backgroundColor: FlixieColors.danger,
+        ),
+      );
+    } finally {
+      if (mounted && notificationId != null) {
+        setState(() => _processingIds.remove(notificationId));
+      }
+    }
+  }
+
+  Future<void> _suggestSchedule(FlixieNotification notification) async {
+    final requestId = notification.linkedRequestId;
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (requestId == null || userId == null) return;
+
+    final selected =
+        await showModalBottomSheet<({DateTime proposedFor, String? message})>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _NotificationScheduleProposalSheet(
+        initial: notification.watchRequestScheduledFor,
+      ),
+    );
+    if (!mounted || selected == null) return;
+
+    final notificationId = notification.id;
+    if (notificationId != null) {
+      setState(() => _processingIds.add(notificationId));
+    }
+    try {
+      await RequestService.proposeWatchSchedule(
+        watchRequestId: requestId,
+        userId: userId,
+        proposedFor: selected.proposedFor,
+        message: selected.message,
+      );
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Suggested a new time'),
+          backgroundColor: FlixieColors.success,
+        ),
+      );
+    } catch (e) {
+      logger.e('[NotificationScreen] suggest schedule error: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to suggest a time. Please try again.'),
+          backgroundColor: FlixieColors.danger,
+        ),
+      );
+    } finally {
+      if (mounted && notificationId != null) {
+        setState(() => _processingIds.remove(notificationId));
+      }
     }
   }
 
@@ -663,15 +833,22 @@ class _NotificationScreenState extends State<NotificationScreen> {
   }
 
   Widget _buildCard(FlixieNotification notification) {
+    final currentUserId = context.read<AuthProvider>().dbUser?.id;
     if (notification.isRequest) {
       return NotificationRequestCard(
         notification: notification,
         isProcessing: _processingIds.contains(notification.id),
         formatDate: _formatDate,
+        currentUserId: currentUserId,
         onAccept: () =>
             _respond(notification, FlixieNotification.actionAccepted),
         onDecline: () =>
             _respond(notification, FlixieNotification.actionDeclined),
+        onAcceptSchedule: () =>
+            _respondToScheduleProposal(notification, 'accepted'),
+        onDeclineSchedule: () =>
+            _respondToScheduleProposal(notification, 'declined'),
+        onSuggestSchedule: () => _suggestSchedule(notification),
         onClose: () => _closeNotification(notification),
       );
     }
@@ -679,6 +856,207 @@ class _NotificationScreenState extends State<NotificationScreen> {
       notification: notification,
       formatDate: _formatDate,
       onClose: () => _closeNotification(notification),
+    );
+  }
+}
+
+class _NotificationScheduleProposalSheet extends StatefulWidget {
+  const _NotificationScheduleProposalSheet({this.initial});
+
+  final DateTime? initial;
+
+  @override
+  State<_NotificationScheduleProposalSheet> createState() =>
+      _NotificationScheduleProposalSheetState();
+}
+
+class _NotificationScheduleProposalSheetState
+    extends State<_NotificationScheduleProposalSheet> {
+  final TextEditingController _messageController = TextEditingController();
+  late DateTime _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = widget.initial?.toLocal() ??
+        DateTime.now().add(const Duration(hours: 2));
+  }
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Container(
+        decoration: const BoxDecoration(
+          color: FlixieColors.background,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          14,
+          16,
+          MediaQuery.of(context).viewInsets.bottom + 16,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Suggest a time',
+              style: TextStyle(
+                color: FlixieColors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _QuickScheduleChip(
+                  label: 'Tonight',
+                  onTap: () => setState(() => _selected = _tonight()),
+                ),
+                _QuickScheduleChip(
+                  label: 'Tomorrow',
+                  onTap: () => setState(() => _selected = _tomorrow()),
+                ),
+                _QuickScheduleChip(
+                  label: 'This weekend',
+                  onTap: () => setState(() => _selected = _thisWeekend()),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading:
+                  const Icon(Icons.event_outlined, color: FlixieColors.primary),
+              title: const Text('Date',
+                  style: TextStyle(color: FlixieColors.light)),
+              subtitle: Text(
+                '${_selected.day} ${_kMonths[_selected.month - 1]} ${_selected.year}',
+                style: const TextStyle(color: FlixieColors.medium),
+              ),
+              onTap: _pickDate,
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.schedule_rounded,
+                  color: FlixieColors.primary),
+              title: const Text('Time',
+                  style: TextStyle(color: FlixieColors.light)),
+              subtitle: Text(
+                TimeOfDay.fromDateTime(_selected).format(context),
+                style: const TextStyle(color: FlixieColors.medium),
+              ),
+              onTap: _pickTime,
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _messageController,
+              maxLines: 2,
+              style: const TextStyle(color: FlixieColors.light),
+              decoration: const InputDecoration(
+                labelText: 'Note (optional)',
+                hintText: 'Add a quick note',
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(
+                  context,
+                  (
+                    proposedFor: _selected,
+                    message: _messageController.text.trim(),
+                  ),
+                ),
+                child: const Text('Send suggestion'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selected,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked == null) return;
+    setState(() {
+      _selected = DateTime(
+        picked.year,
+        picked.month,
+        picked.day,
+        _selected.hour,
+        _selected.minute,
+      );
+    });
+  }
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_selected),
+    );
+    if (picked == null) return;
+    setState(() {
+      _selected = DateTime(
+        _selected.year,
+        _selected.month,
+        _selected.day,
+        picked.hour,
+        picked.minute,
+      );
+    });
+  }
+
+  DateTime _tonight() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day, 20);
+  }
+
+  DateTime _tomorrow() {
+    final tomorrow = DateTime.now().add(const Duration(days: 1));
+    return DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 19, 30);
+  }
+
+  DateTime _thisWeekend() {
+    final now = DateTime.now();
+    final daysUntilSaturday = (DateTime.saturday - now.weekday) % 7;
+    final saturday =
+        now.add(Duration(days: daysUntilSaturday == 0 ? 7 : daysUntilSaturday));
+    return DateTime(saturday.year, saturday.month, saturday.day, 20);
+  }
+}
+
+class _QuickScheduleChip extends StatelessWidget {
+  const _QuickScheduleChip({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ActionChip(
+      label: Text(label),
+      onPressed: onTap,
+      backgroundColor: FlixieColors.tabBarBackgroundFocused,
+      labelStyle: const TextStyle(color: FlixieColors.light),
+      side: BorderSide(color: FlixieColors.primary.withValues(alpha: 0.3)),
     );
   }
 }

@@ -18,6 +18,7 @@ class RequestStatusBadge extends StatelessWidget {
         color = FlixieColors.danger;
       case WatchRequestStatus.completed:
         color = FlixieColors.success;
+      case WatchRequestStatus.accepted:
       case WatchRequestStatus.scheduled:
         color = FlixieColors.secondary;
       case WatchRequestStatus.open:

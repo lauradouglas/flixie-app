@@ -22,7 +22,7 @@ class MovieShort {
   });
 
   factory MovieShort.fromJson(Map<String, dynamic> json) {
-    String? _stringValue(dynamic value) {
+    String? stringValue(dynamic value) {
       if (value == null) return null;
       final str = value.toString();
       return str.isEmpty ? null : str;
@@ -32,15 +32,15 @@ class MovieShort {
       id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
       name: (json['name'] ?? json['title']) as String,
       originalLanguage:
-          _stringValue(json['originalLanguage'] ?? json['original_language']),
-      poster: _stringValue(
+          stringValue(json['originalLanguage'] ?? json['original_language']),
+      poster: stringValue(
           json['poster'] ?? json['posterPath'] ?? json['poster_path']),
-      releaseDate: _stringValue(json['releaseDate'] ?? json['release_date']),
+      releaseDate: stringValue(json['releaseDate'] ?? json['release_date']),
       overview: json['overview'] as String?,
       trailer: json['trailer'] != null
           ? Trailer.fromJson(json['trailer'] as Map<String, dynamic>)
           : null,
-      mediaType: _stringValue(json['mediaType'] ?? json['media_type']),
+      mediaType: stringValue(json['mediaType'] ?? json['media_type']),
       voteAverage:
           ((json['voteAverage'] ?? json['vote_average']) as num?)?.toDouble(),
     );

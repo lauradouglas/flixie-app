@@ -1,3 +1,5 @@
+import '../utils/app_logger.dart';
+
 /// Lightweight user info embedded in friendship/friend-request objects.
 class FriendshipUser {
   final String id;
@@ -32,9 +34,6 @@ class FriendshipUser {
   }
 
   String get shortName {
-    if (firstName != null && lastName != null && lastName!.isNotEmpty) {
-      return '${firstName!} ${lastName![0]}.';
-    }
     if (firstName != null && firstName!.isNotEmpty) return firstName!;
     return username;
   }
@@ -141,7 +140,7 @@ class FriendsData {
         try {
           return Friendship.fromJson(e as Map<String, dynamic>);
         } catch (err) {
-          print('[FriendsData] Error parsing friendship: $err');
+          logger.w('[FriendsData] Error parsing friendship: $err');
           rethrow;
         }
       }).toList();
@@ -150,7 +149,7 @@ class FriendsData {
         try {
           return Friendship.fromJson(e as Map<String, dynamic>);
         } catch (err) {
-          print('[FriendsData] Error parsing pending friend: $err');
+          logger.w('[FriendsData] Error parsing pending friend: $err');
           rethrow;
         }
       }).toList();
@@ -159,7 +158,7 @@ class FriendsData {
         try {
           return Friendship.fromJson(e as Map<String, dynamic>);
         } catch (err) {
-          print('[FriendsData] Error parsing requested friend: $err');
+          logger.w('[FriendsData] Error parsing requested friend: $err');
           rethrow;
         }
       }).toList();
@@ -170,7 +169,7 @@ class FriendsData {
         requestedFriends: requestedFriends,
       );
     } catch (e) {
-      print('[FriendsData] Error in fromJson: $e');
+      logger.w('[FriendsData] Error in fromJson: $e');
       rethrow;
     }
   }

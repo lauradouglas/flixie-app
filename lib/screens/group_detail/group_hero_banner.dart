@@ -59,16 +59,25 @@ class GroupHeroBanner extends StatelessWidget {
             CircleAvatar(
               radius: 28,
               backgroundColor: color.withValues(alpha: 0.22),
-              child: Text(
-                (group.abbreviation?.isNotEmpty == true
-                        ? group.abbreviation!
-                        : group.name
-                            .substring(0, group.name.length.clamp(1, 2)))
-                    .toUpperCase(),
-                style: TextStyle(
-                  color: color,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
+              child: SizedBox(
+                width: 40,
+                height: 40,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    (group.abbreviation?.isNotEmpty == true
+                            ? group.abbreviation!
+                            : group.name
+                                .substring(0, group.name.length.clamp(1, 2)))
+                        .toUpperCase(),
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
                 ),
               ),
             ),

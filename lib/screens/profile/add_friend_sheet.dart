@@ -18,8 +18,10 @@ class AddFriendSheet extends StatefulWidget {
 }
 
 class _AddFriendSheetState extends State<AddFriendSheet> {
-  final FriendActionsController _friendActions = FriendActionsController.instance;
-  final ProfileLookupController _profileLookup = ProfileLookupController.instance;
+  final FriendActionsController _friendActions =
+      FriendActionsController.instance;
+  final ProfileLookupController _profileLookup =
+      ProfileLookupController.instance;
   final TextEditingController _searchController = TextEditingController();
   bool _searching = false;
   List<User> _results = [];
@@ -103,7 +105,6 @@ class _AddFriendSheetState extends State<AddFriendSheet> {
           id: user.id,
           username: user.username,
           firstName: user.firstName,
-          lastName: user.lastName,
           initials: user.initials,
           iconColor: user.iconColor,
         ),
@@ -166,7 +167,7 @@ class _AddFriendSheetState extends State<AddFriendSheet> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text(
-              'Search by username or email',
+              'Search by username',
               style: textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
             ),
           ),
@@ -180,7 +181,7 @@ class _AddFriendSheetState extends State<AddFriendSheet> {
                     controller: _searchController,
                     style: const TextStyle(color: FlixieColors.light),
                     decoration: InputDecoration(
-                      hintText: 'Username or email…',
+                      hintText: 'Username…',
                       hintStyle: const TextStyle(color: FlixieColors.medium),
                       prefixIcon:
                           const Icon(Icons.search, color: FlixieColors.medium),
@@ -253,9 +254,9 @@ class _AddFriendSheetState extends State<AddFriendSheet> {
                         ),
                         title: Text(user.username,
                             style: const TextStyle(color: FlixieColors.light)),
-                        subtitle: Text(
-                          user.email,
-                          style: const TextStyle(
+                        subtitle: const Text(
+                          'Flixie member',
+                          style: TextStyle(
                               color: FlixieColors.medium, fontSize: 12),
                         ),
                         trailing: sent

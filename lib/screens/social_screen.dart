@@ -260,8 +260,7 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
         : friends
             .where((friend) =>
                 friend.username.toLowerCase().contains(query) ||
-                (friend.firstName ?? '').toLowerCase().contains(query) ||
-                (friend.lastName ?? '').toLowerCase().contains(query))
+                (friend.firstName ?? '').toLowerCase().contains(query))
             .toList();
     final authUser = context.read<AuthProvider>().dbUser;
     final myWatchlistIds =

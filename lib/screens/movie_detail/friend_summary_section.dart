@@ -367,7 +367,7 @@ class _RatedFriendRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final displayName = item.displayName ?? item.username;
+    final displayName = item.username;
     final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
 
     return GestureDetector(

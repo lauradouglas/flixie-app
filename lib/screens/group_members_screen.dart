@@ -74,7 +74,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
       logger.d('[GroupMembersScreen] loaded ${members.length} members:');
       for (final m in members) {
         logger.d(
-            '  memberId=${m.memberId} username=${m.username} firstName=${m.firstName} lastName=${m.lastName} displayName=${m.displayName}');
+            '  memberId=${m.memberId} username=${m.username} firstName=${m.firstName} displayName=${m.displayName}');
       }
       if (mounted) {
         setState(() {

@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/movie_short.dart';
 import '../models/activity_list_item.dart';
 import '../models/trending_groups.dart';
+import '../models/watch_request.dart';
 import '../models/watchlist_movie.dart';
 import '../presentation/shared/friend_actions_controller.dart';
 import '../presentation/shared/watchlist_actions_controller.dart';
@@ -14,6 +15,7 @@ import '../services/group_service.dart';
 import '../providers/auth_provider.dart';
 import '../services/movie_service.dart';
 import '../services/recommendation_service.dart';
+import '../services/request_service.dart';
 import '../services/trending_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_logger.dart';
@@ -49,6 +51,10 @@ class _HomeScreenState extends State<HomeScreen> {
   RecommendationFromHighlyRatedResponse? _highlyRatedRecommendations;
   final Set<int> _watchlistUpdatesInFlight = <int>{};
   Set<int> _watchlistMovieIds = {};
+  int _watchRequestsNeedingResponse = 0;
+  int _watchRequestsScheduledToday = 0;
+  int _watchRequestsUpcoming = 0;
+  bool _watchRequestsLoading = true;
   bool _isLoading = true;
   String? _error;
   String? _loadedForUserId;
@@ -106,6 +112,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _error = null;
       _isTrendingGroupsLoading = true;
       _trendingGroupsError = null;
+      _watchRequestsLoading = true;
     });
     final auth = context.read<AuthProvider>();
     final movieService = context.read<MovieService>();
@@ -141,8 +148,16 @@ class _HomeScreenState extends State<HomeScreen> {
               .catchError((_) => <WatchlistMovie>[])
         else
           Future.value(<WatchlistMovie>[]),
+        if (user != null)
+          RequestService.getWatchRequests(user.id)
+              .catchError((_) => <WatchRequest>[])
+        else
+          Future.value(<WatchRequest>[]),
       ]);
       if (mounted) {
+        final watchRequests = results.length > 6
+            ? results[6] as List<WatchRequest>
+            : <WatchRequest>[];
         setState(() {
           _featuredMovies = results[0] as List<MovieShort>;
           _nowPlayingMovies = (results[1] as List<MovieShort>).take(8).toList();
@@ -162,6 +177,18 @@ class _HomeScreenState extends State<HomeScreen> {
               ? results[5] as List<WatchlistMovie>
               : <WatchlistMovie>[];
           _watchlistMovieIds = watchlist.map((w) => w.movieId).toSet();
+          if (user != null) {
+            _watchRequestsNeedingResponse =
+                _countWatchRequestsNeedingResponse(watchRequests, user.id);
+            _watchRequestsScheduledToday =
+                _countWatchRequestsScheduledToday(watchRequests);
+            _watchRequestsUpcoming = _countUpcomingWatchRequests(watchRequests);
+          } else {
+            _watchRequestsNeedingResponse = 0;
+            _watchRequestsScheduledToday = 0;
+            _watchRequestsUpcoming = 0;
+          }
+          _watchRequestsLoading = false;
           _loadedForUserId = user?.id;
           _isLoading = false;
         });
@@ -174,10 +201,62 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _watchRequestsLoading = false;
           _error = 'Couldn\'t load content. Check your connection.';
         });
       }
     }
+  }
+
+  int _countWatchRequestsNeedingResponse(
+    List<WatchRequest> requests,
+    String userId,
+  ) {
+    return requests.where((request) {
+      if (!request.isWatchRequest) return false;
+      if (request.isPending && request.requesterId != userId) return true;
+      final proposal = request.latestPendingProposal;
+      if (request.normalizedScheduleStatus == 'PROPOSED' &&
+          proposal != null &&
+          proposal.proposerId != userId) {
+        return true;
+      }
+      return request.canConfirmWatchedFor(userId);
+    }).length;
+  }
+
+  int _countWatchRequestsScheduledToday(List<WatchRequest> requests) {
+    return requests.where((request) {
+      if (!_hasActiveAgreedSchedule(request)) return false;
+      final scheduledFor = request.scheduledFor?.toLocal();
+      if (scheduledFor == null) return false;
+      return _isSameLocalDate(scheduledFor, DateTime.now());
+    }).length;
+  }
+
+  int _countUpcomingWatchRequests(List<WatchRequest> requests) {
+    final now = DateTime.now();
+    return requests.where((request) {
+      if (!_hasActiveAgreedSchedule(request)) return false;
+      final scheduledFor = request.scheduledFor?.toLocal();
+      return scheduledFor != null && scheduledFor.isAfter(now);
+    }).length;
+  }
+
+  bool _hasActiveAgreedSchedule(WatchRequest request) {
+    final watchedStatus = request.normalizedWatchedStatus;
+    return request.isWatchRequest &&
+        request.normalizedScheduleStatus == 'AGREED' &&
+        request.scheduledFor != null &&
+        watchedStatus != 'WATCHED' &&
+        watchedStatus != 'NOT_WATCHED' &&
+        !request.isTerminal;
+  }
+
+  bool _isSameLocalDate(DateTime left, DateTime right) {
+    return left.year == right.year &&
+        left.month == right.month &&
+        left.day == right.day;
   }
 
   Future<void> _loadTrendingGroups() async {
@@ -367,6 +446,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             onRequests: () => context.go('/watch-requests'),
                           ),
                         ),
+                        _buildWatchPlansShortcut(context),
                         if (heroMovies.isNotEmpty) ...[
                           _buildHeroCarousel(context, heroMovies),
                           const SizedBox(height: 10),
@@ -394,6 +474,150 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
     );
+  }
+
+  Widget _buildWatchPlansShortcut(BuildContext context) {
+    final needsResponse = _watchRequestsNeedingResponse > 0;
+    final hasToday = _watchRequestsScheduledToday > 0;
+    final hasUpcoming = _watchRequestsUpcoming > 0;
+    final accent = needsResponse
+        ? FlixieColors.warning
+        : hasToday
+            ? FlixieColors.secondary
+            : FlixieColors.primary;
+    final subtitle = _watchPlansSubtitle;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => context.go('/watch-requests'),
+          borderRadius: BorderRadius.circular(14),
+          child: Ink(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: FlixieColors.tabBarBackgroundFocused,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: accent.withValues(alpha: 0.38)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    hasToday
+                        ? Icons.event_available_outlined
+                        : Icons.video_camera_back_outlined,
+                    color: accent,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Flexible(
+                            child: Text(
+                              'Watch plans',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          if (needsResponse) ...[
+                            const SizedBox(width: 8),
+                            _WatchPlanBadge(
+                              label: '$_watchRequestsNeedingResponse',
+                              color: FlixieColors.warning,
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: FlixieColors.light,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          height: 1.25,
+                        ),
+                      ),
+                      if (!_watchRequestsLoading &&
+                          (needsResponse || hasToday || hasUpcoming)) ...[
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            if (needsResponse)
+                              _WatchPlanChip(
+                                icon: Icons.reply_outlined,
+                                label:
+                                    '$_watchRequestsNeedingResponse to answer',
+                                color: FlixieColors.warning,
+                              ),
+                            if (hasToday)
+                              _WatchPlanChip(
+                                icon: Icons.today_outlined,
+                                label: '$_watchRequestsScheduledToday today',
+                                color: FlixieColors.secondary,
+                              ),
+                            if (hasUpcoming)
+                              _WatchPlanChip(
+                                icon: Icons.schedule_outlined,
+                                label: '$_watchRequestsUpcoming upcoming',
+                                color: FlixieColors.primary,
+                              ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: FlixieColors.light,
+                  size: 28,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String get _watchPlansSubtitle {
+    if (_watchRequestsLoading) return 'Checking your watch requests...';
+    if (_watchRequestsNeedingResponse > 0) {
+      return 'You have watch requests or schedule times waiting.';
+    }
+    if (_watchRequestsScheduledToday > 0) {
+      final label = _watchRequestsScheduledToday == 1 ? 'watch' : 'watches';
+      return 'You have $_watchRequestsScheduledToday $label scheduled today.';
+    }
+    if (_watchRequestsUpcoming > 0) {
+      final label = _watchRequestsUpcoming == 1 ? 'watch' : 'watches';
+      return '$_watchRequestsUpcoming upcoming $label with friends.';
+    }
+    return 'Schedule something to watch together.';
   }
 
   // ── Hero carousel ──────────────────────────────────────────────────────────
@@ -1278,6 +1502,76 @@ class _HeroIconButton extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _WatchPlanBadge extends StatelessWidget {
+  const _WatchPlanBadge({
+    required this.label,
+    required this.color,
+  });
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: Colors.black,
+          fontSize: 12,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _WatchPlanChip extends StatelessWidget {
+  const _WatchPlanChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 15),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -45,6 +45,10 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (!mounted) return;
+    if (success) {
+      context.go('/');
+      return;
+    }
     if (!success) {
       messenger.showSnackBar(
         SnackBar(
@@ -152,14 +156,10 @@ class _LoginScreenState extends State<LoginScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text.rich(
-                  TextSpan(
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: FlixieColors.light,
-                    ),
-                    children: [
-                      const TextSpan(text: "Don't have an account?"),
-                    ],
+                Text(
+                  "Don't have an account?",
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: FlixieColors.light,
                   ),
                   textAlign: TextAlign.center,
                 ),

@@ -135,6 +135,8 @@ class GroupService {
     String? moviePosterUrl,
     String? message,
     String? proposedDate,
+    String? locationType,
+    String? locationLabel,
   }) async {
     final data = await ApiClient.post(
       '/conversations/$conversationId/watch-requests',
@@ -146,6 +148,10 @@ class GroupService {
         if (moviePosterUrl != null) 'moviePosterUrl': moviePosterUrl,
         if (message != null && message.isNotEmpty) 'message': message,
         if (proposedDate != null) 'proposedDate': proposedDate,
+        if (locationType != null && locationType.isNotEmpty)
+          'locationType': locationType,
+        if (locationLabel != null && locationLabel.isNotEmpty)
+          'locationLabel': locationLabel,
       },
     );
     return GroupWatchRequest.fromJson(data as Map<String, dynamic>);
@@ -311,12 +317,12 @@ class GroupService {
   static Future<void> scheduleWatchRequest(
     String conversationId,
     String requestId, {
-    required String actingUserId,
-    required String scheduledFor,
+    required String userId,
+    required String? scheduledFor,
   }) async {
     await ApiClient.patch(
       '/conversations/$conversationId/watch-requests/$requestId/schedule',
-      body: {'actingUserId': actingUserId, 'scheduledFor': scheduledFor},
+      body: {'userId': userId, 'scheduledFor': scheduledFor},
     );
   }
 
