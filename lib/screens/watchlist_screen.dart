@@ -95,8 +95,16 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
 
       setState(() {
         _allWatchlist = watchlist;
-        _movieWatchProviders.clear();
-        _canWatchNowByMovieId.clear();
+        if (watchlist.isEmpty) {
+          _movieWatchProviders.clear();
+          _canWatchNowByMovieId.clear();
+        } else {
+          final currentMovieIds = watchlist.map((item) => item.movieId).toSet();
+          _movieWatchProviders
+              .removeWhere((movieId, _) => !currentMovieIds.contains(movieId));
+          _canWatchNowByMovieId
+              .removeWhere((movieId, _) => !currentMovieIds.contains(movieId));
+        }
         _filterWatchlist();
         _loading = false;
       });
@@ -984,6 +992,8 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
 
   Widget _buildWatchlistRow(WatchlistMovie item, dynamic user) {
     final isWatched = user?.isMovieWatched(item.movieId) ?? false;
+    final isLoadingProviders = _loadingWatchProviderAvailability &&
+        !_movieWatchProviders.containsKey(item.movieId);
     final providers =
         _movieWatchProviders[item.movieId] ?? const <WatchProvider>[];
     final canWatchNow = _isAvailableOnUserProviders(item.movieId);
@@ -993,6 +1003,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       availableProviders: providers,
       userWatchProviderIds: _userWatchProviderIds,
       canWatchNow: canWatchNow,
+      isLoadingProviders: isLoadingProviders,
       onTap: () => context.push('/movies/${item.movieId}'),
       onMarkAsWatched: () => _markAsWatched(item),
       onAddToFavourites: () => _addToFavorites(item),
@@ -1405,6 +1416,7 @@ class WatchlistMovieRow extends StatelessWidget {
   final List<WatchProvider> availableProviders;
   final Set<int> userWatchProviderIds;
   final bool canWatchNow;
+  final bool isLoadingProviders;
   final VoidCallback onTap;
   final VoidCallback onMarkAsWatched;
   final VoidCallback onAddToFavourites;
@@ -1419,6 +1431,7 @@ class WatchlistMovieRow extends StatelessWidget {
     required this.availableProviders,
     required this.userWatchProviderIds,
     required this.canWatchNow,
+    required this.isLoadingProviders,
     required this.onTap,
     required this.onMarkAsWatched,
     required this.onAddToFavourites,
@@ -1678,6 +1691,7 @@ class WatchlistMovieRow extends StatelessWidget {
                         providers: availableProviders,
                         userWatchProviderIds: userWatchProviderIds,
                         canWatchNow: canWatchNow,
+                        isLoading: isLoadingProviders,
                       ),
                       // Added date row
                       if (addedDate.isNotEmpty) ...[
@@ -1714,14 +1728,36 @@ class _WatchProvidersInline extends StatelessWidget {
     required this.providers,
     required this.userWatchProviderIds,
     required this.canWatchNow,
+    required this.isLoading,
   });
 
   final List<WatchProvider> providers;
   final Set<int> userWatchProviderIds;
   final bool canWatchNow;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Row(
+        children: [
+          SizedBox(
+            width: 13,
+            height: 13,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: FlixieColors.medium,
+            ),
+          ),
+          SizedBox(width: 5),
+          Text(
+            'Checking providers...',
+            style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+          ),
+        ],
+      );
+    }
+
     if (providers.isEmpty) {
       return const Row(
         children: [
