@@ -1,24 +1,48 @@
 import 'movie_short.dart';
 import 'person.dart';
+import 'show.dart';
 
 class SearchResultItem {
   final bool isPerson;
+  final bool isShow;
   final MovieShort? movie;
+  final TvShow? show;
   final Person? person;
 
   const SearchResultItem._({
     required this.isPerson,
+    required this.isShow,
     this.movie,
+    this.show,
     this.person,
   });
 
   factory SearchResultItem.fromJson(Map<String, dynamic> json) {
-    final mediaType = json['media_type'] as String?;
+    final mediaType =
+        _stringValue(json['mediaType'] ?? json['media_type'])?.toLowerCase();
     if (mediaType == 'person') {
-      return SearchResultItem._(isPerson: true, person: Person.fromJson(json));
+      return SearchResultItem._(
+        isPerson: true,
+        isShow: false,
+        person: Person.fromJson(json),
+      );
+    }
+    if (mediaType == 'tv' || mediaType == 'show') {
+      return SearchResultItem.fromShow(TvShow.fromJson(json));
     }
     return SearchResultItem._(
-        isPerson: false, movie: MovieShort.fromJson(json));
+      isPerson: false,
+      isShow: false,
+      movie: MovieShort.fromJson(json),
+    );
+  }
+
+  factory SearchResultItem.fromShow(TvShow show) {
+    return SearchResultItem._(
+      isPerson: false,
+      isShow: true,
+      show: show,
+    );
   }
 }
 

@@ -1419,24 +1419,24 @@ class WatchlistMovieRow extends StatelessWidget {
   final bool isLoadingProviders;
   final VoidCallback onTap;
   final VoidCallback onMarkAsWatched;
-  final VoidCallback onAddToFavourites;
-  final VoidCallback onAddToList;
-  final VoidCallback onRequestToWatch;
+  final VoidCallback? onAddToFavourites;
+  final VoidCallback? onAddToList;
+  final VoidCallback? onRequestToWatch;
   final VoidCallback onRemove;
 
   const WatchlistMovieRow({
     super.key,
     required this.watchlistItem,
     required this.isWatched,
-    required this.availableProviders,
-    required this.userWatchProviderIds,
-    required this.canWatchNow,
-    required this.isLoadingProviders,
+    this.availableProviders = const <WatchProvider>[],
+    this.userWatchProviderIds = const <int>{},
+    this.canWatchNow = false,
+    this.isLoadingProviders = false,
     required this.onTap,
     required this.onMarkAsWatched,
-    required this.onAddToFavourites,
-    required this.onAddToList,
-    required this.onRequestToWatch,
+    this.onAddToFavourites,
+    this.onAddToList,
+    this.onRequestToWatch,
     required this.onRemove,
   });
 
@@ -1576,6 +1576,24 @@ class WatchlistMovieRow extends StatelessWidget {
                               ),
                             ),
                           ),
+                          Tooltip(
+                            message: 'Remove from watchlist',
+                            child: InkWell(
+                              onTap: onRemove,
+                              borderRadius: BorderRadius.circular(15),
+                              child: const SizedBox(
+                                width: 30,
+                                height: 30,
+                                child: Center(
+                                  child: Icon(
+                                    Icons.bookmark_rounded,
+                                    color: FlixieColors.primary,
+                                    size: 20,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                           PopupMenuButton<String>(
                             tooltip: 'More actions',
                             padding: EdgeInsets.zero,
@@ -1586,11 +1604,11 @@ class WatchlistMovieRow extends StatelessWidget {
                               } else if (value == 'remove') {
                                 onRemove();
                               } else if (value == 'favourite') {
-                                onAddToFavourites();
+                                onAddToFavourites?.call();
                               } else if (value == 'list') {
-                                onAddToList();
+                                onAddToList?.call();
                               } else if (value == 'request_watch') {
-                                onRequestToWatch();
+                                onRequestToWatch?.call();
                               } else if (value == 'share') {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
@@ -1607,8 +1625,10 @@ class WatchlistMovieRow extends StatelessWidget {
                                   Icon(Icons.check_circle_outline,
                                       color: FlixieColors.success, size: 20),
                                   SizedBox(width: 8),
-                                  Text('Mark as Watched',
-                                      style: TextStyle(color: Colors.white)),
+                                  Expanded(
+                                    child: Text('Mark as Watched',
+                                        style: TextStyle(color: Colors.white)),
+                                  ),
                                 ]),
                               ),
                               PopupMenuItem(
@@ -1617,8 +1637,10 @@ class WatchlistMovieRow extends StatelessWidget {
                                   Icon(Icons.favorite_border_rounded,
                                       color: FlixieColors.danger, size: 20),
                                   SizedBox(width: 8),
-                                  Text('Add to favourites',
-                                      style: TextStyle(color: Colors.white)),
+                                  Expanded(
+                                    child: Text('Add to favourites',
+                                        style: TextStyle(color: Colors.white)),
+                                  ),
                                 ]),
                               ),
                               PopupMenuItem(
@@ -1627,8 +1649,10 @@ class WatchlistMovieRow extends StatelessWidget {
                                   Icon(Icons.playlist_add_rounded,
                                       color: FlixieColors.secondary, size: 20),
                                   SizedBox(width: 8),
-                                  Text('Add to list',
-                                      style: TextStyle(color: Colors.white)),
+                                  Expanded(
+                                    child: Text('Add to list',
+                                        style: TextStyle(color: Colors.white)),
+                                  ),
                                 ]),
                               ),
                               PopupMenuItem(
@@ -1637,8 +1661,10 @@ class WatchlistMovieRow extends StatelessWidget {
                                   Icon(Icons.group_add_outlined,
                                       color: FlixieColors.primary, size: 20),
                                   SizedBox(width: 8),
-                                  Text('Request to watch',
-                                      style: TextStyle(color: Colors.white)),
+                                  Expanded(
+                                    child: Text('Invite friends',
+                                        style: TextStyle(color: Colors.white)),
+                                  ),
                                 ]),
                               ),
                               PopupMenuItem(
@@ -1647,8 +1673,10 @@ class WatchlistMovieRow extends StatelessWidget {
                                   Icon(Icons.share_outlined,
                                       color: FlixieColors.secondary, size: 20),
                                   SizedBox(width: 8),
-                                  Text('Share',
-                                      style: TextStyle(color: Colors.white)),
+                                  Expanded(
+                                    child: Text('Share',
+                                        style: TextStyle(color: Colors.white)),
+                                  ),
                                 ]),
                               ),
                               PopupMenuItem(
@@ -1657,8 +1685,10 @@ class WatchlistMovieRow extends StatelessWidget {
                                   Icon(Icons.remove_circle_outline,
                                       color: FlixieColors.danger, size: 20),
                                   SizedBox(width: 8),
-                                  Text('Remove',
-                                      style: TextStyle(color: Colors.white)),
+                                  Expanded(
+                                    child: Text('Remove',
+                                        style: TextStyle(color: Colors.white)),
+                                  ),
                                 ]),
                               ),
                             ],

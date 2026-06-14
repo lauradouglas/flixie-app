@@ -15,6 +15,13 @@ import 'services/push_notification_service.dart';
 import 'theme/app_theme.dart';
 import 'utils/app_logger.dart';
 
+bool _hasFirebaseDartDefines(FirebaseOptions options) {
+  return options.apiKey.isNotEmpty &&
+      options.appId.isNotEmpty &&
+      options.messagingSenderId.isNotEmpty &&
+      options.projectId.isNotEmpty;
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -22,10 +29,17 @@ void main() async {
     // Initialize Firebase only if not already initialized
     if (Firebase.apps.isEmpty) {
       logger.i('Initializing Firebase');
-      //logger.d('Env Settings: ${String.fromEnvironment('FIREBASE_WEB_API_KEY')}');
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
+      final options = DefaultFirebaseOptions.currentPlatform;
+      if (_hasFirebaseDartDefines(options)) {
+        await Firebase.initializeApp(
+          options: options,
+        );
+      } else {
+        logger.w(
+          'Firebase dart-defines missing; using native Firebase config fallback (GoogleService-Info.plist/google-services.json)',
+        );
+        await Firebase.initializeApp();
+      }
       logger.i('Firebase initialized successfully');
     } else {
       logger.d('Firebase already initialized, skipping');

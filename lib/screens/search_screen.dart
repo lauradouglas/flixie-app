@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../models/movie_short.dart';
 import '../models/person.dart';
 import '../models/search_result.dart';
+import '../models/show.dart';
 import '../providers/auth_provider.dart';
 import '../services/search_service.dart';
 import '../services/trending_service.dart';
@@ -104,6 +105,10 @@ class _SearchScreenState extends State<SearchScreen> {
           break;
         case _SearchMode.movies:
           results = await SearchService.search(query, type: 'movie');
+          entityResults = null;
+          break;
+        case _SearchMode.shows:
+          results = await SearchService.search(query, type: 'tv');
           entityResults = null;
           break;
         case _SearchMode.people:
@@ -225,6 +230,7 @@ class _SearchScreenState extends State<SearchScreen> {
     final modes = [
       _SearchMode.all,
       _SearchMode.movies,
+      _SearchMode.shows,
       _SearchMode.people,
       _SearchMode.companies,
       _SearchMode.collections,
@@ -378,6 +384,11 @@ class _SearchScreenState extends State<SearchScreen> {
           color: Color(0xFFEF4444),
           mode: _SearchMode.movies),
       _BrowseCategory(
+          label: 'Shows',
+          icon: Icons.live_tv_rounded,
+          color: Color(0xFF8B5CF6),
+          mode: _SearchMode.shows),
+      _BrowseCategory(
           label: 'People',
           icon: Icons.person_outline_rounded,
           color: Color(0xFFF59E0B),
@@ -385,7 +396,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _BrowseCategory(
           label: 'Collections',
           icon: Icons.folder_special_outlined,
-          color: Color(0xFF8B5CF6),
+          color: Color(0xFF6366F1),
           mode: _SearchMode.collections),
       _BrowseCategory(
           label: 'Studios',
@@ -490,21 +501,21 @@ class _SearchScreenState extends State<SearchScreen> {
       );
     }
 
-    final filtered = results.where((item) {
-      if (item.isPerson) return true;
-      return item.movie?.mediaType != 'tv';
-    }).toList();
-
     return ListView.separated(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: filtered.length,
+      itemCount: results.length,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
-        final item = filtered[index];
+        final item = results[index];
         if (item.isPerson && item.person != null) {
           return _PersonResultTile(
             person: item.person!,
             onTap: () => context.push('/people/${item.person!.id}'),
+          );
+        } else if (item.isShow && item.show != null) {
+          return _ShowResultTile(
+            show: item.show!,
+            onTap: () => context.push('/shows/${item.show!.id}'),
           );
         } else if (item.movie != null) {
           return _MovieResultTile(
@@ -610,6 +621,7 @@ class _BrowseCategory {
 enum _SearchMode {
   all,
   movies,
+  shows,
   people,
   companies,
   collections,
@@ -619,14 +631,16 @@ extension _SearchModeView on _SearchMode {
   String get label => switch (this) {
         _SearchMode.all => 'All',
         _SearchMode.movies => 'Movies',
+        _SearchMode.shows => 'Shows',
         _SearchMode.people => 'People',
         _SearchMode.companies => 'Studios',
         _SearchMode.collections => 'Collections',
       };
 
   String get hintText => switch (this) {
-        _SearchMode.all => 'Search movies or people...',
+        _SearchMode.all => 'Search movies, shows or people...',
         _SearchMode.movies => 'Search movies...',
+        _SearchMode.shows => 'Search shows...',
         _SearchMode.people => 'Search people...',
         _SearchMode.companies => 'Search production companies...',
         _SearchMode.collections => 'Search collections...',
@@ -635,6 +649,7 @@ extension _SearchModeView on _SearchMode {
   IconData get icon => switch (this) {
         _SearchMode.all => Icons.search_rounded,
         _SearchMode.movies => Icons.movie_filter_rounded,
+        _SearchMode.shows => Icons.live_tv_rounded,
         _SearchMode.people => Icons.person_outline_rounded,
         _SearchMode.companies => Icons.business_outlined,
         _SearchMode.collections => Icons.folder_special_outlined,
@@ -907,6 +922,150 @@ class _MovieResultTile extends StatelessWidget {
               const Icon(Icons.chevron_right, color: FlixieColors.medium),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Search result: show tile ────────────────────────────────────────────────
+
+class _ShowResultTile extends StatelessWidget {
+  const _ShowResultTile({required this.show, this.onTap});
+
+  final TvShow show;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final year = _extractYear(show.firstAirDate);
+    final posterUrl = show.posterPath == null
+        ? null
+        : 'https://image.tmdb.org/t/p/w92${show.posterPath}';
+
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: SizedBox(
+                  width: 50,
+                  height: 75,
+                  child: posterUrl != null
+                      ? CachedNetworkImage(
+                          imageUrl: posterUrl,
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) => Container(
+                            color: FlixieColors.primary.withValues(alpha: 0.3),
+                            child: const Icon(Icons.live_tv_rounded,
+                                color: FlixieColors.primary),
+                          ),
+                        )
+                      : Container(
+                          color: FlixieColors.primary.withValues(alpha: 0.3),
+                          child: const Icon(Icons.live_tv_rounded,
+                              color: FlixieColors.primary),
+                        ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      show.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyLarge
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 7,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        const _MediaTypePill(
+                          label: 'Show',
+                          color: FlixieColors.primary,
+                        ),
+                        if (year != null)
+                          Text(
+                            year,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: FlixieColors.medium),
+                          ),
+                        if (show.voteAverage != null &&
+                            show.voteAverage! > 0) ...[
+                          const Icon(Icons.star_rounded,
+                              size: 14, color: FlixieColors.warning),
+                          Text(
+                            show.voteAverage!.toStringAsFixed(1),
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: FlixieColors.warning),
+                          ),
+                        ],
+                      ],
+                    ),
+                    if ((show.overview ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        show.overview!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: FlixieColors.light),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.chevron_right_rounded,
+                  color: FlixieColors.medium),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MediaTypePill extends StatelessWidget {
+  const _MediaTypePill({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.38)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
         ),
       ),
     );

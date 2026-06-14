@@ -1,19 +1,45 @@
 import 'dart:io';
+import 'dart:async';
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:go_router/go_router.dart';
 
+import '../firebase_options.dart';
 import '../utils/app_logger.dart';
 import 'user_service.dart';
+
+bool _hasFirebaseDartDefines(FirebaseOptions options) {
+  return options.apiKey.isNotEmpty &&
+      options.appId.isNotEmpty &&
+      options.messagingSenderId.isNotEmpty &&
+      options.projectId.isNotEmpty;
+}
 
 /// Top-level handler for messages received while the app is in the background
 /// or terminated. Must be a top-level function (not a class method) so that
 /// FCM can invoke it in a separate isolate.
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  logger.d('[FCM] Background message received: ${message.notification?.title}');
+  try {
+    if (Firebase.apps.isEmpty) {
+      final options = DefaultFirebaseOptions.currentPlatform;
+      if (_hasFirebaseDartDefines(options)) {
+        await Firebase.initializeApp(
+          options: options,
+        );
+      } else {
+        await Firebase.initializeApp();
+      }
+    }
+  } catch (e) {
+    logger.w('[FCM] Background isolate Firebase init failed: $e');
+  }
+
+  logger.d(
+      '[FCM] Background message received id=${message.messageId} title=${message.notification?.title} data=${message.data}');
 }
 
 /// Manages Firebase Cloud Messaging for push notifications.
@@ -26,6 +52,9 @@ class PushNotificationService {
 
   static final _messaging = FirebaseMessaging.instance;
   static final _localNotifications = FlutterLocalNotificationsPlugin();
+  static StreamSubscription<String>? _tokenRefreshSubscription;
+  static StreamSubscription<RemoteMessage>? _onMessageSubscription;
+  static StreamSubscription<RemoteMessage>? _onMessageOpenedSubscription;
 
   /// The userId of the currently logged-in user. Used to suppress
   /// notifications intended for a different user (e.g. the sender).
@@ -58,6 +87,13 @@ class PushNotificationService {
     required GlobalKey<NavigatorState> navigatorKey,
   }) async {
     _currentUserId = userId;
+    logger.i('[FCM] Initializing push service (platform=${Platform.operatingSystem}, userId=$userId)');
+
+    // Ensure old listeners do not duplicate local notifications across re-logins.
+    await _tokenRefreshSubscription?.cancel();
+    await _onMessageSubscription?.cancel();
+    await _onMessageOpenedSubscription?.cancel();
+
     final settings = await _messaging.requestPermission(
       alert: true,
       badge: true,
@@ -65,7 +101,13 @@ class PushNotificationService {
       provisional: false,
     );
 
-    logger.i('[FCM] Permission status: ${settings.authorizationStatus}');
+    logger.i(
+      '[FCM] Permission status: auth=${settings.authorizationStatus}, '
+      'alert=${settings.alert}, badge=${settings.badge}, sound=${settings.sound}, '
+      'announcement=${settings.announcement}, carPlay=${settings.carPlay}, '
+      'criticalAlert=${settings.criticalAlert}, lockScreen=${settings.lockScreen}, '
+      'notificationCenter=${settings.notificationCenter}',
+    );
 
     if (settings.authorizationStatus == AuthorizationStatus.denied) {
       logger.w('[FCM] Notification permission denied – skipping FCM setup');
@@ -85,22 +127,29 @@ class PushNotificationService {
         badge: true,
         sound: true,
       );
+      logger.d('[FCM] iOS foreground presentation enabled (alert/badge/sound=true)');
+
+      // Ensure Firebase Messaging auto-init is enabled so token generation starts.
+      await _messaging.setAutoInitEnabled(true);
+      logger.d('[FCM] iOS auto-init enabled');
     }
+
+    // Re-register whenever the token is rotated by Firebase.
+    _tokenRefreshSubscription = _messaging.onTokenRefresh.listen((token) {
+      logger.d(
+          '[FCM] Token refreshed: ${_redactToken(token)} – updating backend for userId=$userId');
+      _saveToken(userId, token);
+    });
 
     // Get the FCM token and register it with the backend.
     await _registerToken(userId);
 
-    // Re-register whenever the token is rotated by Firebase.
-    _messaging.onTokenRefresh.listen((token) {
-      logger.d('[FCM] Token refreshed – updating backend');
-      _saveToken(userId, token);
-    });
-
     // Foreground messages: FCM does NOT show a system notification by default,
     // so we display one manually via flutter_local_notifications.
     // Only show if we still have a logged-in user (guards against post-logout delivery).
-    FirebaseMessaging.onMessage.listen((message) {
+    _onMessageSubscription = FirebaseMessaging.onMessage.listen((message) {
       logger.d('[FCM] Foreground message: ${message.notification?.title}');
+      logger.d('[FCM] Foreground payload: data=${message.data}');
       if (_currentUserId == null) {
         logger.d('[FCM] Suppressing foreground message — no user logged in');
         return;
@@ -112,13 +161,22 @@ class PushNotificationService {
         logger.d('[FCM] Suppressing foreground message — not for current user');
         return;
       }
+
+      // On iOS, if this is a notification message, the OS can present it
+      // directly because foreground presentation options are enabled.
+      if (Platform.isIOS && message.notification != null) {
+        logger.d('[FCM] iOS foreground notification handled by system presentation');
+        return;
+      }
+
       _showLocalNotification(message);
     });
 
     // Notification tap while app is in the background (not terminated).
-    FirebaseMessaging.onMessageOpenedApp.listen((message) {
+    _onMessageOpenedSubscription = FirebaseMessaging.onMessageOpenedApp.listen((message) {
       logger.d(
           '[FCM] Notification tapped (background): ${message.notification?.title}');
+      logger.d('[FCM] Notification tap payload: data=${message.data}');
       _navigateFromMessage(message, navigatorKey);
     });
 
@@ -127,6 +185,7 @@ class PushNotificationService {
     if (initialMessage != null) {
       logger.d(
           '[FCM] App launched via notification: ${initialMessage.notification?.title}');
+      logger.d('[FCM] Initial message payload: data=${initialMessage.data}');
       // Give the widget tree time to fully mount before navigating.
       Future<void>.delayed(_launchNavigationDelay, () {
         _navigateFromMessage(initialMessage, navigatorKey);
@@ -188,31 +247,38 @@ class PushNotificationService {
 
   static Future<void> _registerToken(String userId) async {
     try {
+      String? apnsToken;
+
       // On iOS: get the APNs token first (it must exist before we can get
       // or delete an FCM token). Only then delete the old FCM token.
       if (Platform.isIOS) {
-        String? apnsToken;
-        for (var i = 0; i < 5; i++) {
+        for (var i = 0; i < 8; i++) {
           apnsToken = await _messaging.getAPNSToken();
           if (apnsToken != null) break;
           await Future<void>.delayed(const Duration(seconds: 2));
+          logger.d('[FCM] Waiting for APNs token... attempt ${i + 1}/8');
         }
-        if (apnsToken == null) {
-          logger.w(
-              '[FCM] APNs token unavailable after retries – skipping FCM registration');
-          return;
-        }
-        logger.d('[FCM] APNs token obtained');
+
+        logger.i(
+          apnsToken == null
+              ? '[FCM] APNs token is null after retries; iOS push delivery will fail until APNs registration succeeds'
+              : '[FCM] APNs token: ${_redactToken(apnsToken)}',
+        );
       }
 
       // Delete the existing FCM token so Firebase issues a brand-new one,
       // breaking any stale association with a previous user on this device.
-      await _messaging.deleteToken();
-      // Brief pause after delete to let Firebase settle, especially on iOS.
-      await Future<void>.delayed(const Duration(milliseconds: 500));
+      // If APNs isn't ready on iOS, skip delete to avoid unnecessary failures
+      // and still try to fetch/log the current token for diagnostics.
+      if (!Platform.isIOS || apnsToken != null) {
+        await _messaging.deleteToken();
+        // Brief pause after delete to let Firebase settle, especially on iOS.
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      }
 
       final token = await _messaging.getToken();
       if (token != null) {
+        logger.i('[FCM] FCM token: ${_redactToken(token)}');
         await _saveToken(userId, token);
       } else {
         logger.w('[FCM] FCM token returned null');
@@ -225,9 +291,10 @@ class PushNotificationService {
   static Future<void> _saveToken(String userId, String token) async {
     try {
       await UserService.saveFcmToken(userId, token);
-      logger.i('[FCM] Token saved to backend');
+      logger.i('[FCM] Token saved to backend for userId=$userId token=${_redactToken(token)}');
     } catch (e) {
-      logger.w('[FCM] Failed to save FCM token to backend: $e');
+      logger.w(
+          '[FCM] Failed to save FCM token to backend for userId=$userId token=${_redactToken(token)} error=$e');
     }
   }
 
@@ -302,6 +369,12 @@ class PushNotificationService {
 
     // Default fallback.
     return '/notifications';
+  }
+
+  static String _redactToken(String? token) {
+    if (token == null || token.isEmpty) return '<null>';
+    if (token.length <= 12) return token;
+    return '${token.substring(0, 6)}...${token.substring(token.length - 6)}';
   }
 
   static void _navigateToNotifications(GlobalKey<NavigatorState> navigatorKey) {
