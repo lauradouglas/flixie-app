@@ -53,37 +53,56 @@ class ShowService {
         .toList();
   }
 
-  static Future<void> addShowRating(
-      int showId, Map<String, dynamic> body) async {
-    await ApiClient.post('/shows/$showId/add/rating', body: body);
+  static Future<TvShowCredits> getShowCredits(int showId) async {
+    final data = await ApiClient.get('/shows/$showId/credits');
+    if (data is List<dynamic>) {
+      return TvShowCredits(
+        cast: data
+            .whereType<Map<String, dynamic>>()
+            .map(TvShowCredit.fromJson)
+            .toList(growable: false),
+      );
+    }
+    return TvShowCredits.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<Map<String, dynamic>> addShowRating(
+      int showId, String userId, int rating) async {
+    final data = await ApiClient.post(
+      '/shows/$showId/add/rating',
+      body: {'userId': userId, 'rating': rating},
+    );
+    return data as Map<String, dynamic>;
+  }
+
+  static Future<int?> getUserShowRating(int showId, String userId) async {
+    try {
+      final data = await ApiClient.post(
+        '/shows/$showId/user/rating',
+        body: {'userId': userId},
+      );
+      if (data is Map<String, dynamic>) {
+        final rating = data['rating'];
+        if (rating is num) return rating.toInt();
+      }
+    } catch (_) {}
+    return null;
   }
 
   static Future<void> addToWatchlist(String userId, int showId) async {
-    await ApiClient.post(
-      '/shows/watchlist',
-      body: {'userId': userId, 'showId': showId},
-    );
+    await ApiClient.post('/users/$userId/show/watchlist/$showId');
   }
 
   static Future<void> removeFromWatchlist(String userId, int showId) async {
-    await ApiClient.delete(
-      '/shows/watchlist',
-      body: {'userId': userId, 'showId': showId},
-    );
+    await ApiClient.delete('/users/$userId/show/watchlist/$showId');
   }
 
   static Future<void> addToFavourites(String userId, int showId) async {
-    await ApiClient.post(
-      '/shows/favourites',
-      body: {'userId': userId, 'showId': showId},
-    );
+    await ApiClient.post('/users/$userId/show/favorite/$showId');
   }
 
   static Future<void> removeFromFavourites(String userId, int showId) async {
-    await ApiClient.delete(
-      '/shows/favourites',
-      body: {'userId': userId, 'showId': showId},
-    );
+    await ApiClient.delete('/users/$userId/show/favorite/$showId');
   }
 
   static Future<List<Review>> getShowReviews(int showId) async {
@@ -98,7 +117,28 @@ class ShowService {
     String region,
   ) async {
     List<WatchProvider> parseProviders(dynamic data) {
-      return (data as List<dynamic>)
+      Iterable<dynamic> typedList(String type, dynamic value) {
+        if (value is! Iterable) return const [];
+        return value.whereType<Map<String, dynamic>>().map(
+              (provider) => {
+                ...provider,
+                'availabilityType': type,
+              },
+            );
+      }
+
+      final source = data is Map<String, dynamic>
+          ? [
+              ...typedList('stream', data['stream'] ?? data['flatrate']),
+              ...typedList('buy', data['buy']),
+              ...typedList('rent', data['rent']),
+              ...typedList('stream', data['providers']),
+              ...typedList('stream', data['results']),
+              ...typedList('stream', data['streaming']),
+              ...typedList('stream', data['watchProviders']),
+            ]
+          : (data as List<dynamic>? ?? const []);
+      return source
           .map((e) => WatchProvider.fromJson(e as Map<String, dynamic>))
           .toList();
     }

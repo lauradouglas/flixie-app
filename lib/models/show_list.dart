@@ -1,11 +1,11 @@
-class MovieList {
+class ShowList {
   final String id;
   final String? userId;
   final String name;
   final String? description;
   final String visibility;
   final String? coverImageUrl;
-  final String whoCanAddMovies;
+  final String whoCanAddShows;
   final List<String> previewPosterUrls;
   final bool removed;
   final int? itemCount;
@@ -14,14 +14,14 @@ class MovieList {
   final String? createdAt;
   final String? updatedAt;
 
-  const MovieList({
+  const ShowList({
     required this.id,
     this.userId,
     required this.name,
     this.description,
-    this.visibility = ListVisibility.private,
+    this.visibility = ShowListVisibility.private,
     this.coverImageUrl,
-    this.whoCanAddMovies = 'owner',
+    this.whoCanAddShows = 'owner',
     this.previewPosterUrls = const [],
     required this.removed,
     this.itemCount,
@@ -31,17 +31,17 @@ class MovieList {
     this.updatedAt,
   });
 
-  factory MovieList.fromJson(Map<String, dynamic> json) {
-    return MovieList(
+  factory ShowList.fromJson(Map<String, dynamic> json) {
+    return ShowList(
       id: json['id']?.toString() ?? '',
       userId: json['userId']?.toString(),
       name: json['name'] as String? ?? '',
       description: json['description'] as String?,
       visibility: _parseVisibility(json['visibility']?.toString()),
       coverImageUrl: json['coverImageUrl']?.toString(),
-      whoCanAddMovies:
-          (json['whoCanAddMovies']?.toString().trim().isNotEmpty ?? false)
-              ? json['whoCanAddMovies'].toString()
+      whoCanAddShows:
+          (json['whoCanAddShows']?.toString().trim().isNotEmpty ?? false)
+              ? json['whoCanAddShows'].toString()
               : (json['whoCanAddItems']?.toString().trim().isNotEmpty ?? false)
                   ? json['whoCanAddItems'].toString()
                   : 'owner',
@@ -63,7 +63,7 @@ class MovieList {
       'description': description,
       'visibility': visibility,
       'coverImageUrl': coverImageUrl,
-      'whoCanAddMovies': whoCanAddMovies,
+      'whoCanAddShows': whoCanAddShows,
       'previewPosterUrls': previewPosterUrls,
       'removed': removed,
       'itemCount': itemCount,
@@ -75,23 +75,23 @@ class MovieList {
   }
 }
 
-class CreateMovieListRequest {
+class CreateShowListRequest {
   final String name;
   final List<int>? movieIds;
   final List<int>? showIds;
   final String? description;
   final String visibility;
   final String? coverImageUrl;
-  final String whoCanAddMovies;
+  final String whoCanAddShows;
 
-  const CreateMovieListRequest({
+  const CreateShowListRequest({
     required this.name,
     this.movieIds,
     this.showIds,
     this.description,
-    this.visibility = ListVisibility.private,
+    this.visibility = ShowListVisibility.private,
     this.coverImageUrl,
-    this.whoCanAddMovies = 'owner',
+    this.whoCanAddShows = 'owner',
   });
 
   Map<String, dynamic> toJson() => {
@@ -103,23 +103,23 @@ class CreateMovieListRequest {
         'visibility': visibility,
         if (coverImageUrl != null && coverImageUrl!.trim().isNotEmpty)
           'coverImageUrl': coverImageUrl,
-        'whoCanAddItems': whoCanAddMovies,
+        'whoCanAddItems': whoCanAddShows,
       };
 }
 
-class UpdateMovieListRequest {
+class UpdateShowListRequest {
   final String? name;
   final String? description;
   final String? visibility;
   final String? coverImageUrl;
-  final String? whoCanAddMovies;
+  final String? whoCanAddShows;
 
-  const UpdateMovieListRequest({
+  const UpdateShowListRequest({
     this.name,
     this.description,
     this.visibility,
     this.coverImageUrl,
-    this.whoCanAddMovies,
+    this.whoCanAddShows,
   });
 
   Map<String, dynamic> toJson() => {
@@ -127,11 +127,11 @@ class UpdateMovieListRequest {
         if (description != null) 'description': description,
         if (visibility != null) 'visibility': visibility,
         if (coverImageUrl != null) 'coverImageUrl': coverImageUrl,
-        if (whoCanAddMovies != null) 'whoCanAddItems': whoCanAddMovies,
+        if (whoCanAddShows != null) 'whoCanAddItems': whoCanAddShows,
       };
 }
 
-class ListVisibility {
+class ShowListVisibility {
   static const String private = 'PRIVATE';
   static const String friends = 'FRIENDS';
   static const String public = 'PUBLIC';
@@ -140,12 +140,12 @@ class ListVisibility {
 String _parseVisibility(String? value) {
   final normalized = value?.toUpperCase().trim();
   switch (normalized) {
-    case ListVisibility.public:
-      return ListVisibility.public;
-    case ListVisibility.friends:
-      return ListVisibility.friends;
+    case ShowListVisibility.public:
+      return ShowListVisibility.public;
+    case ShowListVisibility.friends:
+      return ShowListVisibility.friends;
     default:
-      return ListVisibility.private;
+      return ShowListVisibility.private;
   }
 }
 

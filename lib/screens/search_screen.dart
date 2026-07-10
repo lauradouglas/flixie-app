@@ -37,6 +37,7 @@ class _SearchScreenState extends State<SearchScreen> {
   String _query = '';
   _SearchMode _searchMode = _SearchMode.all;
   Timer? _debounce;
+  int _searchRequestId = 0;
   final List<String> _recentSearches = [];
 
   // Default view data
@@ -79,8 +80,10 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _onSearchChanged(String value) {
     _debounce?.cancel();
+    final query = value.trim();
     setState(() => _query = value);
-    if (value.trim().length < 3) {
+    if (query.length < 3) {
+      _searchRequestId++;
       setState(() {
         _searchResults = null;
         _entityResults = null;
@@ -89,11 +92,21 @@ class _SearchScreenState extends State<SearchScreen> {
       return;
     }
     _debounce = Timer(const Duration(milliseconds: 500), () {
-      _performSearch(value.trim());
+      _performSearch(query);
     });
   }
 
+  void _submitSearch(String value) {
+    final query = value.trim();
+    if (query.isEmpty) return;
+    _debounce?.cancel();
+    setState(() => _query = value);
+    _performSearch(query);
+  }
+
   Future<void> _performSearch(String query) async {
+    if (query.trim().isEmpty) return;
+    final requestId = ++_searchRequestId;
     setState(() => _isSearching = true);
     try {
       final SearchResults? results;
@@ -124,7 +137,7 @@ class _SearchScreenState extends State<SearchScreen> {
           entityResults = await SearchService.searchCollection(query);
           break;
       }
-      if (mounted) {
+      if (mounted && requestId == _searchRequestId) {
         setState(() {
           _searchResults = results;
           _entityResults = entityResults;
@@ -135,7 +148,7 @@ class _SearchScreenState extends State<SearchScreen> {
         });
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted && requestId == _searchRequestId) {
         setState(() => _isSearching = false);
       }
     }
@@ -189,6 +202,8 @@ class _SearchScreenState extends State<SearchScreen> {
       child: TextField(
         controller: _controller,
         onChanged: _onSearchChanged,
+        onSubmitted: _submitSearch,
+        textInputAction: TextInputAction.search,
         style: const TextStyle(color: Colors.white),
         decoration: InputDecoration(
           hintText: _searchMode.hintText,
@@ -275,13 +290,14 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _setSearchMode(_SearchMode mode) {
     if (_searchMode == mode) return;
+    final hadSearchResponse = _searchResults != null || _entityResults != null;
     setState(() {
       _searchMode = mode;
       _searchResults = null;
       _entityResults = null;
     });
     final query = _controller.text.trim();
-    if (query.length >= 3) {
+    if (query.length >= 3 || hadSearchResponse) {
       _performSearch(query);
     }
   }
@@ -327,7 +343,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         term: term,
                         onTap: () {
                           _controller.text = term;
-                          _onSearchChanged(term);
+                          _submitSearch(term);
                         },
                         onRemove: () =>
                             setState(() => _recentSearches.remove(term)),

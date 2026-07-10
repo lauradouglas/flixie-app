@@ -34,7 +34,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
     _watchedAt =
         DateTime.tryParse(widget.initial?.watchedAt ?? '') ?? DateTime.now();
     final existingRating = widget.initial?.rating;
-    _rating = existingRating != null ? existingRating.round() : null;
+    _rating = existingRating?.round();
     _notesController = TextEditingController(text: widget.initial?.notes ?? '');
   }
 
@@ -140,7 +140,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                   const SizedBox(height: 20),
                   // Star rating (1-10)
                   const Text(
-                    'Rating',
+                    'Rating (optional)',
                     style: TextStyle(
                       color: FlixieColors.light,
                       fontWeight: FontWeight.w600,
@@ -216,6 +216,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                       onPressed: _saving
                           ? null
                           : () async {
+                              final navigator = Navigator.of(context);
                               setState(() => _saving = true);
                               await widget.onSubmit(
                                 watchedAt: _watchedAt.toUtc().toIso8601String(),
@@ -224,7 +225,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                                     ? null
                                     : _notesController.text.trim(),
                               );
-                              if (mounted) Navigator.pop(context);
+                              if (mounted) navigator.pop();
                             },
                       child: _saving
                           ? const SizedBox(

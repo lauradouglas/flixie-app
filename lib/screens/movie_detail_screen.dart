@@ -36,7 +36,6 @@ import 'movie_detail/similar_card.dart';
 import 'movie_detail/video_card.dart';
 import 'movie_detail/watch_provider_card.dart';
 import 'movie_detail/watch_request_sheet.dart';
-import 'movie_detail/should_i_watch_this_card.dart';
 import 'movie_detail/write_review_sheet.dart';
 
 // ---------------------------------------------------------------------------
@@ -62,6 +61,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   List<SimilarMovie> _similar = [];
   List<MovieCastMember> _cast = [];
   List<WatchProvider> _watchProviders = [];
+  Set<int> _userProviderIds = {};
+  bool _showPurchaseProviders = false;
   String? _director;
   List<String> _producers = [];
   List<String> _writers = [];
@@ -133,6 +134,11 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         movieService.getMovieRecommendations(id),
         movieService.getMovieCredits(id),
         movieService.getMovieWatchProviders(id, region),
+        if (userId != null)
+          UserService.getUserWatchProviders(userId)
+              .catchError((_) => <WatchProvider>[])
+        else
+          Future.value(<WatchProvider>[]),
       ];
       if (userId != null) {
         futures.add(movieService.getUserMovieRating(id, userId));
@@ -166,6 +172,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               .toSet()
               .toList();
           _watchProviders = results[3] as List<WatchProvider>;
+          final userProviders = results[4] as List<WatchProvider>;
+          _userProviderIds =
+              userProviders.map((provider) => provider.id).toSet();
           _reviews = (loadedMovie.reviews ?? []).toList();
 
           // Check movie status in user's lists
@@ -176,9 +185,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             _isFavorite = user.isMovieFavorite(id);
           }
           // Load existing user rating from API
-          if (userId != null && results.length > 4) {
-            _userRating = results[4] as int?;
-            _friendsActivity = results[5] as List<MovieFriendActivity>? ?? [];
+          if (userId != null && results.length > 5) {
+            _userRating = results[5] as int?;
+            _friendsActivity = results[6] as List<MovieFriendActivity>? ?? [];
           }
 
           _isLoading = false;
@@ -777,8 +786,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                     _buildWhereToWatchSection(context),
                     const SizedBox(height: 24),
                     _buildSynopsis(context, movie),
-                    const SizedBox(height: 24),
-                    _buildShouldIWatchThisSection(context),
                     const SizedBox(height: 24),
                     _buildFriendSummarySection(context),
                     const SizedBox(height: 24),
@@ -1674,6 +1681,20 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               _statusDivider(),
               Expanded(
                 child: _statusActionItem(
+                  icon: Icons.star_rounded,
+                  label: 'Rate',
+                  badge: _userRating != null ? '${_userRating!}/10' : null,
+                  color: FlixieColors.tertiary,
+                  isActive: _userRating != null,
+                  isLoading: _isRatingLoading,
+                  onTap: _currentlyUpdating != null || _isRatingLoading
+                      ? null
+                      : _showRatingSheet,
+                ),
+              ),
+              _statusDivider(),
+              Expanded(
+                child: _statusActionItem(
                   icon: Icons.playlist_add_rounded,
                   label: 'List',
                   color: FlixieColors.secondary,
@@ -1714,89 +1735,74 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   Widget _statusActionItem({
     required IconData icon,
     required String label,
+    String? badge,
     required Color color,
     required bool isActive,
     required bool isLoading,
     required VoidCallback? onTap,
   }) {
     final iconColor = isActive ? color : FlixieColors.medium;
-    final labelColor = isActive
-        ? FlixieColors.light
-        : FlixieColors.medium.withValues(alpha: 0.95);
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 120;
-          return Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: compact ? 6 : 8,
-              vertical: compact ? 8 : 10,
-            ),
-            child: compact
-                ? Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (isLoading)
-                        SizedBox(
-                          width: 15,
-                          height: 15,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(iconColor),
-                          ),
-                        )
-                      else
-                        Icon(icon, size: 20, color: iconColor),
-                      const SizedBox(height: 4),
-                      Text(
-                        label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: labelColor,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  )
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (isLoading)
-                        SizedBox(
-                          width: 15,
-                          height: 15,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(iconColor),
-                          ),
-                        )
-                      else
-                        Icon(icon, size: 22, color: iconColor),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: labelColor,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        label: label,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 42,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: isActive
+                        ? color.withValues(alpha: 0.14)
+                        : Colors.white.withValues(alpha: 0.03),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isActive
+                          ? color.withValues(alpha: 0.32)
+                          : Colors.white.withValues(alpha: 0.06),
+                    ),
                   ),
-          );
-        },
+                  child: Center(
+                    child: isLoading
+                        ? SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(iconColor),
+                            ),
+                          )
+                        : Icon(icon, size: 23, color: iconColor),
+                  ),
+                ),
+                const SizedBox(height: 5),
+                SizedBox(
+                  height: 14,
+                  child: Text(
+                    badge ?? '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: isActive ? color : Colors.transparent,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1913,28 +1919,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       'Dec'
     ];
     return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
-  }
-
-  // ---- Should I Watch This? -----------------------------------------------
-
-  Widget _buildShouldIWatchThisSection(BuildContext context) {
-    // Only shown when the user is logged in (we need friend data).
-    final userId = context.read<AuthProvider>().dbUser?.id;
-    if (userId == null) return const SizedBox.shrink();
-
-    final movieId = int.tryParse(widget.movieId);
-
-    return ShouldIWatchThisCard(
-      isLoading: _friendRecommendationLoading,
-      data: _friendRecommendation,
-      error: _friendRecommendationError,
-      onRetry:
-          movieId != null ? () => _loadFriendRecommendation(movieId) : null,
-      onSeeAll: _friendRecommendation != null &&
-              _friendRecommendation!.friends.where((f) => f.watched).length > 3
-          ? () => _showAllFriendRecommendations(context)
-          : null,
-    );
   }
 
   void _showAllFriendRecommendations(BuildContext context) {
@@ -2061,6 +2045,15 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       data: _friendSummary,
       error: _friendSummaryError,
       onRetry: movieId != null ? () => _loadFriendSummary(movieId) : null,
+      recommendationLoading: _friendRecommendationLoading,
+      recommendationData: _friendRecommendation,
+      recommendationError: _friendRecommendationError,
+      onRecommendationRetry:
+          movieId != null ? () => _loadFriendRecommendation(movieId) : null,
+      onSeeAllRecommendations: _friendRecommendation != null &&
+              _friendRecommendation!.friends.where((f) => f.watched).length > 3
+          ? () => _showAllFriendRecommendations(context)
+          : null,
     );
   }
 
@@ -2472,25 +2465,143 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   Widget _buildWhereToWatchSection(BuildContext context) {
     if (_watchProviders.isEmpty) return const SizedBox.shrink();
+    final streamProviders = _sortedProviders(
+      _watchProviders.where((provider) => provider.isStreaming),
+    );
+    final purchaseProviders = _sortedProviders(
+      _dedupeProviders(
+        _watchProviders.where(
+          (provider) => provider.isPurchase || provider.isRental,
+        ),
+      ),
+    );
+    final canStreamNow = streamProviders.any(
+      (provider) => _userProviderIds.contains(provider.id),
+    );
+    final shouldShowPurchaseProviders =
+        streamProviders.isEmpty || _showPurchaseProviders;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader(context, 'Where to Watch'),
-        const SizedBox(height: 4),
-        const Text(
-          'Provider availability only',
-          style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+        _buildWatchProviderHeader(
+          hasPurchaseProviders:
+              purchaseProviders.isNotEmpty && streamProviders.isNotEmpty,
+          shouldShowPurchaseProviders: shouldShowPurchaseProviders,
         ),
         const SizedBox(height: 12),
+        if (streamProviders.isNotEmpty)
+          _buildProviderGroup(
+            canStreamNow ? 'Streaming on your providers' : 'Streaming on',
+            streamProviders,
+            highlightUserProviders: true,
+          )
+        else
+          const Text(
+            'Not streaming on your region providers yet.',
+            style: TextStyle(color: FlixieColors.medium, fontSize: 13),
+          ),
+        if (purchaseProviders.isNotEmpty && shouldShowPurchaseProviders) ...[
+          const SizedBox(height: 10),
+          _buildProviderGroup('Buy or rent', purchaseProviders),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildWatchProviderHeader({
+    required bool hasPurchaseProviders,
+    required bool shouldShowPurchaseProviders,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(child: _buildSectionHeader(context, 'Where to Watch')),
+        if (hasPurchaseProviders)
+          TextButton.icon(
+            onPressed: () {
+              setState(
+                () => _showPurchaseProviders = !_showPurchaseProviders,
+              );
+            },
+            icon: Icon(
+              shouldShowPurchaseProviders
+                  ? Icons.expand_less_rounded
+                  : Icons.expand_more_rounded,
+              size: 18,
+            ),
+            label: Text(
+              shouldShowPurchaseProviders ? 'Hide' : 'Buy or rent',
+            ),
+            style: TextButton.styleFrom(
+              foregroundColor: FlixieColors.medium,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(0, 34),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              textStyle: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Iterable<WatchProvider> _dedupeProviders(Iterable<WatchProvider> providers) {
+    final byId = <int, WatchProvider>{};
+    for (final provider in providers) {
+      byId.putIfAbsent(provider.id, () => provider);
+    }
+    return byId.values;
+  }
+
+  List<WatchProvider> _sortedProviders(Iterable<WatchProvider> providers) {
+    return providers.toList()
+      ..sort((a, b) {
+        final aMatches = _userProviderIds.contains(a.id);
+        final bMatches = _userProviderIds.contains(b.id);
+        if (aMatches != bMatches) return aMatches ? -1 : 1;
+        return a.displayPriority.compareTo(b.displayPriority);
+      });
+  }
+
+  Widget _buildProviderGroup(
+    String title,
+    List<WatchProvider> providers, {
+    bool highlightUserProviders = false,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            color: highlightUserProviders &&
+                    providers.any(
+                        (provider) => _userProviderIds.contains(provider.id))
+                ? FlixieColors.success
+                : FlixieColors.medium,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
         SizedBox(
-          height: 100,
+          height: 94,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            itemCount: _watchProviders.length,
+            itemCount: providers.length,
             separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, i) =>
-                WatchProviderCard(provider: _watchProviders[i]),
+            itemBuilder: (context, i) {
+              final provider = providers[i];
+              final isUserProvider = _userProviderIds.contains(provider.id);
+              return WatchProviderCard(
+                provider: provider,
+                isUserProvider: isUserProvider,
+                showUserProviderHighlight: highlightUserProviders,
+              );
+            },
           ),
         ),
       ],

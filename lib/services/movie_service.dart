@@ -120,8 +120,25 @@ class MovieService {
         .d('Fetching watch providers for movie $movieId in region $region.');
 
     List<WatchProvider> parseProviders(dynamic data) {
+      Iterable<dynamic> typedList(String type, dynamic value) {
+        if (value is! Iterable) return const [];
+        return value.whereType<Map<String, dynamic>>().map(
+              (provider) => {
+                ...provider,
+                'availabilityType': type,
+              },
+            );
+      }
+
       final rawList = data is Map<String, dynamic>
-          ? (data['watchProviders'] as List<dynamic>? ?? const [])
+          ? [
+              ...typedList('stream', data['stream'] ?? data['flatrate']),
+              ...typedList('buy', data['buy']),
+              ...typedList('rent', data['rent']),
+              ...typedList('stream', data['watchProviders']),
+              ...typedList('stream', data['providers']),
+              ...typedList('stream', data['results']),
+            ]
           : (data as List<dynamic>? ?? const []);
       return rawList
           .map((e) => WatchProvider.fromJson(e as Map<String, dynamic>))

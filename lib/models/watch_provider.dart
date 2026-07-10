@@ -25,10 +25,14 @@ class WatchProvider {
 
   factory WatchProvider.fromJson(Map<String, dynamic> json) {
     return WatchProvider(
-      id: json['id'],
-      providerName: json['providerName'],
-      displayPriority: json['displayPriority'],
-      logoPath: json['logoPath'],
+      id: _intValue(json['id'] ?? json['providerId'] ?? json['provider_id']) ??
+          0,
+      providerName:
+          _stringValue(json['providerName'] ?? json['provider_name']) ??
+              'Provider',
+      displayPriority:
+          _intValue(json['displayPriority'] ?? json['display_priority']) ?? 0,
+      logoPath: _stringValue(json['logoPath'] ?? json['logo_path']) ?? '',
       tvShows: json['tvShows'] ?? false,
       movies: json['movies'] ?? false,
       isVisible: json['isVisible'] ?? true,
@@ -38,7 +42,9 @@ class WatchProvider {
     );
   }
 
-  String get logoUrl => 'https://image.tmdb.org/t/p/w92$logoPath';
+  String get logoUrl => logoPath.startsWith('http')
+      ? logoPath
+      : 'https://image.tmdb.org/t/p/w92$logoPath';
 
   bool get hasExplicitAvailabilityType => availabilityTypes.isNotEmpty;
 
@@ -49,6 +55,24 @@ class WatchProvider {
 
   bool get isRental =>
       availabilityTypes.any((type) => type == 'rent' || type == 'rental');
+
+  bool get isPurchase => availabilityTypes.any(
+        (type) => type == 'buy' || type == 'purchase' || type == 'purchasable',
+      );
+}
+
+int? _intValue(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is double) return value.toInt();
+  if (value is String) return int.tryParse(value);
+  return null;
+}
+
+String? _stringValue(dynamic value) {
+  if (value == null) return null;
+  final text = value.toString().trim();
+  return text.isEmpty ? null : text;
 }
 
 Set<String> _parseAvailabilityTypes(Map<String, dynamic> json) {

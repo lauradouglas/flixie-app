@@ -67,7 +67,7 @@ class ListsPreviewSection extends StatelessWidget {
                     contentPadding: EdgeInsets.zero,
                     dense: true,
                     title: Text(list.name),
-                    subtitle: Text('${list.movieCount ?? 0} movies'),
+                    subtitle: Text(_listCountLabel(list)),
                     trailing: Icon(
                       _privacyIcon(list.visibility),
                       size: 16,
@@ -110,4 +110,16 @@ IconData _privacyIcon(String visibility) {
     default:
       return Icons.lock_outline;
   }
+}
+
+String _listCountLabel(MovieList list) {
+  final movies = list.movieCount ?? 0;
+  final shows = list.showCount ?? 0;
+  final total = list.itemCount ?? movies + shows;
+  if (movies > 0 && shows > 0) {
+    return '$total items · $movies films · $shows shows';
+  }
+  if (movies > 0) return '$movies films';
+  if (shows > 0) return '$shows shows';
+  return '$total items';
 }

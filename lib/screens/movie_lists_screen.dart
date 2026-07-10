@@ -100,7 +100,7 @@ class _MovieListsView extends StatelessWidget {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    '${list.movieCount ?? 0} movies',
+                                    _listCountLabel(list),
                                     style: const TextStyle(
                                       color: FlixieColors.medium,
                                       fontSize: 12,
@@ -213,7 +213,7 @@ class _MovieListsView extends StatelessWidget {
               StatefulBuilder(
                 builder: (context, setInnerState) =>
                     DropdownButtonFormField<String>(
-                  value: visibility,
+                  initialValue: visibility,
                   decoration: const InputDecoration(labelText: 'Privacy'),
                   items: const [
                     DropdownMenuItem(
@@ -238,9 +238,9 @@ class _MovieListsView extends StatelessWidget {
               StatefulBuilder(
                 builder: (context, setInnerState) =>
                     DropdownButtonFormField<String>(
-                  value: whoCanAddMovies,
+                  initialValue: whoCanAddMovies,
                   decoration:
-                      const InputDecoration(labelText: 'Who can add movies?'),
+                      const InputDecoration(labelText: 'Who can add items?'),
                   items: const [
                     DropdownMenuItem(value: 'owner', child: Text('Only me')),
                     DropdownMenuItem(value: 'friends', child: Text('Friends')),
@@ -383,6 +383,18 @@ IconData _privacyIcon(String visibility) {
     default:
       return Icons.lock_outline;
   }
+}
+
+String _listCountLabel(MovieList list) {
+  final movies = list.movieCount ?? 0;
+  final shows = list.showCount ?? 0;
+  final total = list.itemCount ?? movies + shows;
+  if (movies > 0 && shows > 0) {
+    return '$total items · $movies films · $shows shows';
+  }
+  if (movies > 0) return '$movies films';
+  if (shows > 0) return '$shows shows';
+  return '$total items';
 }
 
 String _updatedLabel(String? date) {

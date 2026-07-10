@@ -148,6 +148,21 @@ class MovieListsProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> removeShowFromList(String listId, int showId) async {
+    try {
+      await repository.removeShowFromList(userId, listId, showId);
+      final current = List<MovieListMovie>.from(listMovies[listId] ?? []);
+      current.removeWhere((e) => _entryMatchesShow(e, showId));
+      listMovies[listId] = current;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      error = _friendlyError(e);
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<List<MovieList>> getListsContainingMovie(int movieId) async {
     try {
       final containing = await repository.getMyListsContainingMovie(
@@ -177,5 +192,9 @@ class MovieListsProvider extends ChangeNotifier {
 
   bool _entryMatchesMovie(MovieListMovie entry, int movieId) {
     return entry.movieId == movieId || entry.movie?.id == movieId;
+  }
+
+  bool _entryMatchesShow(MovieListMovie entry, int showId) {
+    return entry.showId == showId || entry.show?.id == showId;
   }
 }

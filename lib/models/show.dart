@@ -361,13 +361,51 @@ class TvShowCredit {
   });
 
   factory TvShowCredit.fromJson(Map<String, dynamic> json) {
+    final person = json['person'] is Map<String, dynamic>
+        ? json['person'] as Map<String, dynamic>
+        : const <String, dynamic>{};
     return TvShowCredit(
-      id: _intValue(json['id'] ?? json['personId']) ?? 0,
-      name: _stringValue(json['name']) ?? 'Unknown',
+      id: _intValue(json['personId'] ?? person['id'] ?? json['id']) ?? 0,
+      name: _stringValue(
+            json['name'] ?? person['name'] ?? json['personName'],
+          ) ??
+          'Unknown',
       role: _stringValue(
-          json['job'] ?? json['role'] ?? json['knownForDepartment']),
-      character: _stringValue(json['character']),
-      profilePath: _stringValue(json['profilePath'] ?? json['profile_path']),
+        json['job'] ??
+            json['role'] ??
+            json['knownForDepartment'] ??
+            person['department'],
+      ),
+      character: _stringValue(
+        json['character'] ?? json['characterName'] ?? json['roleName'],
+      ),
+      profilePath: _stringValue(
+        json['profilePath'] ??
+            json['profile_path'] ??
+            json['profileImgUrl'] ??
+            person['profilePath'] ??
+            person['profile_path'] ??
+            person['profileImgUrl'],
+      ),
+    );
+  }
+}
+
+class TvShowCredits {
+  final List<TvShowCredit> cast;
+  final List<TvShowCredit> crew;
+
+  const TvShowCredits({
+    this.cast = const [],
+    this.crew = const [],
+  });
+
+  factory TvShowCredits.fromJson(Map<String, dynamic> json) {
+    return TvShowCredits(
+      cast: _mapList(
+          json['cast'] ?? json['credits']?['cast'], TvShowCredit.fromJson),
+      crew: _mapList(
+          json['crew'] ?? json['credits']?['crew'], TvShowCredit.fromJson),
     );
   }
 }

@@ -170,8 +170,7 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                       hasScrollBody: false,
                       child: _EmptyListState(
                         isOwner: widget.isOwner,
-                        message:
-                            provider.error ?? 'No movies in this list yet.',
+                        message: provider.error ?? 'No items in this list yet.',
                         onAddMovies: _showAddMovieSheet,
                       ),
                     )
@@ -204,6 +203,11 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                                     final movieId = _entryMovieId(entry);
                                     if (movieId > 0) {
                                       context.push('/movies/$movieId');
+                                      return;
+                                    }
+                                    final showId = _entryShowId(entry);
+                                    if (showId > 0) {
+                                      context.push('/shows/$showId');
                                     }
                                   },
                                   onRemove: () => _confirmRemove(
@@ -232,12 +236,11 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
         sorted.sort((a, b) => (b.createdAt ?? '').compareTo(a.createdAt ?? ''));
         break;
       case _ListSort.title:
-        sorted.sort(
-            (a, b) => (a.movie?.title ?? '').compareTo(b.movie?.title ?? ''));
+        sorted.sort((a, b) => _entryTitle(a).compareTo(_entryTitle(b)));
         break;
       case _ListSort.rating:
-        sorted.sort((a, b) =>
-            (b.movie?.voteAverage ?? -1).compareTo(a.movie?.voteAverage ?? -1));
+        sorted.sort(
+            (a, b) => (_entryRating(b) ?? -1).compareTo(_entryRating(a) ?? -1));
         break;
     }
     return sorted;
@@ -245,7 +248,7 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
 
   List<String> _posterUrls(List<MovieListMovie> movies) {
     return movies
-        .map((entry) => entry.movie?.posterPath)
+        .map((entry) => entry.movie?.posterPath ?? entry.show?.posterPath)
         .whereType<String>()
         .take(4)
         .map((path) => 'https://image.tmdb.org/t/p/w342$path')
@@ -258,8 +261,9 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
     MovieListMovie entry,
   ) async {
     final movieId = _entryMovieId(entry);
-    if (movieId <= 0) return;
-    final title = entry.movie?.title ?? 'this movie';
+    final showId = _entryShowId(entry);
+    if (movieId <= 0 && showId <= 0) return;
+    final title = _entryTitle(entry);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -278,7 +282,9 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
       ),
     );
     if (confirmed != true || !context.mounted) return;
-    final ok = await provider.removeMovieFromList(widget.listId, movieId);
+    final ok = movieId > 0
+        ? await provider.removeMovieFromList(widget.listId, movieId)
+        : await provider.removeShowFromList(widget.listId, showId);
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -711,7 +717,7 @@ class _ListHeader extends StatelessWidget {
                     ),
                     const SizedBox(width: 5),
                     Text(
-                      '$movieCount ${movieCount == 1 ? 'movie' : 'movies'}',
+                      '$movieCount ${movieCount == 1 ? 'item' : 'items'}',
                       style: const TextStyle(
                         color: FlixieColors.medium,
                         fontSize: 13,
@@ -875,12 +881,14 @@ class _MovieListPosterCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final movie = entry.movie;
-    final posterPath = movie?.posterPath;
+    final show = entry.show;
+    final isShow = _entryShowId(entry) > 0;
+    final posterPath = movie?.posterPath ?? show?.posterPath;
     final posterUrl = posterPath != null
         ? 'https://image.tmdb.org/t/p/w500$posterPath'
         : null;
-    final year = _extractYear(movie?.releaseDate);
-    final rating = movie?.voteAverage;
+    final year = _extractYear(movie?.releaseDate ?? show?.firstAirDate);
+    final rating = _entryRating(entry);
 
     return Material(
       color: FlixieColors.tabBarBackgroundFocused,
@@ -923,7 +931,7 @@ class _MovieListPosterCard extends StatelessWidget {
                       right: 6,
                       top: 6,
                       child: PopupMenuButton<String>(
-                        tooltip: 'Movie actions',
+                        tooltip: 'List item actions',
                         color: FlixieColors.tabBarBackgroundFocused,
                         icon: Container(
                           width: 30,
@@ -958,7 +966,7 @@ class _MovieListPosterCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    movie?.title ?? 'Unknown movie',
+                    _entryTitle(entry),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -973,7 +981,7 @@ class _MovieListPosterCard extends StatelessWidget {
                     children: [
                       if (year != null)
                         Text(
-                          year,
+                          isShow ? '$year · Show' : year,
                           style: const TextStyle(
                             color: FlixieColors.medium,
                             fontSize: 12,
@@ -1055,6 +1063,18 @@ class _EmptyListState extends StatelessWidget {
 
 int _entryMovieId(MovieListMovie entry) {
   return entry.movieId != 0 ? entry.movieId : entry.movie?.id ?? 0;
+}
+
+int _entryShowId(MovieListMovie entry) {
+  return entry.showId != 0 ? entry.showId : entry.show?.id ?? 0;
+}
+
+String _entryTitle(MovieListMovie entry) {
+  return entry.movie?.title ?? entry.show?.name ?? 'Unknown title';
+}
+
+double? _entryRating(MovieListMovie entry) {
+  return entry.movie?.voteAverage ?? entry.show?.voteAverage;
 }
 
 String? _extractYear(String? releaseDate) {

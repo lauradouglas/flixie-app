@@ -604,8 +604,11 @@ class AuthProvider extends ChangeNotifier {
   /// Updates a specific list field on the user
   void updateUserList({
     List<WatchedMovie>? watchedMovies,
+    List<dynamic>? watchedShows,
     List<WatchlistMovie>? movieWatchlist,
+    List<dynamic>? showWatchlist,
     List<FavoriteMovie>? favoriteMovies,
+    List<dynamic>? favoriteShows,
     List<dynamic>? favoritePeople,
   }) {
     if (_dbUser == null) return;
@@ -617,8 +620,14 @@ class AuthProvider extends ChangeNotifier {
     if (movieWatchlist != null) {
       logger.d('Watchlist: ${movieWatchlist.length} items');
     }
+    if (showWatchlist != null) {
+      logger.d('Show watchlist: ${showWatchlist.length} items');
+    }
     if (favoriteMovies != null) {
       logger.d('Favorites: ${favoriteMovies.length} items');
+    }
+    if (favoriteShows != null) {
+      logger.d('Favorite shows: ${favoriteShows.length} items');
     }
     if (favoritePeople != null) {
       logger.d('Fav people: ${favoritePeople.length} items');
@@ -626,8 +635,11 @@ class AuthProvider extends ChangeNotifier {
 
     _dbUser = _dbUser!.copyWith(
       watchedMovies: watchedMovies ?? _dbUser!.watchedMovies,
+      watchedShows: watchedShows ?? _dbUser!.watchedShows,
       movieWatchlist: movieWatchlist ?? _dbUser!.movieWatchlist,
+      showWatchlist: showWatchlist ?? _dbUser!.showWatchlist,
       favoriteMovies: favoriteMovies ?? _dbUser!.favoriteMovies,
+      favoriteShows: favoriteShows ?? _dbUser!.favoriteShows,
       favoritePeople: favoritePeople ?? _dbUser!.favoritePeople,
     );
     notifyListeners();

@@ -1,102 +1,43 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../models/movie_list.dart';
+import '../../models/show_list.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/movie_lists_provider.dart';
-import '../../repositories/movie_features_repository.dart';
+import '../../services/user_service.dart';
 import '../../theme/app_theme.dart';
 
-class AddToListSheet extends StatelessWidget {
-  const AddToListSheet({
+class AddShowToListSheet extends StatefulWidget {
+  const AddShowToListSheet({
     super.key,
-    required this.movieId,
-    this.movieTitle,
-    this.moviePosterPath,
-    this.movieReleaseDate,
-    this.movieRuntimeMinutes,
-    this.movieRatingLabel,
+    required this.showId,
+    this.showTitle,
+    this.showPosterPath,
+    this.firstAirDate,
+    this.ratingLabel,
   });
 
-  final int movieId;
-  final String? movieTitle;
-  final String? moviePosterPath;
-  final String? movieReleaseDate;
-  final int? movieRuntimeMinutes;
-  final String? movieRatingLabel;
+  final int showId;
+  final String? showTitle;
+  final String? showPosterPath;
+  final String? firstAirDate;
+  final String? ratingLabel;
 
   @override
-  Widget build(BuildContext context) {
-    final userId = context.read<AuthProvider>().dbUser?.id;
-    if (userId == null) {
-      return const SizedBox(
-        height: 180,
-        child: Center(child: Text('Sign in to use lists')),
-      );
-    }
-    return ChangeNotifierProvider(
-      create: (_) => MovieListsProvider(
-        repository: const MovieFeaturesRepository(),
-        userId: userId,
-      )..loadLists(),
-      child: _AddToListSheetBody(
-        movieId: movieId,
-        movieTitle: movieTitle,
-        moviePosterPath: moviePosterPath,
-        movieReleaseDate: movieReleaseDate,
-        movieRuntimeMinutes: movieRuntimeMinutes,
-        movieRatingLabel: movieRatingLabel,
-      ),
-    );
-  }
+  State<AddShowToListSheet> createState() => _AddShowToListSheetState();
 }
 
-class _AddToListSheetBody extends StatefulWidget {
-  const _AddToListSheetBody({
-    required this.movieId,
-    this.movieTitle,
-    this.moviePosterPath,
-    this.movieReleaseDate,
-    this.movieRuntimeMinutes,
-    this.movieRatingLabel,
-  });
-  final int movieId;
-  final String? movieTitle;
-  final String? moviePosterPath;
-  final String? movieReleaseDate;
-  final int? movieRuntimeMinutes;
-  final String? movieRatingLabel;
-
-  @override
-  State<_AddToListSheetBody> createState() => _AddToListSheetBodyState();
-}
-
-class _AddToListSheetBodyState extends State<_AddToListSheetBody> {
+class _AddShowToListSheetState extends State<AddShowToListSheet> {
   final TextEditingController _searchController = TextEditingController();
   final Set<String> _selectedListIds = <String>{};
   final Set<String> _initialListIds = <String>{};
+  List<ShowList> _lists = [];
+  bool _loading = true;
   bool _saving = false;
-  bool _loadingMembership = true;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadMembership());
-  }
-
-  Future<void> _loadMembership() async {
-    final provider = context.read<MovieListsProvider>();
-    final containing = await provider.getListsContainingMovie(widget.movieId);
-    if (!mounted) return;
-    setState(() {
-      _initialListIds
-        ..clear()
-        ..addAll(containing.map((list) => list.id));
-      _selectedListIds
-        ..clear()
-        ..addAll(_initialListIds);
-      _loadingMembership = false;
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadLists());
   }
 
   @override
@@ -105,11 +46,42 @@ class _AddToListSheetBodyState extends State<_AddToListSheetBody> {
     super.dispose();
   }
 
+  Future<void> _loadLists() async {
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (userId == null) return;
+    try {
+      final lists = await UserService.getShowLists(userId);
+      final selected = <String>{};
+      for (final list in lists) {
+        final shows = await UserService.getShowListShows(userId, list.id);
+        if (shows.any((show) => show.id == widget.showId)) {
+          selected.add(list.id);
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _lists = lists;
+        _initialListIds
+          ..clear()
+          ..addAll(selected);
+        _selectedListIds
+          ..clear()
+          ..addAll(selected);
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to load lists')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<MovieListsProvider>();
     final query = _searchController.text.trim().toLowerCase();
-    final filtered = provider.lists
+    final filtered = _lists
         .where((list) => list.name.toLowerCase().contains(query))
         .toList(growable: false);
 
@@ -118,7 +90,7 @@ class _AddToListSheetBodyState extends State<_AddToListSheetBody> {
         height: MediaQuery.of(context).size.height * 0.88,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-          child: provider.isLoading || _loadingMembership
+          child: _loading
               ? const Center(child: CircularProgressIndicator())
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -144,12 +116,11 @@ class _AddToListSheetBodyState extends State<_AddToListSheetBody> {
                       ],
                     ),
                     const SizedBox(height: 10),
-                    _SelectedMovieSummary(
-                      title: widget.movieTitle,
-                      posterPath: widget.moviePosterPath,
-                      releaseDate: widget.movieReleaseDate,
-                      runtimeMinutes: widget.movieRuntimeMinutes,
-                      ratingLabel: widget.movieRatingLabel,
+                    _SelectedShowSummary(
+                      title: widget.showTitle,
+                      posterPath: widget.showPosterPath,
+                      firstAirDate: widget.firstAirDate,
+                      ratingLabel: widget.ratingLabel,
                     ),
                     const SizedBox(height: 16),
                     Row(
@@ -187,7 +158,7 @@ class _AddToListSheetBodyState extends State<_AddToListSheetBody> {
                     ),
                     const SizedBox(height: 10),
                     Expanded(
-                      child: provider.lists.isEmpty
+                      child: _lists.isEmpty
                           ? const Center(
                               child: Text(
                                 "You haven't created any lists yet.",
@@ -226,7 +197,7 @@ class _AddToListSheetBodyState extends State<_AddToListSheetBody> {
                                     ),
                                     child: Row(
                                       children: [
-                                        _ListPosterStack(list: list),
+                                        _ShowListPosterStack(list: list),
                                         const SizedBox(width: 10),
                                         Expanded(
                                           child: Column(
@@ -271,9 +242,8 @@ class _AddToListSheetBodyState extends State<_AddToListSheetBody> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed:
-                            _saving ? null : () => _applyChanges(provider),
-                        child: Text('Add to List (${_selectedListIds.length})'),
+                        onPressed: _saving ? null : _applyChanges,
+                        child: Text('Save Lists (${_selectedListIds.length})'),
                       ),
                     ),
                   ],
@@ -283,99 +253,61 @@ class _AddToListSheetBodyState extends State<_AddToListSheetBody> {
     );
   }
 
-  Future<void> _applyChanges(MovieListsProvider provider) async {
+  Future<void> _applyChanges() async {
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (userId == null) return;
     setState(() => _saving = true);
     final toAdd = _selectedListIds.difference(_initialListIds).toList();
     final toRemove = _initialListIds.difference(_selectedListIds).toList();
-    final failed = <String>[];
-
-    for (final listId in toAdd) {
-      final ok = await provider.addMovieToList(listId, widget.movieId);
-      if (!ok) failed.add(listId);
-    }
-    for (final listId in toRemove) {
-      final ok = await provider.removeMovieFromList(listId, widget.movieId);
-      if (!ok) failed.add(listId);
-    }
-
-    if (!mounted) return;
-    setState(() => _saving = false);
-    if (failed.isNotEmpty) {
-      final listNames = failed
-          .map(
-            (id) => provider.lists
-                .firstWhere(
-                  (list) => list.id == id,
-                  orElse: () => const MovieList(
-                    id: '',
-                    name: 'Unknown List',
-                    removed: false,
-                  ),
-                )
-                .name,
-          )
-          .toSet()
-          .join(', ');
+    try {
+      for (final listId in toAdd) {
+        await UserService.addShowToList(userId, listId, widget.showId);
+      }
+      for (final listId in toRemove) {
+        await UserService.removeShowFromList(userId, listId, widget.showId);
+      }
+      if (!mounted) return;
+      Navigator.pop(context, true);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Lists updated')));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Failed to update lists: $listNames. ${provider.error ?? 'Please try again.'}',
-          ),
-        ),
+        const SnackBar(content: Text('Unable to update lists')),
       );
-      return;
     }
-    Navigator.pop(context, true);
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Lists updated')));
   }
 
   Future<void> _openCreateListSheet() async {
-    final provider = context.read<MovieListsProvider>();
-    final created = await showModalBottomSheet<MovieList>(
+    final created = await showModalBottomSheet<ShowList>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: FlixieColors.background,
-      builder: (_) => ChangeNotifierProvider<MovieListsProvider>.value(
-        value: provider,
-        child: const _CreateListFromMovieSheet(),
-      ),
+      builder: (_) => const _CreateShowListSheet(),
     );
     if (!mounted || created == null) return;
     setState(() {
+      _lists = [..._lists, created];
       _searchController.clear();
       _selectedListIds.add(created.id);
     });
   }
 }
 
-String _listCountLabel(MovieList list) {
-  final movies = list.movieCount ?? 0;
-  final shows = list.showCount ?? 0;
-  final total = list.itemCount ?? movies + shows;
-  if (movies > 0 && shows > 0) {
-    return '$total items · $movies films · $shows shows';
-  }
-  if (movies > 0) return '$movies films';
-  if (shows > 0) return '$shows shows';
-  return '$total items';
-}
-
-class _CreateListFromMovieSheet extends StatefulWidget {
-  const _CreateListFromMovieSheet();
+class _CreateShowListSheet extends StatefulWidget {
+  const _CreateShowListSheet();
 
   @override
-  State<_CreateListFromMovieSheet> createState() =>
-      _CreateListFromMovieSheetState();
+  State<_CreateShowListSheet> createState() => _CreateShowListSheetState();
 }
 
-class _CreateListFromMovieSheetState extends State<_CreateListFromMovieSheet> {
+class _CreateShowListSheetState extends State<_CreateShowListSheet> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
-
-  String _visibility = ListVisibility.friends;
-  String _whoCanAddMovies = 'owner';
+  String _visibility = ShowListVisibility.friends;
+  String _whoCanAddShows = 'owner';
   bool _submitting = false;
 
   @override
@@ -389,7 +321,7 @@ class _CreateListFromMovieSheetState extends State<_CreateListFromMovieSheet> {
   Widget build(BuildContext context) {
     return SafeArea(
       child: SizedBox(
-        height: MediaQuery.of(context).size.height * 0.92,
+        height: MediaQuery.of(context).size.height * 0.86,
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
           child: Column(
@@ -404,7 +336,7 @@ class _CreateListFromMovieSheetState extends State<_CreateListFromMovieSheet> {
                   ),
                   const Expanded(
                     child: Text(
-                      'Create New List',
+                      'Create List',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 17,
@@ -424,7 +356,7 @@ class _CreateListFromMovieSheetState extends State<_CreateListFromMovieSheet> {
                 maxLength: 50,
                 decoration: const InputDecoration(
                   labelText: 'List Name',
-                  hintText: 'e.g. 90s Classics',
+                  hintText: 'e.g. Prestige TV',
                 ),
               ),
               const SizedBox(height: 8),
@@ -439,43 +371,33 @@ class _CreateListFromMovieSheetState extends State<_CreateListFromMovieSheet> {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'List Type',
-                style: TextStyle(
-                  color: FlixieColors.light,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 8),
-              _VisibilityOptionTile(
-                label: 'Private',
-                subtitle: 'Only you can see',
-                icon: Icons.lock_outline,
-                selected: _visibility == ListVisibility.private,
-                onTap: () =>
-                    setState(() => _visibility = ListVisibility.private),
-              ),
-              const SizedBox(height: 8),
-              _VisibilityOptionTile(
-                label: 'Friends',
-                subtitle: 'Your friends can see',
-                icon: Icons.group_outlined,
-                selected: _visibility == ListVisibility.friends,
-                onTap: () =>
-                    setState(() => _visibility = ListVisibility.friends),
-              ),
-              const SizedBox(height: 8),
-              _VisibilityOptionTile(
-                label: 'Public',
-                subtitle: 'Anyone can see',
-                icon: Icons.public,
-                selected: _visibility == ListVisibility.public,
-                onTap: () =>
-                    setState(() => _visibility = ListVisibility.public),
+              DropdownButtonFormField<String>(
+                initialValue: _visibility,
+                decoration: const InputDecoration(labelText: 'List Type'),
+                items: const [
+                  DropdownMenuItem(
+                    value: ShowListVisibility.private,
+                    child: Text('Private'),
+                  ),
+                  DropdownMenuItem(
+                    value: ShowListVisibility.friends,
+                    child: Text('Friends'),
+                  ),
+                  DropdownMenuItem(
+                    value: ShowListVisibility.public,
+                    child: Text('Public'),
+                  ),
+                ],
+                onChanged: _submitting
+                    ? null
+                    : (value) => setState(
+                          () =>
+                              _visibility = value ?? ShowListVisibility.friends,
+                        ),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                initialValue: _whoCanAddMovies,
+                initialValue: _whoCanAddShows,
                 decoration:
                     const InputDecoration(labelText: 'Who can add items?'),
                 items: const [
@@ -485,7 +407,7 @@ class _CreateListFromMovieSheetState extends State<_CreateListFromMovieSheet> {
                 onChanged: _submitting
                     ? null
                     : (value) =>
-                        setState(() => _whoCanAddMovies = value ?? 'owner'),
+                        setState(() => _whoCanAddShows = value ?? 'owner'),
               ),
               if (_submitting) ...[
                 const SizedBox(height: 16),
@@ -499,7 +421,9 @@ class _CreateListFromMovieSheetState extends State<_CreateListFromMovieSheet> {
   }
 
   Future<void> _createList() async {
+    final userId = context.read<AuthProvider>().dbUser?.id;
     final name = _nameController.text.trim();
+    if (userId == null) return;
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('List name is required')),
@@ -508,116 +432,65 @@ class _CreateListFromMovieSheetState extends State<_CreateListFromMovieSheet> {
     }
 
     setState(() => _submitting = true);
-    final provider = context.read<MovieListsProvider>();
-    final created = await provider.createList(
-      name,
-      description: _descriptionController.text.trim(),
-      visibility: _visibility,
-      whoCanAddMovies: _whoCanAddMovies,
-    );
-    if (!mounted) return;
-    setState(() => _submitting = false);
-
-    if (created == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(provider.error ?? 'Unable to create list')),
+    try {
+      final created = await UserService.createShowList(
+        userId,
+        CreateShowListRequest(
+          name: name,
+          description: _descriptionController.text.trim(),
+          visibility: _visibility,
+          whoCanAddShows: _whoCanAddShows,
+        ),
       );
-      return;
+      if (!mounted) return;
+      Navigator.pop(context, created);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to create show list')),
+      );
     }
-    Navigator.pop(context, created);
   }
 }
 
-class _VisibilityOptionTile extends StatelessWidget {
-  const _VisibilityOptionTile({
-    required this.label,
-    required this.subtitle,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final String subtitle;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        decoration: BoxDecoration(
-          color: FlixieColors.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected ? FlixieColors.primary : FlixieColors.tabBarBorder,
-            width: selected ? 1.6 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 20, color: FlixieColors.medium),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label,
-                      style: const TextStyle(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      color: FlixieColors.medium,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              selected ? Icons.check_circle : Icons.radio_button_unchecked,
-              color: selected ? FlixieColors.primary : FlixieColors.medium,
-            ),
-          ],
-        ),
-      ),
-    );
+String _listCountLabel(ShowList list) {
+  final movies = list.movieCount ?? 0;
+  final shows = list.showCount ?? 0;
+  final total = list.itemCount ?? movies + shows;
+  if (movies > 0 && shows > 0) {
+    return '$total items · $movies films · $shows shows';
   }
+  if (shows > 0) return '$shows shows';
+  if (movies > 0) return '$movies films';
+  return '$total items';
 }
 
-class _SelectedMovieSummary extends StatelessWidget {
-  const _SelectedMovieSummary({
+class _SelectedShowSummary extends StatelessWidget {
+  const _SelectedShowSummary({
     required this.title,
     required this.posterPath,
-    required this.releaseDate,
-    required this.runtimeMinutes,
+    required this.firstAirDate,
     required this.ratingLabel,
   });
 
   final String? title;
   final String? posterPath;
-  final String? releaseDate;
-  final int? runtimeMinutes;
+  final String? firstAirDate;
   final String? ratingLabel;
 
   @override
   Widget build(BuildContext context) {
-    final year = _extractYear(releaseDate);
-    final runtime = _formatRuntime(runtimeMinutes);
-    final parts = <String>[
-      if (year != null) year,
-      if (runtime != null) runtime,
-      if (ratingLabel != null && ratingLabel!.trim().isNotEmpty)
-        ratingLabel!.trim(),
-    ];
-    final imageUrl = (posterPath != null && posterPath!.isNotEmpty)
+    final year = firstAirDate != null && firstAirDate!.length >= 4
+        ? firstAirDate!.substring(0, 4)
+        : null;
+    final imageUrl = posterPath?.trim().isNotEmpty == true
         ? 'https://image.tmdb.org/t/p/w185$posterPath'
         : null;
+    final parts = [
+      if (year != null) year,
+      if (ratingLabel?.trim().isNotEmpty == true) ratingLabel!.trim(),
+    ];
 
     return Row(
       children: [
@@ -628,7 +501,7 @@ class _SelectedMovieSummary extends StatelessWidget {
             height: 76,
             color: FlixieColors.surface,
             child: imageUrl == null
-                ? const Icon(Icons.movie_outlined, color: FlixieColors.medium)
+                ? const Icon(Icons.live_tv_outlined, color: FlixieColors.medium)
                 : Image.network(
                     imageUrl,
                     fit: BoxFit.cover,
@@ -647,7 +520,7 @@ class _SelectedMovieSummary extends StatelessWidget {
               Text(
                 title?.trim().isNotEmpty == true
                     ? title!.trim()
-                    : 'Selected movie',
+                    : 'Selected show',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style:
@@ -669,9 +542,10 @@ class _SelectedMovieSummary extends StatelessWidget {
   }
 }
 
-class _ListPosterStack extends StatelessWidget {
-  const _ListPosterStack({required this.list});
-  final MovieList list;
+class _ShowListPosterStack extends StatelessWidget {
+  const _ShowListPosterStack({required this.list});
+
+  final ShowList list;
 
   @override
   Widget build(BuildContext context) {
@@ -688,7 +562,7 @@ class _ListPosterStack extends StatelessWidget {
           color: FlixieColors.surfaceElevated,
           borderRadius: BorderRadius.circular(8),
         ),
-        child: const Icon(Icons.movie_outlined, color: FlixieColors.medium),
+        child: const Icon(Icons.live_tv_outlined, color: FlixieColors.medium),
       );
     }
 
@@ -724,18 +598,4 @@ class _ListPosterStack extends StatelessWidget {
       ),
     );
   }
-}
-
-String? _extractYear(String? releaseDate) {
-  if (releaseDate == null || releaseDate.length < 4) return null;
-  return releaseDate.substring(0, 4);
-}
-
-String? _formatRuntime(int? totalMinutes) {
-  if (totalMinutes == null || totalMinutes <= 0) return null;
-  final hours = totalMinutes ~/ 60;
-  final minutes = totalMinutes % 60;
-  if (hours == 0) return '${minutes}m';
-  if (minutes == 0) return '${hours}h';
-  return '${hours}h ${minutes}m';
 }

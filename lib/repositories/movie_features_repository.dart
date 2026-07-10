@@ -58,7 +58,8 @@ class MovieFeaturesRepository {
     return UserService.deleteMovieList(userId, listId);
   }
 
-  Future<List<MovieListMovie>> getMovieListMovies(String userId, String listId) {
+  Future<List<MovieListMovie>> getMovieListMovies(
+      String userId, String listId) {
     return UserService.getMovieListMovies(userId, listId);
   }
 
@@ -74,7 +75,12 @@ class MovieFeaturesRepository {
     return UserService.removeMovieFromList(userId, listId, movieId);
   }
 
-  Future<List<MovieList>> getMyListsContainingMovie(String userId, int movieId) {
+  Future<void> removeShowFromList(String userId, String listId, int showId) {
+    return UserService.removeShowFromList(userId, listId, showId);
+  }
+
+  Future<List<MovieList>> getMyListsContainingMovie(
+      String userId, int movieId) {
     return UserService.getMyListsContainingMovie(userId, movieId);
   }
 
@@ -107,7 +113,8 @@ class MovieFeaturesRepository {
     return UserService.getUserMovieWatches(userId);
   }
 
-  Future<List<MovieWatchEntry>> getMovieWatchHistory(String userId, int movieId) {
+  Future<List<MovieWatchEntry>> getMovieWatchHistory(
+      String userId, int movieId) {
     return UserService.getMovieWatchHistory(userId, movieId);
   }
 
