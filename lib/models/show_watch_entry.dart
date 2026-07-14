@@ -1,4 +1,4 @@
-import 'show.dart';
+import 'package:flixie_app/models/show.dart';
 
 class ShowWatchEntry {
   final String id;

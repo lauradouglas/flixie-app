@@ -4,9 +4,9 @@
 
 import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/models/movie.dart';
-import 'package:flixie_app/screens/movie_detail/action_button.dart';
-import 'package:flixie_app/screens/movie_detail/film_info_card.dart';
-import 'package:flixie_app/screens/profile/friend_avatar.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/action_button.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/film_info_card.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/friend_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

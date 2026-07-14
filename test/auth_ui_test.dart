@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:flixie_app/models/genre.dart';
-import 'package:flixie_app/screens/auth/auth_ui.dart';
+import 'package:flixie_app/features/authentication/presentation/pages/auth_ui.dart';
 
 void main() {
   group('filterSupportedGenres', () {

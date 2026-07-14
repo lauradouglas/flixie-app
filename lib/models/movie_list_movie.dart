@@ -1,5 +1,5 @@
-import 'watchlist_movie.dart';
-import 'show.dart';
+import 'package:flixie_app/models/watchlist_movie.dart';
+import 'package:flixie_app/models/show.dart';
 
 class MovieListMovie {
   final String id;

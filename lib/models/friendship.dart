@@ -1,4 +1,4 @@
-import '../utils/app_logger.dart';
+import 'package:flixie_app/core/utils/app_logger.dart';
 
 /// Lightweight user info embedded in friendship/friend-request objects.
 class FriendshipUser {

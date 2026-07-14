@@ -5,10 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:flixie_app/models/group_watch_request.dart';
-import 'package:flixie_app/providers/auth_provider.dart' as app_auth;
-import 'package:flixie_app/services/auth_service.dart';
-import 'package:flixie_app/services/movie_service.dart';
-import 'package:flixie_app/theme/app_theme.dart';
+import 'package:flixie_app/core/auth/auth_provider.dart' as app_auth;
+import 'package:flixie_app/core/auth/auth_service.dart';
+import 'package:flixie_app/features/movies/data/movie_service.dart';
+import 'package:flixie_app/app/theme/app_theme.dart';
 
 // ---------------------------------------------------------------------------
 // Minimal stubs so tests run without a real Firebase project

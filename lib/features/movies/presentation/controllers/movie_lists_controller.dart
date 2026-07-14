@@ -1,0 +1,200 @@
+import 'package:flutter/foundation.dart';
+
+import 'package:flixie_app/models/movie_list.dart';
+import 'package:flixie_app/models/movie_list_movie.dart';
+import 'package:flixie_app/features/movies/data/movie_features_repository.dart';
+import 'package:flixie_app/core/api/api_client.dart';
+
+class MovieListsProvider extends ChangeNotifier {
+  MovieListsProvider({
+    required this.repository,
+    required this.userId,
+  });
+
+  final MovieFeaturesRepository repository;
+  final String userId;
+
+  List<MovieList> lists = [];
+  final Map<String, List<MovieListMovie>> listMovies = {};
+
+  bool isLoading = false;
+  String? error;
+
+  Future<void> loadLists() async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      lists = await repository.getMovieLists(userId);
+    } catch (e) {
+      error = _friendlyError(e);
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<MovieList?> createList(
+    String name, {
+    String? description,
+    String visibility = ListVisibility.private,
+    String? coverImageUrl,
+    String whoCanAddMovies = 'owner',
+  }) async {
+    try {
+      final created = await repository.createMovieList(
+        userId,
+        name,
+        description: description,
+        visibility: visibility,
+        coverImageUrl: coverImageUrl,
+        whoCanAddMovies: whoCanAddMovies,
+      );
+      lists = [...lists, created]
+        ..sort((a, b) => (a.createdAt ?? '').compareTo(b.createdAt ?? ''));
+      notifyListeners();
+      return created;
+    } catch (e) {
+      error = _friendlyError(e);
+      notifyListeners();
+      return null;
+    }
+  }
+
+  Future<bool> renameList(
+    String listId,
+    String name, {
+    String? description,
+    String? visibility,
+    String? coverImageUrl,
+    String? whoCanAddMovies,
+  }) async {
+    try {
+      final updated = await repository.renameMovieList(
+        userId,
+        listId,
+        name,
+        description: description,
+        visibility: visibility,
+        coverImageUrl: coverImageUrl,
+        whoCanAddMovies: whoCanAddMovies,
+      );
+      lists = lists.map((l) => l.id == listId ? updated : l).toList();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      error = _friendlyError(e);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> deleteList(String listId) async {
+    try {
+      await repository.deleteMovieList(userId, listId);
+      lists = lists.where((l) => l.id != listId).toList();
+      listMovies.remove(listId);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      error = _friendlyError(e);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<void> loadListMovies(String listId) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      listMovies[listId] = await repository.getMovieListMovies(userId, listId);
+    } catch (e) {
+      error = _friendlyError(e);
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> addMovieToList(String listId, int movieId) async {
+    try {
+      final entry = await repository.addMovieToList(userId, listId, movieId);
+      final current = List<MovieListMovie>.from(listMovies[listId] ?? []);
+      current.removeWhere((e) => _entryMatchesMovie(e, movieId));
+      current.insert(0, entry);
+      listMovies[listId] = current;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      error = _friendlyError(e);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> removeMovieFromList(String listId, int movieId) async {
+    try {
+      await repository.removeMovieFromList(userId, listId, movieId);
+      final current = List<MovieListMovie>.from(listMovies[listId] ?? []);
+      current.removeWhere((e) => _entryMatchesMovie(e, movieId));
+      listMovies[listId] = current;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      error = _friendlyError(e);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> removeShowFromList(String listId, int showId) async {
+    try {
+      await repository.removeShowFromList(userId, listId, showId);
+      final current = List<MovieListMovie>.from(listMovies[listId] ?? []);
+      current.removeWhere((e) => _entryMatchesShow(e, showId));
+      listMovies[listId] = current;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      error = _friendlyError(e);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<List<MovieList>> getListsContainingMovie(int movieId) async {
+    try {
+      final containing = await repository.getMyListsContainingMovie(
+        userId,
+        movieId,
+      );
+      return containing.where((list) => !list.removed).toList(growable: false);
+    } catch (e) {
+      error = _friendlyError(e);
+      notifyListeners();
+      return const <MovieList>[];
+    }
+  }
+
+  String _friendlyError(Object e) {
+    if (e is ApiException) {
+      final msg = e.message.toLowerCase();
+      if (e.statusCode == 409 ||
+          msg.contains('duplicate') ||
+          msg.contains('already exists')) {
+        return 'A list with that name already exists.';
+      }
+      return e.message;
+    }
+    return e.toString();
+  }
+
+  bool _entryMatchesMovie(MovieListMovie entry, int movieId) {
+    return entry.movieId == movieId || entry.movie?.id == movieId;
+  }
+
+  bool _entryMatchesShow(MovieListMovie entry, int showId) {
+    return entry.showId == showId || entry.show?.id == showId;
+  }
+}

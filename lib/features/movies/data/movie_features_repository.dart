@@ -1,0 +1,146 @@
+import 'package:flixie_app/models/movie_list.dart';
+import 'package:flixie_app/models/movie_friend_list_entry.dart';
+import 'package:flixie_app/models/movie_list_movie.dart';
+import 'package:flixie_app/models/movie_watch_entry.dart';
+import 'package:flixie_app/models/movie_wrapped.dart';
+import 'package:flixie_app/features/profile/data/user_service.dart';
+
+class MovieFeaturesRepository {
+  const MovieFeaturesRepository();
+
+  Future<List<MovieList>> getMovieLists(String userId) {
+    return UserService.getMovieLists(userId);
+  }
+
+  Future<MovieList> createMovieList(
+    String userId,
+    String name, {
+    String? description,
+    String visibility = ListVisibility.private,
+    String? coverImageUrl,
+    String whoCanAddMovies = 'owner',
+  }) {
+    return UserService.createMovieList(
+      userId,
+      CreateMovieListRequest(
+        name: name,
+        description: description,
+        visibility: visibility,
+        coverImageUrl: coverImageUrl,
+        whoCanAddMovies: whoCanAddMovies,
+      ),
+    );
+  }
+
+  Future<MovieList> renameMovieList(
+    String userId,
+    String listId,
+    String name, {
+    String? description,
+    String? visibility,
+    String? coverImageUrl,
+    String? whoCanAddMovies,
+  }) {
+    return UserService.renameMovieList(
+      userId,
+      listId,
+      UpdateMovieListRequest(
+        name: name,
+        description: description,
+        visibility: visibility,
+        coverImageUrl: coverImageUrl,
+        whoCanAddMovies: whoCanAddMovies,
+      ),
+    );
+  }
+
+  Future<void> deleteMovieList(String userId, String listId) {
+    return UserService.deleteMovieList(userId, listId);
+  }
+
+  Future<List<MovieListMovie>> getMovieListMovies(
+      String userId, String listId) {
+    return UserService.getMovieListMovies(userId, listId);
+  }
+
+  Future<MovieListMovie> addMovieToList(
+    String userId,
+    String listId,
+    int movieId,
+  ) {
+    return UserService.addMovieToList(userId, listId, movieId);
+  }
+
+  Future<void> removeMovieFromList(String userId, String listId, int movieId) {
+    return UserService.removeMovieFromList(userId, listId, movieId);
+  }
+
+  Future<void> removeShowFromList(String userId, String listId, int showId) {
+    return UserService.removeShowFromList(userId, listId, showId);
+  }
+
+  Future<List<MovieList>> getMyListsContainingMovie(
+      String userId, int movieId) {
+    return UserService.getMyListsContainingMovie(userId, movieId);
+  }
+
+  Future<List<MovieFriendListEntry>> getFriendsListsContainingMovie(
+    String userId,
+    int movieId,
+  ) {
+    return UserService.getFriendsListsContainingMovie(userId, movieId);
+  }
+
+  Future<MovieWatchEntry> logMovieWatch(
+    String userId, {
+    required int movieId,
+    String? watchedAt,
+    double? rating,
+    String? notes,
+  }) {
+    return UserService.logMovieWatch(
+      userId,
+      LogMovieWatchRequest(
+        movieId: movieId,
+        watchedAt: watchedAt,
+        rating: rating,
+        notes: notes,
+      ),
+    );
+  }
+
+  Future<List<MovieWatchEntry>> getUserMovieWatches(String userId) {
+    return UserService.getUserMovieWatches(userId);
+  }
+
+  Future<List<MovieWatchEntry>> getMovieWatchHistory(
+      String userId, int movieId) {
+    return UserService.getMovieWatchHistory(userId, movieId);
+  }
+
+  Future<MovieWatchEntry> updateMovieWatch(
+    String userId,
+    String watchEntryId, {
+    String? watchedAt,
+    double? rating,
+    String? notes,
+  }) {
+    return UserService.updateMovieWatch(
+      userId,
+      watchEntryId,
+      UpdateMovieWatchRequest(
+        watchedAt: watchedAt,
+        rating: rating,
+        notes: notes,
+      ),
+    );
+  }
+
+  Future<void> deleteMovieWatch(String userId, String watchEntryId) {
+    return UserService.deleteMovieWatch(userId, watchEntryId);
+  }
+
+  Future<MovieWrapped> getMovieWrapped(String userId, int year) {
+    return UserService.getMovieWrapped(userId, year);
+  }
+}

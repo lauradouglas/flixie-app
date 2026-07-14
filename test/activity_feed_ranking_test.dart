@@ -1,6 +1,6 @@
 import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/models/movie_friend_activity.dart';
-import 'package:flixie_app/utils/activity_feed_ranking.dart';
+import 'package:flixie_app/core/utils/activity_feed_ranking.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Map<String, dynamic> _activityJson({
