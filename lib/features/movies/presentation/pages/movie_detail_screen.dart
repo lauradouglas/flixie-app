@@ -135,7 +135,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         movieService.getMovieCredits(id),
         movieService.getMovieWatchProviders(id, region),
         if (userId != null)
-          WatchlistActionsController.instance.getUserWatchProviders(userId)
+          WatchlistActionsController.instance
+              .getUserWatchProviders(userId)
               .catchError((_) => <WatchProvider>[])
         else
           Future.value(<WatchProvider>[]),
@@ -213,7 +214,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     if (!mounted) return;
     setState(() => _watchHistoryLoading = true);
     try {
-      final history = await WatchlistActionsController.instance.getMovieWatchHistory(userId, movieId);
+      final history = await WatchlistActionsController.instance
+          .getMovieWatchHistory(userId, movieId);
       if (mounted) {
         setState(() {
           _movieWatchHistory = history;
@@ -278,8 +280,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     setState(() => _listsContainingMovieLoading = true);
     try {
       final results = await Future.wait([
-        WatchlistActionsController.instance.getMyListsContainingMovie(userId, movieId),
-        WatchlistActionsController.instance.getFriendsListsContainingMovie(userId, movieId),
+        WatchlistActionsController.instance
+            .getMyListsContainingMovie(userId, movieId),
+        WatchlistActionsController.instance
+            .getFriendsListsContainingMovie(userId, movieId),
       ]);
       if (!mounted) return;
       setState(() {
@@ -310,8 +314,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
     try {
       final result = await (_inWatchlist
-          ? WatchlistActionsController.instance.removeFromWatchlist(user.id, movieId)
-          : WatchlistActionsController.instance.addToWatchlist(user.id, movieId));
+          ? WatchlistActionsController.instance
+              .removeFromWatchlist(user.id, movieId)
+          : WatchlistActionsController.instance
+              .addToWatchlist(user.id, movieId));
 
       // Successfully updated on server, toggle UI state and update user list
       if (mounted) {
@@ -359,8 +365,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               ),
             );
             if (markWatched == true && mounted) {
-              final watchedResult =
-                  await WatchlistActionsController.instance.addToWatched(user.id, movieId);
+              final watchedResult = await WatchlistActionsController.instance
+                  .addToWatched(user.id, movieId);
               final updatedWatched =
                   List<WatchedMovie>.from(user.watchedMovies ?? []);
               updatedWatched.removeWhere((item) => item.movieId == movieId);
@@ -406,7 +412,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     setState(() => _currentlyUpdating = ListUpdateType.watched);
 
     try {
-      await WatchlistActionsController.instance.removeFromWatched(user.id, movieId);
+      await WatchlistActionsController.instance
+          .removeFromWatched(user.id, movieId);
 
       // Successfully updated on server, toggle UI state and update user list
       if (mounted) {
@@ -444,10 +451,12 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     try {
       final FavoriteMovie? addedFavorite;
       if (_isFavorite) {
-        await WatchlistActionsController.instance.removeFromFavorites(user.id, movieId);
+        await WatchlistActionsController.instance
+            .removeFromFavorites(user.id, movieId);
         addedFavorite = null;
       } else {
-        addedFavorite = await WatchlistActionsController.instance.addToFavorites(user.id, movieId);
+        addedFavorite = await WatchlistActionsController.instance
+            .addToFavorites(user.id, movieId);
       }
 
       // Successfully updated on server, toggle UI state and update user list
@@ -540,8 +549,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               );
               // Also mark the movie as watched in the main watched list and
               // update local user state, then offer to remove from watchlist.
-              final watchedResult =
-                  await WatchlistActionsController.instance.addToWatched(userId, movieId);
+              final watchedResult = await WatchlistActionsController.instance
+                  .addToWatched(userId, movieId);
               final user = authProvider.dbUser;
               final updatedWatched =
                   List<WatchedMovie>.from(user?.watchedMovies ?? []);
@@ -580,7 +589,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   ),
                 );
                 if (remove == true && mounted) {
-                  await WatchlistActionsController.instance.removeFromWatchlist(userId, movieId);
+                  await WatchlistActionsController.instance
+                      .removeFromWatchlist(userId, movieId);
                   final updatedWatchlist =
                       (authProvider.dbUser?.movieWatchlist ?? [])
                           .where((item) => item.movieId != movieId)
@@ -637,7 +647,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final movieId = int.tryParse(widget.movieId);
     if (userId == null || movieId == null) return;
     try {
-      await WatchlistActionsController.instance.deleteMovieWatch(userId, entry.id);
+      await WatchlistActionsController.instance
+          .deleteMovieWatch(userId, entry.id);
       await _loadWatchHistory(userId, movieId);
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -1985,7 +1996,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                     height: 1, thickness: 1, color: FlixieColors.tabBarBorder),
                 itemBuilder: (_, index) {
                   final f = watchedFriends[index];
-                  final name = f.displayName ?? f.username;
+                  final name = f.username;
                   final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
                   return ListTile(
                     contentPadding: const EdgeInsets.symmetric(vertical: 6),

@@ -7,6 +7,7 @@ class ProfileHeader extends StatelessWidget {
   const ProfileHeader({
     super.key,
     required this.displayName,
+    required this.username,
     required this.email,
     this.photoUrl,
     this.bio,
@@ -14,6 +15,7 @@ class ProfileHeader extends StatelessWidget {
   });
 
   final String displayName;
+  final String username;
   final String email;
   final String? photoUrl;
   final String? bio;
@@ -35,7 +37,7 @@ class ProfileHeader extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (_) => EditProfileSheet(
-        currentUsername: displayName,
+        currentUsername: username,
         currentBio: bio,
       ),
     );
@@ -112,8 +114,7 @@ class ProfileHeader extends StatelessWidget {
                       photoUrl != null ? NetworkImage(photoUrl!) : null,
                   child: photoUrl == null
                       ? Icon(Icons.person,
-                          size: 48,
-                          color: Colors.white.withValues(alpha: 0.70))
+                          size: 48, color: Colors.white.withValues(alpha: 0.70))
                       : null,
                 ),
               ),

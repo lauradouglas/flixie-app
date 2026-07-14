@@ -88,10 +88,9 @@ class ChatService {
     for (final doc in snap.docs) {
       final data = doc.data();
       final userId = data['userId'] as String? ?? doc.id;
-      final username = data['username'] as String? ??
-          data['firstName'] as String? ??
-          data['displayName'] as String?;
-      if (username != null) map[userId] = username;
+      final username = data['username'] as String?;
+      map[userId] =
+          username?.trim().isNotEmpty == true ? username!.trim() : userId;
     }
     logger.d('[ChatService] userId→username map: $map');
     return map;

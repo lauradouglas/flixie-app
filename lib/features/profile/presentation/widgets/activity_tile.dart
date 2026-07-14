@@ -69,8 +69,6 @@ class ActivityTile extends StatelessWidget {
   String _displayName() {
     final username = item.username.trim();
     if (username.isNotEmpty) return username;
-    final firstName = item.firstName.trim();
-    if (firstName.isNotEmpty) return firstName;
     return 'Friend';
   }
 

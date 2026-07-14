@@ -219,8 +219,7 @@ class _CreateGroupSheetState extends State<CreateGroupSheet> {
   Widget _buildInviteStep(ScrollController scrollController) {
     final query = _searchController.text.toLowerCase();
     final filtered = _friends.where((f) {
-      return f.username.toLowerCase().contains(query) ||
-          (f.firstName?.toLowerCase().contains(query) ?? false);
+      return f.username.toLowerCase().contains(query);
     }).toList();
 
     return Column(
@@ -319,11 +318,6 @@ class _CreateGroupSheetState extends State<CreateGroupSheet> {
                           title: Text(friend.username,
                               style:
                                   const TextStyle(color: FlixieColors.light)),
-                          subtitle: friend.firstName != null
-                              ? Text(friend.firstName!,
-                                  style: const TextStyle(
-                                      color: FlixieColors.medium, fontSize: 12))
-                              : null,
                           activeColor: FlixieColors.primary,
                           checkColor: Colors.black,
                           secondary: CircleAvatar(

@@ -258,9 +258,7 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
     final filteredFriends = query.isEmpty
         ? friends
         : friends
-            .where((friend) =>
-                friend.username.toLowerCase().contains(query) ||
-                (friend.firstName ?? '').toLowerCase().contains(query))
+            .where((friend) => friend.username.toLowerCase().contains(query))
             .toList();
     final authUser = context.read<AuthProvider>().dbUser;
     final myWatchlistIds =
@@ -438,9 +436,7 @@ class _FriendStoryStrip extends StatelessWidget {
                 SizedBox(
                   width: 48,
                   child: Text(
-                    friend.firstName?.isNotEmpty == true
-                        ? friend.firstName!
-                        : friend.username,
+                    friend.username,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
@@ -2014,8 +2010,7 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
   Widget _buildInviteStep(ScrollController scrollController) {
     final query = _searchController.text.toLowerCase();
     final filtered = _friends.where((f) {
-      return f.username.toLowerCase().contains(query) ||
-          (f.firstName?.toLowerCase().contains(query) ?? false);
+      return f.username.toLowerCase().contains(query);
     }).toList();
 
     return Column(
@@ -2114,11 +2109,6 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
                           title: Text(friend.username,
                               style:
                                   const TextStyle(color: FlixieColors.light)),
-                          subtitle: friend.firstName != null
-                              ? Text(friend.firstName!,
-                                  style: const TextStyle(
-                                      color: FlixieColors.medium, fontSize: 12))
-                              : null,
                           activeColor: FlixieColors.primary,
                           checkColor: Colors.black,
                           secondary: CircleAvatar(

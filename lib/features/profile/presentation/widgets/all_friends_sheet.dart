@@ -357,15 +357,6 @@ class _PendingRequestTile extends StatelessWidget {
                     style: const TextStyle(color: FlixieColors.light),
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (user.firstName != null)
-                    Text(
-                      '${user.firstName}'.trim(),
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: FlixieColors.light.withValues(alpha: 0.6),
-                        fontSize: 12,
-                      ),
-                    ),
                   const Text(
                     'Wants to be your friend',
                     overflow: TextOverflow.ellipsis,

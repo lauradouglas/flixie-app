@@ -693,8 +693,7 @@ class _InviteMembersSheetState extends State<_InviteMembersSheet> {
   Widget build(BuildContext context) {
     final query = _search.text.toLowerCase();
     final filtered = _friends.where((f) {
-      return f.username.toLowerCase().contains(query) ||
-          (f.firstName?.toLowerCase().contains(query) ?? false);
+      return f.username.toLowerCase().contains(query);
     }).toList();
 
     return DraggableScrollableSheet(
@@ -806,14 +805,6 @@ class _InviteMembersSheetState extends State<_InviteMembersSheet> {
                               friend.username,
                               style: const TextStyle(color: FlixieColors.light),
                             ),
-                            subtitle: friend.firstName != null
-                                ? Text(
-                                    friend.firstName!,
-                                    style: const TextStyle(
-                                        color: FlixieColors.medium,
-                                        fontSize: 12),
-                                  )
-                                : null,
                             activeColor: FlixieColors.primary,
                             checkColor: Colors.black,
                             secondary: CircleAvatar(

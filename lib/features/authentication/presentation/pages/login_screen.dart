@@ -71,7 +71,6 @@ class _LoginScreenState extends State<LoginScreen> {
         textAlign: TextAlign.center,
       ),
       subtitle: 'Sign in to continue to your account',
-      onBack: () => Navigator.of(context).maybePop(),
       cardChild: Form(
         key: _formKey,
         child: Column(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:flixie_app/core/auth/auth_provider.dart';
+import 'package:flixie_app/core/api/api_client.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
@@ -71,6 +72,16 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
 
       auth.updateDbUser(updated);
       if (mounted) Navigator.of(context).pop();
+    } on ApiException catch (e) {
+      logger.e('[EditProfileSheet] save error: $e');
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+          _errorMessage = e.code == 'USERNAME_NOT_AVAILABLE'
+              ? e.message
+              : 'Failed to save changes. Please try again.';
+        });
+      }
     } catch (e) {
       logger.e('[EditProfileSheet] save error: $e');
       if (mounted) {

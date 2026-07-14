@@ -51,7 +51,8 @@ class GroupMember {
     };
   }
 
-  String get displayName => username ?? firstName ?? memberId;
+  String get displayName =>
+      username?.trim().isNotEmpty == true ? username!.trim() : memberId;
 
   bool get isOwner => role == 'OWNER';
   bool get isAdmin => role == 'ADMIN';

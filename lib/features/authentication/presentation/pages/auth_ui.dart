@@ -117,11 +117,13 @@ class AuthScaffold extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: _AuthBackButton(onPressed: onBack),
-                              ),
-                              const SizedBox(height: 20),
+                              if (onBack != null) ...[
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: _AuthBackButton(onPressed: onBack),
+                                ),
+                                const SizedBox(height: 20),
+                              ],
                               Text(
                                 topLabel,
                                 style: textTheme.headlineSmall?.copyWith(
@@ -728,8 +730,8 @@ class MovieSelectionCard extends StatelessWidget {
             child: movie.poster == null
                 ? Container(
                     color: FlixieColors.surfaceElevated,
-                    child:
-                        const Icon(Icons.movie_outlined, color: FlixieColors.light),
+                    child: const Icon(Icons.movie_outlined,
+                        color: FlixieColors.light),
                   )
                 : CachedNetworkImage(
                     imageUrl: '$posterBaseUrl${movie.poster}',
@@ -840,8 +842,8 @@ class _MovieSearchSheetState extends State<MovieSearchSheet> {
                         return ListTile(
                           title: Text(
                             movie.name,
-                            style:
-                                const TextStyle(color: FlixieColors.textPrimary),
+                            style: const TextStyle(
+                                color: FlixieColors.textPrimary),
                           ),
                           onTap: () => Navigator.of(context).pop(movie),
                         );
@@ -982,9 +984,9 @@ class _AuthBackground extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF031B33),
-            Color(0xFF08284A),
-            Color(0xFF031628),
+            Color(0xFF170B32),
+            Color(0xFF28104D),
+            Color(0xFF120821),
           ],
         ),
       ),
@@ -1003,7 +1005,7 @@ class _AuthBackground extends StatelessWidget {
             top: 180,
             left: -110,
             child: _buildGlow(
-              color: const Color(0xFF1B3B66).withValues(alpha: 0.34),
+              color: const Color(0xFF6D35A8).withValues(alpha: 0.30),
               size: 280,
             ),
           ),

@@ -35,6 +35,7 @@ class _SignupScreenState extends State<SignupScreen> {
   Timer? _usernameDebounce;
   bool _checkingUsername = false;
   bool? _usernameAvailable;
+  String? _usernameCheckError;
 
   List<Country> _countries = [];
   Country? _selectedCountry;
@@ -89,6 +90,7 @@ class _SignupScreenState extends State<SignupScreen> {
         setState(() {
           _checkingUsername = false;
           _usernameAvailable = null;
+          _usernameCheckError = null;
         });
       }
       return;
@@ -97,6 +99,7 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() {
       _checkingUsername = true;
       _usernameAvailable = null;
+      _usernameCheckError = null;
     });
 
     try {
@@ -105,6 +108,7 @@ class _SignupScreenState extends State<SignupScreen> {
       setState(() {
         _checkingUsername = false;
         _usernameAvailable = !exists;
+        _usernameCheckError = null;
       });
     } catch (error) {
       logger.e('Username check failed: $error');
@@ -112,13 +116,18 @@ class _SignupScreenState extends State<SignupScreen> {
       setState(() {
         _checkingUsername = false;
         _usernameAvailable = null;
+        _usernameCheckError =
+            'Unable to check usernames right now. Please try again.';
       });
     }
   }
 
   void _onUsernameChanged(String _) {
     _usernameDebounce?.cancel();
-    setState(() => _usernameAvailable = null);
+    setState(() {
+      _usernameAvailable = null;
+      _usernameCheckError = null;
+    });
     _usernameDebounce = Timer(_usernameDebounceDuration, () {
       _checkUsernameAvailability();
     });
@@ -127,18 +136,19 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Always revalidate immediately before creating the Firebase account.
+    // The earlier debounced result is only UI feedback and may be stale.
+    await _checkUsernameAvailability();
+    if (!mounted) return;
     if (_usernameAvailable != true) {
-      await _checkUsernameAvailability();
-      if (!mounted) return;
-      if (_usernameAvailable != true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please choose an available username.'),
-            backgroundColor: FlixieColors.danger,
-          ),
-        );
-        return;
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              _usernameCheckError ?? 'Please choose an available username.'),
+          backgroundColor: FlixieColors.danger,
+        ),
+      );
+      return;
     }
 
     final auth = context.read<AuthProvider>();
@@ -152,6 +162,10 @@ class _SignupScreenState extends State<SignupScreen> {
     );
 
     if (!mounted || success) return;
+    if (auth.errorCode == 'USERNAME_NOT_AVAILABLE' ||
+        auth.errorCode == 'VALIDATION_ERROR') {
+      setState(() => _usernameCheckError = auth.errorMessage);
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(auth.errorMessage ?? 'Sign up failed.'),
@@ -267,6 +281,19 @@ class _SignupScreenState extends State<SignupScreen> {
                 return null;
               },
             ),
+            if (_usernameCheckError != null) ...[
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  _usernameCheckError!,
+                  style: const TextStyle(
+                    color: FlixieColors.danger,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 14),
             AppTextField(
               controller: _emailController,

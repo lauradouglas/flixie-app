@@ -26,6 +26,9 @@ import 'package:flixie_app/core/utils/app_logger.dart';
 /// Auth states that the UI can observe.
 enum AuthStatus { unknown, authenticated, unauthenticated }
 
+typedef BackendProfileCreator = Future<models.User> Function(
+    Map<String, dynamic> body);
+
 /// Exposes Firebase auth state to the widget tree via [ChangeNotifier].
 ///
 /// Screens can read [status], [firebaseUser], [dbUser], [isLoading] and [errorMessage] and call
@@ -38,8 +41,12 @@ class AuthProvider extends ChangeNotifier {
     this._authService,
     MovieService movieService, {
     AuthPrefetchCoordinator? prefetchCoordinator,
-  }) : _prefetchCoordinator = prefetchCoordinator ??
-            AuthPrefetchCoordinator(movieService: movieService) {
+    BackendProfileCreator? profileCreator,
+    bool prefetchAfterAuth = true,
+  })  : _prefetchCoordinator = prefetchCoordinator ??
+            AuthPrefetchCoordinator(movieService: movieService),
+        _profileCreator = profileCreator ?? UserService.createUser {
+    _prefetchAfterAuth = prefetchAfterAuth;
     _authStateSubscription = _authService.authStateChanges.listen((user) {
       unawaited(_onAuthStateChanged(user));
     });
@@ -47,6 +54,8 @@ class AuthProvider extends ChangeNotifier {
 
   final AuthService _authService;
   final AuthPrefetchCoordinator _prefetchCoordinator;
+  final BackendProfileCreator _profileCreator;
+  late final bool _prefetchAfterAuth;
   final AuthNotificationPoller _notificationPoller = AuthNotificationPoller();
   final _authStatusNotifier = _AuthStatusNotifier();
   StreamSubscription<firebase_auth.User?>? _authStateSubscription;
@@ -56,6 +65,7 @@ class AuthProvider extends ChangeNotifier {
   models.User? _dbUser;
   bool _isLoading = false;
   String? _errorMessage;
+  String? _errorCode;
   int _activityVersion = 0;
 
   // Prefetched at login — screens use these to skip spinners
@@ -82,6 +92,7 @@ class AuthProvider extends ChangeNotifier {
   models.User? get dbUser => _dbUser;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  String? get errorCode => _errorCode;
   bool get isAuthenticated => _status == AuthStatus.authenticated;
   int get activityVersion => _activityVersion;
 
@@ -132,6 +143,8 @@ class AuthProvider extends ChangeNotifier {
   // Flag set during sign-up to prevent _onAuthStateChanged from running
   // getUserByExternalId before the DB user has been created.
   bool _isSigningUp = false;
+  Map<String, dynamic>? _pendingSignupProfile;
+  String? _pendingSignupEmail;
   bool _isHandlingAuthState = false;
   Future<void>? _authStateChangeFuture;
 
@@ -377,6 +390,7 @@ class AuthProvider extends ChangeNotifier {
 
   void _setError(String? message) {
     _errorMessage = message;
+    if (message == null) _errorCode = null;
     notifyListeners();
   }
 
@@ -451,16 +465,8 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Creates a new account. Returns `true` on success.
-  ///
-  /// Creates the Firebase user first, then registers the user in the backend
-  /// database. If the database call fails, the Firebase account is deleted so
-  /// no orphaned credential is left behind.
-  /// Creates a new account. Returns `true` on success.
-  ///
-  /// Creates the Firebase user first, then registers the user in the backend
-  /// database. If the database call fails, the Firebase account is deleted so
-  /// no orphaned credential is left behind.
+  /// Creates Firebase identity once, then creates (or retries) the backend
+  /// profile using the authenticated Firebase token.
   Future<bool> signUp({
     required String email,
     required String password,
@@ -471,43 +477,50 @@ class AuthProvider extends ChangeNotifier {
     int? countryId,
     List<int> genreIds = const [],
   }) async {
+    if (_isLoading) return false;
     _setLoading(true);
     _setError(null);
     _isSigningUp = true;
-    firebase_auth.UserCredential? credential;
     bool succeeded = false;
     try {
-      final displayName = '${firstName.trim()} ${lastName.trim()}';
-      credential = await _authService.signUp(email, password, displayName);
-
-      final uid = credential.user!.uid;
-
-      // Register in the backend database.
+      final normalizedEmail = email.trim();
       final createUserBody = <String, dynamic>{
-        'externalId': uid,
         'firstName': firstName.trim(),
         'lastName': lastName.trim(),
-        'email': email.trim(),
         'username': username.trim(),
+        'email': normalizedEmail,
         'bio': '',
+        'countryId': countryId,
+        'languageId': languageId,
       };
-      if (languageId != null) {
-        createUserBody['languageId'] = languageId;
-      }
-      if (countryId != null) {
-        createUserBody['countryId'] = countryId;
+
+      final canRetryProfile = _pendingSignupProfile != null &&
+          _pendingSignupEmail == normalizedEmail &&
+          _authService.currentUser != null;
+
+      if (!canRetryProfile) {
+        final displayName = '${firstName.trim()} ${lastName.trim()}';
+        await _authService.signUp(normalizedEmail, password, displayName);
+        _pendingSignupEmail = normalizedEmail;
+        _pendingSignupProfile = createUserBody;
+      } else {
+        _pendingSignupProfile = createUserBody;
       }
 
-      _dbUser = await UserService.createUser(createUserBody);
+      _firebaseUser = _authService.currentUser;
+      _dbUser = await _createBackendProfileWithAuthRetry(
+        _pendingSignupProfile ?? createUserBody,
+      );
+      _pendingSignupEmail = null;
+      _pendingSignupProfile = null;
 
       // Save favourite genres if any were selected
       if (genreIds.isNotEmpty && _dbUser?.id != null) {
         await UserService.addFavoriteGenres(_dbUser!.id, genreIds);
       }
 
-      _firebaseUser = credential.user;
       _status = AuthStatus.authenticated;
-      if (_dbUser?.id != null) {
+      if (_prefetchAfterAuth && _dbUser?.id != null) {
         _prefetch(_dbUser!.id); // region defaults to 'US' for new sign-ups
       }
       // Defer router notification so GoRouter navigates *after* the current
@@ -519,18 +532,19 @@ class AuthProvider extends ChangeNotifier {
       });
       succeeded = true;
       return true;
+    } on ApiException catch (e) {
+      logger.e('Backend rejected sign-up: $e');
+      _errorCode = e.code;
+      _errorMessage = _signupApiErrorMessage(e);
+      return false;
     } on firebase_auth.FirebaseAuthException catch (e) {
       _errorMessage = AuthService.messageFromAuthException(e);
       return false;
     } catch (e) {
       logger.e('Error during sign-up: $e');
-      _errorMessage = 'Failed to create account. Please try again.';
-      // Roll back the Firebase account so the user can try again.
-      try {
-        await credential?.user?.delete();
-      } catch (deleteError) {
-        logger.e('Failed to roll back Firebase account: $deleteError');
-      }
+      _errorMessage = _pendingSignupProfile != null
+          ? 'Your account was created, but your Flixie profile could not be saved. Please try again.'
+          : 'Failed to create account. Please try again.';
       return false;
     } finally {
       _isSigningUp = false;
@@ -544,6 +558,40 @@ class AuthProvider extends ChangeNotifier {
         // On failure, notify immediately so the error state is visible.
         _setLoading(false);
       }
+    }
+  }
+
+  Future<models.User> _createBackendProfileWithAuthRetry(
+      Map<String, dynamic> body) async {
+    try {
+      return await _profileCreator(body);
+    } on ApiException catch (error) {
+      if (error.statusCode != 401) rethrow;
+      try {
+        await _authService.refreshIdToken();
+      } catch (_) {
+        throw const ApiException(
+          statusCode: 401,
+          message: 'Your session expired. Please sign in again.',
+        );
+      }
+      return _profileCreator(body);
+    }
+  }
+
+  String _signupApiErrorMessage(ApiException error) {
+    switch (error.code) {
+      case 'USERNAME_NOT_AVAILABLE':
+      case 'VALIDATION_ERROR':
+        return error.message;
+      case 'USER_ALREADY_EXISTS':
+        return 'This Firebase account already has a Flixie profile.';
+      case 'VERIFIED_EMAIL_REQUIRED':
+        return 'A verified email address is required to create your profile.';
+      default:
+        return error.statusCode == 401
+            ? 'Your session expired. Please sign in again.'
+            : 'Your account was created, but your Flixie profile could not be saved. Please try again.';
     }
   }
 

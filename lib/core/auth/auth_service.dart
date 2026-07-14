@@ -39,7 +39,7 @@ class AuthService {
   /// Creates a new account with [email] and [password], then sets [displayName].
   ///
   /// Throws a [FirebaseAuthException] on failure.
-  Future<UserCredential> signUp(
+  Future<String> signUp(
     String email,
     String password,
     String displayName,
@@ -50,14 +50,27 @@ class AuthService {
     );
     await credential.user?.updateDisplayName(displayName.trim());
 
-    // Get the ID token and set it in ApiClient
-    final idToken = await credential.user?.getIdToken();
-    if (idToken != null) {
-      apiLogger.d('Got Firebase ID token after signup, setting in ApiClient');
-      ApiClient.setToken(idToken);
+    final idToken = await credential.user?.getIdToken(true);
+    if (idToken == null) {
+      throw FirebaseAuthException(code: 'missing-id-token');
     }
+    apiLogger.d('Got fresh Firebase ID token after signup');
+    ApiClient.setToken(idToken);
+    return idToken;
+  }
 
-    return credential;
+  /// Forces Firebase to refresh the current user's ID token for an API retry.
+  Future<String> refreshIdToken() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw FirebaseAuthException(code: 'no-current-user');
+    }
+    final token = await user.getIdToken(true);
+    if (token == null) {
+      throw FirebaseAuthException(code: 'missing-id-token');
+    }
+    ApiClient.setToken(token);
+    return token;
   }
 
   /// Signs out the current user.

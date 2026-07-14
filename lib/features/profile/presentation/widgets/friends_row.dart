@@ -190,9 +190,7 @@ class _FriendPreviewCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            user.firstName?.isNotEmpty == true
-                ? user.firstName!
-                : user.username,
+            user.username,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(

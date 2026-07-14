@@ -5,17 +5,23 @@ import 'package:flixie_app/core/utils/app_logger.dart';
 class ApiException implements Exception {
   final int statusCode;
   final String message;
+  final String? code;
 
-  const ApiException({required this.statusCode, required this.message});
+  const ApiException({
+    required this.statusCode,
+    required this.message,
+    this.code,
+  });
 
   @override
-  String toString() => 'ApiException($statusCode): $message';
+  String toString() =>
+      'ApiException($statusCode${code == null ? '' : ', $code'}): $message';
 }
 
 class ApiClient {
   // static const String baseUrl = String.fromEnvironment(
   //   'API_BASE_URL',
-  //   defaultValue: 'http://192.168.1.203:3000',
+  //   defaultValue: 'http://192.168.68.114:3000',
   // );
 
   static const String baseUrl = String.fromEnvironment(
@@ -39,11 +45,11 @@ class ApiClient {
 
   static String? getToken() => _token;
 
-  static Map<String, String> _headers() {
+  static Map<String, String> _headers({bool includeAuth = true}) {
     final headers = <String, String>{
       'Content-Type': 'application/json',
     };
-    if (_token != null) {
+    if (includeAuth && _token != null) {
       headers['Authorization'] = 'Bearer $_token';
     }
     return headers;
@@ -60,31 +66,47 @@ class ApiClient {
   static dynamic _parseResponse(http.Response response) {
     if (response.statusCode >= 400) {
       String message;
+      String? code;
       try {
         final decoded = jsonDecode(response.body);
-        message = decoded['message'] as String? ?? response.body;
+        if (decoded is Map<String, dynamic>) {
+          message = decoded['error'] as String? ??
+              decoded['message'] as String? ??
+              response.body;
+          code = decoded['code'] as String?;
+        } else {
+          message = response.body;
+        }
       } catch (_) {
         message = response.body;
       }
       apiLogger.e('Error ${response.statusCode}: $message');
-      throw ApiException(statusCode: response.statusCode, message: message);
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: message,
+        code: code,
+      );
     }
     if (response.body.isEmpty) return null;
     return jsonDecode(response.body);
   }
 
-  static Future<dynamic> get(String path,
-      {Map<String, String>? queryParams}) async {
+  static Future<dynamic> get(
+    String path, {
+    Map<String, String>? queryParams,
+    bool authenticated = true,
+  }) async {
     final uri = _buildUri(path, queryParams: queryParams);
     apiLogger.d('GET $uri');
     // Redact Authorization header from logs
-    final headersForLog = Map<String, String>.from(_headers());
+    final headers = _headers(includeAuth: authenticated);
+    final headersForLog = Map<String, String>.from(headers);
     if (headersForLog.containsKey('Authorization')) {
       headersForLog['Authorization'] = '[REDACTED]';
     }
     apiLogger.d('Headers: $headersForLog');
 
-    final response = await http.get(uri, headers: _headers()).timeout(_timeout);
+    final response = await http.get(uri, headers: headers).timeout(_timeout);
 
     apiLogger.d('Response ${response.statusCode}');
 

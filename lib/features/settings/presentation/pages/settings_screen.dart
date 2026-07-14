@@ -7,6 +7,7 @@ import 'package:flixie_app/models/country.dart';
 import 'package:flixie_app/models/user.dart' as user_model;
 import 'package:flixie_app/features/settings/presentation/controllers/settings_controller.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
+import 'package:flixie_app/core/api/api_client.dart';
 import 'package:flixie_app/features/settings/data/reference_data_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
@@ -445,13 +446,21 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
         content: Text('Profile updated'),
         backgroundColor: FlixieColors.success,
       ));
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      messenger.showSnackBar(SnackBar(
+        content: Text(error.code == 'USERNAME_NOT_AVAILABLE'
+            ? error.message
+            : 'Failed to update profile. Please try again.'),
+        backgroundColor: FlixieColors.danger,
+      ));
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
       messenger.showSnackBar(const SnackBar(
-        content: Text('Failed to update profile. Please try again.'),
-        backgroundColor: FlixieColors.danger,
-      ));
+          content: Text('Failed to update profile. Please try again.'),
+          backgroundColor: FlixieColors.danger));
     }
   }
 

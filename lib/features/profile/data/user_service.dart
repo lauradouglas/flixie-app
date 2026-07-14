@@ -96,7 +96,16 @@ class UserService {
   }
 
   static Future<User> createUser(Map<String, dynamic> body) async {
-    final data = await ApiClient.post('/users', body: body);
+    final profileBody = <String, dynamic>{
+      'firstName': body['firstName'],
+      'lastName': body['lastName'],
+      'username': body['username'],
+      'email': body['email'],
+      'bio': body['bio'] ?? '',
+      'countryId': body['countryId'],
+      'languageId': body['languageId'],
+    };
+    final data = await ApiClient.post('/users/', body: profileBody);
     return User.fromJson(data as Map<String, dynamic>);
   }
 
@@ -106,7 +115,8 @@ class UserService {
   }
 
   static Future<User> getUserByUsername(String username) async {
-    final data = await ApiClient.get('/users/username/$username');
+    final encodedUsername = Uri.encodeComponent(username);
+    final data = await ApiClient.get('/users/username/$encodedUsername');
     return User.fromJson(data as Map<String, dynamic>);
   }
 
@@ -134,14 +144,20 @@ class UserService {
   }
 
   static Future<bool> usernameExists(String username) async {
-    final data = await ApiClient.get('/utils/$username/exists');
+    final data = await ApiClient.get(
+      usernameAvailabilityPath(username),
+      authenticated: false,
+    );
     return data as bool;
   }
 
-  /// Updates a single field on the user via POST /users/:userId
+  static String usernameAvailabilityPath(String username) =>
+      '/users/${Uri.encodeComponent(username)}/exists';
+
+  /// Updates a single field on the user via PUT /users/:userId.
   static Future<User> updateUserField(
       String userId, String field, dynamic value) async {
-    final data = await ApiClient.post(
+    final data = await ApiClient.put(
       '/users/$userId',
       body: {field: value},
     );

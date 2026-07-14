@@ -214,8 +214,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final dbUser = auth.dbUser;
 
     // Prefer database user info, fallback to Firebase
-    final displayName =
-        dbUser?.username ?? firebaseUser?.displayName ?? 'Guest User';
+    final displayName = dbUser?.firstName?.trim().isNotEmpty == true
+        ? dbUser!.firstName!.trim()
+        : dbUser?.username ?? firebaseUser?.displayName ?? 'Guest User';
+    final username = dbUser?.username ?? firebaseUser?.displayName ?? '';
     final email = dbUser?.email ?? firebaseUser?.email ?? '';
     final bio = dbUser?.bio;
     final photoUrl = firebaseUser?.photoURL;
@@ -273,6 +275,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               // Avatar, name, bio & edit (full-width, no side padding)
               ProfileHeader(
                 displayName: displayName,
+                username: username,
                 email: email,
                 photoUrl: photoUrl,
                 bio: bio,

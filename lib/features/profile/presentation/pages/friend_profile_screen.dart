@@ -477,6 +477,9 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final profileName = _user?.firstName?.trim().isNotEmpty == true
+        ? _user!.firstName!.trim()
+        : _user?.username ?? 'Profile';
     final visibleReviews = _showAllReviews
         ? _reviews
         : _reviews.take(_initialReviewCount).toList();
@@ -489,7 +492,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_user?.username ?? 'Profile'),
+        title: Text(profileName),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
@@ -537,7 +540,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          _user?.username ?? '',
+                          profileName,
                           style: textTheme.headlineSmall,
                         ),
                         if (_user?.bio case final bioText
