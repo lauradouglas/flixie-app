@@ -1,5 +1,5 @@
 import 'package:flixie_app/models/watchlist_movie.dart';
-import 'package:flixie_app/screens/watchlist_screen.dart';
+import 'package:flixie_app/features/watchlist/presentation/pages/watchlist_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

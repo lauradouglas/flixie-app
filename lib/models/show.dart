@@ -1,4 +1,4 @@
-import 'watch_provider.dart';
+import 'package:flixie_app/models/watch_provider.dart';
 
 class TvShow {
   final int id;

@@ -5,15 +5,15 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import 'firebase_options.dart';
-import 'providers/auth_provider.dart';
-import 'router.dart';
-import 'services/auth_service.dart';
-import 'services/movie_cache_service.dart';
-import 'services/movie_service.dart';
-import 'services/push_notification_service.dart';
-import 'theme/app_theme.dart';
-import 'utils/app_logger.dart';
+import 'package:flixie_app/app/router/router.dart';
+import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/core/auth/auth_provider.dart';
+import 'package:flixie_app/core/auth/auth_service.dart';
+import 'package:flixie_app/core/auth/firebase_options.dart';
+import 'package:flixie_app/core/auth/push_notification_service.dart';
+import 'package:flixie_app/core/storage/movie_cache_service.dart';
+import 'package:flixie_app/core/utils/app_logger.dart';
+import 'package:flixie_app/features/movies/data/movie_service.dart';
 
 bool _hasFirebaseDartDefines(FirebaseOptions options) {
   return options.apiKey.isNotEmpty &&

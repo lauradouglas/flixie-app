@@ -1,5 +1,5 @@
 import 'package:flixie_app/models/activity_list_item.dart';
-import 'package:flixie_app/screens/profile/activity_tile.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

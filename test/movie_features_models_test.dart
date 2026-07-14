@@ -4,7 +4,7 @@ import 'package:flixie_app/models/movie_list.dart';
 import 'package:flixie_app/models/movie_list_movie.dart';
 import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'package:flixie_app/models/movie_wrapped.dart';
-import 'package:flixie_app/services/recommendation_service.dart';
+import 'package:flixie_app/features/home/data/recommendation_service.dart';
 
 void main() {
   group('MovieList', () {

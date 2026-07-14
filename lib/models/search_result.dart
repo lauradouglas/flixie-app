@@ -1,6 +1,6 @@
-import 'movie_short.dart';
-import 'person.dart';
-import 'show.dart';
+import 'package:flixie_app/models/movie_short.dart';
+import 'package:flixie_app/models/person.dart';
+import 'package:flixie_app/models/show.dart';
 
 class SearchResultItem {
   final bool isPerson;

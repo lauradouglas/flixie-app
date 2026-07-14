@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import 'review.dart';
+import 'package:flixie_app/models/review.dart';
 
 enum ActivityListType {
   movieWatchlist('watchlist-movie'),

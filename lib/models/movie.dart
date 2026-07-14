@@ -1,6 +1,6 @@
-import 'genre.dart';
-import 'movie_video.dart';
-import 'review.dart';
+import 'package:flixie_app/models/genre.dart';
+import 'package:flixie_app/models/movie_video.dart';
+import 'package:flixie_app/models/review.dart';
 
 class Movie {
   final int id;

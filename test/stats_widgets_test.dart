@@ -1,9 +1,9 @@
-import 'package:flixie_app/screens/stats/genre_bar.dart';
-import 'package:flixie_app/screens/stats/monthly_bar_chart.dart';
-import 'package:flixie_app/screens/stats/section_header.dart';
-import 'package:flixie_app/screens/stats/stat_card.dart';
-import 'package:flixie_app/screens/stats/stats_entry.dart';
-import 'package:flixie_app/screens/stats/year_breakdown.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/genre_bar.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/monthly_bar_chart.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/stats_section_header.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/stat_card.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/stats_entry.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/year_breakdown.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

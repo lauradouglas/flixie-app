@@ -1,4 +1,4 @@
-import 'user.dart';
+import 'package:flixie_app/models/user.dart';
 
 class Review {
   final String id;

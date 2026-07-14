@@ -1,7 +1,7 @@
-import '../utils/app_logger.dart';
-import 'favorite_movie.dart';
-import 'watched_movie.dart';
-import 'watchlist_movie.dart';
+import 'package:flixie_app/core/utils/app_logger.dart';
+import 'package:flixie_app/models/favorite_movie.dart';
+import 'package:flixie_app/models/watched_movie.dart';
+import 'package:flixie_app/models/watchlist_movie.dart';
 
 class User {
   final String id;
