@@ -18,7 +18,7 @@ import 'package:flixie_app/models/watched_movie.dart';
 import 'package:flixie_app/models/watchlist_movie.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/features/movies/data/movie_service.dart';
-import 'package:flixie_app/features/profile/data/user_service.dart';
+import 'package:flixie_app/features/watchlist/presentation/controllers/watchlist_actions_controller.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/models/friend_summary.dart';
@@ -135,7 +135,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         movieService.getMovieCredits(id),
         movieService.getMovieWatchProviders(id, region),
         if (userId != null)
-          UserService.getUserWatchProviders(userId)
+          WatchlistActionsController.instance.getUserWatchProviders(userId)
               .catchError((_) => <WatchProvider>[])
         else
           Future.value(<WatchProvider>[]),
@@ -213,7 +213,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     if (!mounted) return;
     setState(() => _watchHistoryLoading = true);
     try {
-      final history = await UserService.getMovieWatchHistory(userId, movieId);
+      final history = await WatchlistActionsController.instance.getMovieWatchHistory(userId, movieId);
       if (mounted) {
         setState(() {
           _movieWatchHistory = history;
@@ -278,8 +278,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     setState(() => _listsContainingMovieLoading = true);
     try {
       final results = await Future.wait([
-        UserService.getMyListsContainingMovie(userId, movieId),
-        UserService.getFriendsListsContainingMovie(userId, movieId),
+        WatchlistActionsController.instance.getMyListsContainingMovie(userId, movieId),
+        WatchlistActionsController.instance.getFriendsListsContainingMovie(userId, movieId),
       ]);
       if (!mounted) return;
       setState(() {
@@ -310,8 +310,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
     try {
       final result = await (_inWatchlist
-          ? UserService.removeFromWatchlist(user.id, movieId)
-          : UserService.addToWatchlist(user.id, movieId));
+          ? WatchlistActionsController.instance.removeFromWatchlist(user.id, movieId)
+          : WatchlistActionsController.instance.addToWatchlist(user.id, movieId));
 
       // Successfully updated on server, toggle UI state and update user list
       if (mounted) {
@@ -360,7 +360,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             );
             if (markWatched == true && mounted) {
               final watchedResult =
-                  await UserService.addToWatched(user.id, movieId);
+                  await WatchlistActionsController.instance.addToWatched(user.id, movieId);
               final updatedWatched =
                   List<WatchedMovie>.from(user.watchedMovies ?? []);
               updatedWatched.removeWhere((item) => item.movieId == movieId);
@@ -406,7 +406,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     setState(() => _currentlyUpdating = ListUpdateType.watched);
 
     try {
-      await UserService.removeFromWatched(user.id, movieId);
+      await WatchlistActionsController.instance.removeFromWatched(user.id, movieId);
 
       // Successfully updated on server, toggle UI state and update user list
       if (mounted) {
@@ -444,10 +444,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     try {
       final FavoriteMovie? addedFavorite;
       if (_isFavorite) {
-        await UserService.removeFromFavorites(user.id, movieId);
+        await WatchlistActionsController.instance.removeFromFavorites(user.id, movieId);
         addedFavorite = null;
       } else {
-        addedFavorite = await UserService.addToFavorites(user.id, movieId);
+        addedFavorite = await WatchlistActionsController.instance.addToFavorites(user.id, movieId);
       }
 
       // Successfully updated on server, toggle UI state and update user list
@@ -529,7 +529,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         }) async {
           try {
             if (entry == null) {
-              await UserService.logMovieWatch(
+              await WatchlistActionsController.instance.logMovieWatch(
                 userId,
                 LogMovieWatchRequest(
                   movieId: movieId,
@@ -541,7 +541,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               // Also mark the movie as watched in the main watched list and
               // update local user state, then offer to remove from watchlist.
               final watchedResult =
-                  await UserService.addToWatched(userId, movieId);
+                  await WatchlistActionsController.instance.addToWatched(userId, movieId);
               final user = authProvider.dbUser;
               final updatedWatched =
                   List<WatchedMovie>.from(user?.watchedMovies ?? []);
@@ -580,7 +580,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   ),
                 );
                 if (remove == true && mounted) {
-                  await UserService.removeFromWatchlist(userId, movieId);
+                  await WatchlistActionsController.instance.removeFromWatchlist(userId, movieId);
                   final updatedWatchlist =
                       (authProvider.dbUser?.movieWatchlist ?? [])
                           .where((item) => item.movieId != movieId)
@@ -592,7 +592,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 }
               }
             } else {
-              await UserService.updateMovieWatch(
+              await WatchlistActionsController.instance.updateMovieWatch(
                 userId,
                 entry.id,
                 UpdateMovieWatchRequest(
@@ -637,7 +637,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final movieId = int.tryParse(widget.movieId);
     if (userId == null || movieId == null) return;
     try {
-      await UserService.deleteMovieWatch(userId, entry.id);
+      await WatchlistActionsController.instance.deleteMovieWatch(userId, entry.id);
       await _loadWatchHistory(userId, movieId);
       if (mounted) {
         ScaffoldMessenger.of(context)

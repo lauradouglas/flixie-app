@@ -1,9 +1,11 @@
 import 'package:flixie_app/features/watchlist/data/watchlist_repository_impl.dart';
 import 'package:flixie_app/features/watchlist/data/watchlist_actions_usecase.dart';
+import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/models/favorite_movie.dart';
 import 'package:flixie_app/models/movie_friend_list_entry.dart';
 import 'package:flixie_app/models/movie_list.dart';
 import 'package:flixie_app/models/movie_watch_entry.dart';
+import 'package:flixie_app/models/watch_provider.dart';
 import 'package:flixie_app/models/watched_movie.dart';
 import 'package:flixie_app/models/watchlist_movie.dart';
 
@@ -33,4 +35,7 @@ class WatchlistActionsController {
   Future<List<MovieList>> getMyListsContainingMovie(String userId, int movieId) => _useCase.getMyListsContainingMovie(userId, movieId);
   Future<List<MovieFriendListEntry>> getFriendsListsContainingMovie(String userId, int movieId) =>
       _useCase.getFriendsListsContainingMovie(userId, movieId);
+
+  Future<List<WatchProvider>> getUserWatchProviders(String userId) =>
+      UserService.getUserWatchProviders(userId);
 }
