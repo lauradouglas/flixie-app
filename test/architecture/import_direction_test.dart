@@ -14,7 +14,7 @@ void main() {
 
     for (final path in targets) {
       final content = File(path).readAsStringSync();
-      final importLines = RegExp(r'^\s*import\s+[\'"].+[\'"];', multiLine: true)
+      final importLines = RegExp(r'^\s*import\s+[\'"].+['"]', multiLine: true)
           .allMatches(content)
           .map((m) => m.group(0) ?? '')
           .toList(growable: false);

@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  Widget _wrap(Widget child) {
+  Widget wrap(Widget child) {
     return MaterialApp(
       home: Scaffold(body: child),
     );
@@ -16,14 +16,14 @@ void main() {
 
   group('stats reusable widgets', () {
     testWidgets('SectionHeader renders uppercase title', (tester) async {
-      await tester.pumpWidget(_wrap(const SectionHeader(title: 'Top Genres')));
+      await tester.pumpWidget(wrap(const SectionHeader(title: 'Top Genres')));
 
       expect(find.text('TOP GENRES'), findsOneWidget);
     });
 
     testWidgets('StatsCard renders label, value, and subtitle', (tester) async {
       await tester.pumpWidget(
-        _wrap(
+        wrap(
           const Row(
             children: [
               StatsCard(
@@ -44,7 +44,7 @@ void main() {
 
     testWidgets('MonthlyBarChart shows counts and month labels', (tester) async {
       await tester.pumpWidget(
-        _wrap(
+        wrap(
           const MonthlyBarChart(
             buckets: [0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             maxValue: 3,
@@ -59,7 +59,7 @@ void main() {
 
     testWidgets('GenreBar renders rank, genre name and count', (tester) async {
       await tester.pumpWidget(
-        _wrap(
+        wrap(
           const GenreBar(rank: 1, name: 'Drama', count: 7, maxCount: 10),
         ),
       );
@@ -71,7 +71,7 @@ void main() {
 
     testWidgets('YearBreakdown aggregates yearly counts', (tester) async {
       await tester.pumpWidget(
-        _wrap(
+        wrap(
           YearBreakdown(
             years: const [2025, 2024],
             entries: [

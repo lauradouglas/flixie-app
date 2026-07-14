@@ -140,7 +140,7 @@ class WrappedGenreChips extends StatelessWidget {
         return Chip(
           label: Text('${g.name}  ${g.count}'),
           labelStyle: const TextStyle(color: FlixieColors.white, fontSize: 13),
-          backgroundColor: FlixieColors.primary.withOpacity(0.25),
+          backgroundColor: FlixieColors.primary.withValues(alpha: 0.25),
           side: const BorderSide(color: FlixieColors.primary),
           padding: const EdgeInsets.symmetric(horizontal: 4),
         );
@@ -209,7 +209,7 @@ class WrappedSummaryCard extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [Color(0xFF1A1040), Color(0xFF2A1B5E), Color(0xFF0D1B2A)],
         ),
-        border: Border.all(color: FlixieColors.primary.withOpacity(0.4)),
+        border: Border.all(color: FlixieColors.primary.withValues(alpha: 0.4)),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
@@ -232,10 +232,10 @@ class WrappedSummaryCard extends StatelessWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: FlixieColors.primary.withOpacity(0.3),
+                      color: FlixieColors.primary.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                          color: FlixieColors.primary.withOpacity(0.6)),
+                          color: FlixieColors.primary.withValues(alpha: 0.6)),
                     ),
                     child: Text(
                       '${card.year} Wrapped',
@@ -404,7 +404,7 @@ class _SummaryMovieRow extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: FlixieColors.primary.withOpacity(0.2),
+            color: FlixieColors.primary.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(

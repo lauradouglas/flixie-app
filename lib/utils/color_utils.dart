@@ -12,5 +12,5 @@ Color avatarColorFromIconColor(
   if (iconColor == null) return fallback;
   final hex = ((iconColor['hexCode'] ?? iconColor['hex']) as String? ?? '')
       .replaceAll('#', '');
-  return Color(int.tryParse('0xFF$hex') ?? fallback.value);
+  return Color(int.tryParse('0xFF$hex') ?? fallback.toARGB32());
 }

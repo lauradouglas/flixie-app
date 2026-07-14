@@ -76,8 +76,8 @@ class SettingsTile extends StatelessWidget {
           ),
         ),
         if (!isLast)
-          Padding(
-            padding: const EdgeInsets.only(left: _kDividerLeftInset),
+          const Padding(
+            padding: EdgeInsets.only(left: _kDividerLeftInset),
             child: Divider(
               height: 1,
               thickness: 0.5,

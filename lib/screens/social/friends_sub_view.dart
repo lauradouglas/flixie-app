@@ -14,7 +14,7 @@ import 'pending_friend_card.dart';
 import 'section_header.dart';
 
 class FriendsSubView extends StatefulWidget {
-  const FriendsSubView();
+  const FriendsSubView({super.key});
 
   @override
   State<FriendsSubView> createState() => _FriendsSubViewState();

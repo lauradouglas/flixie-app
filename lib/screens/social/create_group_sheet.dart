@@ -11,7 +11,7 @@ import '../../utils/app_logger.dart';
 import 'visibility_chip.dart';
 
 class CreateGroupSheet extends StatefulWidget {
-  const CreateGroupSheet({this.onCreated});
+  const CreateGroupSheet({super.key, this.onCreated});
 
   final void Function(Group)? onCreated;
 

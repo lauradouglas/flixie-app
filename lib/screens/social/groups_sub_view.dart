@@ -15,7 +15,7 @@ import 'invitation_card.dart';
 import 'section_header.dart';
 
 class GroupsSubView extends StatefulWidget {
-  const GroupsSubView();
+  const GroupsSubView({super.key});
 
   @override
   State<GroupsSubView> createState() => _GroupsSubViewState();

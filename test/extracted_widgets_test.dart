@@ -58,7 +58,7 @@ void main() {
   // ── FilmInfoCard ──────────────────────────────────────────────────────────
 
   group('FilmInfoCard', () {
-    const _movie = Movie(id: 1, title: 'Test Movie');
+    const movie = Movie(id: 1, title: 'Test Movie');
 
     testWidgets('renders nothing when all fields empty', (tester) async {
       await tester.pumpWidget(
@@ -67,7 +67,7 @@ void main() {
             director: null,
             writers: [],
             producers: [],
-            movie: _movie,
+            movie: movie,
           ),
         ),
       );
@@ -82,7 +82,7 @@ void main() {
             director: 'Christopher Nolan',
             writers: [],
             producers: [],
-            movie: _movie,
+            movie: movie,
           ),
         ),
       );
@@ -97,7 +97,7 @@ void main() {
             director: null,
             writers: ['Jane Doe'],
             producers: [],
-            movie: _movie,
+            movie: movie,
           ),
         ),
       );
@@ -113,7 +113,7 @@ void main() {
             director: null,
             writers: ['Jane Doe', 'John Smith'],
             producers: [],
-            movie: _movie,
+            movie: movie,
           ),
         ),
       );
