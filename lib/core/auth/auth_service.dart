@@ -123,7 +123,7 @@ class AuthService {
       case 'email-already-in-use':
         return 'An account already exists for that email.';
       case 'weak-password':
-        return 'Password must be at least 6 characters.';
+        return 'Password must be at least 8 characters and include uppercase, lowercase, a number, and a special character.';
       case 'invalid-email':
         return 'Please enter a valid email address.';
       case 'too-many-requests':

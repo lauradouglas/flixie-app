@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flixie_app/models/notification.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/color_utils.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 
 class NotificationActivityCard extends StatelessWidget {
   const NotificationActivityCard({
@@ -25,18 +26,6 @@ class NotificationActivityCard extends StatelessWidget {
         return FlixieColors.tertiary;
       default:
         return FlixieColors.secondary;
-    }
-  }
-
-  IconData get _icon {
-    switch (notification.type) {
-      case 'MOVIE_WATCH_REQUEST':
-      case 'SHOW_WATCH_REQUEST':
-        return Icons.play_circle_outline;
-      case 'ALERT':
-        return Icons.campaign_outlined;
-      default:
-        return Icons.notifications_outlined;
     }
   }
 
@@ -72,19 +61,11 @@ class NotificationActivityCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Avatar or icon
-          CircleAvatar(
-            radius: 22,
-            backgroundColor: avatarBg.withValues(alpha: 0.2),
-            child: initials.isNotEmpty
-                ? Text(
-                    initials,
-                    style: TextStyle(
-                      color: avatarBg,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  )
-                : Icon(_icon, color: avatarBg, size: 20),
+          ProfileAvatarView(
+            avatar: notification.senderAvatar,
+            fallbackText: initials.isNotEmpty ? initials : '!',
+            fallbackColor: avatarBg,
+            size: 44,
           ),
           const SizedBox(width: 12),
           // Content

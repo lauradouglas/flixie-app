@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:flixie_app/models/notification.dart';
@@ -533,19 +534,11 @@ class NotificationRequestCard extends StatelessWidget {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          CircleAvatar(
-                            radius: 17,
-                            backgroundColor: avatarBg.withValues(alpha: 0.2),
-                            child: initials.isNotEmpty
-                                ? Text(
-                                    initials,
-                                    style: TextStyle(
-                                      color: avatarBg,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                    ),
-                                  )
-                                : Icon(_typeIcon, color: avatarBg, size: 18),
+                          ProfileAvatarView(
+                            avatar: notification.senderAvatar,
+                            fallbackText: initials.isNotEmpty ? initials : '!',
+                            fallbackColor: avatarBg,
+                            size: 34,
                           ),
                           const SizedBox(width: 8),
                           Expanded(

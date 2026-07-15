@@ -280,6 +280,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 photoUrl: photoUrl,
                 bio: bio,
                 iconColor: dbUser?.iconColor,
+                avatar: dbUser?.avatar,
               ),
 
               Padding(

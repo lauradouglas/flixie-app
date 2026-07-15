@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/edit_profile_sheet.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/change_avatar_sheet.dart';
+import 'package:flixie_app/models/profile_avatar.dart';
 
 class ProfileHeader extends StatelessWidget {
   const ProfileHeader({
@@ -12,6 +15,7 @@ class ProfileHeader extends StatelessWidget {
     this.photoUrl,
     this.bio,
     this.iconColor,
+    this.avatar,
   });
 
   final String displayName;
@@ -20,6 +24,7 @@ class ProfileHeader extends StatelessWidget {
   final String? photoUrl;
   final String? bio;
   final Map<String, dynamic>? iconColor;
+  final ProfileAvatar? avatar;
 
   Color get _avatarColor {
     final hex = ((iconColor?['hexCode'] ?? iconColor?['hex']) as String? ?? '')
@@ -42,6 +47,17 @@ class ProfileHeader extends StatelessWidget {
       ),
     );
   }
+
+  void _openAvatarSheet(BuildContext context) => showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: FlixieColors.background,
+        builder: (_) => const FractionallySizedBox(
+          heightFactor: .9,
+          child: ChangeAvatarSheet(),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -107,15 +123,16 @@ class ProfileHeader extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: CircleAvatar(
-                  radius: 48,
-                  backgroundColor: color.withValues(alpha: 0.95),
-                  backgroundImage:
-                      photoUrl != null ? NetworkImage(photoUrl!) : null,
-                  child: photoUrl == null
-                      ? Icon(Icons.person,
-                          size: 48, color: Colors.white.withValues(alpha: 0.70))
-                      : null,
+                child: GestureDetector(
+                  onTap: () => _openAvatarSheet(context),
+                  child: ProfileAvatarView(
+                    avatar: avatar,
+                    fallbackText: displayName.isEmpty
+                        ? '?'
+                        : displayName[0].toUpperCase(),
+                    fallbackColor: color,
+                    size: 96,
+                  ),
                 ),
               ),
             ),

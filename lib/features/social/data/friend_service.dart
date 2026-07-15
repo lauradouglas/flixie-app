@@ -1,6 +1,7 @@
 import 'package:flixie_app/models/friend.dart';
 import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/models/activity_list_item.dart';
+import 'package:flixie_app/models/profile_avatar.dart';
 import 'package:flixie_app/core/utils/activity_feed_ranking.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 import 'package:flixie_app/features/social/data/request_service.dart';
@@ -48,9 +49,28 @@ class FriendService {
   static Future<List<ActivityListItem>> getFriendsActivityLists(
       String userId) async {
     final data = await ApiClient.get('/friends/$userId/activity-lists');
-    final activities = (data as List<dynamic>)
+    var activities = (data as List<dynamic>)
         .map((e) => ActivityListItem.fromJson(e as Map<String, dynamic>))
         .toList();
+
+    if (activities.any((activity) => activity.avatar == null)) {
+      try {
+        final friends = await getFriends(userId);
+        final avatarsByUserId = <String, ProfileAvatar?>{
+          for (final friendship in friends.friendships)
+            if (friendship.friendUser != null)
+              friendship.friendUser!.id: friendship.friendUser!.avatar,
+        };
+        activities = activities
+            .map((activity) => activity.avatar != null
+                ? activity
+                : activity.copyWith(avatar: avatarsByUserId[activity.userId]))
+            .toList();
+      } catch (_) {
+        // Activity remains usable with the initials fallback if friend
+        // enrichment is temporarily unavailable.
+      }
+    }
     return rankActivitiesForFeed(activities);
   }
 }

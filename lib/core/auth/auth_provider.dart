@@ -13,6 +13,7 @@ import 'package:flixie_app/models/review.dart';
 import 'package:flixie_app/models/user.dart' as models;
 import 'package:flixie_app/models/watched_movie.dart';
 import 'package:flixie_app/models/watchlist_movie.dart';
+import 'package:flixie_app/models/profile_avatar.dart';
 import 'package:flixie_app/core/auth/auth_notification_poller.dart';
 import 'package:flixie_app/core/auth/auth_prefetch_coordinator.dart';
 import 'package:flixie_app/core/auth/auth_prefetch_snapshot.dart';
@@ -21,6 +22,7 @@ import 'package:flixie_app/core/auth/auth_service.dart';
 import 'package:flixie_app/features/movies/data/movie_service.dart';
 import 'package:flixie_app/core/auth/push_notification_service.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
+import 'package:flixie_app/features/profile/data/avatar_service.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 
 /// Auth states that the UI can observe.
@@ -28,6 +30,7 @@ enum AuthStatus { unknown, authenticated, unauthenticated }
 
 typedef BackendProfileCreator = Future<models.User> Function(
     Map<String, dynamic> body);
+typedef AvatarSelector = Future<ProfileAvatar> Function(int avatarId);
 
 /// Exposes Firebase auth state to the widget tree via [ChangeNotifier].
 ///
@@ -43,10 +46,12 @@ class AuthProvider extends ChangeNotifier {
     AuthPrefetchCoordinator? prefetchCoordinator,
     BackendProfileCreator? profileCreator,
     bool prefetchAfterAuth = true,
+    AvatarSelector? avatarSelector,
   })  : _prefetchCoordinator = prefetchCoordinator ??
             AuthPrefetchCoordinator(movieService: movieService),
         _profileCreator = profileCreator ?? UserService.createUser {
     _prefetchAfterAuth = prefetchAfterAuth;
+    _avatarSelector = avatarSelector ?? AvatarService.selectAvatar;
     _authStateSubscription = _authService.authStateChanges.listen((user) {
       unawaited(_onAuthStateChanged(user));
     });
@@ -56,6 +61,7 @@ class AuthProvider extends ChangeNotifier {
   final AuthPrefetchCoordinator _prefetchCoordinator;
   final BackendProfileCreator _profileCreator;
   late final bool _prefetchAfterAuth;
+  late final AvatarSelector _avatarSelector;
   final AuthNotificationPoller _notificationPoller = AuthNotificationPoller();
   final _authStatusNotifier = _AuthStatusNotifier();
   StreamSubscription<firebase_auth.User?>? _authStateSubscription;
@@ -145,6 +151,7 @@ class AuthProvider extends ChangeNotifier {
   bool _isSigningUp = false;
   Map<String, dynamic>? _pendingSignupProfile;
   String? _pendingSignupEmail;
+  int? _pendingAvatarId;
   bool _isHandlingAuthState = false;
   Future<void>? _authStateChangeFuture;
 
@@ -558,6 +565,89 @@ class AuthProvider extends ChangeNotifier {
         // On failure, notify immediately so the error state is visible.
         _setLoading(false);
       }
+    }
+  }
+
+  Future<bool> beginAvatarSignUp({
+    required String email,
+    required String password,
+    required String firstName,
+    required String lastName,
+    required String username,
+    int? languageId,
+    int? countryId,
+  }) async {
+    if (_isLoading) return false;
+    _setLoading(true);
+    _setError(null);
+    _isSigningUp = true;
+    try {
+      final normalizedEmail = email.trim();
+      _pendingSignupProfile = {
+        'firstName': firstName.trim(),
+        'lastName': lastName.trim(),
+        'username': username.trim(),
+        'email': normalizedEmail,
+        'bio': '',
+        'countryId': countryId,
+        'languageId': languageId,
+      };
+      _pendingSignupEmail = normalizedEmail;
+      if (_authService.currentUser == null) {
+        await _authService.signUp(
+          normalizedEmail,
+          password,
+          '${firstName.trim()} ${lastName.trim()}',
+        );
+      }
+      _firebaseUser = _authService.currentUser;
+      return true;
+    } on firebase_auth.FirebaseAuthException catch (error) {
+      _pendingSignupProfile = null;
+      _pendingSignupEmail = null;
+      _errorMessage = AuthService.messageFromAuthException(error);
+      return false;
+    } finally {
+      _isSigningUp = false;
+      _setLoading(false);
+    }
+  }
+
+  Future<bool> completeAvatarSignUp(int avatarId) async {
+    if (_isLoading || _pendingSignupProfile == null) return false;
+    _setLoading(true);
+    _setError(null);
+    _isSigningUp = true;
+    _pendingAvatarId = avatarId;
+    try {
+      _dbUser ??= await _createBackendProfileWithAuthRetry(
+        _pendingSignupProfile!,
+      );
+      final avatar = await _avatarSelector(_pendingAvatarId!);
+      _dbUser = _dbUser!.copyWith(avatar: avatar);
+      _pendingSignupEmail = null;
+      _pendingSignupProfile = null;
+      _pendingAvatarId = null;
+      _status = AuthStatus.authenticated;
+      if (_prefetchAfterAuth) _prefetch(_dbUser!.id);
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        _authStatusNotifier.notify();
+        notifyListeners();
+      });
+      return true;
+    } on ApiException catch (error) {
+      _errorCode = error.code;
+      _errorMessage = _signupApiErrorMessage(error);
+      return false;
+    } catch (error) {
+      logger.e('Avatar signup completion failed: $error');
+      _errorMessage = _dbUser == null
+          ? 'Your Flixie profile could not be created. Please try again.'
+          : 'Your profile was created, but the avatar could not be assigned. Please retry.';
+      return false;
+    } finally {
+      _isSigningUp = false;
+      _setLoading(false);
     }
   }
 

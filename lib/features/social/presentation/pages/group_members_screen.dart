@@ -7,6 +7,7 @@ import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/features/social/data/friend_service.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 
 class GroupMembersScreen extends StatefulWidget {
@@ -534,17 +535,11 @@ class _MemberTile extends StatelessWidget {
             : '?');
     return ListTile(
       onTap: onTap,
-      leading: CircleAvatar(
-        radius: 22,
-        backgroundColor: color.withValues(alpha: 0.25),
-        child: Text(
-          initials,
-          style: TextStyle(
-            color: color,
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-          ),
-        ),
+      leading: ProfileAvatarView(
+        avatar: member.avatar,
+        fallbackText: initials,
+        fallbackColor: color,
+        size: 44,
       ),
       title: Row(
         children: [

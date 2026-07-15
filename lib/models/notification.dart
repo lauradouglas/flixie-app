@@ -1,3 +1,5 @@
+import 'package:flixie_app/models/profile_avatar.dart';
+
 class FlixieNotification {
   // Notification type constants
   static const String friendRequest = 'FRIEND_REQUEST';
@@ -94,6 +96,11 @@ class FlixieNotification {
 
   Map<String, dynamic>? get senderIconColor =>
       (_linkOtherUser)?['iconColor'] as Map<String, dynamic>?;
+
+  ProfileAvatar? get senderAvatar {
+    final value = _linkOtherUser?['avatar'];
+    return value is Map<String, dynamic> ? ProfileAvatar.fromJson(value) : null;
+  }
 
   /// The movie/show title embedded in a watch request link, if present.
   /// The poster path for the movie/show embedded in any request link.

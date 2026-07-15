@@ -156,7 +156,7 @@ void main() {
     test('weak-password returns correct message', () {
       expect(
         AuthService.messageFromAuthException(makeException('weak-password')),
-        'Password must be at least 6 characters.',
+        'Password must be at least 8 characters and include uppercase, lowercase, a number, and a special character.',
       );
     });
 

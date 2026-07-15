@@ -26,6 +26,7 @@ class _GroupsSubViewState extends State<GroupsSubView> {
   List<Group> _groups = [];
   final Map<String, GroupMember> _pendingInvites = {};
   final Map<String, int> _memberCounts = {};
+  final Map<String, List<GroupMember>> _groupMembers = {};
   final Map<String, FlixieNotification> _inviteNotifications = {};
   int _innerTab = 0;
   String? _error;
@@ -82,6 +83,7 @@ class _GroupsSubViewState extends State<GroupsSubView> {
           ),
       };
       final memberCounts = <String, int>{};
+      final groupMembers = <String, List<GroupMember>>{};
       final groupsWithId = groups.where((g) => g.id != null).toList();
       final memberResults = await Future.wait(
         groupsWithId.map(
@@ -92,6 +94,7 @@ class _GroupsSubViewState extends State<GroupsSubView> {
       for (var i = 0; i < groupsWithId.length; i++) {
         final group = groupsWithId[i];
         final members = memberResults[i];
+        groupMembers[group.id!] = members;
         memberCounts[group.id!] = members.where((m) => m.isAccepted).length;
         final myMembership = members.firstWhere(
           (m) => m.memberId == userId,
@@ -116,6 +119,9 @@ class _GroupsSubViewState extends State<GroupsSubView> {
           _memberCounts
             ..clear()
             ..addAll(memberCounts);
+          _groupMembers
+            ..clear()
+            ..addAll(groupMembers);
           _inviteNotifications
             ..clear()
             ..addAll(inviteNotifs);
@@ -289,6 +295,7 @@ class _GroupsSubViewState extends State<GroupsSubView> {
             ...myGroups.map((g) => GroupCard(
                   group: g,
                   memberCount: _memberCounts[g.id],
+                  members: _groupMembers[g.id] ?? const [],
                 )),
           const SizedBox(height: 24),
         ],

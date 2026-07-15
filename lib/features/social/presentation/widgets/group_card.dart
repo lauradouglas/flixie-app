@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:flixie_app/models/group.dart';
+import 'package:flixie_app/models/group_member.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/social/presentation/widgets/group_avatar.dart';
 
 class GroupCard extends StatelessWidget {
@@ -10,11 +12,13 @@ class GroupCard extends StatelessWidget {
     super.key,
     required this.group,
     this.memberCount,
+    this.members = const [],
     this.statusLabel,
   });
 
   final Group group;
   final int? memberCount;
+  final List<GroupMember> members;
   final String? statusLabel;
 
   static String _formatCount(int count) {
@@ -73,6 +77,10 @@ class GroupCard extends StatelessWidget {
                         ),
                     ],
                   ),
+                  if (members.isNotEmpty) ...[
+                    const SizedBox(height: 7),
+                    _MemberAvatars(members: members),
+                  ],
                   if (group.description != null &&
                       group.description!.isNotEmpty) ...[
                     const SizedBox(height: 4),
@@ -92,6 +100,46 @@ class GroupCard extends StatelessWidget {
             const Icon(Icons.chevron_right, color: FlixieColors.medium),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _MemberAvatars extends StatelessWidget {
+  const _MemberAvatars({required this.members});
+
+  final List<GroupMember> members;
+
+  @override
+  Widget build(BuildContext context) {
+    final shown = members.where((member) => member.isAccepted).take(5).toList();
+    return SizedBox(
+      height: 28,
+      child: Stack(
+        children: [
+          for (var index = 0; index < shown.length; index++)
+            Positioned(
+              left: index * 20,
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: FlixieColors.tabBarBackgroundFocused,
+                    width: 2,
+                  ),
+                ),
+                child: ProfileAvatarView(
+                  avatar: shown[index].avatar,
+                  fallbackText: shown[index].initials ??
+                      (shown[index].username?.isNotEmpty == true
+                          ? shown[index].username![0].toUpperCase()
+                          : '?'),
+                  fallbackColor: FlixieColors.primary,
+                  size: 28,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

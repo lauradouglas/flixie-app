@@ -17,6 +17,7 @@ import 'package:flixie_app/features/settings/presentation/widgets/favorite_genre
 import 'package:flixie_app/features/settings/presentation/widgets/icon_color_sheet.dart';
 import 'package:flixie_app/features/settings/presentation/widgets/settings_tile.dart';
 import 'package:flixie_app/features/settings/presentation/widgets/watch_providers_sheet.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/change_avatar_sheet.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -44,6 +45,20 @@ class SettingsScreen extends StatelessWidget {
                 icon: Icons.person_outline,
                 label: 'Edit Profile',
                 onTap: () => _showEditProfileSheet(context),
+              ),
+              SettingsTile(
+                icon: Icons.face_outlined,
+                label: 'Change Avatar',
+                onTap: () => showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  useSafeArea: true,
+                  backgroundColor: FlixieColors.background,
+                  builder: (_) => const FractionallySizedBox(
+                    heightFactor: .9,
+                    child: ChangeAvatarSheet(),
+                  ),
+                ),
               ),
               SettingsTile(
                 icon: Icons.lock_outline,

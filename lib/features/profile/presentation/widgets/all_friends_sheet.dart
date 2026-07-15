@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:flixie_app/models/friendship.dart';
@@ -331,18 +332,14 @@ class _PendingRequestTile extends StatelessWidget {
         children: [
           GestureDetector(
             onTap: onTap,
-            child: CircleAvatar(
-              backgroundColor: _avatarColor.withValues(alpha: 0.25),
-              child: Text(
-                user.initials ??
-                    (user.username.isNotEmpty
-                        ? user.username[0].toUpperCase()
-                        : '?'),
-                style: TextStyle(
-                  color: _avatarColor,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+            child: ProfileAvatarView(
+              avatar: user.avatar,
+              fallbackText: user.initials ??
+                  (user.username.isNotEmpty
+                      ? user.username[0].toUpperCase()
+                      : '?'),
+              fallbackColor: _avatarColor,
+              size: 40,
             ),
           ),
           const SizedBox(width: 12),
@@ -424,16 +421,12 @@ class _FriendListTile extends StatelessWidget {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       onTap: onTap,
-      leading: CircleAvatar(
-        backgroundColor: _avatarColor.withValues(alpha: 0.25),
-        child: Text(
-          user.initials ??
-              (user.username.isNotEmpty ? user.username[0].toUpperCase() : '?'),
-          style: TextStyle(
-            color: _avatarColor,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+      leading: ProfileAvatarView(
+        avatar: user.avatar,
+        fallbackText: user.initials ??
+            (user.username.isNotEmpty ? user.username[0].toUpperCase() : '?'),
+        fallbackColor: _avatarColor,
+        size: 40,
       ),
       title: Text(user.displayName,
           style: const TextStyle(color: FlixieColors.light)),

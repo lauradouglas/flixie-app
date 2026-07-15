@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import 'package:flixie_app/models/review.dart';
+import 'package:flixie_app/models/profile_avatar.dart';
 
 enum ActivityListType {
   movieWatchlist('watchlist-movie'),
@@ -54,6 +55,7 @@ class ActivityListItem {
   final String? notes;
   final Review? reviewData;
   final int activityScore;
+  final ProfileAvatar? avatar;
 
   String get timestamp {
     if (watchedAt != null && watchedAt!.isNotEmpty) return watchedAt!;
@@ -83,7 +85,33 @@ class ActivityListItem {
     this.notes,
     this.reviewData,
     this.activityScore = 0,
+    this.avatar,
   });
+
+  ActivityListItem copyWith({ProfileAvatar? avatar}) => ActivityListItem(
+        id: id,
+        userId: userId,
+        username: username,
+        firstName: firstName,
+        lastName: lastName,
+        movieId: movieId,
+        showId: showId,
+        personId: personId,
+        removed: removed,
+        createdAt: createdAt,
+        updatedAt: updatedAt,
+        type: type,
+        mediaTitle: mediaTitle,
+        mediaPosterPath: mediaPosterPath,
+        mediaRating: mediaRating,
+        watchedAt: watchedAt,
+        watchCount: watchCount,
+        isRewatch: isRewatch,
+        notes: notes,
+        reviewData: reviewData,
+        activityScore: activityScore,
+        avatar: avatar ?? this.avatar,
+      );
 
   factory ActivityListItem.fromJson(Map<String, dynamic> json) {
     // Group activity API nests user info; friends API uses top-level fields
@@ -168,6 +196,10 @@ class ActivityListItem {
       isRewatch: isRewatch,
       notes: json['notes'] as String?,
       reviewData: reviewData,
+      avatar: (user?['avatar'] ?? json['avatar']) == null
+          ? null
+          : ProfileAvatar.fromJson(
+              (user?['avatar'] ?? json['avatar']) as Map<String, dynamic>),
       activityScore: _parseInt(json['activityScore']) ?? 0,
     );
   }

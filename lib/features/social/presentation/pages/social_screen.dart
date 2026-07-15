@@ -17,6 +17,7 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/social/presentation/widgets/group_card.dart';
 import 'package:flixie_app/features/social/presentation/widgets/group_avatar.dart';
 import 'package:flixie_app/features/social/presentation/widgets/invitation_card.dart';
@@ -421,16 +422,11 @@ class _FriendStoryStrip extends StatelessWidget {
             onTap: () => context.push('/friends/${friend.id}'),
             child: Column(
               children: [
-                CircleAvatar(
-                  radius: 21,
-                  backgroundColor: _avatarColor(friend.iconColor),
-                  child: Text(
-                    initial,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                ProfileAvatarView(
+                  avatar: friend.avatar,
+                  fallbackText: initial,
+                  fallbackColor: _avatarColor(friend.iconColor),
+                  size: 42,
                 ),
                 const SizedBox(height: 4),
                 SizedBox(
@@ -863,17 +859,11 @@ class _EnhancedFriendCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: _avatarColor.withValues(alpha: 0.25),
-                  child: Text(
-                    initial,
-                    style: TextStyle(
-                      color: _avatarColor,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 18,
-                    ),
-                  ),
+                ProfileAvatarView(
+                  avatar: friend.avatar,
+                  fallbackText: initial,
+                  fallbackColor: _avatarColor,
+                  size: 48,
                 ),
                 const Spacer(),
                 PopupMenuButton<String>(
@@ -1063,6 +1053,7 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
   List<Group> _groups = [];
   final Map<String, GroupMember> _pendingInvites = {};
   final Map<String, int> _memberCounts = {};
+  final Map<String, List<GroupMember>> _groupMembers = {};
   final Map<String, FlixieNotification> _inviteNotifications = {};
   int _innerTab = 0; // 0 = Groups, 1 = Invites
   String? _error;
@@ -1126,6 +1117,7 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
           ),
       };
       final memberCounts = <String, int>{};
+      final groupMembers = <String, List<GroupMember>>{};
       final groupsWithId = groups.where((g) => g.id != null).toList();
       final memberResults = await Future.wait(
         groupsWithId.map(
@@ -1136,6 +1128,7 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
       for (var i = 0; i < groupsWithId.length; i++) {
         final group = groupsWithId[i];
         final members = memberResults[i];
+        groupMembers[group.id!] = members;
         memberCounts[group.id!] = members.where((m) => m.isAccepted).length;
         final myMembership = members.firstWhere(
           (m) => m.memberId == userId,
@@ -1160,6 +1153,9 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
           _memberCounts
             ..clear()
             ..addAll(memberCounts);
+          _groupMembers
+            ..clear()
+            ..addAll(groupMembers);
           _inviteNotifications
             ..clear()
             ..addAll(inviteNotifs);
@@ -1427,6 +1423,7 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
             ...displayedGroups.map((g) => GroupCard(
                   group: g,
                   memberCount: _memberCounts[g.id],
+                  members: _groupMembers[g.id] ?? const [],
                   statusLabel: _pendingInvites.containsKey(g.id)
                       ? 'Invite pending'
                       : _groupFreshnessLabel(g),

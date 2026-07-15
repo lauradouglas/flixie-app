@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:provider/provider.dart';
 
 import 'package:flixie_app/models/friendship.dart';
@@ -241,16 +242,14 @@ class _AddFriendSheetState extends State<AddFriendSheet> {
                       final color = _userAvatarColor(user);
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
-                        leading: CircleAvatar(
-                          backgroundColor: color.withValues(alpha: 0.25),
-                          child: Text(
-                            user.initials ??
-                                (user.username.isNotEmpty
-                                    ? user.username[0].toUpperCase()
-                                    : '?'),
-                            style: TextStyle(
-                                color: color, fontWeight: FontWeight.bold),
-                          ),
+                        leading: ProfileAvatarView(
+                          avatar: user.avatar,
+                          fallbackText: user.initials ??
+                              (user.username.isNotEmpty
+                                  ? user.username[0].toUpperCase()
+                                  : '?'),
+                          fallbackColor: color,
+                          size: 40,
                         ),
                         title: Text(user.username,
                             style: const TextStyle(color: FlixieColors.light)),

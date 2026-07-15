@@ -56,6 +56,30 @@ void main() {
     });
   });
 
+  group('validateFirebasePassword', () {
+    test('accepts a password matching the configured Firebase policy', () {
+      expect(validateFirebasePassword('Flixie123!'), isNull);
+    });
+
+    test('requires every configured character class', () {
+      expect(validateFirebasePassword('flixie123!'), contains('uppercase'));
+      expect(validateFirebasePassword('FLIXIE123!'), contains('lowercase'));
+      expect(validateFirebasePassword('FlixiePass!'), contains('number'));
+      expect(validateFirebasePassword('Flixie123'), contains('special'));
+    });
+
+    test('enforces Firebase length limits', () {
+      expect(validateFirebasePassword('F1!a'), contains('at least 8'));
+      expect(validateFirebasePassword('Aa1!${List.filled(4093, 'x').join()}'),
+          contains('no more than 4096'));
+    });
+
+    test('only accepts Firebase-supported special characters', () {
+      expect(validateFirebasePassword('Flixie123 '), contains('special'));
+      expect(validateFirebasePassword('Flixie123_'), isNull);
+    });
+  });
+
   group('isValidEmailFormat', () {
     test('accepts valid email', () {
       expect(isValidEmailFormat('doug@example.com'), isTrue);

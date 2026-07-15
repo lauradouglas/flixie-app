@@ -8,6 +8,7 @@ import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/features/social/data/friend_service.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/mini_stats.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/taste_compatibility_card.dart';
@@ -523,20 +524,14 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                     ),
                     child: Column(
                       children: [
-                        CircleAvatar(
-                          radius: 46,
-                          backgroundColor: _avatarColor.withValues(alpha: 0.25),
-                          child: Text(
-                            _user?.initials ??
-                                (_user?.username.isNotEmpty == true
-                                    ? _user!.username[0].toUpperCase()
-                                    : '?'),
-                            style: TextStyle(
-                              color: _avatarColor,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 24,
-                            ),
-                          ),
+                        ProfileAvatarView(
+                          avatar: _user?.avatar,
+                          fallbackText: _user?.initials ??
+                              (_user?.username.isNotEmpty == true
+                                  ? _user!.username[0].toUpperCase()
+                                  : '?'),
+                          fallbackColor: _avatarColor,
+                          size: 92,
                         ),
                         const SizedBox(height: 10),
                         Text(

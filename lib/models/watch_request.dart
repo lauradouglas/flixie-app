@@ -1,9 +1,12 @@
+import 'package:flixie_app/models/profile_avatar.dart';
+
 class WatchRequestUser {
   final String id;
   final String username;
   final String? firstName;
   final String? lastName;
   final Map<String, dynamic>? iconColor;
+  final ProfileAvatar? avatar;
 
   const WatchRequestUser({
     required this.id,
@@ -11,6 +14,7 @@ class WatchRequestUser {
     this.firstName,
     this.lastName,
     this.iconColor,
+    this.avatar,
   });
 
   factory WatchRequestUser.fromJson(Map<String, dynamic> json) {
@@ -20,6 +24,9 @@ class WatchRequestUser {
       firstName: json['firstName'] as String?,
       lastName: json['lastName'] as String?,
       iconColor: json['iconColor'] as Map<String, dynamic>?,
+      avatar: json['avatar'] == null
+          ? null
+          : ProfileAvatar.fromJson(json['avatar'] as Map<String, dynamic>),
     );
   }
 

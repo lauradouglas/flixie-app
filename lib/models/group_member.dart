@@ -1,3 +1,5 @@
+import 'package:flixie_app/models/profile_avatar.dart';
+
 class GroupMember {
   final String groupId;
   final String memberId;
@@ -8,6 +10,7 @@ class GroupMember {
   final String? lastName;
   final Map<String, dynamic>? iconColor;
   final String? initials;
+  final ProfileAvatar? avatar;
 
   const GroupMember({
     required this.groupId,
@@ -19,6 +22,7 @@ class GroupMember {
     this.lastName,
     this.iconColor,
     this.initials,
+    this.avatar,
   });
 
   factory GroupMember.fromJson(Map<String, dynamic> json) {
@@ -34,6 +38,10 @@ class GroupMember {
       iconColor:
           (user?['iconColor'] ?? json['iconColor']) as Map<String, dynamic>?,
       initials: (user?['initials'] ?? json['initials']) as String?,
+      avatar: (user?['avatar'] ?? json['avatar']) == null
+          ? null
+          : ProfileAvatar.fromJson(
+              (user?['avatar'] ?? json['avatar']) as Map<String, dynamic>),
     );
   }
 
@@ -48,6 +56,7 @@ class GroupMember {
       'lastName': lastName,
       'iconColor': iconColor,
       'initials': initials,
+      'avatar': avatar?.toJson(),
     };
   }
 

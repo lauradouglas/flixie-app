@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:flixie_app/models/friendship.dart';
@@ -173,20 +174,14 @@ class _FriendPreviewCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          CircleAvatar(
-            radius: 25,
-            backgroundColor: _avatarColor.withValues(alpha: 0.25),
-            child: Text(
-              user.initials ??
-                  (user.username.isNotEmpty
-                      ? user.username[0].toUpperCase()
-                      : '?'),
-              style: TextStyle(
-                color: _avatarColor,
-                fontWeight: FontWeight.w700,
-                fontSize: 16,
-              ),
-            ),
+          ProfileAvatarView(
+            avatar: user.avatar,
+            fallbackText: user.initials ??
+                (user.username.isNotEmpty
+                    ? user.username[0].toUpperCase()
+                    : '?'),
+            fallbackColor: _avatarColor,
+            size: 50,
           ),
           const SizedBox(height: 8),
           Text(

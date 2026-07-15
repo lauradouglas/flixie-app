@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 
 class FriendAvatar extends StatelessWidget {
   const FriendAvatar({super.key, required this.user});
@@ -22,20 +23,12 @@ class FriendAvatar extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        CircleAvatar(
-          radius: 38,
-          backgroundColor: _avatarColor.withValues(alpha: 0.3),
-          child: Text(
-            user.initials ??
-                (user.username.isNotEmpty
-                    ? user.username[0].toUpperCase()
-                    : '?'),
-            style: TextStyle(
-              color: _avatarColor,
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-            ),
-          ),
+        ProfileAvatarView(
+          avatar: user.avatar,
+          fallbackText: user.initials ??
+              (user.username.isNotEmpty ? user.username[0].toUpperCase() : '?'),
+          fallbackColor: _avatarColor,
+          size: 76,
         ),
         const SizedBox(height: 4),
         SizedBox(

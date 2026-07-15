@@ -4,7 +4,8 @@ import 'package:flixie_app/core/auth/auth_repository.dart';
 import 'package:flixie_app/core/auth/auth_service.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
-  AuthRepositoryImpl([AuthService? authService]) : _authService = authService ?? AuthService();
+  AuthRepositoryImpl([AuthService? authService])
+      : _authService = authService ?? AuthService();
 
   final AuthService _authService;
 
@@ -15,15 +16,17 @@ class AuthRepositoryImpl implements AuthRepository {
   User? currentUser() => _authService.currentUser;
 
   @override
-  Future<UserCredential> signIn(String email, String password) => _authService.signIn(email, password);
+  Future<UserCredential> signIn(String email, String password) =>
+      _authService.signIn(email, password);
 
   @override
-  Future<UserCredential> signUp(String email, String password, String displayName) =>
+  Future<String> signUp(String email, String password, String displayName) =>
       _authService.signUp(email, password, displayName);
 
   @override
   Future<void> signOut() => _authService.signOut();
 
   @override
-  Future<void> sendPasswordResetEmail(String email) => _authService.sendPasswordResetEmail(email);
+  Future<void> sendPasswordResetEmail(String email) =>
+      _authService.sendPasswordResetEmail(email);
 }

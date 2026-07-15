@@ -12,6 +12,9 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/widgets/flixie_wordmark.dart';
 import 'package:flixie_app/features/authentication/presentation/pages/auth_ui.dart';
+import 'package:flixie_app/features/profile/data/avatar_service.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/avatar_picker.dart';
+import 'package:flixie_app/models/profile_avatar.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -36,6 +39,11 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _checkingUsername = false;
   bool? _usernameAvailable;
   String? _usernameCheckError;
+  bool _choosingAvatar = false;
+  bool _loadingAvatars = false;
+  String? _avatarError;
+  List<ProfileAvatar> _avatars = const [];
+  int? _selectedAvatarId;
 
   List<Country> _countries = [];
   Country? _selectedCountry;
@@ -152,7 +160,7 @@ class _SignupScreenState extends State<SignupScreen> {
     }
 
     final auth = context.read<AuthProvider>();
-    final success = await auth.signUp(
+    final success = await auth.beginAvatarSignUp(
       email: _emailController.text.trim(),
       password: _passwordController.text,
       firstName: _firstNameController.text.trim(),
@@ -161,7 +169,15 @@ class _SignupScreenState extends State<SignupScreen> {
       countryId: _selectedCountry?.id,
     );
 
-    if (!mounted || success) return;
+    if (!mounted) return;
+    if (success) {
+      setState(() {
+        _choosingAvatar = true;
+        _loadingAvatars = true;
+      });
+      await _loadAvatars();
+      return;
+    }
     if (auth.errorCode == 'USERNAME_NOT_AVAILABLE' ||
         auth.errorCode == 'VALIDATION_ERROR') {
       setState(() => _usernameCheckError = auth.errorMessage);
@@ -172,6 +188,38 @@ class _SignupScreenState extends State<SignupScreen> {
         backgroundColor: FlixieColors.danger,
       ),
     );
+  }
+
+  Future<void> _loadAvatars() async {
+    try {
+      final avatars = await AvatarService.getAvatars();
+      if (!mounted) return;
+      setState(() {
+        _avatars = avatars;
+        _loadingAvatars = false;
+        _avatarError = avatars.isEmpty
+            ? 'No profile avatars are currently available.'
+            : null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingAvatars = false;
+        _avatarError = 'Unable to load profile avatars.';
+      });
+    }
+  }
+
+  Future<void> _completeAvatarSignup() async {
+    final avatarId = _selectedAvatarId;
+    if (avatarId == null) return;
+    final auth = context.read<AuthProvider>();
+    final success = await auth.completeAvatarSignUp(avatarId);
+    if (!mounted || success) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(auth.errorMessage ?? 'Unable to assign avatar.'),
+      backgroundColor: FlixieColors.danger,
+    ));
   }
 
   Widget? _buildUsernameSuffix() {
@@ -232,157 +280,174 @@ class _SignupScreenState extends State<SignupScreen> {
       subtitle: 'Secure your account with the basics.',
       onBack: () => context.pop(),
       cardPadding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
-      cardChild: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const OnboardingProgressIndicator(currentStep: 0, totalSteps: 3),
-            const SizedBox(height: 18),
-            AppTextField(
-              controller: _firstNameController,
-              label: 'First Name',
-              prefixIcon: Icons.person_outline_rounded,
-              keyboardType: TextInputType.name,
-              textCapitalization: TextCapitalization.words,
-              textInputAction: TextInputAction.next,
-              autofillHints: const [AutofillHints.givenName],
-              validator: _requiredNameValidator,
-            ),
-            const SizedBox(height: 14),
-            AppTextField(
-              controller: _lastNameController,
-              label: 'Last Name',
-              prefixIcon: Icons.person_outline_rounded,
-              keyboardType: TextInputType.name,
-              textCapitalization: TextCapitalization.words,
-              textInputAction: TextInputAction.next,
-              autofillHints: const [AutofillHints.familyName],
-              validator: _requiredNameValidator,
-            ),
-            const SizedBox(height: 14),
-            AppTextField(
-              controller: _usernameController,
-              label: 'Username',
-              prefixIcon: Icons.alternate_email_rounded,
-              textInputAction: TextInputAction.next,
-              autofillHints: const [AutofillHints.username],
-              onChanged: _onUsernameChanged,
-              suffixIcon: _buildUsernameSuffix(),
-              validator: (value) {
-                final raw = value?.trim() ?? '';
-                if (raw.isEmpty) return 'Please enter a username.';
-                if (raw.length < 3) {
-                  return 'Username must be at least 3 characters.';
-                }
-                if (_usernameAvailable == false) {
-                  return 'This username is already taken.';
-                }
-                return null;
-              },
-            ),
-            if (_usernameCheckError != null) ...[
-              const SizedBox(height: 6),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  _usernameCheckError!,
-                  style: const TextStyle(
-                    color: FlixieColors.danger,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: 14),
-            AppTextField(
-              controller: _emailController,
-              label: 'Email Address',
-              prefixIcon: Icons.mail_outline_rounded,
-              keyboardType: TextInputType.emailAddress,
-              textInputAction: TextInputAction.next,
-              autofillHints: const [AutofillHints.email],
-              onChanged: (_) => setState(() {}),
-              suffixIcon: _buildEmailSuffix(),
-              validator: (value) {
-                final raw = value?.trim() ?? '';
-                if (raw.isEmpty) return 'Please enter your email.';
-                if (!isValidEmailFormat(raw)) {
-                  return 'Please enter a valid email.';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 14),
-            _CountryPickerField(
-              selected: _selectedCountry,
-              onTap: _countries.isEmpty ? null : _pickCountry,
-            ),
-            const SizedBox(height: 14),
-            PasswordField(
-              controller: _passwordController,
-              label: 'Password',
-              textInputAction: TextInputAction.next,
-              onChanged: (_) => setState(() {}),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter a password.';
-                }
-                if (value.length < 8) {
-                  return 'Password must be at least 8 characters.';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 10),
-            PasswordStrengthBar(password: _passwordController.text),
-            const SizedBox(height: 14),
-            PasswordField(
-              controller: _confirmPasswordController,
-              label: 'Confirm Password',
-              textInputAction: TextInputAction.done,
-              onFieldSubmitted: (_) => _submit(),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please confirm your password.';
-                }
-                if (value != _passwordController.text) {
-                  return 'Passwords do not match.';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 22),
-            PrimaryButton(
-              label: 'Continue',
-              isLoading: isLoading,
-              onPressed: isLoading ? null : _submit,
-            ),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+      cardChild: _choosingAvatar
+          ? Column(
               children: [
-                Text(
-                  'Already have an account?',
-                  style:
-                      textTheme.bodyMedium?.copyWith(color: FlixieColors.light),
+                Text('Choose your profile avatar', style: textTheme.titleLarge),
+                const SizedBox(height: 16),
+                AvatarPicker(
+                  avatars: _avatars,
+                  selectedId: _selectedAvatarId,
+                  loading: _loadingAvatars,
+                  error: _avatarError,
+                  onRetry: _loadAvatars,
+                  onSelected: (avatar) =>
+                      setState(() => _selectedAvatarId = avatar.id),
                 ),
-                TextButton(
-                  onPressed: () => context.pop(),
-                  style: TextButton.styleFrom(
-                    foregroundColor: FlixieColors.primaryTint,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                  ),
-                  child: const Text(
-                    'Sign In',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
+                const SizedBox(height: 18),
+                PrimaryButton(
+                  label: 'Continue',
+                  isLoading: isLoading,
+                  onPressed: isLoading || _selectedAvatarId == null
+                      ? null
+                      : _completeAvatarSignup,
                 ),
               ],
+            )
+          : Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const OnboardingProgressIndicator(
+                      currentStep: 0, totalSteps: 3),
+                  const SizedBox(height: 18),
+                  AppTextField(
+                    controller: _firstNameController,
+                    label: 'First Name',
+                    prefixIcon: Icons.person_outline_rounded,
+                    keyboardType: TextInputType.name,
+                    textCapitalization: TextCapitalization.words,
+                    textInputAction: TextInputAction.next,
+                    autofillHints: const [AutofillHints.givenName],
+                    validator: _requiredNameValidator,
+                  ),
+                  const SizedBox(height: 14),
+                  AppTextField(
+                    controller: _lastNameController,
+                    label: 'Last Name',
+                    prefixIcon: Icons.person_outline_rounded,
+                    keyboardType: TextInputType.name,
+                    textCapitalization: TextCapitalization.words,
+                    textInputAction: TextInputAction.next,
+                    autofillHints: const [AutofillHints.familyName],
+                    validator: _requiredNameValidator,
+                  ),
+                  const SizedBox(height: 14),
+                  AppTextField(
+                    controller: _usernameController,
+                    label: 'Username',
+                    prefixIcon: Icons.alternate_email_rounded,
+                    textInputAction: TextInputAction.next,
+                    autofillHints: const [AutofillHints.username],
+                    onChanged: _onUsernameChanged,
+                    suffixIcon: _buildUsernameSuffix(),
+                    validator: (value) {
+                      final raw = value?.trim() ?? '';
+                      if (raw.isEmpty) return 'Please enter a username.';
+                      if (raw.length < 3) {
+                        return 'Username must be at least 3 characters.';
+                      }
+                      if (_usernameAvailable == false) {
+                        return 'This username is already taken.';
+                      }
+                      return null;
+                    },
+                  ),
+                  if (_usernameCheckError != null) ...[
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        _usernameCheckError!,
+                        style: const TextStyle(
+                          color: FlixieColors.danger,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+                  AppTextField(
+                    controller: _emailController,
+                    label: 'Email Address',
+                    prefixIcon: Icons.mail_outline_rounded,
+                    keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
+                    autofillHints: const [AutofillHints.email],
+                    onChanged: (_) => setState(() {}),
+                    suffixIcon: _buildEmailSuffix(),
+                    validator: (value) {
+                      final raw = value?.trim() ?? '';
+                      if (raw.isEmpty) return 'Please enter your email.';
+                      if (!isValidEmailFormat(raw)) {
+                        return 'Please enter a valid email.';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  _CountryPickerField(
+                    selected: _selectedCountry,
+                    onTap: _countries.isEmpty ? null : _pickCountry,
+                  ),
+                  const SizedBox(height: 14),
+                  PasswordField(
+                    controller: _passwordController,
+                    label: 'Password',
+                    textInputAction: TextInputAction.next,
+                    onChanged: (_) => setState(() {}),
+                    validator: validateFirebasePassword,
+                  ),
+                  const SizedBox(height: 10),
+                  PasswordStrengthBar(password: _passwordController.text),
+                  const SizedBox(height: 14),
+                  PasswordField(
+                    controller: _confirmPasswordController,
+                    label: 'Confirm Password',
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => _submit(),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please confirm your password.';
+                      }
+                      if (value != _passwordController.text) {
+                        return 'Passwords do not match.';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 22),
+                  PrimaryButton(
+                    label: 'Continue',
+                    isLoading: isLoading,
+                    onPressed: isLoading ? null : _submit,
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Already have an account?',
+                        style: textTheme.bodyMedium
+                            ?.copyWith(color: FlixieColors.light),
+                      ),
+                      TextButton(
+                        onPressed: () => context.pop(),
+                        style: TextButton.styleFrom(
+                          foregroundColor: FlixieColors.primaryTint,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                        child: const Text(
+                          'Sign In',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
-      ),
     );
   }
 

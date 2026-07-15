@@ -1,4 +1,5 @@
 import 'package:flixie_app/core/utils/app_logger.dart';
+import 'package:flixie_app/models/profile_avatar.dart';
 
 /// Lightweight user info embedded in friendship/friend-request objects.
 class FriendshipUser {
@@ -8,6 +9,7 @@ class FriendshipUser {
   final String? lastName;
   final String? initials;
   final Map<String, dynamic>? iconColor;
+  final ProfileAvatar? avatar;
 
   const FriendshipUser({
     required this.id,
@@ -16,6 +18,7 @@ class FriendshipUser {
     this.lastName,
     this.initials,
     this.iconColor,
+    this.avatar,
   });
 
   factory FriendshipUser.fromJson(Map<String, dynamic> json) {
@@ -26,6 +29,9 @@ class FriendshipUser {
       lastName: json['lastName'] as String?,
       initials: json['initials'] as String?,
       iconColor: json['iconColor'] as Map<String, dynamic>?,
+      avatar: json['avatar'] == null
+          ? null
+          : ProfileAvatar.fromJson(json['avatar'] as Map<String, dynamic>),
     );
   }
 
@@ -34,7 +40,6 @@ class FriendshipUser {
   }
 
   String get shortName {
-    if (firstName != null && firstName!.isNotEmpty) return firstName!;
     return username;
   }
 }

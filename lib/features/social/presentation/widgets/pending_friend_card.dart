@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 
 class PendingFriendCard extends StatelessWidget {
   const PendingFriendCard({
@@ -44,16 +45,14 @@ class PendingFriendCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            CircleAvatar(
-              radius: 22,
-              backgroundColor: color.withValues(alpha: 0.3),
-              child: Text(
-                user?.initials ??
-                    (user?.username.isNotEmpty == true
-                        ? user!.username[0].toUpperCase()
-                        : '?'),
-                style: TextStyle(color: color, fontWeight: FontWeight.bold),
-              ),
+            ProfileAvatarView(
+              avatar: user?.avatar,
+              fallbackText: user?.initials ??
+                  (user?.username.isNotEmpty == true
+                      ? user!.username[0].toUpperCase()
+                      : '?'),
+              fallbackColor: color,
+              size: 44,
             ),
             const SizedBox(width: 12),
             Expanded(

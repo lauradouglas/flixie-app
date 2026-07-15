@@ -19,6 +19,30 @@ const Set<String> _unsupportedGenreNames = {
   'war & politics',
 };
 final _emailPattern = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+final _firebaseSpecialCharacterPattern =
+    RegExp(r'''[\^\$\*\.\[\]\{\}\(\)\?"!@#%&/\\,><':;\|_~]''');
+
+String? validateFirebasePassword(String? value) {
+  final password = value ?? '';
+  if (password.isEmpty) return 'Please enter a password.';
+  if (password.length < 8) return 'Password must be at least 8 characters.';
+  if (password.length > 4096) {
+    return 'Password must be no more than 4096 characters.';
+  }
+  if (!RegExp(r'[a-z]').hasMatch(password)) {
+    return 'Password must include a lowercase letter.';
+  }
+  if (!RegExp(r'[A-Z]').hasMatch(password)) {
+    return 'Password must include an uppercase letter.';
+  }
+  if (!RegExp(r'[0-9]').hasMatch(password)) {
+    return 'Password must include a number.';
+  }
+  if (!_firebaseSpecialCharacterPattern.hasMatch(password)) {
+    return 'Password must include a special character.';
+  }
+  return null;
+}
 
 List<Genre> filterSupportedGenres(List<Genre> genres) {
   return genres
@@ -35,12 +59,15 @@ enum PasswordStrengthLevel { weak, medium, strong }
 PasswordStrengthLevel evaluatePasswordStrength(String password) {
   var score = 0;
   if (password.length >= 8) score++;
+  if (RegExp(r'[a-z]').hasMatch(password)) score++;
   if (RegExp(r'[A-Z]').hasMatch(password)) score++;
   if (RegExp(r'[0-9]').hasMatch(password)) score++;
-  if (RegExp(r'[^A-Za-z0-9]').hasMatch(password)) score++;
+  if (_firebaseSpecialCharacterPattern.hasMatch(password)) score++;
 
-  if (score >= 3) return PasswordStrengthLevel.strong;
-  if (score >= 2) return PasswordStrengthLevel.medium;
+  if (score == 5 && password.length <= 4096) {
+    return PasswordStrengthLevel.strong;
+  }
+  if (score >= 3) return PasswordStrengthLevel.medium;
   return PasswordStrengthLevel.weak;
 }
 

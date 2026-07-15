@@ -10,6 +10,7 @@ import 'package:flixie_app/core/auth/auth_service.dart';
 import 'package:flixie_app/features/movies/data/movie_service.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/models/user.dart' as model;
+import 'package:flixie_app/models/profile_avatar.dart';
 
 class _FakeFirebaseUser extends Fake implements User {}
 
@@ -225,5 +226,48 @@ void main() {
 
     completer.complete(_createdUser());
     expect(await first, isTrue);
+  });
+
+  test(
+      'avatar signup creates profile before assigning avatar and retries assignment only',
+      () async {
+    final order = <String>[];
+    var avatarCalls = 0;
+    final provider = AuthProvider(
+      authService,
+      MovieService(),
+      prefetchAfterAuth: false,
+      profileCreator: (_) async {
+        order.add('profile');
+        return _createdUser();
+      },
+      avatarSelector: (id) async {
+        order.add('avatar');
+        avatarCalls++;
+        if (avatarCalls == 1) throw Exception('temporary');
+        return const ProfileAvatar(
+          id: 1,
+          key: 'spaniel',
+          displayName: 'Spaniel',
+          storagePath: 'avatars/spaniel.png',
+        );
+      },
+    );
+
+    expect(
+      await provider.beginAvatarSignUp(
+        email: 'laura@example.com',
+        password: 'Password1!',
+        firstName: 'Laura',
+        lastName: 'Douglas',
+        username: 'Movie_User.99',
+      ),
+      isTrue,
+    );
+    expect(await provider.completeAvatarSignUp(1), isFalse);
+    expect(await provider.completeAvatarSignUp(1), isTrue);
+    expect(order, ['profile', 'avatar', 'avatar']);
+    expect(authService.signupCalls, 1);
+    expect(provider.dbUser?.avatar?.id, 1);
   });
 }

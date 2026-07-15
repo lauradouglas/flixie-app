@@ -7,6 +7,7 @@ import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/models/review.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/review_card.dart';
 
 class ActivityTile extends StatelessWidget {
@@ -154,17 +155,11 @@ class ActivityTile extends StatelessWidget {
 
   Widget _buildAvatar() {
     final initial = _displayName().substring(0, 1).toUpperCase();
-    return CircleAvatar(
-      radius: compact ? 18 : 20,
-      backgroundColor: FlixieColors.primary.withValues(alpha: 0.22),
-      child: Text(
-        initial,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
+    return ProfileAvatarView(
+      avatar: item.avatar,
+      fallbackText: initial,
+      fallbackColor: FlixieColors.primary,
+      size: compact ? 36 : 40,
     );
   }
 
