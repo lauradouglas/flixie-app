@@ -413,31 +413,17 @@ class UserService {
 
   static Future<List<WatchlistMovie>> getUserWatchlist(String userId) async {
     try {
-      final data = await _withMovieWatchlistBasePath(
-        userId,
-        (basePath) => ApiClient.get(basePath),
-      );
-      final watchlist = (data as List<dynamic>)
+      final data = await ApiClient.get('/users/$userId/watchlists');
+      final rawWatchlist = data is Map<String, dynamic>
+          ? data['movieWatchlistWithWatchedStatus'] ??
+              data['movieWatchlist'] ??
+              const <dynamic>[]
+          : data;
+      final watchlist = (rawWatchlist as List<dynamic>)
           .map((e) => WatchlistMovie.fromJson(e as Map<String, dynamic>))
           .toList();
       apiLogger.i('[Watchlist] Parsed ${watchlist.length} items');
       return watchlist;
-    } on ApiException catch (e) {
-      if (e.statusCode != 404) {
-        apiLogger.e('[Watchlist] Error fetching watchlist: $e');
-        rethrow;
-      }
-      apiLogger.w(
-          '[Watchlist] Endpoint unavailable (404). Falling back to /users/:id payload.');
-      try {
-        final userData = await ApiClient.get('/users/$userId');
-        final user = User.fromJson(userData as Map<String, dynamic>);
-        return user.movieWatchlist ?? const <WatchlistMovie>[];
-      } catch (fallbackError) {
-        apiLogger
-            .e('[Watchlist] Fallback via /users/:id failed: $fallbackError');
-        rethrow;
-      }
     } catch (e) {
       apiLogger.e('[Watchlist] Error fetching watchlist: $e');
       rethrow;

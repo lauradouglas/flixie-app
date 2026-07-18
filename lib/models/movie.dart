@@ -55,8 +55,9 @@ class Movie {
       title: json['title'] as String,
       releaseDate: json['releaseDate'] as String?,
       overview: json['overview'] as String?,
-      posterPath: json['posterPath'] as String?,
-      backdropPath: json['backdropPath'] as String?,
+      posterPath: _cleanImagePath(json['posterPath']),
+      backdropPath:
+          _cleanImagePath(json['backdropPath'] ?? json['backdropUrl']),
       popularity: _parseDouble(json['popularity']),
       voteAverage: _parseDouble(json['voteAverage']),
       voteCount: _parseInt(json['voteCount']),
@@ -101,6 +102,12 @@ class Movie {
     if (value is double) return value.toInt();
     if (value is String) return int.tryParse(value);
     return null;
+  }
+
+  static String? _cleanImagePath(dynamic value) {
+    if (value is! String) return null;
+    final cleaned = value.trim();
+    return cleaned.isEmpty ? null : cleaned;
   }
 
   Movie copyWith({

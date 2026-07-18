@@ -264,10 +264,51 @@ void main() {
       ),
       isTrue,
     );
+    expect(order, ['profile'],
+        reason: 'the backend user must exist before avatar/setup screens');
+    expect(provider.dbUser?.id, 'profile-1');
     expect(await provider.completeAvatarSignUp(1), isFalse);
     expect(await provider.completeAvatarSignUp(1), isTrue);
     expect(order, ['profile', 'avatar', 'avatar']);
     expect(authService.signupCalls, 1);
     expect(provider.dbUser?.avatar?.id, 1);
+  });
+
+  test('avatar signup does not continue when backend rejects the user',
+      () async {
+    var avatarCalls = 0;
+    final provider = AuthProvider(
+      authService,
+      MovieService(),
+      prefetchAfterAuth: false,
+      profileCreator: (_) => throw const ApiException(
+        statusCode: 409,
+        message: 'A user with this email already exists.',
+        code: 'USER_ALREADY_EXISTS',
+      ),
+      avatarSelector: (_) async {
+        avatarCalls++;
+        return const ProfileAvatar(
+          id: 1,
+          key: 'spaniel',
+          displayName: 'Spaniel',
+          storagePath: 'avatars/spaniel.png',
+        );
+      },
+    );
+
+    expect(
+      await provider.beginAvatarSignUp(
+        email: 'laura@example.com',
+        password: 'Password1!',
+        firstName: 'Laura',
+        lastName: 'Douglas',
+        username: 'Movie_User.99',
+      ),
+      isFalse,
+    );
+    expect(provider.dbUser, isNull);
+    expect(provider.errorCode, 'USER_ALREADY_EXISTS');
+    expect(avatarCalls, 0);
   });
 }

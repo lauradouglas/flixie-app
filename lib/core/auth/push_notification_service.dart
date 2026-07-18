@@ -40,6 +40,12 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
   logger.d(
       '[FCM] Background message received id=${message.messageId} title=${message.notification?.title} data=${message.data}');
+
+  // Android displays notification payloads itself in the background, but
+  // data-only watch-request pushes are silent unless the app shows them.
+  if (message.notification == null) {
+    await PushNotificationService.showBackgroundDataNotification(message);
+  }
 }
 
 /// Manages Firebase Cloud Messaging for push notifications.
@@ -87,7 +93,8 @@ class PushNotificationService {
     required GlobalKey<NavigatorState> navigatorKey,
   }) async {
     _currentUserId = userId;
-    logger.i('[FCM] Initializing push service (platform=${Platform.operatingSystem}, userId=$userId)');
+    logger.i(
+        '[FCM] Initializing push service (platform=${Platform.operatingSystem}, userId=$userId)');
 
     // Ensure old listeners do not duplicate local notifications across re-logins.
     await _tokenRefreshSubscription?.cancel();
@@ -127,7 +134,8 @@ class PushNotificationService {
         badge: true,
         sound: true,
       );
-      logger.d('[FCM] iOS foreground presentation enabled (alert/badge/sound=true)');
+      logger.d(
+          '[FCM] iOS foreground presentation enabled (alert/badge/sound=true)');
 
       // Ensure Firebase Messaging auto-init is enabled so token generation starts.
       await _messaging.setAutoInitEnabled(true);
@@ -165,15 +173,17 @@ class PushNotificationService {
       // On iOS, if this is a notification message, the OS can present it
       // directly because foreground presentation options are enabled.
       if (Platform.isIOS && message.notification != null) {
-        logger.d('[FCM] iOS foreground notification handled by system presentation');
+        logger.d(
+            '[FCM] iOS foreground notification handled by system presentation');
         return;
       }
 
-      _showLocalNotification(message);
+      unawaited(_showLocalNotification(message));
     });
 
     // Notification tap while app is in the background (not terminated).
-    _onMessageOpenedSubscription = FirebaseMessaging.onMessageOpenedApp.listen((message) {
+    _onMessageOpenedSubscription =
+        FirebaseMessaging.onMessageOpenedApp.listen((message) {
       logger.d(
           '[FCM] Notification tapped (background): ${message.notification?.title}');
       logger.d('[FCM] Notification tap payload: data=${message.data}');
@@ -291,21 +301,55 @@ class PushNotificationService {
   static Future<void> _saveToken(String userId, String token) async {
     try {
       await UserService.saveFcmToken(userId, token);
-      logger.i('[FCM] Token saved to backend for userId=$userId token=${_redactToken(token)}');
+      logger.i(
+          '[FCM] Token saved to backend for userId=$userId token=${_redactToken(token)}');
     } catch (e) {
       logger.w(
           '[FCM] Failed to save FCM token to backend for userId=$userId token=${_redactToken(token)} error=$e');
     }
   }
 
-  static void _showLocalNotification(RemoteMessage message) {
-    final notification = message.notification;
-    if (notification == null) return;
+  static Future<void> showBackgroundDataNotification(
+      RemoteMessage message) async {
+    const androidSettings =
+        AndroidInitializationSettings('@mipmap/launcher_icon');
+    const iosSettings = DarwinInitializationSettings();
+    await _localNotifications.initialize(
+      const InitializationSettings(
+        android: androidSettings,
+        iOS: iosSettings,
+      ),
+    );
+    await _localNotifications
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(_androidChannel);
+    await _showLocalNotification(message);
+  }
 
-    _localNotifications.show(
-      notification.hashCode,
-      notification.title,
-      notification.body,
+  static Future<void> _showLocalNotification(RemoteMessage message) async {
+    final notification = message.notification;
+    final type = (message.data['type']?.toString() ?? '').toUpperCase();
+    final isWatchRequest = type == 'MOVIE_WATCH_REQUEST' ||
+        type == 'SHOW_WATCH_REQUEST' ||
+        type == 'GROUP_REQUEST' ||
+        type == 'WATCH_REQUEST';
+    final title = notification?.title ??
+        message.data['title']?.toString() ??
+        (isWatchRequest ? 'New watch request' : null);
+    final body = notification?.body ??
+        message.data['body']?.toString() ??
+        message.data['message']?.toString() ??
+        (isWatchRequest ? 'Someone invited you to watch something.' : null);
+    if (title == null && body == null) {
+      logger.d('[FCM] Data-only message has no displayable content');
+      return;
+    }
+
+    await _localNotifications.show(
+      message.messageId?.hashCode ?? message.hashCode,
+      title ?? 'Flixie',
+      body,
       NotificationDetails(
         android: AndroidNotificationDetails(
           _androidChannel.id,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +11,7 @@ import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/models/trending_groups.dart';
 import 'package:flixie_app/models/watch_request.dart';
 import 'package:flixie_app/models/watchlist_movie.dart';
+import 'package:flixie_app/models/user.dart' as models;
 import 'package:flixie_app/features/social/presentation/controllers/friend_actions_controller.dart';
 import 'package:flixie_app/features/watchlist/presentation/controllers/watchlist_actions_controller.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
@@ -48,7 +51,6 @@ class _HomeScreenState extends State<HomeScreen> {
   TrendingGroupsResponse? _trendingGroups;
   bool _isTrendingGroupsLoading = true;
   String? _trendingGroupsError;
-  RecommendationFromHighlyRatedResponse? _highlyRatedRecommendations;
   final Set<int> _watchlistUpdatesInFlight = <int>{};
   Set<int> _watchlistMovieIds = {};
   int _watchRequestsNeedingResponse = 0;
@@ -116,85 +118,31 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     final auth = context.read<AuthProvider>();
     final movieService = context.read<MovieService>();
-    // Re-fetch user + all cached data (notifications, friends, reviews, etc.)
-    await auth.refreshUserData();
     final user = auth.dbUser;
     final region =
         (user?.country?['isoCode'] as String?)?.toUpperCase() ?? 'US';
     logger.d('[HomeScreen] loading, user=[200b${user?.id}, region=$region');
 
+    // Refresh the profile without holding up above-the-fold home content.
+    unawaited(auth.refreshUserData());
+    _loadedForUserId = user?.id;
+
+    // Secondary sections manage their own loading/error states and should not
+    // keep the whole page behind a skeleton.
+    unawaited(_loadSecondaryContent(user));
+    unawaited(_loadTrendingGroups());
+
     try {
       final results = await Future.wait([
         TrendingService.getTrendingMovies(),
         movieService.getNowPlayingMovies(region: region),
-        if (user != null)
-          _friendActions.getFriendsActivityLists(user.id)
-        else
-          Future.value([]),
-        if (user != null)
-          RecommendationService.getRecommendationsFromHighlyRated(
-                  userId: user.id)
-              .catchError((_) => null)
-        else
-          Future.value(null),
-        if (user != null)
-          RecommendationService.getUserRecommendations(user.id)
-              .catchError((_) => <MovieShort>[])
-        else
-          Future.value(<MovieShort>[]),
-        if (user != null)
-          _watchlistActions
-              .getUserWatchlist(user.id)
-              .catchError((_) => <WatchlistMovie>[])
-        else
-          Future.value(<WatchlistMovie>[]),
-        if (user != null)
-          RequestService.getWatchRequests(user.id)
-              .catchError((_) => <WatchRequest>[])
-        else
-          Future.value(<WatchRequest>[]),
       ]);
       if (mounted) {
-        final watchRequests = results.length > 6
-            ? results[6] as List<WatchRequest>
-            : <WatchRequest>[];
         setState(() {
-          _featuredMovies = results[0] as List<MovieShort>;
-          _nowPlayingMovies = (results[1] as List<MovieShort>).take(8).toList();
-          _friendsActivity =
-              results.length > 2 ? results[2] as List<ActivityListItem> : [];
-          _highlyRatedRecommendations = results.length > 3
-              ? results[3] as RecommendationFromHighlyRatedResponse?
-              : null;
-          final fallbackForYou = results.length > 4
-              ? results[4] as List<MovieShort>
-              : <MovieShort>[];
-          _forYouMovies = (_highlyRatedRecommendations?.recommendations ?? [])
-                  .isNotEmpty
-              ? (_highlyRatedRecommendations!.recommendations).take(20).toList()
-              : fallbackForYou.take(20).toList();
-          final watchlist = results.length > 5
-              ? results[5] as List<WatchlistMovie>
-              : <WatchlistMovie>[];
-          _watchlistMovieIds = watchlist.map((w) => w.movieId).toSet();
-          if (user != null) {
-            _watchRequestsNeedingResponse =
-                _countWatchRequestsNeedingResponse(watchRequests, user.id);
-            _watchRequestsScheduledToday =
-                _countWatchRequestsScheduledToday(watchRequests);
-            _watchRequestsUpcoming = _countUpcomingWatchRequests(watchRequests);
-          } else {
-            _watchRequestsNeedingResponse = 0;
-            _watchRequestsScheduledToday = 0;
-            _watchRequestsUpcoming = 0;
-          }
-          _watchRequestsLoading = false;
-          _loadedForUserId = user?.id;
+          _featuredMovies = results[0];
+          _nowPlayingMovies = results[1].take(8).toList();
           _isLoading = false;
         });
-      }
-      if (mounted) {
-        await _loadTrendingGroups();
       }
     } catch (e) {
       logger.e('[HomeScreen] load error: $e');
@@ -206,6 +154,57 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     }
+  }
+
+  Future<void> _loadSecondaryContent(models.User? user) async {
+    if (user == null) {
+      if (!mounted) return;
+      setState(() {
+        _friendsActivity = [];
+        _forYouMovies = [];
+        _watchlistMovieIds = {};
+        _watchRequestsNeedingResponse = 0;
+        _watchRequestsScheduledToday = 0;
+        _watchRequestsUpcoming = 0;
+        _watchRequestsLoading = false;
+      });
+      return;
+    }
+
+    final results = await Future.wait([
+      _friendActions
+          .getFriendsActivityLists(user.id)
+          .catchError((_) => <ActivityListItem>[]),
+      RecommendationService.getRecommendationsFromHighlyRated(userId: user.id)
+          .catchError((_) => null),
+      RecommendationService.getUserRecommendations(user.id)
+          .catchError((_) => <MovieShort>[]),
+      _watchlistActions
+          .getUserWatchlist(user.id)
+          .catchError((_) => <WatchlistMovie>[]),
+      RequestService.getWatchRequests(user.id)
+          .catchError((_) => <WatchRequest>[]),
+    ]);
+    if (!mounted || _loadedForUserId != user.id) return;
+
+    final highlyRated = results[1] as RecommendationFromHighlyRatedResponse?;
+    final fallbackForYou = results[2] as List<MovieShort>;
+    final watchRequests = results[4] as List<WatchRequest>;
+    setState(() {
+      _friendsActivity = results[0] as List<ActivityListItem>;
+      _forYouMovies = (highlyRated?.recommendations ?? []).isNotEmpty
+          ? highlyRated!.recommendations.take(20).toList()
+          : fallbackForYou.take(20).toList();
+      _watchlistMovieIds = (results[3] as List<WatchlistMovie>)
+          .map((item) => item.movieId)
+          .toSet();
+      _watchRequestsNeedingResponse =
+          _countWatchRequestsNeedingResponse(watchRequests, user.id);
+      _watchRequestsScheduledToday =
+          _countWatchRequestsScheduledToday(watchRequests);
+      _watchRequestsUpcoming = _countUpcomingWatchRequests(watchRequests);
+      _watchRequestsLoading = false;
+    });
   }
 
   int _countWatchRequestsNeedingResponse(

@@ -50,18 +50,21 @@ class _NotificationScreenState extends State<NotificationScreen> {
     final id = notification.id;
     if (id == null) return;
     try {
-      await NotificationService.updateNotification(id, closed: true);
+      await NotificationService.deleteNotification(id);
       if (mounted) {
         setState(() {
           _notifications.removeWhere((n) => n.id == id);
         });
+        context.read<AuthProvider>().setUnreadNotificationCount(
+              _notifications.where((n) => !n.isRead).length,
+            );
       }
     } catch (e) {
       logger.e('[NotificationScreen] close error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Failed to close notification.'),
+            content: Text('Failed to dismiss notification.'),
             backgroundColor: FlixieColors.danger,
           ),
         );

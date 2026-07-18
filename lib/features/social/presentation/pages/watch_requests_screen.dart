@@ -9,6 +9,7 @@ import 'package:flixie_app/features/social/data/request_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
+import 'package:flixie_app/core/calendar/watch_calendar_service.dart';
 
 const List<String> _kMonths = [
   'Jan',
@@ -310,6 +311,14 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
           decision: decision,
         );
         _replaceRequest(state.request);
+        final agreedTime = state.request.scheduledFor ?? proposal.proposedFor;
+        if (decision == 'accepted' && agreedTime != null) {
+          await WatchCalendarService.addScheduledWatch(
+            title: request.movie?.title ?? 'Movie',
+            scheduledFor: agreedTime,
+            note: request.message,
+          );
+        }
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

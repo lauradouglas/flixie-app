@@ -840,6 +840,11 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   // ---- Sliver app bar with hero image --------------------------------------
 
   Widget _buildSliverAppBar(BuildContext context, Movie movie) {
+    final useBackdrop = MediaQuery.sizeOf(context).shortestSide >= 600;
+    final preferredImage = useBackdrop ? movie.backdropPath : movie.posterPath;
+    final fallbackImage = useBackdrop ? movie.posterPath : movie.backdropPath;
+    final heroImagePath = preferredImage ?? fallbackImage;
+
     return SliverAppBar(
       expandedHeight: 430,
       pinned: false,
@@ -850,11 +855,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           fit: StackFit.expand,
           children: [
             MovieHeroBackdrop(
-              imagePath: movie.backdropPath != null
-                  ? 'https://image.tmdb.org/t/p/w780${movie.backdropPath}'
-                  : (movie.posterPath != null
-                      ? 'https://image.tmdb.org/t/p/w780${movie.posterPath}'
-                      : null),
+              imagePath: heroImagePath == null
+                  ? null
+                  : 'https://image.tmdb.org/t/p/w780$heroImagePath',
             ),
             const DecoratedBox(
               decoration: BoxDecoration(
@@ -2626,130 +2629,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.9,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: FlixieColors.background,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            children: [
-              // Handle bar
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: FlixieColors.medium,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              // Header
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Full Cast (${_cast.length})',
-                      style: const TextStyle(
-                        color: FlixieColors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, color: FlixieColors.light),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(color: FlixieColors.tabBarBorder, height: 1),
-              // Cast list
-              Expanded(
-                child: ListView.builder(
-                  controller: scrollController,
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _cast.length,
-                  itemBuilder: (context, index) {
-                    final member = _cast[index];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: FlixieColors.surface,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          // Profile image
-                          Container(
-                            width: 60,
-                            height: 80,
-                            decoration: BoxDecoration(
-                              color: FlixieColors.surfaceElevated,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            clipBehavior: Clip.antiAlias,
-                            child: member.profileImage != null
-                                ? CachedNetworkImage(
-                                    imageUrl:
-                                        'https://image.tmdb.org/t/p/w185${member.profileImage}',
-                                    fit: BoxFit.cover,
-                                    errorWidget: (_, __, ___) => const Icon(
-                                      Icons.person,
-                                      color: FlixieColors.medium,
-                                      size: 32,
-                                    ),
-                                  )
-                                : const Icon(
-                                    Icons.person,
-                                    color: FlixieColors.medium,
-                                    size: 32,
-                                  ),
-                          ),
-                          const SizedBox(width: 12),
-                          // Name and character
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  member.name,
-                                  style: const TextStyle(
-                                    color: FlixieColors.white,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  member.character,
-                                  style: const TextStyle(
-                                    color: FlixieColors.medium,
-                                    fontSize: 13,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      builder: (_) => _AllCastSheet(cast: _cast),
     );
   }
 
@@ -2792,7 +2672,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 170,
+          height: 194,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: _cast.length > 6 ? 6 : _cast.length,
@@ -2997,6 +2877,260 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _AllCastSheet extends StatefulWidget {
+  const _AllCastSheet({required this.cast});
+
+  final List<MovieCastMember> cast;
+
+  @override
+  State<_AllCastSheet> createState() => _AllCastSheetState();
+}
+
+class _AllCastSheetState extends State<_AllCastSheet> {
+  final _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<MovieCastMember> get _filteredCast {
+    final query = _query.trim().toLowerCase();
+    if (query.isEmpty) return widget.cast;
+    return widget.cast.where((member) {
+      return member.name.toLowerCase().contains(query) ||
+          member.character.toLowerCase().contains(query);
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _filteredCast;
+    return DraggableScrollableSheet(
+      initialChildSize: 0.9,
+      minChildSize: 0.55,
+      maxChildSize: 0.96,
+      builder: (context, scrollController) => Container(
+        decoration: const BoxDecoration(
+          color: FlixieColors.background,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 10, bottom: 6),
+              width: 42,
+              height: 4,
+              decoration: BoxDecoration(
+                color: FlixieColors.medium.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 6, 8, 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Cast',
+                          style: TextStyle(
+                            color: FlixieColors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(
+                          '${widget.cast.length} cast members',
+                          style: const TextStyle(
+                            color: FlixieColors.medium,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Close',
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded,
+                        color: FlixieColors.light),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (value) => setState(() => _query = value),
+                style: const TextStyle(color: FlixieColors.white),
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  hintText: 'Search cast or character',
+                  hintStyle: const TextStyle(color: FlixieColors.medium),
+                  prefixIcon: const Icon(Icons.search_rounded,
+                      color: FlixieColors.medium),
+                  suffixIcon: _query.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: 'Clear search',
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _query = '');
+                          },
+                          icon: const Icon(Icons.close_rounded,
+                              color: FlixieColors.medium),
+                        ),
+                  filled: true,
+                  fillColor: FlixieColors.surface,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide:
+                        BorderSide(color: Colors.white.withValues(alpha: 0.07)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: FlixieColors.primary),
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: filtered.isEmpty
+                  ? const _EmptyCastSearch()
+                  : ListView.separated(
+                      controller: scrollController,
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                      itemCount: filtered.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) =>
+                          _FullCastCard(member: filtered[index]),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FullCastCard extends StatelessWidget {
+  const _FullCastCard({required this.member});
+
+  final MovieCastMember member;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: FlixieColors.surface,
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () {
+          Navigator.pop(context);
+          context.push('/people/${member.id}');
+        },
+        child: SizedBox(
+          height: 104,
+          child: Row(
+            children: [
+              SizedBox(
+                width: 82,
+                height: double.infinity,
+                child: member.profileImage == null
+                    ? const ColoredBox(
+                        color: FlixieColors.surfaceElevated,
+                        child: Icon(Icons.person_rounded,
+                            color: FlixieColors.medium, size: 36),
+                      )
+                    : CachedNetworkImage(
+                        imageUrl:
+                            'https://image.tmdb.org/t/p/w185${member.profileImage}',
+                        fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) => const ColoredBox(
+                          color: FlixieColors.surfaceElevated,
+                          child: Icon(Icons.person_rounded,
+                              color: FlixieColors.medium, size: 36),
+                        ),
+                      ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      member.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: FlixieColors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        height: 1.15,
+                      ),
+                    ),
+                    if (member.character.trim().isNotEmpty) ...[
+                      const SizedBox(height: 5),
+                      Text(
+                        member.character,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: FlixieColors.medium,
+                          fontSize: 12.5,
+                          height: 1.25,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.chevron_right_rounded,
+                  color: FlixieColors.medium),
+              const SizedBox(width: 10),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyCastSearch extends StatelessWidget {
+  const _EmptyCastSearch();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.person_search_rounded,
+              color: FlixieColors.medium, size: 42),
+          SizedBox(height: 10),
+          Text('No cast members found',
+              style: TextStyle(
+                  color: FlixieColors.light, fontWeight: FontWeight.w700)),
+        ],
+      ),
     );
   }
 }

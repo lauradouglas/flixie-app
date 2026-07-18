@@ -91,6 +91,10 @@ class AuthProvider extends ChangeNotifier {
   /// Call once the root navigator is ready (e.g. in [FlixieApp.initState]).
   void setNavigatorKey(GlobalKey<NavigatorState> key) {
     _navigatorKey = key;
+    final externalId = _dbUser?.externalId;
+    if (externalId != null && _status == AuthStatus.authenticated) {
+      _initializePushNotifications(externalId);
+    }
   }
 
   AuthStatus get status => _status;
@@ -233,7 +237,7 @@ class AuthProvider extends ChangeNotifier {
       // we do not want to block the sign-out flow on a network call, and any
       // failure is tolerable because the token will be re-registered on next
       // login.
-      if (_dbUser?.id != null && _dbUser!.externalId != null) {
+      if (_dbUser?.externalId != null) {
         unawaited(PushNotificationService.removeToken(_dbUser!.externalId!));
       }
       ApiClient.setToken(null);
@@ -278,6 +282,9 @@ class AuthProvider extends ChangeNotifier {
   /// Fetches profile/friend/home cache in parallel right after login.
   void _prefetch(String userId, {String region = 'US'}) {
     _isPrefetching = true;
+    // Token registration is independent of home/profile prefetching. Start it
+    // immediately so a slow secondary API cannot delay push notifications.
+    _initializePushNotifications(_dbUser?.externalId ?? userId);
     _prefetchCoordinator.prefetch(userId, region: region).then((snapshot) {
       _applyPrefetchSnapshot(snapshot);
       logger.i('[AuthProvider] Prefetch complete for $userId');
@@ -286,19 +293,6 @@ class AuthProvider extends ChangeNotifier {
         interval: const Duration(seconds: 30),
         onTick: refreshNotificationCount,
       );
-
-      // Initialise push notifications now that we have a valid user and the
-      // widget tree is about to be ready. We do this inside a post-frame
-      // callback to ensure the navigator key has been attached.
-      final key = _navigatorKey;
-      if (key != null) {
-        SchedulerBinding.instance.addPostFrameCallback((_) {
-          PushNotificationService.initialize(
-            userId: _dbUser?.externalId ?? userId,
-            navigatorKey: key,
-          );
-        });
-      }
 
       // Defer navigation trigger to avoid mid-frame widget tree mutations
       // (same pattern used in _onAuthStateChanged).
@@ -315,6 +309,17 @@ class AuthProvider extends ChangeNotifier {
         SchedulerBinding.instance
             .addPostFrameCallback((_) => notifyListeners());
       });
+    });
+  }
+
+  void _initializePushNotifications(String userId) {
+    final key = _navigatorKey;
+    if (key == null) return;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      unawaited(PushNotificationService.initialize(
+        userId: userId,
+        navigatorKey: key,
+      ));
     });
   }
 
@@ -601,11 +606,29 @@ class AuthProvider extends ChangeNotifier {
         );
       }
       _firebaseUser = _authService.currentUser;
+
+      // Do not let the user continue to avatar selection or onboarding until
+      // both identity stores agree that the account exists. Firebase account
+      // creation rejects an email that is already registered there, while the
+      // backend profile creation enforces the database uniqueness rules.
+      _dbUser ??= await _createBackendProfileWithAuthRetry(
+        _pendingSignupProfile!,
+      );
       return true;
+    } on ApiException catch (error) {
+      _errorCode = error.code;
+      _errorMessage = _signupApiErrorMessage(error);
+      return false;
     } on firebase_auth.FirebaseAuthException catch (error) {
       _pendingSignupProfile = null;
       _pendingSignupEmail = null;
       _errorMessage = AuthService.messageFromAuthException(error);
+      return false;
+    } catch (error) {
+      logger.e('Account creation failed: $error');
+      _errorMessage = _authService.currentUser == null
+          ? 'Failed to create account. Please try again.'
+          : 'Your account was created, but your Flixie profile could not be saved. Please try again.';
       return false;
     } finally {
       _isSigningUp = false;
@@ -620,6 +643,9 @@ class AuthProvider extends ChangeNotifier {
     _isSigningUp = true;
     _pendingAvatarId = avatarId;
     try {
+      // Normally created by beginAvatarSignUp before this screen is shown.
+      // Keep this fallback for a safe retry if an older in-progress signup is
+      // resumed after an app update.
       _dbUser ??= await _createBackendProfileWithAuthRetry(
         _pendingSignupProfile!,
       );
