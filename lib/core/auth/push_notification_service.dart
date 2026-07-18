@@ -387,6 +387,8 @@ class PushNotificationService {
 
   /// Converts a notification data map into a GoRouter path.
   static String _buildDeepLinkPath(Map<String, dynamic> data) {
+    final route = data['route']?.toString();
+    if (route != null && route.startsWith('/')) return route;
     final type = (data['type'] as String? ?? '').toUpperCase();
     final groupId = data['groupId'] as String?;
     final friendId = data['friendId'] as String?;

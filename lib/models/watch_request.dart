@@ -94,6 +94,7 @@ class WatchScheduleProposal {
   final String proposerId;
   final DateTime? proposedFor;
   final String? message;
+  final String? location;
   final String status;
   final String? createdAt;
   final String? updatedAt;
@@ -103,6 +104,7 @@ class WatchScheduleProposal {
     required this.proposerId,
     this.proposedFor,
     this.message,
+    this.location,
     this.status = 'PENDING',
     this.createdAt,
     this.updatedAt,
@@ -114,6 +116,7 @@ class WatchScheduleProposal {
       proposerId: (json['proposerId'] ?? json['userId'])?.toString() ?? '',
       proposedFor: _dateTimeValue(json['proposedFor']),
       message: json['message'] as String?,
+      location: json['location'] as String?,
       status: json['status']?.toString() ?? 'PENDING',
       createdAt: json['createdAt'] as String?,
       updatedAt: json['updatedAt'] as String?,
@@ -188,6 +191,7 @@ class WatchRequest {
   final String? updatedAt;
   final DateTime? proposedDate;
   final DateTime? scheduledFor;
+  final String? location;
   final String scheduleStatus;
   final String? scheduledById;
   final String watchedStatus;
@@ -223,6 +227,7 @@ class WatchRequest {
     this.updatedAt,
     this.proposedDate,
     this.scheduledFor,
+    this.location,
     this.scheduleStatus = 'NONE',
     this.scheduledById,
     this.watchedStatus = 'NOT_DUE',
@@ -271,6 +276,7 @@ class WatchRequest {
       updatedAt: json['updatedAt'] as String?,
       proposedDate: _dateTimeValue(json['proposedDate']),
       scheduledFor: _dateTimeValue(json['scheduledFor']),
+      location: (json['location'] ?? json['locationLabel'])?.toString(),
       scheduleStatus: json['scheduleStatus']?.toString() ?? 'NONE',
       scheduledById: json['scheduledById']?.toString(),
       watchedStatus: json['watchedStatus']?.toString() ?? 'NOT_DUE',

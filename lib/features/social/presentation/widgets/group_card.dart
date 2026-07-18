@@ -128,15 +128,22 @@ class _MemberAvatars extends StatelessWidget {
                     width: 2,
                   ),
                 ),
-                child: ProfileAvatarView(
-                  avatar: shown[index].avatar,
-                  fallbackText: shown[index].initials ??
-                      (shown[index].username?.isNotEmpty == true
-                          ? shown[index].username![0].toUpperCase()
-                          : '?'),
-                  fallbackColor: FlixieColors.primary,
-                  size: 28,
-                ),
+                child: shown[index].avatar != null
+                    ? ProfileAvatarView(
+                        avatar: shown[index].avatar,
+                        fallbackText: '',
+                        fallbackColor: FlixieColors.primary,
+                        size: 28,
+                      )
+                    : const CircleAvatar(
+                        radius: 14,
+                        backgroundColor: FlixieColors.primary,
+                        child: Icon(
+                          Icons.person_rounded,
+                          size: 17,
+                          color: FlixieColors.light,
+                        ),
+                      ),
               ),
             ),
         ],

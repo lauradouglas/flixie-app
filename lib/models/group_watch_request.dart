@@ -239,6 +239,7 @@ class GroupWatchRequest {
   final WatchRequestStatus status;
   final String? proposedDate;
   final String? scheduledFor;
+  final String? location;
   final String? expiresAt;
   final String? completedAt;
   final String? cancelledAt;
@@ -271,6 +272,7 @@ class GroupWatchRequest {
     this.status = WatchRequestStatus.open,
     this.proposedDate,
     this.scheduledFor,
+    this.location,
     this.expiresAt,
     this.completedAt,
     this.cancelledAt,
@@ -343,6 +345,7 @@ class GroupWatchRequest {
       status: WatchRequestStatus.fromString(json['status'] as String?),
       proposedDate: json['proposedDate'] as String?,
       scheduledFor: json['scheduledFor'] as String?,
+      location: (json['location'] ?? json['locationLabel']) as String?,
       expiresAt: json['expiresAt'] as String?,
       completedAt: json['completedAt'] as String?,
       cancelledAt: json['cancelledAt'] as String?,

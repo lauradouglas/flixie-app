@@ -5,6 +5,7 @@ import 'package:flixie_app/models/group_watch_request.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
+import 'package:flixie_app/core/calendar/watch_calendar_service.dart';
 import 'package:flixie_app/features/social/presentation/widgets/request_poster_placeholder.dart';
 
 const List<String> _kRequestMonths = [
@@ -293,7 +294,8 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
 
   Future<void> _scheduleRequest(GroupWatchRequest req,
       {String? initialIso}) async {
-    final selected = await showModalBottomSheet<DateTime>(
+    final selected =
+        await showModalBottomSheet<({DateTime scheduledFor, String? location})>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -311,14 +313,26 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
         convId,
         req.id,
         userId: userId,
-        scheduledFor: selected.toUtc().toIso8601String(),
+        scheduledFor: selected.scheduledFor.toUtc().toIso8601String(),
+        location: selected.location,
       );
       await _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Watch scheduled for ${_fullDateTime(selected)}'),
+            content: Text(
+                'Watch scheduled for ${_fullDateTime(selected.scheduledFor)}'),
             backgroundColor: FlixieColors.success,
+            action: SnackBarAction(
+              label: 'Add to calendar',
+              textColor: FlixieColors.background,
+              onPressed: () => WatchCalendarService.addScheduledWatch(
+                title: req.movieTitle ?? 'Watch together',
+                scheduledFor: selected.scheduledFor,
+                note: req.message,
+                location: selected.location ?? req.location,
+              ),
+            ),
           ),
         );
       }
@@ -1028,6 +1042,25 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
           ),
         if (req.status == WatchRequestStatus.scheduled && showScheduling)
           SizedBox(
+            width: 170,
+            child: _responseButton(
+              label: 'Add to calendar',
+              icon: Icons.event_available_outlined,
+              color: FlixieColors.secondary,
+              onPressed: () {
+                final scheduledFor = DateTime.tryParse(req.scheduledFor ?? '');
+                if (scheduledFor == null) return;
+                WatchCalendarService.addScheduledWatch(
+                  title: req.movieTitle ?? 'Watch together',
+                  scheduledFor: scheduledFor,
+                  note: req.message,
+                  location: req.location,
+                );
+              },
+            ),
+          ),
+        if (req.status == WatchRequestStatus.scheduled && showScheduling)
+          SizedBox(
             width: 150,
             child: _responseButton(
               label: 'Unschedule',
@@ -1196,6 +1229,30 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
                                     fontWeight: FontWeight.w600,
                                   ),
                                   overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        if (req.location?.trim().isNotEmpty == true) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(
+                                Icons.location_on_outlined,
+                                size: 15,
+                                color: FlixieColors.secondary,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  req.location!.trim(),
+                                  style: const TextStyle(
+                                    color: FlixieColors.light,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                             ],
@@ -1376,6 +1433,7 @@ class _GroupScheduleWatchSheet extends StatefulWidget {
 
 class _GroupScheduleWatchSheetState extends State<_GroupScheduleWatchSheet> {
   late DateTime _selected;
+  final TextEditingController _locationController = TextEditingController();
 
   @override
   void initState() {
@@ -1454,10 +1512,26 @@ class _GroupScheduleWatchSheetState extends State<_GroupScheduleWatchSheet> {
               onTap: _pickTime,
             ),
             const SizedBox(height: 12),
+            TextField(
+              controller: _locationController,
+              style: const TextStyle(color: FlixieColors.light),
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.location_on_outlined),
+                labelText: 'Location (optional)',
+                hintText: 'e.g. My place or local cinema',
+              ),
+            ),
+            const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () => Navigator.pop(context, _selected),
+                onPressed: () => Navigator.pop(
+                  context,
+                  (
+                    scheduledFor: _selected,
+                    location: _locationController.text.trim(),
+                  ),
+                ),
                 child: const Text('Confirm schedule'),
               ),
             ),
@@ -1465,6 +1539,12 @@ class _GroupScheduleWatchSheetState extends State<_GroupScheduleWatchSheet> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _locationController.dispose();
+    super.dispose();
   }
 
   Future<void> _pickDate() async {

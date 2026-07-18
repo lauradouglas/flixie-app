@@ -3070,42 +3070,46 @@ class _FullCastCard extends StatelessWidget {
                         ),
                       ),
               ),
-              const SizedBox(width: 14),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      member.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: FlixieColors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        height: 1.15,
-                      ),
-                    ),
-                    if (member.character.trim().isNotEmpty) ...[
-                      const SizedBox(height: 5),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 15, 8, 15),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        member.character,
+                        member.name,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: FlixieColors.medium,
-                          fontSize: 12.5,
-                          height: 1.25,
+                          color: FlixieColors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.15,
+                          height: 1.2,
                         ),
                       ),
+                      if (member.character.trim().isNotEmpty) ...[
+                        const SizedBox(height: 7),
+                        Text(
+                          member.character,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: FlixieColors.medium,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
               const Icon(Icons.chevron_right_rounded,
-                  color: FlixieColors.medium),
-              const SizedBox(width: 10),
+                  color: FlixieColors.medium, size: 26),
+              const SizedBox(width: 14),
             ],
           ),
         ),

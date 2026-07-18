@@ -10,6 +10,7 @@ import 'package:flixie_app/features/profile/data/notification_service.dart';
 import 'package:flixie_app/features/social/data/request_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
+import 'package:flixie_app/core/calendar/watch_calendar_service.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/notification_activity_card.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/notification_request_card.dart';
 
@@ -338,7 +339,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
       setState(() => _processingIds.add(notificationId));
     }
     try {
-      await RequestService.respondToWatchScheduleProposal(
+      final state = await RequestService.respondToWatchScheduleProposal(
         watchRequestId: requestId,
         proposalId: proposalId,
         userId: userId,
@@ -346,6 +347,29 @@ class _NotificationScreenState extends State<NotificationScreen> {
       );
       await _load();
       if (!mounted) return;
+      final scheduledFor = state.request.scheduledFor;
+      if (decision == 'accepted' && scheduledFor != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Watch time agreed'),
+            backgroundColor: FlixieColors.success,
+            action: SnackBarAction(
+              label: 'Add to calendar',
+              textColor: FlixieColors.background,
+              onPressed: () => WatchCalendarService.addScheduledWatch(
+                title: state.request.movie?.title ??
+                    notification.watchMediaTitle ??
+                    'Watch together',
+                scheduledFor: scheduledFor,
+                note: state.request.message,
+                location:
+                    state.request.location ?? notification.watchRequestLocation,
+              ),
+            ),
+          ),
+        );
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(

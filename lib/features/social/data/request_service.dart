@@ -36,6 +36,7 @@ class RequestService {
     required String userId,
     required DateTime proposedFor,
     String? message,
+    String? location,
   }) async {
     await ApiClient.post(
       '/watch-requests/$watchRequestId/schedule-proposals',
@@ -44,6 +45,8 @@ class RequestService {
         'proposedFor': proposedFor.toUtc().toIso8601String(),
         if (message != null && message.trim().isNotEmpty)
           'message': message.trim(),
+        if (location != null && location.trim().isNotEmpty)
+          'location': location.trim(),
       },
     );
     return getWatchRequestState(watchRequestId: watchRequestId, userId: userId);
@@ -89,12 +92,15 @@ class RequestService {
     required String watchRequestId,
     required String userId,
     required DateTime? scheduledFor,
+    String? location,
   }) async {
     final data = await ApiClient.patch(
       '/watch-requests/$watchRequestId/schedule',
       body: {
         'userId': userId,
         'scheduledFor': scheduledFor?.toUtc().toIso8601String(),
+        if (location != null && location.trim().isNotEmpty)
+          'location': location.trim(),
       },
     );
     return WatchRequest.fromJson(data as Map<String, dynamic>);

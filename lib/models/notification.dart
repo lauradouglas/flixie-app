@@ -140,6 +140,18 @@ class FlixieNotification {
     return null;
   }
 
+  DateTime? get watchRequestProposedFor {
+    final raw = (_linkedWatchRequest ??
+        link?['groupRequest'] as Map<String, dynamic>?)?['proposedDate'];
+    return raw is String && raw.isNotEmpty ? DateTime.tryParse(raw) : null;
+  }
+
+  String? get watchRequestLocation {
+    final request =
+        _linkedWatchRequest ?? link?['groupRequest'] as Map<String, dynamic>?;
+    return (request?['location'] ?? request?['locationLabel'])?.toString();
+  }
+
   String? get watchRequestScheduleStatus {
     return _linkedWatchRequest?['scheduleStatus'] as String?;
   }

@@ -46,7 +46,19 @@ class NotificationRequestCard extends StatelessWidget {
 
   bool get _isWatchNotification =>
       notification.type == FlixieNotification.movieWatchRequest ||
-      notification.type == FlixieNotification.showWatchRequest;
+      notification.type == FlixieNotification.showWatchRequest ||
+      (notification.type == FlixieNotification.groupRequest &&
+          notification.groupWatchMovieTitle != null);
+
+  String get _watchRequestPath {
+    final groupId = notification.groupInviteGroupId;
+    if (notification.type == FlixieNotification.groupRequest &&
+        groupId != null &&
+        groupId.isNotEmpty) {
+      return '/groups/$groupId?tab=requests&requestId=${notification.linkedRequestId ?? ''}';
+    }
+    return '/watch-requests/${notification.linkedRequestId ?? ''}';
+  }
 
   Map<String, dynamic>? get _latestProposal =>
       notification.latestWatchScheduleProposal;
@@ -499,6 +511,8 @@ class NotificationRequestCard extends StatelessWidget {
     final posterUrl = posterPath == null
         ? null
         : 'https://image.tmdb.org/t/p/w185$posterPath';
+    final pendingTime = notification.watchRequestProposedFor;
+    final pendingLocation = notification.watchRequestLocation?.trim();
 
     return Container(
       clipBehavior: Clip.hardEdge,
@@ -586,6 +600,45 @@ class NotificationRequestCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       _buildSubtitleWidget(context),
+                      if (_isWatchNotification &&
+                          !_showsScheduleFlow &&
+                          (pendingTime != null ||
+                              pendingLocation?.isNotEmpty == true)) ...[
+                        const SizedBox(height: 9),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: FlixieColors.surface.withValues(alpha: 0.65),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: FlixieColors.tabBarBorder,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (pendingTime != null)
+                                _PendingWatchDetail(
+                                  icon: Icons.schedule_outlined,
+                                  text:
+                                      'Proposed for ${_formatScheduleDate(pendingTime)}',
+                                ),
+                              if (pendingTime != null &&
+                                  pendingLocation?.isNotEmpty == true)
+                                const SizedBox(height: 7),
+                              if (pendingLocation?.isNotEmpty == true)
+                                _PendingWatchDetail(
+                                  icon: Icons.location_on_outlined,
+                                  text: pendingLocation!,
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
                       if (hasMessage) ...[
                         const SizedBox(height: 8),
                         Container(
@@ -651,6 +704,28 @@ class NotificationRequestCard extends StatelessWidget {
               const SizedBox(
                 height: 28,
                 child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+              ),
+            ] else if (_isWatchNotification &&
+                notification.linkedRequestId != null) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => context.push(_watchRequestPath),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: FlixieColors.primary,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  icon: const Icon(Icons.visibility_outlined, size: 18),
+                  label: const Text(
+                    'View request',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
               ),
             ] else if (_canRespondToScheduleProposal) ...[
               const SizedBox(height: 10),
@@ -816,6 +891,35 @@ class NotificationRequestCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PendingWatchDetail extends StatelessWidget {
+  const _PendingWatchDetail({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 15, color: FlixieColors.secondary),
+        const SizedBox(width: 7),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              color: FlixieColors.light,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              height: 1.3,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

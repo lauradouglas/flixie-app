@@ -9,12 +9,14 @@ class WatchCalendarService {
     required String title,
     required DateTime scheduledFor,
     String? note,
+    String? location,
   }) async {
     try {
       return await Add2Calendar.addEvent2Cal(
         Event(
           title: 'Watch $title',
           description: _description(note),
+          location: location?.trim() ?? '',
           startDate: scheduledFor.toLocal(),
           endDate: scheduledFor.toLocal().add(const Duration(hours: 2)),
         ),

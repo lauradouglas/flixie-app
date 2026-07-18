@@ -4,6 +4,47 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('WatchRequest', () {
+    test('parses independently optional proposed time and location', () {
+      final request = WatchRequest.fromJson({
+        'id': 'request-1',
+        'type': 'MOVIE_WATCH_REQUEST',
+        'status': 'open',
+        'proposedDate': '2026-08-01T18:30:00.000Z',
+        'location': 'Odeon Leicester Square',
+      });
+
+      expect(request.proposedDate, DateTime.utc(2026, 8, 1, 18, 30));
+      expect(request.location, 'Odeon Leicester Square');
+
+      final locationOnly = WatchRequest.fromJson({
+        'id': 'request-2',
+        'type': 'MOVIE_WATCH_REQUEST',
+        'status': 'open',
+        'location': 'My place',
+      });
+      expect(locationOnly.proposedDate, isNull);
+      expect(locationOnly.location, 'My place');
+    });
+
+    test('parses location attached to a schedule proposal', () {
+      final request = WatchRequest.fromJson({
+        'id': 'request-with-plan',
+        'type': 'MOVIE_WATCH_REQUEST',
+        'status': 'ACCEPTED',
+        'scheduleStatus': 'PROPOSED',
+        'scheduleProposals': [
+          {
+            'id': 'proposal-1',
+            'proposerId': 'user-1',
+            'proposedFor': '2026-08-01T18:30:00.000Z',
+            'location': 'Odeon Leicester Square',
+            'status': 'PENDING',
+          },
+        ],
+      });
+
+      expect(request.latestPendingProposal?.location, 'Odeon Leicester Square');
+    });
     test('parses accepted lifecycle response with participants', () {
       final request = WatchRequest.fromJson({
         'id': 'wr-1',

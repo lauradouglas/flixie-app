@@ -169,6 +169,7 @@ class GroupService {
     String mediaType,
     int mediaId, {
     String? proposedDate,
+    String? location,
   }) async {
     final data = await ApiClient.post(
       '/groups/$groupId/send-request',
@@ -178,6 +179,7 @@ class GroupService {
         'mediaType': mediaType,
         'mediaId': mediaId,
         if (proposedDate != null) 'proposedDate': proposedDate,
+        if (location != null && location.isNotEmpty) 'location': location,
       },
     );
     if (data is Map<String, dynamic>) return data;
@@ -319,10 +321,16 @@ class GroupService {
     String requestId, {
     required String userId,
     required String? scheduledFor,
+    String? location,
   }) async {
     await ApiClient.patch(
       '/conversations/$conversationId/watch-requests/$requestId/schedule',
-      body: {'userId': userId, 'scheduledFor': scheduledFor},
+      body: {
+        'userId': userId,
+        'scheduledFor': scheduledFor,
+        if (location != null && location.trim().isNotEmpty)
+          'location': location.trim(),
+      },
     );
   }
 

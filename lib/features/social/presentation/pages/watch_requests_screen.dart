@@ -47,6 +47,21 @@ class WatchRequestsScreen extends StatefulWidget {
   State<WatchRequestsScreen> createState() => _WatchRequestsScreenState();
 }
 
+/// Dedicated full-page view for one watch request.
+class WatchRequestDetailScreen extends StatelessWidget {
+  const WatchRequestDetailScreen({
+    super.key,
+    required this.requestId,
+  });
+
+  final String requestId;
+
+  @override
+  Widget build(BuildContext context) {
+    return WatchRequestsScreen(initialRequestId: requestId);
+  }
+}
+
 class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
   final _searchController = TextEditingController();
 
@@ -129,6 +144,10 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
 
     setState(() {
       _filtered = _all.where((r) {
+        final focusedId = widget.initialRequestId;
+        if (focusedId != null && focusedId.isNotEmpty) {
+          return r.id == focusedId;
+        }
         // Status filter
         if (_statusFilter != _StatusFilter.all && !_matchesStatusFilter(r)) {
           return false;
@@ -256,8 +275,8 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
       {DateTime? initial}) async {
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (userId == null || userId.isEmpty) return;
-    final selected =
-        await showModalBottomSheet<({DateTime proposedFor, String? message})>(
+    final selected = await showModalBottomSheet<
+        ({DateTime proposedFor, String? message, String? location})>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -272,6 +291,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
           userId: userId,
           proposedFor: selected.proposedFor,
           message: selected.message,
+          location: selected.location,
         );
         _replaceRequest(state.request);
         if (!mounted) return;
@@ -312,12 +332,37 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         );
         _replaceRequest(state.request);
         final agreedTime = state.request.scheduledFor ?? proposal.proposedFor;
+        if (!mounted) return;
         if (decision == 'accepted' && agreedTime != null) {
-          await WatchCalendarService.addScheduledWatch(
-            title: request.movie?.title ?? 'Movie',
-            scheduledFor: agreedTime,
-            note: request.message,
-          );
+          final addToCalendar = await showDialog<bool>(
+                context: context,
+                builder: (dialogContext) => AlertDialog(
+                  title: const Text('Time agreed'),
+                  content: Text(
+                    'Add “${request.movie?.title ?? 'Watch together'}” to your phone calendar?',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(dialogContext, false),
+                      child: const Text('Not now'),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => Navigator.pop(dialogContext, true),
+                      icon: const Icon(Icons.event_available_outlined),
+                      label: const Text('Add to calendar'),
+                    ),
+                  ],
+                ),
+              ) ??
+              false;
+          if (addToCalendar) {
+            await WatchCalendarService.addScheduledWatch(
+              title: request.movie?.title ?? 'Watch together',
+              scheduledFor: agreedTime,
+              note: request.message,
+              location: request.location,
+            );
+          }
         }
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -384,86 +429,93 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isFocused = widget.initialRequestId?.isNotEmpty == true;
     return FlixiePageScaffold(
       appBar: FlixieTitleAppBar(
         backgroundColor: FlixieColors.background,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Watch Requests',
-                style: TextStyle(
+            Text(isFocused ? 'Watch Request' : 'Watch Requests',
+                style: const TextStyle(
                     color: Colors.white,
                     fontSize: 22,
                     fontWeight: FontWeight.bold)),
-            if (!_loading && _error == null)
+            if (!isFocused && !_loading && _error == null)
               Text('${_all.length} total',
                   style: const TextStyle(
                       color: FlixieColors.medium, fontSize: 12)),
           ],
         ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(104),
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: TextField(
-                  controller: _searchController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'Search by movie or username...',
-                    hintStyle: const TextStyle(color: FlixieColors.medium),
-                    prefixIcon:
-                        const Icon(Icons.search, color: FlixieColors.medium),
-                    filled: true,
-                    fillColor: FlixieColors.tabBarBackgroundFocused,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                  ),
-                ),
-              ),
-              // Status filter chips
-              Container(
-                width: double.infinity,
-                color: FlixieColors.tabBarBackgroundFocused,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: _StatusFilter.values.map((f) {
-                      final selected = _statusFilter == f;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: Text(_filterLabel(f)),
-                          selected: selected,
-                          onSelected: (_) {
-                            setState(() => _statusFilter = f);
-                            _applyFilter();
-                          },
-                          selectedColor: _statusFilterColor(f),
-                          backgroundColor: FlixieColors.tabBarBorder,
-                          labelStyle: TextStyle(
-                            color: selected ? Colors.black : FlixieColors.light,
-                            fontWeight:
-                                selected ? FontWeight.w600 : FontWeight.normal,
-                            fontSize: 13,
+        bottom: isFocused
+            ? null
+            : PreferredSize(
+                preferredSize: const Size.fromHeight(104),
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: TextField(
+                        controller: _searchController,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          hintText: 'Search by movie or username...',
+                          hintStyle:
+                              const TextStyle(color: FlixieColors.medium),
+                          prefixIcon: const Icon(Icons.search,
+                              color: FlixieColors.medium),
+                          filled: true,
+                          fillColor: FlixieColors.tabBarBackgroundFocused,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide.none,
                           ),
-                          side: BorderSide.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
                         ),
-                      );
-                    }).toList(),
-                  ),
+                      ),
+                    ),
+                    // Status filter chips
+                    Container(
+                      width: double.infinity,
+                      color: FlixieColors.tabBarBackgroundFocused,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: _StatusFilter.values.map((f) {
+                            final selected = _statusFilter == f;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: ChoiceChip(
+                                label: Text(_filterLabel(f)),
+                                selected: selected,
+                                onSelected: (_) {
+                                  setState(() => _statusFilter = f);
+                                  _applyFilter();
+                                },
+                                selectedColor: _statusFilterColor(f),
+                                backgroundColor: FlixieColors.tabBarBorder,
+                                labelStyle: TextStyle(
+                                  color: selected
+                                      ? Colors.black
+                                      : FlixieColors.light,
+                                  fontWeight: selected
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                  fontSize: 13,
+                                ),
+                                side: BorderSide.none,
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-        ),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -480,6 +532,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
                         separatorBuilder: (_, __) => const SizedBox(height: 10),
                         itemBuilder: (_, i) => _WatchRequestCard(
                           request: _filtered[i],
+                          compact: !isFocused,
                           myUserId:
                               context.read<AuthProvider>().dbUser?.id ?? '',
                           formattedDate: _formatDate(_filtered[i].createdAt),
@@ -493,10 +546,15 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
                           onAccept: () => _respond(_filtered[i], 'ACCEPTED'),
                           onMaybe: () => _respond(_filtered[i], 'MAYBE'),
                           onDecline: () => _respond(_filtered[i], 'DECLINED'),
-                          onOpen: () => _refreshRequestState(
-                            _filtered[i],
-                            context.read<AuthProvider>().dbUser?.id ?? '',
-                          ),
+                          onOpen: isFocused
+                              ? () => _refreshRequestState(
+                                    _filtered[i],
+                                    context.read<AuthProvider>().dbUser?.id ??
+                                        '',
+                                  )
+                              : () => context.push(
+                                    '/watch-requests/${_filtered[i].id}',
+                                  ),
                           onSuggestSchedule: () =>
                               _suggestSchedule(_filtered[i]),
                           onSuggestDifferentTime: () => _suggestSchedule(
@@ -612,6 +670,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
 class _WatchRequestCard extends StatelessWidget {
   const _WatchRequestCard({
     required this.request,
+    required this.compact,
     required this.myUserId,
     required this.formattedDate,
     required this.scheduledLabel,
@@ -628,6 +687,7 @@ class _WatchRequestCard extends StatelessWidget {
   });
 
   final WatchRequest request;
+  final bool compact;
   final String myUserId;
   final String formattedDate;
   final String scheduledLabel;
@@ -705,6 +765,10 @@ class _WatchRequestCard extends StatelessWidget {
         ? 'https://image.tmdb.org/t/p/w185${movie!.posterPath}'
         : null;
 
+    if (!compact) {
+      return _buildFullDetail(context, other, isSent, movie, posterUrl);
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: FlixieColors.tabBarBackgroundFocused,
@@ -717,9 +781,10 @@ class _WatchRequestCard extends StatelessWidget {
       child: InkWell(
         onTap: onOpen,
         borderRadius: BorderRadius.circular(12),
-        child: IntrinsicHeight(
+        child: SizedBox(
+          height: compact ? 166 : null,
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Poster
               GestureDetector(
@@ -729,6 +794,7 @@ class _WatchRequestCard extends StatelessWidget {
                       const BorderRadius.horizontal(left: Radius.circular(12)),
                   child: SizedBox(
                     width: 80,
+                    height: compact ? 166 : 190,
                     child: posterUrl != null
                         ? CachedNetworkImage(
                             imageUrl: posterUrl,
@@ -780,8 +846,52 @@ class _WatchRequestCard extends StatelessWidget {
                           ],
                         ),
                       ),
-                      // Message
-                      if (request.message != null &&
+                      if (compact) ...[
+                        if (_effectiveWatchTime != null) ...[
+                          const SizedBox(height: 9),
+                          _CompactWatchDetail(
+                            icon: Icons.schedule_outlined,
+                            text: _dateLabel(_effectiveWatchTime),
+                          ),
+                        ],
+                        if (_effectiveLocation?.isNotEmpty == true) ...[
+                          const SizedBox(height: 7),
+                          _CompactWatchDetail(
+                            icon: Icons.location_on_outlined,
+                            text: _effectiveLocation!,
+                          ),
+                        ],
+                        const Spacer(),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: OutlinedButton.icon(
+                            onPressed: onOpen,
+                            icon:
+                                const Icon(Icons.visibility_outlined, size: 15),
+                            label: const Text('View request'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: FlixieColors.primary,
+                              side: BorderSide(
+                                color: FlixieColors.primary
+                                    .withValues(alpha: 0.45),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              minimumSize: const Size(0, 30),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              textStyle: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                      // Detail-only content
+                      if (!compact &&
+                          request.message != null &&
                           request.message!.isNotEmpty) ...[
                         const SizedBox(height: 6),
                         Text(
@@ -794,63 +904,109 @@ class _WatchRequestCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
-                      const Spacer(),
+                      if (!compact &&
+                          (_effectiveWatchTime != null ||
+                              _effectiveLocation?.isNotEmpty == true)) ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: FlixieColors.surface.withValues(alpha: 0.7),
+                            borderRadius: BorderRadius.circular(9),
+                            border: Border.all(
+                              color: FlixieColors.tabBarBorder,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (_effectiveWatchTime != null)
+                                _WatchDetailRow(
+                                  icon: request.scheduledFor != null
+                                      ? Icons.event_available_outlined
+                                      : Icons.schedule_outlined,
+                                  label: request.scheduledFor != null ||
+                                          request.normalizedScheduleStatus ==
+                                              'AGREED'
+                                      ? 'Scheduled'
+                                      : 'Proposed time',
+                                  value: _dateLabel(_effectiveWatchTime),
+                                ),
+                              if (_effectiveWatchTime != null &&
+                                  _effectiveLocation?.isNotEmpty == true)
+                                const SizedBox(height: 8),
+                              if (_effectiveLocation?.isNotEmpty == true)
+                                _WatchDetailRow(
+                                  icon: Icons.location_on_outlined,
+                                  label: 'Location',
+                                  value: _effectiveLocation!,
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      if (!compact) const SizedBox(height: 12),
                       // Accept/Decline buttons for pending requests (if recipient)
-                      _LifecycleSummary(
-                        request: request,
-                        scheduledLabel: _scheduleSummaryLabel(),
-                        myUserId: myUserId,
-                      ),
-                      if (_proposalNoteText != null) ...[
+                      if (!compact)
+                        _LifecycleSummary(
+                          request: request,
+                          scheduledLabel: _scheduleSummaryLabel(),
+                          myUserId: myUserId,
+                        ),
+                      if (!compact && _proposalNoteText != null) ...[
                         const SizedBox(height: 7),
                         _ProposalNote(text: _proposalNoteText!),
                       ],
-                      const SizedBox(height: 10),
-                      _buildActions(),
-                      const SizedBox(height: 8),
+                      if (!compact) ...[
+                        const SizedBox(height: 10),
+                        _buildActions(),
+                        const SizedBox(height: 8),
+                      ],
                       // Status badge + date
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 6,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: _statusColor.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: _statusColor.withValues(alpha: 0.4),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(_statusIcon,
-                                    size: 12, color: _statusColor),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _statusLabel,
-                                  style: TextStyle(
-                                    color: _statusColor,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                      if (!compact)
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: _statusColor.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: _statusColor.withValues(alpha: 0.4),
                                 ),
-                              ],
-                            ),
-                          ),
-                          if (formattedDate.isNotEmpty)
-                            Text(
-                              formattedDate,
-                              style: const TextStyle(
-                                color: FlixieColors.medium,
-                                fontSize: 11,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(_statusIcon,
+                                      size: 12, color: _statusColor),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    _statusLabel,
+                                    style: TextStyle(
+                                      color: _statusColor,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                        ],
-                      ),
+                            if (formattedDate.isNotEmpty)
+                              Text(
+                                formattedDate,
+                                style: const TextStyle(
+                                  color: FlixieColors.medium,
+                                  fontSize: 11,
+                                ),
+                              ),
+                          ],
+                        ),
                     ],
                   ),
                 ),
@@ -858,6 +1014,146 @@ class _WatchRequestCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildFullDetail(
+    BuildContext context,
+    WatchRequestUser? other,
+    bool isSent,
+    WatchRequestMovieDetails? movie,
+    String? posterUrl,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              GestureDetector(
+                onTap: onMovieTap,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(
+                    width: 108,
+                    height: 162,
+                    child: posterUrl != null
+                        ? CachedNetworkImage(
+                            imageUrl: posterUrl,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) =>
+                                const _PosterPlaceholder(),
+                          )
+                        : const _PosterPlaceholder(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 18),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        movie?.title ?? 'Watch request',
+                        style: const TextStyle(
+                          color: FlixieColors.primary,
+                          fontSize: 23,
+                          fontWeight: FontWeight.w800,
+                          height: 1.15,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        '${isSent ? 'To' : 'From'}: ${other?.username ?? 'Unknown user'}',
+                        style: const TextStyle(
+                          color: FlixieColors.light,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      _DetailStatusBadge(
+                        icon: _statusIcon,
+                        label: _statusLabel,
+                        color: _statusColor,
+                      ),
+                      if (formattedDate.isNotEmpty) ...[
+                        const SizedBox(height: 9),
+                        Text(
+                          'Requested $formattedDate',
+                          style: const TextStyle(
+                            color: FlixieColors.medium,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 26),
+          const Divider(color: FlixieColors.tabBarBorder),
+          if (_effectiveWatchTime != null || _effectiveLocation != null) ...[
+            const SizedBox(height: 18),
+            const _DetailSectionTitle(title: 'Plans'),
+            const SizedBox(height: 12),
+            if (_effectiveWatchTime != null)
+              _WatchDetailRow(
+                icon: request.scheduledFor != null
+                    ? Icons.event_available_outlined
+                    : Icons.schedule_outlined,
+                label: request.scheduledFor != null ? 'Scheduled' : 'Proposed',
+                value: _dateLabel(_effectiveWatchTime),
+              ),
+            if (_effectiveWatchTime != null && _effectiveLocation != null)
+              const SizedBox(height: 12),
+            if (_effectiveLocation != null)
+              _WatchDetailRow(
+                icon: Icons.location_on_outlined,
+                label: 'Location',
+                value: _effectiveLocation!,
+              ),
+            const SizedBox(height: 20),
+            const Divider(color: FlixieColors.tabBarBorder),
+          ],
+          if (request.message?.trim().isNotEmpty == true) ...[
+            const SizedBox(height: 18),
+            const _DetailSectionTitle(title: 'Message'),
+            const SizedBox(height: 10),
+            Text(
+              request.message!.trim(),
+              style: const TextStyle(
+                color: FlixieColors.light,
+                fontSize: 14,
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Divider(color: FlixieColors.tabBarBorder),
+          ],
+          const SizedBox(height: 18),
+          const _DetailSectionTitle(title: 'Request status'),
+          const SizedBox(height: 10),
+          _LifecycleSummary(
+            request: request,
+            scheduledLabel: _scheduleSummaryLabel(),
+            myUserId: myUserId,
+          ),
+          if (_proposalNoteText != null) ...[
+            const SizedBox(height: 10),
+            _ProposalNote(text: _proposalNoteText!),
+          ],
+          const SizedBox(height: 18),
+          _buildActions(),
+          const SizedBox(height: 28),
+        ],
       ),
     );
   }
@@ -1002,13 +1298,28 @@ class _WatchRequestCard extends StatelessWidget {
       final isFuture =
           scheduledFor != null && scheduledFor.isAfter(DateTime.now());
       if (!isFuture) return const SizedBox.shrink();
-      return Align(
-        alignment: Alignment.centerLeft,
-        child: _CompactActionButton(
-          icon: Icons.edit_calendar_outlined,
-          label: 'Suggest different',
-          onPressed: onSuggestDifferentTime,
-        ),
+      return Row(
+        children: [
+          Expanded(
+            child: _PrimaryActionButton(
+              label: 'Add to calendar',
+              onPressed: () => WatchCalendarService.addScheduledWatch(
+                title: request.movie?.title ?? 'Watch together',
+                scheduledFor: scheduledFor,
+                note: request.message,
+                location: request.location,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _CompactActionButton(
+              icon: Icons.edit_calendar_outlined,
+              label: 'Suggest different',
+              onPressed: onSuggestDifferentTime,
+            ),
+          ),
+        ],
       );
     }
 
@@ -1031,6 +1342,17 @@ class _WatchRequestCard extends StatelessWidget {
     final minute = local.minute.toString().padLeft(2, '0');
     final suffix = local.hour >= 12 ? 'pm' : 'am';
     return '${local.day} ${_kMonths[local.month - 1]}, $hour:$minute$suffix';
+  }
+
+  DateTime? get _effectiveWatchTime =>
+      request.scheduledFor ??
+      request.latestPendingProposal?.proposedFor ??
+      request.proposedDate;
+
+  String? get _effectiveLocation {
+    final value = request.location ?? request.latestPendingProposal?.location;
+    final trimmed = value?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
   }
 
   String _scheduleSummaryLabel() {
@@ -1067,6 +1389,134 @@ class _WatchRequestCard extends StatelessWidget {
     final message = _visibleScheduleProposal()?.message?.trim();
     if (message == null || message.isEmpty) return null;
     return message;
+  }
+}
+
+class _WatchDetailRow extends StatelessWidget {
+  const _WatchDetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 17, color: FlixieColors.secondary),
+        const SizedBox(width: 8),
+        Expanded(
+          child: RichText(
+            text: TextSpan(
+              style: const TextStyle(
+                color: FlixieColors.light,
+                fontSize: 12.5,
+                height: 1.35,
+              ),
+              children: [
+                TextSpan(
+                  text: '$label: ',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                TextSpan(text: value),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DetailSectionTitle extends StatelessWidget {
+  const _DetailSectionTitle({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title.toUpperCase(),
+      style: const TextStyle(
+        color: FlixieColors.medium,
+        fontSize: 11,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 1.1,
+      ),
+    );
+  }
+}
+
+class _DetailStatusBadge extends StatelessWidget {
+  const _DetailStatusBadge({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CompactWatchDetail extends StatelessWidget {
+  const _CompactWatchDetail({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 15, color: FlixieColors.secondary),
+        const SizedBox(width: 7),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: FlixieColors.light,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -1357,6 +1807,7 @@ class _ScheduleProposalSheet extends StatefulWidget {
 
 class _ScheduleProposalSheetState extends State<_ScheduleProposalSheet> {
   final TextEditingController _messageController = TextEditingController();
+  final TextEditingController _locationController = TextEditingController();
   late DateTime _selected;
 
   @override
@@ -1438,6 +1889,17 @@ class _ScheduleProposalSheetState extends State<_ScheduleProposalSheet> {
             ),
             const SizedBox(height: 8),
             TextField(
+              controller: _locationController,
+              textInputAction: TextInputAction.next,
+              style: const TextStyle(color: FlixieColors.light),
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.location_on_outlined),
+                labelText: 'Location (optional)',
+                hintText: 'e.g. My place or local cinema',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
               controller: _messageController,
               maxLines: 2,
               style: const TextStyle(color: FlixieColors.light),
@@ -1455,6 +1917,7 @@ class _ScheduleProposalSheetState extends State<_ScheduleProposalSheet> {
                   (
                     proposedFor: _selected,
                     message: _messageController.text.trim(),
+                    location: _locationController.text.trim(),
                   ),
                 ),
                 child: const Text('Send suggestion'),
@@ -1469,6 +1932,7 @@ class _ScheduleProposalSheetState extends State<_ScheduleProposalSheet> {
   @override
   void dispose() {
     _messageController.dispose();
+    _locationController.dispose();
     super.dispose();
   }
 
