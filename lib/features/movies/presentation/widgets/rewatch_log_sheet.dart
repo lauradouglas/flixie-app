@@ -14,6 +14,7 @@ class RewatchLogSheet extends StatefulWidget {
   final Future<void> Function({
     required String watchedAt,
     required double? rating,
+    required bool? recommended,
     required String? notes,
   }) onSubmit;
 
@@ -26,6 +27,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
   late TextEditingController _notesController;
   // null means "no rating"; 1-10 when set
   int? _rating;
+  bool? _recommended;
   bool _saving = false;
 
   @override
@@ -35,6 +37,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
         DateTime.tryParse(widget.initial?.watchedAt ?? '') ?? DateTime.now();
     final existingRating = widget.initial?.rating;
     _rating = existingRating?.round();
+    _recommended = _rating == null ? null : _rating! >= 7;
     _notesController = TextEditingController(text: widget.initial?.notes ?? '');
   }
 
@@ -138,7 +141,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  // Star rating (1-10)
+                  // Rating (1-10)
                   const Text(
                     'Rating (optional)',
                     style: TextStyle(
@@ -147,23 +150,51 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Row(
+                  Wrap(
+                    spacing: 7,
+                    runSpacing: 7,
                     children: List.generate(10, (i) {
                       final value = i + 1;
-                      final isSelected = _rating != null && value <= _rating!;
-                      return GestureDetector(
-                        onTap: () => setState(() {
-                          // Tapping the currently-selected last star clears the rating
-                          _rating = (_rating == value) ? null : value;
-                        }),
-                        child: Padding(
-                          padding: const EdgeInsets.only(right: 4),
-                          child: Icon(
-                            isSelected ? Icons.star : Icons.star_border,
+                      final isSelected = _rating == value;
+                      return ConstrainedBox(
+                        constraints:
+                            const BoxConstraints(minWidth: 48, minHeight: 42),
+                        child: ChoiceChip(
+                          label: Text('$value'),
+                          avatar: Icon(
+                            isSelected
+                                ? Icons.star_rounded
+                                : Icons.star_border_rounded,
+                            size: 17,
                             color:
-                                isSelected ? Colors.amber : FlixieColors.medium,
-                            size: 28,
+                                isSelected ? Colors.white : FlixieColors.medium,
                           ),
+                          selected: isSelected,
+                          showCheckmark: false,
+                          onSelected: (_) => setState(
+                            () {
+                              _rating = isSelected ? null : value;
+                              _recommended =
+                                  _rating == null ? null : value >= 7;
+                            },
+                          ),
+                          selectedColor: FlixieColors.primary,
+                          backgroundColor: FlixieColors.surfaceElevated,
+                          side: BorderSide(
+                            color: isSelected
+                                ? FlixieColors.primary
+                                : FlixieColors.tabBarBorder,
+                          ),
+                          labelStyle: TextStyle(
+                            color:
+                                isSelected ? Colors.white : FlixieColors.light,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                          visualDensity: VisualDensity.compact,
                         ),
                       );
                     }),
@@ -176,6 +207,32 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                       fontSize: 13,
                     ),
                   ),
+                  if (_rating != null) ...[
+                    const SizedBox(height: 12),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      value: _recommended ?? false,
+                      onChanged: (value) =>
+                          setState(() => _recommended = value),
+                      activeTrackColor: FlixieColors.success,
+                      title: Text(
+                        _recommended == true
+                            ? 'Recommended'
+                            : 'Not recommended',
+                        style: const TextStyle(
+                          color: FlixieColors.light,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      subtitle: const Text(
+                        'Scores of 7+ select recommended automatically, but you can change it.',
+                        style: TextStyle(
+                          color: FlixieColors.medium,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   // Notes
                   const Text(
@@ -221,6 +278,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                               await widget.onSubmit(
                                 watchedAt: _watchedAt.toUtc().toIso8601String(),
                                 rating: _rating?.toDouble(),
+                                recommended: _recommended,
                                 notes: _notesController.text.trim().isEmpty
                                     ? null
                                     : _notesController.text.trim(),

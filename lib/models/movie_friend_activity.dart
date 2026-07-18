@@ -8,6 +8,7 @@ class MovieFriendActivity {
   final bool favorited;
   final int? rating;
   final bool? reviewRecommended;
+  final bool? recommended;
   final int activityScore;
   final String? createdAt;
   final int? watchCount;
@@ -23,6 +24,7 @@ class MovieFriendActivity {
     required this.favorited,
     this.rating,
     this.reviewRecommended,
+    this.recommended,
     this.activityScore = 0,
     this.createdAt,
     this.watchCount,
@@ -41,6 +43,8 @@ class MovieFriendActivity {
       favorited: json['favorited'] as bool? ?? false,
       rating: _parseInt(json['rating']),
       reviewRecommended:
+          (json['review'] as Map<String, dynamic>?)?['recommended'] as bool?,
+      recommended: json['recommended'] as bool? ??
           (json['review'] as Map<String, dynamic>?)?['recommended'] as bool?,
       activityScore: _parseInt(json['activityScore']) ?? 0,
       createdAt: (json['createdAt'] ?? json['updatedAt']) as String?,

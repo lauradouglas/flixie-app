@@ -5,9 +5,14 @@ import 'package:provider/provider.dart';
 
 import 'package:flixie_app/models/watchlist_movie.dart';
 import 'package:flixie_app/models/watched_movie.dart';
+import 'package:flixie_app/models/movie_watch_entry.dart';
+import 'package:flixie_app/models/review.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/features/watchlist/presentation/controllers/watchlist_actions_controller.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_sheet.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/write_review_sheet.dart';
 
 const List<String> _kMonths = [
   'Jan',
@@ -62,11 +67,32 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
       return;
     }
     try {
-      final watched = await UserService.getUserWatchedMovies(userId);
-      final entries = watched
-          .map((m) => _toWatchedEntry(m))
-          .where((e) => e.movie != null)
-          .toList();
+      final results = await Future.wait<dynamic>([
+        UserService.getUserWatchedMovies(userId),
+        UserService.getUserMovieReviews(userId),
+      ]);
+      final watched = results[0] as List<WatchedMovie>;
+      final reviews = results[1] as List<Review>;
+      final history = await Future.wait(watched.map((item) async {
+        try {
+          return await WatchlistActionsController.instance
+              .getMovieWatchHistory(userId, item.movieId);
+        } catch (_) {
+          return <MovieWatchEntry>[];
+        }
+      }));
+      final reviewsByMovie = <int, Review>{
+        for (final review in reviews)
+          if (review.movieId != null) review.movieId!: review,
+      };
+      final entries = <_WatchedEntry>[
+        for (var index = 0; index < watched.length; index++)
+          _toWatchedEntry(
+            watched[index],
+            watches: history[index],
+            review: reviewsByMovie[watched[index].movieId],
+          ),
+      ].where((entry) => entry.movie != null).toList();
       if (!mounted) return;
       setState(() {
         _all = entries;
@@ -80,7 +106,11 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
     }
   }
 
-  _WatchedEntry _toWatchedEntry(WatchedMovie item) {
+  _WatchedEntry _toWatchedEntry(
+    WatchedMovie item, {
+    required List<MovieWatchEntry> watches,
+    Review? review,
+  }) {
     WatchlistMovieDetails? movie;
     final rawMovie = item.movie;
     if (rawMovie != null) {
@@ -88,14 +118,85 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
         movie = WatchlistMovieDetails.fromJson(rawMovie);
       } catch (_) {}
     }
+    final sortedWatches = [...watches]..sort(
+        (a, b) => _parseDate(b.watchedAt).compareTo(_parseDate(a.watchedAt)));
+    final latestWatch = sortedWatches.isEmpty ? null : sortedWatches.first;
     return _WatchedEntry(
       id: item.id,
       movieId: item.movieId,
-      watchedAt: item.watchedAt ?? item.createdAt,
-      rating: item.rating,
-      notes: item.notes,
+      watchedAt: latestWatch?.watchedAt ?? item.watchedAt ?? item.createdAt,
+      rating: latestWatch?.rating ?? item.rating,
+      notes: latestWatch?.notes ?? item.notes,
       movie: movie,
+      watches: sortedWatches,
+      review: review,
     );
+  }
+
+  Future<void> _openWatchEntry(_WatchedEntry entry,
+      {MovieWatchEntry? initial}) async {
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (userId == null) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => RewatchLogSheet(
+        initial: initial,
+        onSubmit: ({
+          required String watchedAt,
+          required double? rating,
+          required bool? recommended,
+          required String? notes,
+        }) async {
+          if (initial == null) {
+            await WatchlistActionsController.instance.logMovieWatch(
+              userId,
+              LogMovieWatchRequest(
+                movieId: entry.movieId,
+                watchedAt: watchedAt,
+                rating: rating,
+                recommended: recommended,
+                notes: notes,
+              ),
+            );
+          } else {
+            await WatchlistActionsController.instance.updateMovieWatch(
+              userId,
+              initial.id,
+              UpdateMovieWatchRequest(
+                watchedAt: watchedAt,
+                rating: rating,
+                recommended: recommended,
+                notes: notes,
+              ),
+            );
+          }
+          if (mounted) context.read<AuthProvider>().markActivityChanged();
+        },
+      ),
+    );
+    if (mounted) await _load();
+  }
+
+  Future<void> _writeReview(_WatchedEntry entry) async {
+    final auth = context.read<AuthProvider>();
+    final userId = auth.dbUser?.id;
+    if (userId == null) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => WriteReviewSheet(
+        movieId: entry.movieId,
+        userId: userId,
+        onSubmitted: (_) {
+          auth.invalidateCachedReviews();
+          auth.markActivityChanged();
+        },
+      ),
+    );
+    if (mounted) await _load();
   }
 
   void _applyFilter() {
@@ -229,6 +330,16 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
                       entry: entry,
                       formattedDate: _formatDate(entry.watchedAt),
                       onTap: () => context.push('/movies/${entry.movieId}'),
+                      onLogAgain: () => _openWatchEntry(entry),
+                      onEditEntry: entry.watches.isEmpty
+                          ? null
+                          : () => _openWatchEntry(
+                                entry,
+                                initial: entry.watches.first,
+                              ),
+                      onWriteReview: entry.review == null
+                          ? () => _writeReview(entry)
+                          : null,
                     );
                   },
                 ),
@@ -265,6 +376,8 @@ class _WatchedEntry {
   final double? rating;
   final String? notes;
   final WatchlistMovieDetails? movie;
+  final List<MovieWatchEntry> watches;
+  final Review? review;
 
   const _WatchedEntry({
     required this.id,
@@ -273,6 +386,8 @@ class _WatchedEntry {
     this.rating,
     this.notes,
     this.movie,
+    this.watches = const [],
+    this.review,
   });
 }
 
@@ -285,11 +400,17 @@ class _WatchedMovieCard extends StatelessWidget {
     required this.entry,
     required this.formattedDate,
     required this.onTap,
+    required this.onLogAgain,
+    this.onEditEntry,
+    this.onWriteReview,
   });
 
   final _WatchedEntry entry;
   final String formattedDate;
   final VoidCallback onTap;
+  final VoidCallback onLogAgain;
+  final VoidCallback? onEditEntry;
+  final VoidCallback? onWriteReview;
 
   @override
   Widget build(BuildContext context) {
@@ -312,15 +433,75 @@ class _WatchedMovieCard extends StatelessWidget {
               child: ClipRRect(
                 borderRadius:
                     const BorderRadius.vertical(top: Radius.circular(12)),
-                child: SizedBox.expand(
-                  child: posterUrl != null
-                      ? CachedNetworkImage(
-                          imageUrl: posterUrl,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) => _PosterFallback(),
-                          errorWidget: (_, __, ___) => _PosterFallback(),
-                        )
-                      : _PosterFallback(),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    posterUrl != null
+                        ? CachedNetworkImage(
+                            imageUrl: posterUrl,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => _PosterFallback(),
+                            errorWidget: (_, __, ___) => _PosterFallback(),
+                          )
+                        : _PosterFallback(),
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: PopupMenuButton<String>(
+                        color: FlixieColors.surfaceElevated,
+                        onSelected: (value) {
+                          if (value == 'log') onLogAgain();
+                          if (value == 'edit') onEditEntry?.call();
+                          if (value == 'review') onWriteReview?.call();
+                        },
+                        itemBuilder: (_) => [
+                          const PopupMenuItem(
+                            value: 'log',
+                            child: Text('Log another watch'),
+                          ),
+                          if (onEditEntry != null)
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: Text('Edit latest entry'),
+                            ),
+                          if (onWriteReview != null)
+                            const PopupMenuItem(
+                              value: 'review',
+                              child: Text('Write a review'),
+                            ),
+                        ],
+                        child: Container(
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.68),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.more_horiz,
+                              color: Colors.white, size: 18),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 7,
+                      bottom: 7,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.72),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          '${entry.watches.isEmpty ? 1 : entry.watches.length}× watched',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -368,7 +549,7 @@ class _WatchedMovieCard extends StatelessWidget {
                     if (entry.rating != null) ...[
                       const SizedBox(height: 4),
                       Text(
-                        'Your rating: ${entry.rating!.toStringAsFixed(1)}/10',
+                        'Your rating: ${entry.rating!.toStringAsFixed(1)}/10${entry.review != null ? ' • Reviewed' : ''}',
                         style: const TextStyle(
                           color: FlixieColors.tertiary,
                           fontSize: 11,
@@ -376,6 +557,16 @@ class _WatchedMovieCard extends StatelessWidget {
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
+                      ),
+                    ] else if (entry.review != null) ...[
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Review added',
+                        style: TextStyle(
+                          color: FlixieColors.primary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ],

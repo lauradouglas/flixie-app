@@ -44,22 +44,29 @@ class MovieService {
   }
 
   Future<Map<String, dynamic>> addMovieRating(
-      int movieId, String userId, int rating) async {
-    final data = await ApiClient.post('/movies/$movieId/add/rating',
-        body: {'userId': userId, 'rating': rating});
+      int movieId, String userId, int rating, bool recommended) async {
+    final data = await ApiClient.post('/movies/$movieId/add/rating', body: {
+      'userId': userId,
+      'rating': rating,
+      'recommended': recommended,
+    });
     return data as Map<String, dynamic>;
   }
 
-  Future<int?> getUserMovieRating(int movieId, String userId) async {
+  Future<({int? rating, bool? recommended})> getUserMovieRating(
+      int movieId, String userId) async {
     try {
       final data = await ApiClient.post('/movies/$movieId/user/rating',
           body: {'userId': userId});
       if (data != null && data is Map<String, dynamic>) {
         final r = data['rating'];
-        if (r != null) return (r as num).toInt();
+        return (
+          rating: r == null ? null : (r as num).toInt(),
+          recommended: data['recommended'] as bool?,
+        );
       }
     } catch (_) {}
-    return null;
+    return (rating: null, recommended: null);
   }
 
   Future<void> addToWatchlist(String userId, int movieId) async {

@@ -49,13 +49,13 @@ class FriendActivityRow extends StatelessWidget {
         color: FlixieColors.tertiary,
       ));
     }
-    if (activity.reviewRecommended == true) {
+    if (activity.recommended == true) {
       badges.add(const _ActivityBadge(
         icon: Icons.thumb_up_outlined,
-        label: 'Recommends',
+        label: 'Recommended',
         color: FlixieColors.success,
       ));
-    } else if (activity.reviewRecommended == false) {
+    } else if (activity.recommended == false) {
       badges.add(const _ActivityBadge(
         icon: Icons.thumb_down_outlined,
         label: 'Not recommended',
@@ -105,7 +105,8 @@ class FriendActivityRow extends StatelessWidget {
                     children: [
                       Expanded(
                         child: GestureDetector(
-                          onTap: () => context.push('/friends/${activity.userId}'),
+                          onTap: () =>
+                              context.push('/friends/${activity.userId}'),
                           child: Text(
                             displayName,
                             maxLines: 1,

@@ -398,6 +398,17 @@ class NotificationRequestCard extends StatelessWidget {
       );
     }
 
+    if (notification.type == FlixieNotification.friendRequest) {
+      return const Text(
+        'sent you a friend request',
+        style: TextStyle(
+          color: FlixieColors.light,
+          fontSize: 13,
+          height: 1.25,
+        ),
+      );
+    }
+
     return Text(
       notification.message.isNotEmpty
           ? notification.message

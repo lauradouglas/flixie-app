@@ -10,6 +10,12 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
 import 'package:flixie_app/core/calendar/watch_calendar_service.dart';
+import 'package:flixie_app/models/movie_watch_entry.dart';
+import 'package:flixie_app/models/review.dart';
+import 'package:flixie_app/features/watchlist/presentation/controllers/watchlist_actions_controller.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_sheet.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/watch_follow_up_sheet.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/write_review_sheet.dart';
 
 const List<String> _kMonths = [
   'Jan',
@@ -271,6 +277,70 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     });
   }
 
+  Future<void> _showWatchFollowUps(WatchRequest request, String userId) async {
+    final movie = request.movie;
+    if (movie == null || movie.id == 0 || !mounted) return;
+    final choice = await showModalBottomSheet<WatchFollowUpChoice>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => WatchFollowUpSheet(
+        movieTitle: movie.title,
+        posterPath: movie.posterPath,
+      ),
+    );
+    if (!mounted || choice == null) return;
+
+    if (choice.addWatchEntry) {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => RewatchLogSheet(
+          onSubmit: ({
+            required String watchedAt,
+            required double? rating,
+            required bool? recommended,
+            required String? notes,
+          }) async {
+            await WatchlistActionsController.instance.logMovieWatch(
+              userId,
+              LogMovieWatchRequest(
+                movieId: movie.id,
+                watchedAt: watchedAt,
+                rating: rating,
+                recommended: recommended,
+                notes: notes,
+              ),
+            );
+            await WatchlistActionsController.instance
+                .addToWatched(userId, movie.id);
+            if (mounted) {
+              context.read<AuthProvider>().markActivityChanged();
+            }
+          },
+        ),
+      );
+    }
+
+    if (mounted && choice.writeReview) {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => WriteReviewSheet(
+          movieId: movie.id,
+          userId: userId,
+          onSubmitted: (Review review) {
+            final auth = context.read<AuthProvider>();
+            auth.invalidateCachedReviews();
+            auth.markActivityChanged();
+          },
+        ),
+      );
+    }
+  }
+
   Future<void> _suggestSchedule(WatchRequest request,
       {DateTime? initial}) async {
     final userId = context.read<AuthProvider>().dbUser?.id;
@@ -415,6 +485,9 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
             backgroundColor: FlixieColors.success,
           ),
         );
+        if (result.watched) {
+          await _showWatchFollowUps(request, userId);
+        }
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -782,7 +855,7 @@ class _WatchRequestCard extends StatelessWidget {
         onTap: onOpen,
         borderRadius: BorderRadius.circular(12),
         child: SizedBox(
-          height: compact ? 166 : null,
+          height: compact ? 150 : null,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -793,8 +866,8 @@ class _WatchRequestCard extends StatelessWidget {
                   borderRadius:
                       const BorderRadius.horizontal(left: Radius.circular(12)),
                   child: SizedBox(
-                    width: 80,
-                    height: compact ? 166 : 190,
+                    width: 100,
+                    height: compact ? 150 : 190,
                     child: posterUrl != null
                         ? CachedNetworkImage(
                             imageUrl: posterUrl,
@@ -2020,15 +2093,7 @@ class _WatchConfirmationSheet extends StatefulWidget {
 }
 
 class _WatchConfirmationSheetState extends State<_WatchConfirmationSheet> {
-  final TextEditingController _reviewController = TextEditingController();
-  int? _rating;
   bool _watched = true;
-
-  @override
-  void dispose() {
-    _reviewController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -2107,37 +2172,11 @@ class _WatchConfirmationSheetState extends State<_WatchConfirmationSheet> {
               const SizedBox(height: 18),
               if (_watched) ...[
                 const Text(
-                  'Rating',
+                  'After confirming, you can add a watch entry or write a review.',
                   style: TextStyle(
-                      color: FlixieColors.light, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  children: List.generate(10, (index) {
-                    final value = index + 1;
-                    final selected = _rating == value;
-                    return ChoiceChip(
-                      label: Text('$value'),
-                      selected: selected,
-                      onSelected: (_) => setState(() => _rating = value),
-                      selectedColor: FlixieColors.primary,
-                      backgroundColor: FlixieColors.tabBarBackgroundFocused,
-                      labelStyle: TextStyle(
-                        color: selected ? Colors.black : FlixieColors.light,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    );
-                  }),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _reviewController,
-                  maxLines: 4,
-                  style: const TextStyle(color: FlixieColors.light),
-                  decoration: const InputDecoration(
-                    labelText: 'Review notes (optional)',
-                    hintText: 'How was the watch?',
+                    color: FlixieColors.medium,
+                    fontSize: 13,
+                    height: 1.35,
                   ),
                 ),
               ] else
@@ -2153,8 +2192,8 @@ class _WatchConfirmationSheetState extends State<_WatchConfirmationSheet> {
                     context,
                     (
                       watched: _watched,
-                      rating: _rating,
-                      reviewText: _reviewController.text.trim(),
+                      rating: null,
+                      reviewText: null,
                     ),
                   ),
                   child: const Text('Submit confirmation'),

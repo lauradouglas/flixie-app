@@ -18,6 +18,12 @@ import 'package:flixie_app/features/movies/presentation/widgets/watch_request_sh
 import 'package:flixie_app/features/watchlist/presentation/widgets/filter_sheet.dart';
 import 'package:flixie_app/models/watch_provider.dart';
 import 'package:flixie_app/features/movies/data/movie_service.dart';
+import 'package:flixie_app/models/movie_watch_entry.dart';
+import 'package:flixie_app/models/review.dart';
+import 'package:flixie_app/features/watchlist/presentation/controllers/watchlist_actions_controller.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_sheet.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/watch_follow_up_sheet.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/write_review_sheet.dart';
 
 class WatchlistScreen extends StatefulWidget {
   const WatchlistScreen({super.key});
@@ -342,6 +348,70 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     }
   }
 
+  Future<void> _showWatchedFollowUps(
+    WatchlistMovie item,
+    String userId,
+  ) async {
+    final movie = item.movie;
+    final choice = await showModalBottomSheet<WatchFollowUpChoice>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => WatchFollowUpSheet(
+        movieTitle: movie?.title ?? 'This movie',
+        posterPath: movie?.posterPath,
+      ),
+    );
+    if (!mounted || choice == null) return;
+
+    if (choice.addWatchEntry) {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => RewatchLogSheet(
+          onSubmit: ({
+            required String watchedAt,
+            required double? rating,
+            required bool? recommended,
+            required String? notes,
+          }) async {
+            await WatchlistActionsController.instance.logMovieWatch(
+              userId,
+              LogMovieWatchRequest(
+                movieId: item.movieId,
+                watchedAt: watchedAt,
+                rating: rating,
+                recommended: recommended,
+                notes: notes,
+              ),
+            );
+            if (mounted) {
+              context.read<AuthProvider>().markActivityChanged();
+            }
+          },
+        ),
+      );
+    }
+
+    if (mounted && choice.writeReview) {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => WriteReviewSheet(
+          movieId: item.movieId,
+          userId: userId,
+          onSubmitted: (Review review) {
+            final auth = context.read<AuthProvider>();
+            auth.invalidateCachedReviews();
+            auth.markActivityChanged();
+          },
+        ),
+      );
+    }
+  }
+
   WatchlistMovie _entryWithMovieFallback(
     WatchlistMovie entry,
     MovieShort movie,
@@ -437,6 +507,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
             backgroundColor: FlixieColors.success,
           ),
         );
+        await _showWatchedFollowUps(item, user.id);
       }
     } catch (e) {
       debugPrint('Error marking as watched: $e');
@@ -543,6 +614,75 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
           ),
         );
       }
+    }
+  }
+
+  Future<void> _clearWatchedFromWatchlist() async {
+    final authProvider = context.read<AuthProvider>();
+    final user = authProvider.dbUser;
+    if (user == null) return;
+    final watchedIds =
+        user.watchedMovies?.map((item) => item.movieId).toSet() ?? <int>{};
+    final watchedItems = _allWatchlist
+        .where((item) => watchedIds.contains(item.movieId))
+        .toList();
+    if (watchedItems.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Clear watched movies?'),
+            content: Text(
+              'Remove ${watchedItems.length} watched ${watchedItems.length == 1 ? 'movie' : 'movies'} from your watchlist? Your watch history will not be affected.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: FlixieColors.danger,
+                ),
+                child: const Text('Clear watched'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed) return;
+
+    try {
+      await Future.wait(watchedItems.map(
+        (item) => UserService.removeFromWatchlist(user.id, item.movieId),
+      ));
+      final idsToRemove = watchedItems.map((item) => item.movieId).toSet();
+      final updatedWatchlist = (user.movieWatchlist ?? [])
+          .where((item) => !idsToRemove.contains(item.movieId))
+          .toList();
+      authProvider.updateUserList(movieWatchlist: updatedWatchlist);
+      if (!mounted) return;
+      setState(() {
+        _allWatchlist.removeWhere((item) => idsToRemove.contains(item.movieId));
+        _filterWatchlist();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${watchedItems.length} watched ${watchedItems.length == 1 ? 'movie' : 'movies'} removed from your watchlist',
+          ),
+          backgroundColor: FlixieColors.success,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to clear watched movies'),
+          backgroundColor: FlixieColors.danger,
+        ),
+      );
     }
   }
 
@@ -756,11 +896,20 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
           ),
           const Spacer(),
           TextButton.icon(
-            onPressed: _openFilterSheet,
-            icon: const Icon(Icons.tune_rounded, size: 19),
-            label: const Text('Filter'),
+            onPressed: _selectedTab == 3
+                ? _clearWatchedFromWatchlist
+                : _openFilterSheet,
+            icon: Icon(
+              _selectedTab == 3
+                  ? Icons.playlist_remove_rounded
+                  : Icons.tune_rounded,
+              size: 19,
+            ),
+            label: Text(_selectedTab == 3 ? 'Clear watched' : 'Filter'),
             style: TextButton.styleFrom(
-              foregroundColor: FlixieColors.primary,
+              foregroundColor: _selectedTab == 3
+                  ? FlixieColors.danger
+                  : FlixieColors.primary,
               textStyle: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -832,6 +981,11 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.history_rounded, color: Colors.white),
+            tooltip: 'Watch history',
+            onPressed: () => context.push('/watch-history'),
+          ),
           IconButton(
             icon: const Icon(Icons.add_rounded, color: Colors.white),
             tooltip: 'Add movie',
@@ -913,6 +1067,21 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         child: _WatchlistTabs(
           selectedIndex: _selectedTab,
           onChanged: (i) => setState(() => _selectedTab = i),
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+        child: Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: () => context.push('/watch-history'),
+            icon: const Icon(Icons.history_rounded, size: 18),
+            label: const Text('View watch history'),
+            style: TextButton.styleFrom(
+              foregroundColor: FlixieColors.primary,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            ),
+          ),
         ),
       ),
       if (hasMovies) _buildStatsRow(),
@@ -1354,7 +1523,7 @@ class _WatchlistTabs extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onChanged;
 
-  static const labels = ['All', 'Watch now', 'Upcoming', 'Watched'];
+  static const labels = ['All', 'Watch now', 'Upcoming', 'Watched in list'];
 
   @override
   Widget build(BuildContext context) {

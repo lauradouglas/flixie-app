@@ -23,11 +23,6 @@ class SearchService {
     String type = 'all',
     int page = 1,
   }) async {
-    if (_isShowSearchType(type)) {
-      final shows = await searchShows(value);
-      return _showResults(shows, page: page);
-    }
-
     final data = await ApiClient.get('/search', queryParams: {
       'value': value,
       'type': type,
@@ -95,10 +90,15 @@ class SearchService {
   }
 
   static Future<List<TvShow>> searchShows(String query) async {
-    final data =
-        await ApiClient.get('/search/shows', queryParams: {'query': query});
-    return (data as List<dynamic>)
-        .map((e) => TvShow.fromJson(e as Map<String, dynamic>))
+    final data = await ApiClient.get('/search', queryParams: {
+      'value': query,
+      'type': 'tv',
+      'page': '1',
+    });
+    final results = SearchResults.fromJson(data as Map<String, dynamic>);
+    return results.results
+        .where((item) => item.isShow && item.show != null)
+        .map((item) => item.show!)
         .toList();
   }
 
@@ -113,19 +113,5 @@ class SearchService {
   static Future<Map<String, dynamic>> searchAll(String query) async {
     final data = await ApiClient.get('/search', queryParams: {'query': query});
     return data as Map<String, dynamic>;
-  }
-
-  static bool _isShowSearchType(String type) {
-    final normalized = type.toLowerCase();
-    return normalized == 'tv' || normalized == 'show' || normalized == 'shows';
-  }
-
-  static SearchResults _showResults(List<TvShow> shows, {required int page}) {
-    return SearchResults(
-      page: page,
-      results: shows.map(SearchResultItem.fromShow).toList(),
-      totalPages: 1,
-      totalResults: shows.length,
-    );
   }
 }

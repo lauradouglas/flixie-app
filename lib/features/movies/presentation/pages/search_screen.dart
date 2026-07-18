@@ -263,6 +263,7 @@ class _SearchScreenState extends State<SearchScreen> {
           final selected = mode == _searchMode;
           return ChoiceChip(
             selected: selected,
+            showCheckmark: false,
             label: Text(mode.label),
             avatar: Icon(
               mode.icon,

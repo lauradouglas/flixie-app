@@ -6,6 +6,7 @@ class MovieWatchEntry {
   final int movieId;
   final String? watchedAt;
   final double? rating;
+  final bool? recommended;
   final String? notes;
   final bool removed;
   final String? createdAt;
@@ -18,6 +19,7 @@ class MovieWatchEntry {
     required this.movieId,
     this.watchedAt,
     this.rating,
+    this.recommended,
     this.notes,
     required this.removed,
     this.createdAt,
@@ -32,12 +34,14 @@ class MovieWatchEntry {
       movieId: _parseInt(json['movieId']) ?? 0,
       watchedAt: json['watchedAt'] as String? ?? json['createdAt'] as String?,
       rating: _parseDouble(json['rating']),
+      recommended: json['recommended'] as bool?,
       notes: json['notes'] as String?,
       removed: json['removed'] as bool? ?? false,
       createdAt: json['createdAt'] as String?,
       updatedAt: json['updatedAt'] as String?,
       movie: json['movie'] is Map<String, dynamic>
-          ? WatchlistMovieDetails.fromJson(json['movie'] as Map<String, dynamic>)
+          ? WatchlistMovieDetails.fromJson(
+              json['movie'] as Map<String, dynamic>)
           : null,
     );
   }
@@ -49,6 +53,7 @@ class MovieWatchEntry {
       'movieId': movieId,
       'watchedAt': watchedAt,
       'rating': rating,
+      'recommended': recommended,
       'notes': notes,
       'removed': removed,
       'createdAt': createdAt,
@@ -62,12 +67,14 @@ class LogMovieWatchRequest {
   final int movieId;
   final String? watchedAt;
   final double? rating;
+  final bool? recommended;
   final String? notes;
 
   const LogMovieWatchRequest({
     required this.movieId,
     this.watchedAt,
     this.rating,
+    this.recommended,
     this.notes,
   });
 
@@ -76,6 +83,7 @@ class LogMovieWatchRequest {
       'movieId': movieId,
       'watchedAt': watchedAt,
       'rating': rating,
+      'recommended': recommended,
       'notes': notes,
     };
   }
@@ -83,11 +91,13 @@ class LogMovieWatchRequest {
 
 class UpdateMovieWatchRequest {
   final double? rating;
+  final bool? recommended;
   final String? notes;
   final String? watchedAt;
 
   const UpdateMovieWatchRequest({
     this.rating,
+    this.recommended,
     this.notes,
     this.watchedAt,
   });
@@ -96,6 +106,7 @@ class UpdateMovieWatchRequest {
     return {
       'watchedAt': watchedAt,
       'rating': rating,
+      'recommended': recommended,
       'notes': notes,
     };
   }
