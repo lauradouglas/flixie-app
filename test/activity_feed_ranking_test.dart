@@ -9,6 +9,7 @@ Map<String, dynamic> _activityJson({
   double? rating,
   int? watchCount,
   int? activityScore,
+  bool? recommended,
   String? createdAt,
 }) {
   return <String, dynamic>{
@@ -22,6 +23,7 @@ Map<String, dynamic> _activityJson({
     'rating': rating,
     'watchCount': watchCount,
     'activityScore': activityScore,
+    if (recommended != null) 'recommended': recommended,
     'createdAt': createdAt ?? '2025-01-01T12:00:00.000Z',
     'updatedAt': '2025-01-01T12:00:00.000Z',
     'removed': false,
@@ -58,6 +60,18 @@ MovieFriendActivity _movieFriend({
 }
 
 void main() {
+  test('rating activity keeps the explicit recommendation choice', () {
+    final item = ActivityListItem.fromJson(_activityJson(
+      id: 'rating-choice',
+      type: 'movie-rating',
+      rating: 8,
+      recommended: false,
+    ));
+
+    expect(item.recommended, isFalse);
+    expect(computeActivityFallbackScore(item), greaterThan(100));
+  });
+
   test('ActivityListItem parses activity score and rewatch metadata', () {
     final scored = ActivityListItem.fromJson(_activityJson(
       id: 'a1',

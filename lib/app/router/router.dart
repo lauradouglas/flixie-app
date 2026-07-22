@@ -24,6 +24,7 @@ import 'package:flixie_app/features/social/presentation/pages/watch_requests_scr
 import 'package:flixie_app/features/movies/presentation/pages/movie_list_detail_screen.dart';
 import 'package:flixie_app/features/movies/presentation/pages/movie_lists_screen.dart';
 import 'package:flixie_app/features/social/presentation/pages/social_screen.dart';
+import 'package:flixie_app/features/social/presentation/pages/friends_activity_screen.dart';
 import 'package:flixie_app/features/social/presentation/pages/group_detail_screen.dart';
 import 'package:flixie_app/features/social/presentation/pages/group_members_screen.dart';
 import 'package:flixie_app/features/authentication/presentation/pages/login_screen.dart';
@@ -119,6 +120,11 @@ GoRouter buildRouter(AuthProvider authProvider) {
             path: '/social',
             pageBuilder: (context, state) =>
                 _calmPage(state, const SocialScreen()),
+          ),
+          GoRoute(
+            path: '/friends-activity',
+            pageBuilder: (context, state) =>
+                _calmPage(state, const FriendsActivityScreen()),
           ),
           GoRoute(
             path: '/groups/:id',

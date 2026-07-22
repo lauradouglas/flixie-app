@@ -38,6 +38,7 @@ enum _StatusFilter {
   accepted,
   scheduled,
   completed,
+  declined,
   cancelled,
   expired,
 }
@@ -155,7 +156,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
           return r.id == focusedId;
         }
         // Status filter
-        if (_statusFilter != _StatusFilter.all && !_matchesStatusFilter(r)) {
+        if (!_matchesStatusFilter(r)) {
           return false;
         }
 
@@ -172,7 +173,11 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
   bool _matchesStatusFilter(WatchRequest request) {
     switch (_statusFilter) {
       case _StatusFilter.all:
-        return true;
+        // Keep the default feed useful by hiding historical terminal requests.
+        // They remain available under their dedicated filters.
+        return !_isCompletedRequest(request) &&
+            !_isDeclinedRequest(request) &&
+            !_isCancelledRequest(request);
       case _StatusFilter.open:
         return request.isPending;
       case _StatusFilter.accepted:
@@ -181,15 +186,23 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         return request.normalizedScheduleStatus == 'AGREED' ||
             request.normalizedScheduleStatus == 'PROPOSED';
       case _StatusFilter.completed:
-        return request.normalizedWatchedStatus == 'WATCHED';
+        return _isCompletedRequest(request);
+      case _StatusFilter.declined:
+        return _isDeclinedRequest(request);
       case _StatusFilter.cancelled:
-        return request.normalizedScheduleStatus == 'CANCELLED' ||
-            request.isCancelled ||
-            request.isDeclined;
+        return _isCancelledRequest(request);
       case _StatusFilter.expired:
         return request.isExpired;
     }
   }
+
+  bool _isCompletedRequest(WatchRequest request) =>
+      request.isCompleted || request.normalizedWatchedStatus == 'WATCHED';
+
+  bool _isDeclinedRequest(WatchRequest request) => request.isDeclined;
+
+  bool _isCancelledRequest(WatchRequest request) =>
+      request.isCancelled || request.normalizedScheduleStatus == 'CANCELLED';
 
   DateTime _parseDate(String? iso) =>
       DateTime.tryParse(iso ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
@@ -659,6 +672,8 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         return 'Scheduled';
       case _StatusFilter.completed:
         return 'Completed';
+      case _StatusFilter.declined:
+        return 'Declined';
       case _StatusFilter.cancelled:
         return 'Cancelled';
       case _StatusFilter.expired:
@@ -676,6 +691,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         return FlixieColors.secondary;
       case _StatusFilter.completed:
         return FlixieColors.primary;
+      case _StatusFilter.declined:
       case _StatusFilter.cancelled:
       case _StatusFilter.expired:
         return FlixieColors.danger;

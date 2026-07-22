@@ -116,6 +116,7 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
   bool _loading = true;
   FriendsData? _friendsData;
   List<ActivityListItem> _activity = [];
+  bool _showMoreActivity = false;
   List<Group> _groupsPreview = [];
   String? _error;
 
@@ -355,14 +356,39 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
                 onAddFriend: _showAddFriendSheet,
                 onOpenWatchlist: () => context.push('/watchlist'),
               )
-            else
+            else ...[
               ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: _activity.length,
+                itemCount: _activity.take(_showMoreActivity ? 8 : 3).length,
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
                 itemBuilder: (_, i) => ActivityTile(item: _activity[i]),
               ),
+              if (_activity.length > 3) ...[
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    if (!_showMoreActivity)
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () =>
+                              setState(() => _showMoreActivity = true),
+                          icon: const Icon(Icons.expand_more_rounded),
+                          label: const Text('Show more'),
+                        ),
+                      ),
+                    if (!_showMoreActivity) const SizedBox(width: 10),
+                    Expanded(
+                      child: TextButton.icon(
+                        onPressed: () => context.push('/friends-activity'),
+                        icon: const Icon(Icons.people_outline_rounded),
+                        label: const Text('Show all'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
             if (_groupsPreview.isNotEmpty) ...[
               const SizedBox(height: 20),
               _GroupsPreviewSection(groups: _groupsPreview.take(3).toList()),

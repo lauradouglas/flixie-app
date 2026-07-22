@@ -70,6 +70,8 @@ class ActivityTile extends StatelessWidget {
   String _displayName() {
     final username = item.username.trim();
     if (username.isNotEmpty) return username;
+    final fullName = '${item.firstName} ${item.lastName}'.trim();
+    if (fullName.isNotEmpty) return fullName;
     return 'Friend';
   }
 
@@ -458,6 +460,18 @@ class ActivityTile extends StatelessWidget {
                                     label:
                                         '${item.mediaRating!.toStringAsFixed(1)}/10',
                                     color: FlixieColors.tertiary,
+                                  ),
+                                if (item.recommended != null)
+                                  _buildChip(
+                                    icon: item.recommended!
+                                        ? Icons.thumb_up_alt_rounded
+                                        : Icons.thumb_down_alt_rounded,
+                                    label: item.recommended!
+                                        ? 'Recommends'
+                                        : 'Doesn\'t recommend',
+                                    color: item.recommended!
+                                        ? FlixieColors.success
+                                        : FlixieColors.medium,
                                   ),
                               ],
                             ),

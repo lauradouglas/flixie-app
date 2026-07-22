@@ -47,8 +47,13 @@ class FriendService {
   }
 
   static Future<List<ActivityListItem>> getFriendsActivityLists(
-      String userId) async {
-    final data = await ApiClient.get('/friends/$userId/activity-lists');
+    String userId, {
+    int days = 14,
+    int limit = 100,
+  }) async {
+    final data = await ApiClient.get(
+      '/friends/$userId/activity-lists?days=$days&limit=$limit',
+    );
     var activities = (data as List<dynamic>)
         .map((e) => ActivityListItem.fromJson(e as Map<String, dynamic>))
         .toList();

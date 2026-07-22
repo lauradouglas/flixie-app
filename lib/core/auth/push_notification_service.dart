@@ -8,6 +8,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:flixie_app/core/auth/firebase_options.dart';
+import 'package:flixie_app/core/auth/notification_deep_link.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
 
@@ -362,7 +363,7 @@ class PushNotificationService {
         iOS: const DarwinNotificationDetails(),
       ),
       // Attach the raw data so the local notification tap can also deep-link.
-      payload: _buildDeepLinkPath(message.data),
+      payload: notificationDeepLinkPath(message.data),
     );
   }
 
@@ -378,43 +379,11 @@ class PushNotificationService {
     RemoteMessage message,
     GlobalKey<NavigatorState> navigatorKey,
   ) {
-    final path = _buildDeepLinkPath(message.data);
+    final path = notificationDeepLinkPath(message.data);
     logger.d('[FCM] Deep-link → $path');
     final context = navigatorKey.currentContext;
     if (context == null) return;
     GoRouter.of(context).go(path);
-  }
-
-  /// Converts a notification data map into a GoRouter path.
-  static String _buildDeepLinkPath(Map<String, dynamic> data) {
-    final route = data['route']?.toString();
-    if (route != null && route.startsWith('/')) return route;
-    final type = (data['type'] as String? ?? '').toUpperCase();
-    final groupId = data['groupId'] as String?;
-    final friendId = data['friendId'] as String?;
-
-    // Group watch-request → open the group on the Requests tab.
-    // The GroupDetailScreen reads an optional `tab` query param for this.
-    if ((type == 'MOVIE_WATCH_REQUEST' ||
-            type == 'SHOW_WATCH_REQUEST' ||
-            type == 'GROUP_REQUEST') &&
-        groupId != null &&
-        groupId.isNotEmpty) {
-      return '/groups/$groupId?tab=requests';
-    }
-
-    // Group invite → open the group detail.
-    if (type == 'GROUP_INVITE' && groupId != null && groupId.isNotEmpty) {
-      return '/groups/$groupId';
-    }
-
-    // Friend request → open friend profile if we have their id.
-    if (type == 'FRIEND_REQUEST' && friendId != null && friendId.isNotEmpty) {
-      return '/friends/$friendId';
-    }
-
-    // Default fallback.
-    return '/notifications';
   }
 
   static String _redactToken(String? token) {

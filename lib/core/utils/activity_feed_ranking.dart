@@ -8,7 +8,7 @@ int computeActivityFallbackScore(ActivityListItem item) {
   switch (item.type) {
     case ActivityListType.movieRating:
     case ActivityListType.showRating:
-      baseScore = (rating != null && rating >= 9) ? 100 : 60;
+      baseScore = (rating != null && rating >= 9) ? 120 : 105;
       break;
     case ActivityListType.movieReview:
     case ActivityListType.showReview:
@@ -35,7 +35,10 @@ int computeActivityFallbackScore(ActivityListItem item) {
       break;
   }
 
-  return baseScore + _recencyBoost(_tryParseDate(item.timestamp));
+  final recommendationBoost = item.recommended == null ? 0 : 12;
+  return baseScore +
+      recommendationBoost +
+      _recencyBoost(_tryParseDate(item.timestamp));
 }
 
 List<ActivityListItem> rankActivitiesForFeed(

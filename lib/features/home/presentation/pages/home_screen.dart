@@ -48,6 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<MovieShort> _nowPlayingMovies = [];
   List<MovieShort> _forYouMovies = [];
   List<ActivityListItem> _friendsActivity = [];
+  bool _showMoreFriendActivity = false;
   TrendingGroupsResponse? _trendingGroups;
   bool _isTrendingGroupsLoading = true;
   String? _trendingGroupsError;
@@ -1110,13 +1111,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildFriendActivitySection(BuildContext context) {
     if (_friendsActivity.isEmpty) return const SizedBox.shrink();
-    final items = _friendsActivity.take(5).toList();
+    final previewCount = _showMoreFriendActivity ? 8 : 3;
+    final items = _friendsActivity.take(previewCount).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         HomeSectionHeader(
           title: 'Friend Activity',
-          onSeeAll: () => context.go('/social'),
+          onSeeAll: () => context.push('/friends-activity'),
         ),
         const SizedBox(height: 12),
         Padding(
@@ -1130,6 +1132,33 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
+        if (_friendsActivity.length > 3) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                if (!_showMoreFriendActivity)
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () =>
+                          setState(() => _showMoreFriendActivity = true),
+                      icon: const Icon(Icons.expand_more_rounded),
+                      label: const Text('Show more'),
+                    ),
+                  ),
+                if (!_showMoreFriendActivity) const SizedBox(width: 10),
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: () => context.push('/friends-activity'),
+                    icon: const Icon(Icons.people_outline_rounded),
+                    label: const Text('Show all'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         const SizedBox(height: 20),
       ],
     );
