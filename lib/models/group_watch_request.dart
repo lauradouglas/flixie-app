@@ -222,6 +222,9 @@ class GroupRequestMemberStatus {
 
 class GroupWatchRequest {
   final String id;
+
+  /// Postgres group-request ID when [id] is the mirrored conversation ID.
+  final String? databaseRequestId;
   final String groupId;
   final String userId;
   final String? message;
@@ -257,6 +260,7 @@ class GroupWatchRequest {
 
   const GroupWatchRequest({
     required this.id,
+    this.databaseRequestId,
     required this.groupId,
     required this.userId,
     this.message,
@@ -323,6 +327,7 @@ class GroupWatchRequest {
 
     return GroupWatchRequest(
       id: json['id']?.toString() ?? '',
+      databaseRequestId: json['pgGroupRequestId']?.toString(),
       groupId: (json['conversationId'] ?? json['groupId'])?.toString() ?? '',
       userId: (json['createdById'] ?? json['requesterId'] ?? json['userId'])
               ?.toString() ??
@@ -390,6 +395,11 @@ class GroupWatchRequest {
 
   /// True when members can still respond (request is active and not expired).
   bool get canRespond => isActive && !hasExpired;
+
+  /// A group request is mirrored between Postgres and the conversation store.
+  /// Deep links may contain either identifier depending on where they began.
+  bool matchesId(String requestId) =>
+      id == requestId || databaseRequestId == requestId;
 
   bool canScheduleFor(String userId) =>
       canSchedule ??

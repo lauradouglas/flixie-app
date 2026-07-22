@@ -13,6 +13,7 @@ import 'package:flixie_app/features/profile/data/notification_service.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/features/home/data/trending_service.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
+import 'package:flixie_app/core/utils/notification_visibility.dart';
 import 'package:flixie_app/features/social/presentation/controllers/friend_actions_controller.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/features/profile/presentation/controllers/profile_lookup_controller.dart';
@@ -75,8 +76,9 @@ class AuthPrefetchCoordinator {
           .getNowPlayingMovies(region: region)
           .then((v) => nowPlaying = v, onError: (_) {}),
       NotificationService.getNotifications(userId).then((value) {
-        notifications = value;
-        unreadNotificationCount = value.where((item) => !item.isRead).length;
+        final visible = visibleNotificationsForUser(value, userId);
+        notifications = visible;
+        unreadNotificationCount = visible.where((item) => !item.isRead).length;
       }, onError: (_) {}),
       fetchWatchProviders(userId, watchlistMovieIds, region: region).then(
           (value) {
@@ -141,7 +143,7 @@ class AuthPrefetchCoordinator {
   Future<int?> fetchUnreadCount(String userId) async {
     try {
       final notifications = await NotificationService.getNotifications(userId);
-      return notifications.where((n) => !n.isRead).length;
+      return visibleUnreadNotificationCount(notifications, userId);
     } catch (e) {
       logger
           .w('[AuthPrefetchCoordinator] notification count refresh error: $e');

@@ -132,6 +132,7 @@ GoRouter buildRouter(AuthProvider authProvider) {
               state,
               GroupDetailScreen(
                 groupId: state.pathParameters['id'] ?? '',
+                initialRequestId: state.uri.queryParameters['requestId'],
                 initialTab: state.uri.queryParameters['tab'] == 'requests'
                     ? 2
                     : state.uri.queryParameters['tab'] == 'insights'

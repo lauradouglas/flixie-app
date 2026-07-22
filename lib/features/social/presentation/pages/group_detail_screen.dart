@@ -19,12 +19,18 @@ import 'package:flixie_app/features/social/presentation/widgets/insights_tab.dar
 import 'package:flixie_app/features/social/presentation/widgets/requests_tab.dart';
 
 class GroupDetailScreen extends StatefulWidget {
-  const GroupDetailScreen({super.key, required this.groupId, this.initialTab});
+  const GroupDetailScreen({
+    super.key,
+    required this.groupId,
+    this.initialTab,
+    this.initialRequestId,
+  });
 
   final String groupId;
 
   /// 0=Chat, 1=Activity, 2=Requests, 3=Insights. Defaults to 1 (Activity).
   final int? initialTab;
+  final String? initialRequestId;
 
   @override
   State<GroupDetailScreen> createState() => _GroupDetailScreenState();
@@ -255,6 +261,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
             ? null
             : TabBar(
                 controller: _tabController,
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
                 padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
                 indicator: BoxDecoration(
                   color: FlixieColors.primary.withValues(alpha: 0.18),
@@ -334,6 +342,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                       groupId: widget.groupId,
                       conversationId: _conversationId,
                       initialRequests: _watchRequests,
+                      initialRequestId: widget.initialRequestId,
                       currentUserId:
                           context.read<AuthProvider>().dbUser?.id ?? '',
                       isAdmin: () {

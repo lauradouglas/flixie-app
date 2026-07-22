@@ -195,6 +195,9 @@ class WatchRequest {
   final String scheduleStatus;
   final String? scheduledById;
   final String watchedStatus;
+  final String? groupId;
+  final String? groupName;
+  final String? conversationId;
   final List<WatchScheduleProposal> scheduleProposals;
   final List<WatchConfirmation> watchConfirmations;
   final bool? needsWatchConfirmation;
@@ -231,6 +234,9 @@ class WatchRequest {
     this.scheduleStatus = 'NONE',
     this.scheduledById,
     this.watchedStatus = 'NOT_DUE',
+    this.groupId,
+    this.groupName,
+    this.conversationId,
     this.scheduleProposals = const [],
     this.watchConfirmations = const [],
     this.needsWatchConfirmation,
@@ -259,6 +265,7 @@ class WatchRequest {
     final confirmationsRaw = json['watchConfirmations'] as List<dynamic>? ?? [];
     final requester = json['requester'] as Map<String, dynamic>?;
     final recipient = json['recipient'] as Map<String, dynamic>?;
+    final group = json['group'] as Map<String, dynamic>?;
 
     return WatchRequest(
       id: json['id']?.toString() ?? '',
@@ -280,6 +287,9 @@ class WatchRequest {
       scheduleStatus: json['scheduleStatus']?.toString() ?? 'NONE',
       scheduledById: json['scheduledById']?.toString(),
       watchedStatus: json['watchedStatus']?.toString() ?? 'NOT_DUE',
+      groupId: (json['groupId'] ?? group?['id'])?.toString(),
+      groupName: (json['groupName'] ?? group?['name'])?.toString(),
+      conversationId: json['conversationId']?.toString(),
       scheduleProposals: proposalsRaw
           .whereType<Map<String, dynamic>>()
           .map(WatchScheduleProposal.fromJson)
@@ -375,7 +385,7 @@ class WatchRequest {
   bool hasCurrentUserConfirmed(String userId) =>
       watchConfirmations.any((c) => c.userId == userId);
 
-  bool get canProposeSchedule => isWatchRequest && isAccepted;
+  bool get canProposeSchedule => isWatchRequest && (isAccepted || isScheduled);
 
   bool canRespondToProposal(String userId) {
     final proposal = latestPendingProposal;

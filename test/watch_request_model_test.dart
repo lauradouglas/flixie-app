@@ -45,6 +45,18 @@ void main() {
 
       expect(request.latestPendingProposal?.location, 'Odeon Leicester Square');
     });
+    test('parses group and conversation context', () {
+      final request = WatchRequest.fromJson({
+        'id': 'group-request',
+        'status': 'accepted',
+        'conversationId': 'conversation-1',
+        'group': {'id': 'group-1', 'name': 'Film Club'},
+      });
+
+      expect(request.groupId, 'group-1');
+      expect(request.groupName, 'Film Club');
+      expect(request.conversationId, 'conversation-1');
+    });
     test('parses accepted lifecycle response with participants', () {
       final request = WatchRequest.fromJson({
         'id': 'wr-1',
@@ -113,6 +125,7 @@ void main() {
       });
 
       expect(scheduled.isScheduled, isTrue);
+      expect(scheduled.canProposeSchedule, isTrue);
       expect(scheduled.scheduledFor, isA<DateTime>());
       expect(scheduled.canCompleteFor('u-2'), isTrue);
       expect(completed.isCompleted, isTrue);
@@ -218,6 +231,7 @@ void main() {
     test('parses computed capability fields', () {
       final request = GroupWatchRequest.fromJson({
         'id': 'wr-6',
+        'pgGroupRequestId': 'pg-wr-6',
         'conversationId': 'conv-1',
         'createdById': 'u-1',
         'status': 'scheduled',
@@ -232,6 +246,9 @@ void main() {
       expect(request.canScheduleFor('u-2'), isTrue);
       expect(request.canCompleteFor('u-2'), isTrue);
       expect(request.canCancelFor('u-2'), isFalse);
+      expect(request.matchesId('wr-6'), isTrue);
+      expect(request.matchesId('pg-wr-6'), isTrue);
+      expect(request.matchesId('another-request'), isFalse);
     });
   });
 }

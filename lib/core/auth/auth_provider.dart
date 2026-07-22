@@ -27,6 +27,7 @@ import 'package:flixie_app/core/auth/push_notification_service.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/features/profile/data/avatar_service.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
+import 'package:flixie_app/core/utils/notification_visibility.dart';
 
 /// Auth states that the UI can observe.
 enum AuthStatus { unknown, authenticated, unauthenticated }
@@ -138,9 +139,12 @@ class AuthProvider extends ChangeNotifier {
   }
 
   void updateCachedNotifications(List<FlixieNotification> notifications) {
-    _cachedNotifications = List.unmodifiable(notifications);
-    _unreadNotificationCount =
-        notifications.where((item) => !item.isRead).length;
+    final userId = _dbUser?.id;
+    final visible = userId == null
+        ? List<FlixieNotification>.of(notifications)
+        : visibleNotificationsForUser(notifications, userId);
+    _cachedNotifications = List.unmodifiable(visible);
+    _unreadNotificationCount = visible.where((item) => !item.isRead).length;
     notifyListeners();
   }
 

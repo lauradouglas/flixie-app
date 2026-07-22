@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:flixie_app/models/group_watch_request.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
@@ -34,6 +35,7 @@ class GroupRequestsTab extends StatefulWidget {
     required this.currentUserId,
     this.isAdmin = false,
     this.onCountChanged,
+    this.initialRequestId,
   });
 
   final String groupId;
@@ -42,6 +44,7 @@ class GroupRequestsTab extends StatefulWidget {
   final String currentUserId;
   final bool isAdmin;
   final void Function(int count)? onCountChanged;
+  final String? initialRequestId;
 
   @override
   State<GroupRequestsTab> createState() => GroupRequestsTabState();
@@ -133,18 +136,32 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
       if (conversationId != null) {
         requests = await GroupService.getConversationWatchRequests(
           conversationId,
+          filter: widget.initialRequestId?.isNotEmpty == true
+              ? WatchRequestFilter.all
+              : WatchRequestFilter.active,
           userId: widget.currentUserId,
         );
       } else {
         requests = await GroupService.getGroupWatchRequests(widget.groupId);
       }
       if (mounted) {
+        final focusedId = widget.initialRequestId;
+        final fetchedFocusedRequest = focusedId == null ||
+            focusedId.isEmpty ||
+            requests.any((request) => request.matchesId(focusedId));
+        // Conversation data can arrive a frame after the Postgres group data.
+        // Do not replace an already-visible focused request with an incomplete
+        // mirror response while those stores synchronise.
+        final nextRequests = !fetchedFocusedRequest &&
+                _requests.any((request) => request.matchesId(focusedId))
+            ? _requests
+            : requests;
         setState(() {
-          _requests = requests;
+          _requests = nextRequests;
           _loading = false;
         });
         final currentUserId = widget.currentUserId;
-        final needsResponseCount = requests.where((r) {
+        final needsResponseCount = nextRequests.where((r) {
           if (!r.canRespond) return false;
           if (r.userId == currentUserId) return false;
           if (r.currentUserResponse != null) return false;
@@ -165,6 +182,11 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
   List<GroupWatchRequest> get _filtered {
     final currentUserId = widget.currentUserId;
     var list = _requests;
+
+    final focusedId = widget.initialRequestId;
+    if (focusedId != null && focusedId.isNotEmpty) {
+      return _sortRequests(list.where((r) => r.matchesId(focusedId)).toList());
+    }
 
     // Apply filter chip
     switch (_filter) {
@@ -1121,6 +1143,7 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
         : null;
     final proposedDate =
         _fullDateTimeString(req.scheduledFor ?? req.proposedDate);
+    final isFocused = widget.initialRequestId?.isNotEmpty == true;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -1133,7 +1156,11 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () => _showMemberStatusSheet(context, req),
+        onTap: isFocused
+            ? () => _showMemberStatusSheet(context, req)
+            : () => context.push(
+                  '/groups/${widget.groupId}?tab=requests&requestId=${req.id}',
+                ),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
@@ -1165,7 +1192,7 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
                                 textScaler: TextScaler.noScaling,
                               ),
                             ),
-                            if (canDelete) ...[
+                            if (canDelete && isFocused) ...[
                               const SizedBox(width: 6),
                               IconButton(
                                 tooltip: 'Delete request',
@@ -1263,15 +1290,17 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
                   ),
                 ],
               ),
-              if (req.message != null && req.message!.isNotEmpty) ...[
+              if (isFocused &&
+                  req.message != null &&
+                  req.message!.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 _messageBubble(req.message!),
               ],
-              if (req.memberStatuses.isNotEmpty) ...[
+              if (isFocused && req.memberStatuses.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 _buildMemberStatuses(req.memberStatuses),
               ],
-              if (!isMyRequest && req.canRespond) ...[
+              if (isFocused && !isMyRequest && req.canRespond) ...[
                 const SizedBox(height: 12),
                 if (myStatus == 'ACCEPTED')
                   _myStatusChip('You accepted', FlixieColors.success)
@@ -1291,7 +1320,7 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
                 else
                   _responseActions(req),
               ],
-              if (canManage && req.isActive) ...[
+              if (isFocused && canManage && req.isActive) ...[
                 const SizedBox(height: 12),
                 if (isProcessing)
                   const SizedBox(
@@ -1304,6 +1333,33 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
                   )
                 else
                   _manageActions(req),
+              ],
+              if (!isFocused) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    if (_needsCurrentUserResponse(req))
+                      const Expanded(
+                        child: Text(
+                          'Needs your response',
+                          style: TextStyle(
+                            color: FlixieColors.warning,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      )
+                    else
+                      const Spacer(),
+                    OutlinedButton.icon(
+                      onPressed: () => context.push(
+                        '/groups/${widget.groupId}?tab=requests&requestId=${req.id}',
+                      ),
+                      icon: const Icon(Icons.visibility_outlined, size: 15),
+                      label: const Text('View request'),
+                    ),
+                  ],
+                ),
               ],
             ],
           ),
@@ -1325,56 +1381,58 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
       color: FlixieColors.primary,
       child: Column(
         children: [
-          _buildSummaryStrip(),
+          if (widget.initialRequestId?.isNotEmpty != true) _buildSummaryStrip(),
           // Search bar
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (v) => setState(() => _searchQuery = v),
-              style: const TextStyle(color: FlixieColors.white, fontSize: 14),
-              decoration: InputDecoration(
-                hintText: 'Search by movie or member…',
-                hintStyle:
-                    const TextStyle(color: FlixieColors.medium, fontSize: 14),
-                prefixIcon: const Icon(Icons.search,
-                    color: FlixieColors.medium, size: 20),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.close,
-                            color: FlixieColors.medium, size: 18),
-                        onPressed: () => setState(() {
-                          _searchController.clear();
-                          _searchQuery = '';
-                        }),
-                      )
-                    : null,
-                filled: true,
-                fillColor: FlixieColors.tabBarBackgroundFocused,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
+          if (widget.initialRequestId?.isNotEmpty != true)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (v) => setState(() => _searchQuery = v),
+                style: const TextStyle(color: FlixieColors.white, fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: 'Search by movie or member…',
+                  hintStyle:
+                      const TextStyle(color: FlixieColors.medium, fontSize: 14),
+                  prefixIcon: const Icon(Icons.search,
+                      color: FlixieColors.medium, size: 20),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.close,
+                              color: FlixieColors.medium, size: 18),
+                          onPressed: () => setState(() {
+                            _searchController.clear();
+                            _searchQuery = '';
+                          }),
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: FlixieColors.tabBarBackgroundFocused,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
               ),
             ),
-          ),
           // Filter chips
-          SizedBox(
-            height: 42,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              children: [
-                _filterChip(_RequestFilter.active, 'Active'),
-                _filterChip(_RequestFilter.needsResponse, 'Needs Response'),
-                _filterChip(_RequestFilter.completed, 'Completed'),
-                _filterChip(_RequestFilter.byMe, 'By Me'),
-                _filterChip(_RequestFilter.all, 'All'),
-              ],
+          if (widget.initialRequestId?.isNotEmpty != true)
+            SizedBox(
+              height: 42,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                children: [
+                  _filterChip(_RequestFilter.active, 'Active'),
+                  _filterChip(_RequestFilter.needsResponse, 'Needs Response'),
+                  _filterChip(_RequestFilter.completed, 'Completed'),
+                  _filterChip(_RequestFilter.byMe, 'By Me'),
+                  _filterChip(_RequestFilter.all, 'All'),
+                ],
+              ),
             ),
-          ),
           const SizedBox(height: 4),
           // List
           Expanded(

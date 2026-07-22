@@ -106,6 +106,22 @@ class RequestService {
     return WatchRequest.fromJson(data as Map<String, dynamic>);
   }
 
+  static Future<WatchRequest> updateWatchRequestLocation({
+    required String watchRequestId,
+    required String userId,
+    required String location,
+  }) async {
+    final data = await ApiClient.patch(
+      '/watch-requests/$watchRequestId/schedule',
+      body: {
+        'userId': userId,
+        'locationOnly': true,
+        'location': location.trim(),
+      },
+    );
+    return WatchRequest.fromJson(data as Map<String, dynamic>);
+  }
+
   static Future<WatchRequest> completeWatchRequest({
     required String watchRequestId,
     required String userId,
@@ -133,6 +149,16 @@ class RequestService {
       body: {'userId': userId},
     );
     return WatchRequest.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<void> deleteWatchRequest({
+    required String watchRequestId,
+    required String userId,
+  }) async {
+    await ApiClient.delete(
+      '/watch-requests/$watchRequestId',
+      body: {'userId': userId},
+    );
   }
 
   static Future<List<WatchRequest>> getWatchRequests(String userId) async {

@@ -10,6 +10,7 @@ import 'package:flixie_app/features/profile/data/notification_service.dart';
 import 'package:flixie_app/features/social/data/request_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
+import 'package:flixie_app/core/utils/notification_visibility.dart';
 import 'package:flixie_app/core/calendar/watch_calendar_service.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/notification_activity_card.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/notification_request_card.dart';
@@ -90,7 +91,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     final cached = auth.cachedNotifications;
     final userId = auth.dbUser?.id;
     if (cached != null && userId != null) {
-      _notifications = _visibleNotificationsForUser(cached, userId);
+      _notifications = visibleNotificationsForUser(cached, userId);
       _isLoading = false;
     }
     _load(showSpinner: cached == null);
@@ -123,7 +124,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     if (userId == null) return;
     try {
       final fresh = await NotificationService.getNotifications(userId);
-      final visible = _visibleNotificationsForUser(fresh, userId);
+      final visible = visibleNotificationsForUser(fresh, userId);
       if (mounted) {
         setState(() => _notifications = visible);
         auth.updateCachedNotifications(visible);
@@ -147,7 +148,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     }
     try {
       final notifications = await NotificationService.getNotifications(userId);
-      final visible = _visibleNotificationsForUser(notifications, userId);
+      final visible = visibleNotificationsForUser(notifications, userId);
       if (mounted) {
         setState(() {
           _notifications = visible;
@@ -165,71 +166,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
         });
       }
     }
-  }
-
-  List<FlixieNotification> _visibleNotificationsForUser(
-    List<FlixieNotification> notifications,
-    String userId,
-  ) {
-    final addressedToUser = notifications.where((n) => n.userId == userId);
-    final byScheduleKey = <String, FlixieNotification>{};
-    final visible = <FlixieNotification>[];
-
-    for (final notification in addressedToUser) {
-      final key = _scheduleNotificationKey(notification);
-      if (key == null) {
-        visible.add(notification);
-        continue;
-      }
-
-      final existing = byScheduleKey[key];
-      if (existing == null ||
-          _notificationSortDate(notification).isAfter(
-            _notificationSortDate(existing),
-          )) {
-        byScheduleKey[key] = notification;
-      }
-    }
-
-    visible.addAll(byScheduleKey.values);
-    visible.sort(
-      (a, b) => _notificationSortDate(b).compareTo(_notificationSortDate(a)),
-    );
-    return visible;
-  }
-
-  String? _scheduleNotificationKey(FlixieNotification notification) {
-    if (notification.type != FlixieNotification.movieWatchRequest &&
-        notification.type != FlixieNotification.showWatchRequest) {
-      return null;
-    }
-    final requestId = notification.linkedRequestId;
-    if (requestId == null || requestId.isEmpty) return null;
-    final scheduleStatus =
-        notification.watchRequestScheduleStatus?.toUpperCase();
-    if (scheduleStatus == null ||
-        (scheduleStatus != 'PROPOSED' &&
-            scheduleStatus != 'AGREED' &&
-            scheduleStatus != 'DECLINED')) {
-      return null;
-    }
-    final proposal = notification.latestWatchScheduleProposal;
-    final proposalId = proposal?['id']?.toString();
-    final proposedFor = proposal?['proposedFor']?.toString();
-    return [
-      notification.type,
-      requestId,
-      scheduleStatus,
-      if (proposalId != null && proposalId.isNotEmpty)
-        proposalId
-      else if (proposedFor != null && proposedFor.isNotEmpty)
-        proposedFor,
-    ].join(':');
-  }
-
-  DateTime _notificationSortDate(FlixieNotification notification) {
-    return DateTime.tryParse(notification.receivedAt) ??
-        DateTime.fromMillisecondsSinceEpoch(0);
   }
 
   Future<void> _respond(FlixieNotification notification, String action) async {

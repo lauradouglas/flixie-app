@@ -4,8 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'package:flixie_app/models/watch_request.dart';
+import 'package:flixie_app/models/group.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/features/social/data/request_service.dart';
+import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
@@ -16,6 +18,7 @@ import 'package:flixie_app/features/watchlist/presentation/controllers/watchlist
 import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_sheet.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/watch_follow_up_sheet.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/write_review_sheet.dart';
+import 'package:flixie_app/features/social/presentation/widgets/group_watch_requests_overview.dart';
 
 const List<String> _kMonths = [
   'Jan',
@@ -33,9 +36,9 @@ const List<String> _kMonths = [
 ];
 
 enum _StatusFilter {
-  all,
-  open,
-  accepted,
+  active,
+  needsResponse,
+  planning,
   scheduled,
   completed,
   declined,
@@ -43,7 +46,16 @@ enum _StatusFilter {
   expired,
 }
 
-enum _RequestAction { accepting, maybe, declining, scheduling, completing }
+enum _RequestAction {
+  accepting,
+  maybe,
+  declining,
+  scheduling,
+  completing,
+  deleting,
+}
+
+enum _RequestAudience { friends, groups }
 
 class WatchRequestsScreen extends StatefulWidget {
   const WatchRequestsScreen({super.key, this.initialRequestId});
@@ -76,14 +88,39 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
   List<WatchRequest> _filtered = [];
   bool _loading = true;
   String? _error;
-  _StatusFilter _statusFilter = _StatusFilter.all;
+  _StatusFilter _statusFilter = _StatusFilter.active;
   final Map<String, _RequestAction> _busyActions = {};
+  List<Group> _groups = [];
+  bool _loadingGroups = true;
+  _RequestAudience _audience = _RequestAudience.friends;
 
   @override
   void initState() {
     super.initState();
+    _groups = context.read<AuthProvider>().cachedGroups ?? [];
+    _loadingGroups = _groups.isEmpty;
     _load();
+    _loadGroups();
     _searchController.addListener(_applyFilter);
+  }
+
+  Future<void> _loadGroups() async {
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (userId == null || userId.isEmpty) {
+      if (mounted) setState(() => _loadingGroups = false);
+      return;
+    }
+    try {
+      final groups = await GroupService.getUserGroups(userId);
+      if (mounted) {
+        setState(() {
+          _groups = groups;
+          _loadingGroups = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingGroups = false);
+    }
   }
 
   @override
@@ -172,19 +209,19 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
 
   bool _matchesStatusFilter(WatchRequest request) {
     switch (_statusFilter) {
-      case _StatusFilter.all:
-        // Keep the default feed useful by hiding historical terminal requests.
-        // They remain available under their dedicated filters.
-        return !_isCompletedRequest(request) &&
-            !_isDeclinedRequest(request) &&
-            !_isCancelledRequest(request);
-      case _StatusFilter.open:
-        return request.isPending;
-      case _StatusFilter.accepted:
-        return request.isAccepted;
+      case _StatusFilter.active:
+        return _isActiveRequest(request);
+      case _StatusFilter.needsResponse:
+        final myUserId = context.read<AuthProvider>().dbUser?.id ?? '';
+        return _isActiveRequest(request) && _needsAttention(request, myUserId);
+      case _StatusFilter.planning:
+        return _isActiveRequest(request) &&
+            (request.isAccepted || request.isScheduled) &&
+            request.normalizedScheduleStatus != 'AGREED';
       case _StatusFilter.scheduled:
-        return request.normalizedScheduleStatus == 'AGREED' ||
-            request.normalizedScheduleStatus == 'PROPOSED';
+        return _isActiveRequest(request) &&
+            (request.normalizedScheduleStatus == 'AGREED' ||
+                request.isScheduled);
       case _StatusFilter.completed:
         return _isCompletedRequest(request);
       case _StatusFilter.declined:
@@ -201,8 +238,15 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
 
   bool _isDeclinedRequest(WatchRequest request) => request.isDeclined;
 
-  bool _isCancelledRequest(WatchRequest request) =>
-      request.isCancelled || request.normalizedScheduleStatus == 'CANCELLED';
+  // A cancelled time proposal is still an active accepted request that can be
+  // replanned. Only the request's own terminal status belongs in Cancelled.
+  bool _isCancelledRequest(WatchRequest request) => request.isCancelled;
+
+  bool _isActiveRequest(WatchRequest request) =>
+      !_isCompletedRequest(request) &&
+      !_isDeclinedRequest(request) &&
+      !_isCancelledRequest(request) &&
+      !request.isExpired;
 
   DateTime _parseDate(String? iso) =>
       DateTime.tryParse(iso ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
@@ -246,6 +290,76 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     } catch (e) {
       logger.w('[WatchRequestsScreen] state refresh failed: $e');
     }
+  }
+
+  Future<void> _confirmDelete(WatchRequest request) async {
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (userId == null || userId.isEmpty) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete watch request?'),
+        content: const Text(
+          'This permanently removes the request, its schedule and related notifications for everyone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep request'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: FlixieColors.danger,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete permanently'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    await _withRequestAction(request, _RequestAction.deleting, () async {
+      try {
+        await RequestService.deleteWatchRequest(
+          watchRequestId: request.id,
+          userId: userId,
+        );
+        if (!mounted) return;
+        final auth = context.read<AuthProvider>();
+        final cachedNotifications = auth.cachedNotifications;
+        if (cachedNotifications != null) {
+          auth.updateCachedNotifications(
+            cachedNotifications
+                .where((item) => item.linkedRequestId != request.id)
+                .toList(),
+          );
+        }
+        setState(() {
+          _all.removeWhere((item) => item.id == request.id);
+          _filtered.removeWhere((item) => item.id == request.id);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Watch request deleted')),
+        );
+        if (widget.initialRequestId?.isNotEmpty == true) {
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.go('/watch-requests');
+          }
+        }
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not delete the watch request'),
+            backgroundColor: FlixieColors.danger,
+          ),
+        );
+      }
+    });
   }
 
   Future<void> _withRequestAction(
@@ -397,6 +511,69 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     });
   }
 
+  Future<void> _editLocation(WatchRequest request) async {
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (userId == null || userId.isEmpty) return;
+    var enteredLocation = request.location ?? '';
+    final location = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(request.location?.isNotEmpty == true
+            ? 'Change location'
+            : 'Add a location'),
+        content: TextFormField(
+          initialValue: enteredLocation,
+          autofocus: true,
+          onChanged: (value) => enteredLocation = value,
+          onFieldSubmitted: (value) {
+            final trimmed = value.trim();
+            if (trimmed.isNotEmpty) Navigator.pop(dialogContext, trimmed);
+          },
+          decoration: const InputDecoration(
+            prefixIcon: Icon(Icons.location_on_outlined),
+            hintText: 'e.g. My place or local cinema',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(
+              dialogContext,
+              enteredLocation.trim(),
+            ),
+            child: const Text('Save location'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || location == null || location.isEmpty) return;
+
+    await _withRequestAction(request, _RequestAction.scheduling, () async {
+      try {
+        final updated = await RequestService.updateWatchRequestLocation(
+          watchRequestId: request.id,
+          userId: userId,
+          location: location,
+        );
+        _replaceRequest(updated);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Location set to $location')),
+          );
+        }
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not update the location')),
+          );
+        }
+      }
+    });
+  }
+
   Future<void> _respondToProposal(
     WatchRequest request,
     WatchScheduleProposal proposal,
@@ -516,6 +693,33 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
   @override
   Widget build(BuildContext context) {
     final isFocused = widget.initialRequestId?.isNotEmpty == true;
+    final directBody = _loading
+        ? const Center(child: CircularProgressIndicator())
+        : _error != null
+            ? _buildError()
+            : _filtered.isEmpty
+                ? _buildEmpty()
+                : _buildRequestsList(isFocused);
+    final body = isFocused
+        ? directBody
+        : Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                child: _AudienceSwitcher(
+                  selected: _audience,
+                  onChanged: (value) => setState(() => _audience = value),
+                ),
+              ),
+              Expanded(
+                child: _audience == _RequestAudience.friends
+                    ? directBody
+                    : _loadingGroups
+                        ? const Center(child: CircularProgressIndicator())
+                        : GroupWatchRequestsOverview(groups: _groups),
+              ),
+            ],
+          );
     return FlixiePageScaffold(
       appBar: FlixieTitleAppBar(
         backgroundColor: FlixieColors.background,
@@ -528,12 +732,33 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
                     fontSize: 22,
                     fontWeight: FontWeight.bold)),
             if (!isFocused && !_loading && _error == null)
-              Text('${_all.length} total',
+              Text(
+                  _audience == _RequestAudience.friends
+                      ? '${_filtered.length} shown'
+                      : 'Across ${_groups.length} groups',
                   style: const TextStyle(
                       color: FlixieColors.medium, fontSize: 12)),
           ],
         ),
-        bottom: isFocused
+        actions: isFocused && !_loading && _filtered.isNotEmpty
+            ? [
+                IconButton(
+                  tooltip: 'Delete watch request',
+                  onPressed: _busyActions[_filtered.first.id] ==
+                          _RequestAction.deleting
+                      ? null
+                      : () => _confirmDelete(_filtered.first),
+                  icon: _busyActions[_filtered.first.id] ==
+                          _RequestAction.deleting
+                      ? const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.delete_outline),
+                ),
+              ]
+            : null,
+        bottom: isFocused || _audience == _RequestAudience.groups
             ? null
             : PreferredSize(
                 preferredSize: const Size.fromHeight(104),
@@ -603,71 +828,128 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
                 ),
               ),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? _buildError()
-              : _filtered.isEmpty
-                  ? _buildEmpty()
-                  : RefreshIndicator(
-                      onRefresh: _load,
-                      color: FlixieColors.primary,
-                      child: ListView.separated(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _filtered.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (_, i) => _WatchRequestCard(
-                          request: _filtered[i],
-                          compact: !isFocused,
-                          myUserId:
-                              context.read<AuthProvider>().dbUser?.id ?? '',
-                          formattedDate: _formatDate(_filtered[i].createdAt),
-                          scheduledLabel: _formatFriendlyDateTime(
-                              _filtered[i].scheduledFor),
-                          busyAction: _busyActions[_filtered[i].id],
-                          onMovieTap: _filtered[i].movieId != null
-                              ? () => context
-                                  .push('/movies/${_filtered[i].movieId}')
-                              : null,
-                          onAccept: () => _respond(_filtered[i], 'ACCEPTED'),
-                          onMaybe: () => _respond(_filtered[i], 'MAYBE'),
-                          onDecline: () => _respond(_filtered[i], 'DECLINED'),
-                          onOpen: isFocused
-                              ? () => _refreshRequestState(
-                                    _filtered[i],
-                                    context.read<AuthProvider>().dbUser?.id ??
-                                        '',
-                                  )
-                              : () => context.push(
-                                    '/watch-requests/${_filtered[i].id}',
-                                  ),
-                          onSuggestSchedule: () =>
-                              _suggestSchedule(_filtered[i]),
-                          onSuggestDifferentTime: () => _suggestSchedule(
-                            _filtered[i],
-                            initial: _filtered[i].scheduledFor,
-                          ),
-                          onRespondToProposal: (proposal, decision) =>
-                              _respondToProposal(
-                            _filtered[i],
-                            proposal,
-                            decision,
-                          ),
-                          onConfirmWatched: () => _confirmWatched(_filtered[i]),
-                        ),
-                      ),
-                    ),
+      body: body,
+    );
+  }
+
+  Widget _buildRequestsList(bool isFocused) {
+    final myUserId = context.read<AuthProvider>().dbUser?.id ?? '';
+    if (isFocused ||
+        _statusFilter != _StatusFilter.active ||
+        _searchController.text.trim().isNotEmpty) {
+      return RefreshIndicator(
+        onRefresh: _load,
+        color: FlixieColors.primary,
+        child: ListView.separated(
+          padding: const EdgeInsets.all(16),
+          itemCount: _filtered.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 10),
+          itemBuilder: (_, index) =>
+              _buildRequestCard(_filtered[index], isFocused, myUserId),
+        ),
+      );
+    }
+
+    final needsAttention = _filtered
+        .where((request) => _needsAttention(request, myUserId))
+        .toList();
+    final upcoming = _filtered
+        .where((request) =>
+            !needsAttention.contains(request) && _isUpcoming(request))
+        .toList();
+    final planning = _filtered
+        .where((request) =>
+            !needsAttention.contains(request) && !upcoming.contains(request))
+        .toList();
+
+    final children = <Widget>[];
+    void addSection(String title, String subtitle, List<WatchRequest> items) {
+      if (items.isEmpty) return;
+      if (children.isNotEmpty) children.add(const SizedBox(height: 22));
+      children.add(_RequestListSectionHeader(
+        title: title,
+        subtitle: subtitle,
+        count: items.length,
+      ));
+      children.add(const SizedBox(height: 10));
+      for (var i = 0; i < items.length; i++) {
+        if (i > 0) children.add(const SizedBox(height: 10));
+        children.add(_buildRequestCard(items[i], false, myUserId));
+      }
+    }
+
+    addSection(
+      'Needs your attention',
+      'Requests and plans waiting for you',
+      needsAttention,
+    );
+    addSection('Upcoming', 'Your agreed watch plans', upcoming);
+    addSection('Planning', 'Invites waiting or being arranged', planning);
+
+    return RefreshIndicator(
+      onRefresh: _load,
+      color: FlixieColors.primary,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        children: children,
+      ),
+    );
+  }
+
+  bool _needsAttention(WatchRequest request, String myUserId) {
+    final isIncoming = request.requesterId != myUserId &&
+        (request.recipientId == myUserId ||
+            request.participantFor(myUserId) != null);
+    final proposal = request.latestPendingProposal;
+    return (request.isPending && isIncoming) ||
+        (proposal != null && proposal.proposerId != myUserId) ||
+        request.canConfirmWatchedFor(myUserId);
+  }
+
+  bool _isUpcoming(WatchRequest request) =>
+      request.normalizedScheduleStatus == 'AGREED' &&
+      request.scheduledFor != null &&
+      request.scheduledFor!.isAfter(DateTime.now());
+
+  Widget _buildRequestCard(
+    WatchRequest request,
+    bool isFocused,
+    String myUserId,
+  ) {
+    return _WatchRequestCard(
+      request: request,
+      compact: !isFocused,
+      myUserId: myUserId,
+      formattedDate: _formatDate(request.createdAt),
+      scheduledLabel: _formatFriendlyDateTime(request.scheduledFor),
+      busyAction: _busyActions[request.id],
+      onMovieTap: request.movieId != null
+          ? () => context.push('/movies/${request.movieId}')
+          : null,
+      onAccept: () => _respond(request, 'ACCEPTED'),
+      onDecline: () => _respond(request, 'DECLINED'),
+      onOpen: isFocused
+          ? () => _refreshRequestState(request, myUserId)
+          : () => context.push('/watch-requests/${request.id}'),
+      onSuggestSchedule: () => _suggestSchedule(request),
+      onSuggestDifferentTime: () =>
+          _suggestSchedule(request, initial: request.scheduledFor),
+      onEditLocation: () => _editLocation(request),
+      onRespondToProposal: (proposal, decision) =>
+          _respondToProposal(request, proposal, decision),
+      onConfirmWatched: () => _confirmWatched(request),
     );
   }
 
   String _filterLabel(_StatusFilter f) {
     switch (f) {
-      case _StatusFilter.all:
-        return 'All';
-      case _StatusFilter.open:
-        return 'Open';
-      case _StatusFilter.accepted:
-        return 'Accepted';
+      case _StatusFilter.active:
+        return 'Active';
+      case _StatusFilter.needsResponse:
+        return 'Needs response';
+      case _StatusFilter.planning:
+        return 'Planning';
       case _StatusFilter.scheduled:
         return 'Scheduled';
       case _StatusFilter.completed:
@@ -683,9 +965,9 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
 
   Color _statusFilterColor(_StatusFilter f) {
     switch (f) {
-      case _StatusFilter.open:
+      case _StatusFilter.needsResponse:
         return FlixieColors.warning;
-      case _StatusFilter.accepted:
+      case _StatusFilter.planning:
         return FlixieColors.success;
       case _StatusFilter.scheduled:
         return FlixieColors.secondary;
@@ -695,7 +977,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
       case _StatusFilter.cancelled:
       case _StatusFilter.expired:
         return FlixieColors.danger;
-      case _StatusFilter.all:
+      case _StatusFilter.active:
         return FlixieColors.primary;
     }
   }
@@ -726,7 +1008,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
           const SizedBox(height: 16),
           Text(
             _searchController.text.isNotEmpty ||
-                    _statusFilter != _StatusFilter.all
+                    _statusFilter != _StatusFilter.active
                 ? 'No requests match'
                 : 'No watch requests yet',
             style: const TextStyle(color: FlixieColors.medium, fontSize: 16),
@@ -752,9 +1034,125 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
   }
 }
 
+class _AudienceSwitcher extends StatelessWidget {
+  const _AudienceSwitcher({
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final _RequestAudience selected;
+  final ValueChanged<_RequestAudience> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 46,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: FlixieColors.tabBarBackgroundFocused,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: FlixieColors.primary.withValues(alpha: 0.28),
+        ),
+      ),
+      child: Row(
+        children: [
+          _item(_RequestAudience.friends, 'Friends'),
+          _item(_RequestAudience.groups, 'Groups'),
+        ],
+      ),
+    );
+  }
+
+  Widget _item(_RequestAudience value, String label) {
+    final isSelected = selected == value;
+    return Expanded(
+      child: InkWell(
+        onTap: () => onChanged(value),
+        borderRadius: BorderRadius.circular(11),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOut,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: isSelected ? FlixieColors.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(11),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.black : FlixieColors.medium,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Card
 // ---------------------------------------------------------------------------
+
+class _RequestListSectionHeader extends StatelessWidget {
+  const _RequestListSectionHeader({
+    required this.title,
+    required this.subtitle,
+    required this.count,
+  });
+
+  final String title;
+  final String subtitle;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: FlixieColors.light,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  color: FlixieColors.medium,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+          decoration: BoxDecoration(
+            color: FlixieColors.primary.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            '$count',
+            style: const TextStyle(
+              color: FlixieColors.primary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class _WatchRequestCard extends StatelessWidget {
   const _WatchRequestCard({
@@ -764,11 +1162,11 @@ class _WatchRequestCard extends StatelessWidget {
     required this.formattedDate,
     required this.scheduledLabel,
     required this.onAccept,
-    required this.onMaybe,
     required this.onDecline,
     required this.onOpen,
     required this.onSuggestSchedule,
     required this.onSuggestDifferentTime,
+    required this.onEditLocation,
     required this.onRespondToProposal,
     required this.onConfirmWatched,
     this.onMovieTap,
@@ -782,11 +1180,11 @@ class _WatchRequestCard extends StatelessWidget {
   final String scheduledLabel;
   final VoidCallback? onMovieTap;
   final VoidCallback onAccept;
-  final VoidCallback onMaybe;
   final VoidCallback onDecline;
   final VoidCallback onOpen;
   final VoidCallback onSuggestSchedule;
   final VoidCallback onSuggestDifferentTime;
+  final VoidCallback onEditLocation;
   final void Function(WatchScheduleProposal proposal, String decision)
       onRespondToProposal;
   final VoidCallback onConfirmWatched;
@@ -932,6 +1330,8 @@ class _WatchRequestCard extends StatelessWidget {
                                   color: FlixieColors.light,
                                   fontWeight: FontWeight.w600),
                             ),
+                            if (request.groupName?.trim().isNotEmpty == true)
+                              TextSpan(text: ' · ${request.groupName}'),
                           ],
                         ),
                       ),
@@ -1165,6 +1565,27 @@ class _WatchRequestCard extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
+                      if (request.groupName?.trim().isNotEmpty == true) ...[
+                        const SizedBox(height: 7),
+                        Row(
+                          children: [
+                            const Icon(Icons.groups_2_outlined,
+                                size: 16, color: FlixieColors.medium),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                request.groupName!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: FlixieColors.medium,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 14),
                       _DetailStatusBadge(
                         icon: _statusIcon,
@@ -1228,7 +1649,7 @@ class _WatchRequestCard extends StatelessWidget {
             const Divider(color: FlixieColors.tabBarBorder),
           ],
           const SizedBox(height: 18),
-          const _DetailSectionTitle(title: 'Request status'),
+          const _DetailSectionTitle(title: 'What’s next'),
           const SizedBox(height: 10),
           _LifecycleSummary(
             request: request,
@@ -1241,6 +1662,15 @@ class _WatchRequestCard extends StatelessWidget {
           ],
           const SizedBox(height: 18),
           _buildActions(),
+          if (request.groupId?.isNotEmpty == true) ...[
+            const SizedBox(height: 8),
+            _IconTextAction(
+              icon: Icons.chat_bubble_outline_rounded,
+              label: 'Open group chat',
+              onPressed: () =>
+                  context.push('/groups/${request.groupId}?tab=chat'),
+            ),
+          ],
           const SizedBox(height: 28),
         ],
       ),
@@ -1265,25 +1695,26 @@ class _WatchRequestCard extends StatelessWidget {
         (request.recipientId == myUserId ||
             request.participantFor(myUserId) != null) &&
         request.requesterId != myUserId) {
-      return Row(
+      return Column(
         children: [
-          Expanded(
-            child: _PrimaryActionButton(label: 'Accept', onPressed: onAccept),
+          SizedBox(
+            width: double.infinity,
+            child: _PrimaryActionButton(
+              label: 'Accept invitation',
+              onPressed: onAccept,
+            ),
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _SecondaryActionButton(label: 'Maybe', onPressed: onMaybe),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child:
-                _SecondaryActionButton(label: 'Decline', onPressed: onDecline),
+          const SizedBox(height: 6),
+          TextButton(
+            onPressed: onDecline,
+            child: const Text('Decline invitation'),
           ),
         ],
       );
     }
 
-    if (!request.isAccepted || !request.isWatchRequest) {
+    if ((!request.isAccepted && !request.isScheduled) ||
+        !request.isWatchRequest) {
       return const SizedBox.shrink();
     }
 
@@ -1304,7 +1735,7 @@ class _WatchRequestCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _PrimaryActionButton(
-                  label: 'Confirm',
+                  label: 'Mark as watched',
                   onPressed: onConfirmWatched,
                 ),
               ),
@@ -1355,27 +1786,17 @@ class _WatchRequestCard extends StatelessWidget {
             text: 'Proposed for ${_dateLabel(proposal.proposedFor)}',
           ),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _PrimaryActionButton(
-                  label: 'Accept time',
-                  onPressed: () => onRespondToProposal(proposal, 'accepted'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _SecondaryActionButton(
-                  label: 'Decline',
-                  onPressed: () => onRespondToProposal(proposal, 'declined'),
-                ),
-              ),
-            ],
+          SizedBox(
+            width: double.infinity,
+            child: _PrimaryActionButton(
+              label: 'Accept time',
+              onPressed: () => onRespondToProposal(proposal, 'accepted'),
+            ),
           ),
           const SizedBox(height: 8),
           _IconTextAction(
             icon: Icons.edit_calendar_outlined,
-            label: 'Suggest another time',
+            label: 'Suggest another instead',
             onPressed: onSuggestDifferentTime,
           ),
         ],
@@ -1387,9 +1808,11 @@ class _WatchRequestCard extends StatelessWidget {
       final isFuture =
           scheduledFor != null && scheduledFor.isAfter(DateTime.now());
       if (!isFuture) return const SizedBox.shrink();
-      return Row(
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
+          SizedBox(
+            width: double.infinity,
             child: _PrimaryActionButton(
               label: 'Add to calendar',
               onPressed: () => WatchCalendarService.addScheduledWatch(
@@ -1400,13 +1823,24 @@ class _WatchRequestCard extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: _CompactActionButton(
-              icon: Icons.edit_calendar_outlined,
-              label: 'Suggest different',
-              onPressed: onSuggestDifferentTime,
-            ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              _IconTextAction(
+                icon: Icons.edit_calendar_outlined,
+                label: 'Change time',
+                onPressed: onSuggestDifferentTime,
+              ),
+              _IconTextAction(
+                icon: Icons.location_on_outlined,
+                label: request.location?.trim().isNotEmpty == true
+                    ? 'Change location'
+                    : 'Add location',
+                onPressed: onEditLocation,
+              ),
+            ],
           ),
         ],
       );
@@ -1415,9 +1849,25 @@ class _WatchRequestCard extends StatelessWidget {
     if (request.normalizedScheduleStatus == 'NONE' ||
         request.normalizedScheduleStatus == 'DECLINED' ||
         request.normalizedScheduleStatus == 'CANCELLED') {
-      return _PrimaryActionButton(
-        label: 'Suggest a time',
-        onPressed: onSuggestSchedule,
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: _PrimaryActionButton(
+              label: 'Suggest a time',
+              onPressed: onSuggestSchedule,
+            ),
+          ),
+          const SizedBox(height: 6),
+          _IconTextAction(
+            icon: Icons.location_on_outlined,
+            label: request.location?.trim().isNotEmpty == true
+                ? 'Change location'
+                : 'Add a location',
+            onPressed: onEditLocation,
+          ),
+        ],
       );
     }
 
@@ -1427,9 +1877,16 @@ class _WatchRequestCard extends StatelessWidget {
   String _dateLabel(DateTime? value) {
     if (value == null) return 'the suggested time';
     final local = value.toLocal();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final date = DateTime(local.year, local.month, local.day);
     final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
     final minute = local.minute.toString().padLeft(2, '0');
     final suffix = local.hour >= 12 ? 'pm' : 'am';
+    if (date == today) return 'Today at $hour:$minute$suffix';
+    if (date == today.add(const Duration(days: 1))) {
+      return 'Tomorrow at $hour:$minute$suffix';
+    }
     return '${local.day} ${_kMonths[local.month - 1]}, $hour:$minute$suffix';
   }
 
@@ -1641,11 +2098,14 @@ class _LifecycleSummary extends StatelessWidget {
       final pending = request.participants
           .where((p) => p.response.toLowerCase() == 'pending')
           .length;
-      return pending > 0
-          ? '$pending pending response${pending == 1 ? '' : 's'}'
-          : 'Awaiting responses';
+      if (request.requesterId == myUserId) {
+        return pending > 0
+            ? 'Waiting for $pending response${pending == 1 ? '' : 's'}'
+            : 'Waiting for a response';
+      }
+      return 'Accept the invitation to start making a plan.';
     }
-    if (request.isAccepted) {
+    if (request.isAccepted || request.isScheduled) {
       if (request.normalizedWatchedStatus == 'WATCHED') {
         return 'Watched together';
       }
@@ -1662,7 +2122,7 @@ class _LifecycleSummary extends StatelessWidget {
       if (request.normalizedScheduleStatus == 'PROPOSED' && proposal != null) {
         return proposal.proposerId == myUserId
             ? 'Waiting for them to respond'
-            : 'They suggested a time';
+            : 'Choose this time or suggest another that suits you.';
       }
       if (request.normalizedScheduleStatus == 'AGREED') {
         return scheduledLabel.isEmpty
@@ -1675,7 +2135,7 @@ class _LifecycleSummary extends StatelessWidget {
       if (request.normalizedScheduleStatus == 'CANCELLED') {
         return 'Schedule cancelled';
       }
-      return 'Accepted. Ready to suggest a time.';
+      return 'You’re both up for it. Add a time or location when you’re ready.';
     }
     if (request.isCompleted) {
       final mine = request.participantFor(myUserId);
@@ -1821,40 +2281,6 @@ class _SecondaryActionButton extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
-      ),
-    );
-  }
-}
-
-class _CompactActionButton extends StatelessWidget {
-  const _CompactActionButton({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 15),
-      label: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: FlixieColors.medium,
-        side: BorderSide(color: FlixieColors.medium.withValues(alpha: 0.35)),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        minimumSize: const Size(0, 32),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
