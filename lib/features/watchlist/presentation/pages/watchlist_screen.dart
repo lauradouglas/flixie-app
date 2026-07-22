@@ -17,7 +17,6 @@ import 'package:flixie_app/features/movies/presentation/widgets/add_to_list_shee
 import 'package:flixie_app/features/movies/presentation/widgets/watch_request_sheet.dart';
 import 'package:flixie_app/features/watchlist/presentation/widgets/filter_sheet.dart';
 import 'package:flixie_app/models/watch_provider.dart';
-import 'package:flixie_app/features/movies/data/movie_service.dart';
 import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'package:flixie_app/models/review.dart';
 import 'package:flixie_app/features/watchlist/presentation/controllers/watchlist_actions_controller.dart';
@@ -126,7 +125,6 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       List<WatchlistMovie> watchlist) async {
     final requestId = ++_watchProviderAvailabilityRequest;
     final authProvider = context.read<AuthProvider>();
-    final movieService = context.read<MovieService>();
     final user = authProvider.dbUser;
     if (user == null || watchlist.isEmpty) {
       if (mounted) {
@@ -141,34 +139,49 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     }
 
     try {
-      setState(() => _loadingWatchProviderAvailability = true);
-      final userProviders = await UserService.getUserWatchProviders(user.id);
-      final userProviderIds = userProviders.map((p) => p.id).toSet();
-      final region = user.countryAbbreviation ?? 'GB';
-      final movieIds = watchlist.map((w) => w.movieId).toSet().toList();
+      final movieIds = watchlist.map((w) => w.movieId).toSet();
+      final cachedProviders = authProvider.cachedWatchProvidersByMovieId;
+      final hasMissingProviders = movieIds.any(
+        (movieId) => !cachedProviders.containsKey(movieId),
+      );
+      final needsUserProviders =
+          authProvider.cachedUserWatchProviderIds == null;
+      setState(() {
+        _movieWatchProviders
+          ..clear()
+          ..addEntries(movieIds
+              .where(cachedProviders.containsKey)
+              .map((id) => MapEntry(id, cachedProviders[id]!)));
+        _userWatchProviderIds =
+            authProvider.cachedUserWatchProviderIds ?? const {};
+        _loadingWatchProviderAvailability =
+            hasMissingProviders || needsUserProviders;
+      });
 
-      final results = await Future.wait(movieIds.map((movieId) async {
-        try {
-          final providers =
-              await movieService.getMovieWatchProviders(movieId, region);
-          final canWatchNow = providers
-              .any((p) => p.isStreaming && userProviderIds.contains(p.id));
-          return (movieId, providers, canWatchNow);
-        } catch (_) {
-          return (movieId, <WatchProvider>[], false);
-        }
-      }));
+      if (hasMissingProviders || needsUserProviders) {
+        await authProvider.ensureWatchProviderCache(movieIds: movieIds);
+      }
 
       if (!mounted || requestId != _watchProviderAvailabilityRequest) return;
 
+      final providers = authProvider.cachedWatchProvidersByMovieId;
+      final userProviderIds =
+          authProvider.cachedUserWatchProviderIds ?? const <int>{};
       setState(() {
         _userWatchProviderIds = userProviderIds;
         _movieWatchProviders
           ..clear()
-          ..addEntries(results.map((r) => MapEntry(r.$1, r.$2)));
+          ..addEntries(movieIds
+              .where(providers.containsKey)
+              .map((id) => MapEntry(id, providers[id]!)));
         _canWatchNowByMovieId
           ..clear()
-          ..addEntries(results.map((r) => MapEntry(r.$1, r.$3)));
+          ..addEntries(_movieWatchProviders.entries.map((entry) => MapEntry(
+                entry.key,
+                entry.value.any((provider) =>
+                    provider.isStreaming &&
+                    userProviderIds.contains(provider.id)),
+              )));
         _loadingWatchProviderAvailability = false;
       });
 
@@ -1887,6 +1900,7 @@ class WatchlistMovieRow extends StatelessWidget {
                       ],
                       const SizedBox(height: 12),
                       _WatchProvidersInline(
+                        releaseDate: movie.releaseDate,
                         providers: availableProviders,
                         userWatchProviderIds: userWatchProviderIds,
                         canWatchNow: canWatchNow,
@@ -1924,19 +1938,80 @@ class WatchlistMovieRow extends StatelessWidget {
 
 class _WatchProvidersInline extends StatelessWidget {
   const _WatchProvidersInline({
+    required this.releaseDate,
     required this.providers,
     required this.userWatchProviderIds,
     required this.canWatchNow,
     required this.isLoading,
   });
 
+  final String? releaseDate;
   final List<WatchProvider> providers;
   final Set<int> userWatchProviderIds;
   final bool canWatchNow;
   final bool isLoading;
 
+  DateTime? get _releaseDay {
+    final parsed = DateTime.tryParse(releaseDate ?? '');
+    return parsed == null
+        ? null
+        : DateTime(parsed.year, parsed.month, parsed.day);
+  }
+
+  DateTime get _today {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  bool get _isUpcoming {
+    final release = _releaseDay;
+    return release != null && release.isAfter(_today);
+  }
+
+  String get _releaseLabel {
+    final date = _releaseDay;
+    if (date == null) return '';
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
+    return '${date.day} ${months[date.month - 1]}';
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isUpcoming) {
+      return Row(
+        children: [
+          const Icon(Icons.event_outlined,
+              size: 15, color: FlixieColors.primary),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              _releaseLabel.isEmpty
+                  ? 'Coming to cinema'
+                  : 'Coming to cinema $_releaseLabel',
+              style: const TextStyle(
+                color: FlixieColors.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     if (isLoading) {
       return const Row(
         children: [
@@ -1958,16 +2033,16 @@ class _WatchProvidersInline extends StatelessWidget {
     }
 
     if (providers.isEmpty) {
-      return const Row(
-        children: [
-          Icon(Icons.tv_off_outlined, size: 13, color: FlixieColors.medium),
-          SizedBox(width: 5),
-          Text(
-            'Not streamable yet',
+      return const Row(children: [
+        Icon(Icons.tv_off_outlined, size: 13, color: FlixieColors.medium),
+        SizedBox(width: 5),
+        Flexible(
+          child: Text(
+            'Streaming availability unavailable',
             style: TextStyle(color: FlixieColors.medium, fontSize: 12),
           ),
-        ],
-      );
+        ),
+      ]);
     }
 
     final streamingProviders = providers.where((p) => p.isStreaming).toList();
@@ -1977,16 +2052,16 @@ class _WatchProvidersInline extends StatelessWidget {
     final showingRentals =
         streamingProviders.isEmpty && rentalProviders.isNotEmpty;
     if (displayProviders.isEmpty) {
-      return const Row(
-        children: [
-          Icon(Icons.tv_off_outlined, size: 13, color: FlixieColors.medium),
-          SizedBox(width: 5),
-          Text(
-            'Not streamable or rentable yet',
+      return const Row(children: [
+        Icon(Icons.tv_off_outlined, size: 13, color: FlixieColors.medium),
+        SizedBox(width: 5),
+        Flexible(
+          child: Text(
+            'Streaming availability unavailable',
             style: TextStyle(color: FlixieColors.medium, fontSize: 12),
           ),
-        ],
-      );
+        ),
+      ]);
     }
 
     final sortedProviders = [...displayProviders]..sort((a, b) {

@@ -300,6 +300,31 @@ class UserService {
     return FavoriteMovie.fromJson(data as Map<String, dynamic>);
   }
 
+  /// Adds a group of movies to favourites through the backend's bulk route.
+  /// The bulk route imports any missing TMDB movies before creating the user
+  /// relationships, which is important for onboarding search results.
+  static Future<void> addMoviesToFavorites(
+      String userId, Iterable<int> movieIds) async {
+    final ids = movieIds.toSet().toList(growable: false);
+    if (ids.isEmpty) return;
+    await ApiClient.post(
+      '/users/$userId/movies/favorites',
+      body: {'movieIds': ids},
+    );
+  }
+
+  /// Adds a group of watched movies, importing missing TMDB movies first on
+  /// the backend before watch entries are created.
+  static Future<void> addMoviesToWatched(
+      String userId, Iterable<int> movieIds) async {
+    final ids = movieIds.toSet().toList(growable: false);
+    if (ids.isEmpty) return;
+    await ApiClient.post(
+      '/users/$userId/movies/watched',
+      body: {'movieIds': ids},
+    );
+  }
+
   static Future<void> removeFromFavorites(String userId, int movieId) async {
     apiLogger.d('DELETE /users/$userId/movie/favorite/$movieId');
     final data =

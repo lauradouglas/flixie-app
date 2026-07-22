@@ -29,6 +29,11 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
   bool _isFavoriteLoading = false;
   _CreditFilter _creditFilter = _CreditFilter.all;
   _CreditSort _creditSort = _CreditSort.popular;
+  final TextEditingController _filmographySearchController =
+      TextEditingController();
+  String _filmographyQuery = '';
+  String? _filmographyYear;
+  bool _showAllKnownFor = false;
 
   static const _imgBase = 'https://image.tmdb.org/t/p/w500';
 
@@ -36,6 +41,12 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _filmographySearchController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -109,6 +120,15 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
           _isFavorite = !_isFavorite;
           _isFavoriteLoading = false;
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _isFavorite
+                  ? 'Added to favourite people'
+                  : 'Removed from favourite people',
+            ),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -156,6 +176,19 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
   String? _year(String? raw) {
     if (raw == null || raw.length < 4) return null;
     return raw.substring(0, 4);
+  }
+
+  String? _ageLabel(Person person) {
+    final born = DateTime.tryParse(person.dateOfBirth ?? '');
+    if (born == null) return null;
+    final end = DateTime.tryParse(person.dateOfDeath ?? '') ?? DateTime.now();
+    var age = end.year - born.year;
+    if (end.month < born.month ||
+        (end.month == born.month && end.day < born.day)) {
+      age--;
+    }
+    if (age < 0) return null;
+    return person.dateOfDeath == null ? 'Age $age' : 'Lived to $age';
   }
 
   List<_PersonFilmCredit> _allMovieCredits(PersonCredits credits) {
@@ -215,13 +248,20 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
 
   List<_PersonFilmCredit> _filteredCredits(PersonCredits credits) {
     final filtered = _allMovieCredits(credits).where((credit) {
-      return switch (_creditFilter) {
+      final matchesRole = switch (_creditFilter) {
         _CreditFilter.all => true,
         _CreditFilter.actor => credit.isCast,
         _CreditFilter.director => credit.isDirector,
         _CreditFilter.writer => credit.isWriter,
         _CreditFilter.producer => credit.isProducer,
       };
+      final query = _filmographyQuery.trim().toLowerCase();
+      final matchesQuery = query.isEmpty ||
+          credit.title.toLowerCase().contains(query) ||
+          credit.roleLabel.toLowerCase().contains(query);
+      final matchesYear =
+          _filmographyYear == null || credit.year == _filmographyYear;
+      return matchesRole && matchesQuery && matchesYear;
     }).toList();
 
     filtered.sort((a, b) {
@@ -267,19 +307,56 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
   List<Widget> _personalBadges(int movieId) {
     final badges = <Widget>[];
     if (_movieInWatched(movieId)) {
-      badges.add(_miniBadge('Watched', FlixieColors.success));
+      badges.add(_miniBadge(
+        'Watched',
+        FlixieColors.success,
+        icon: Icons.check_circle_rounded,
+      ));
     }
     if (_movieInWatchlist(movieId)) {
-      badges.add(_miniBadge('Watchlist', FlixieColors.warning));
+      badges.add(_miniBadge(
+        'Watchlist',
+        FlixieColors.warning,
+        icon: Icons.bookmark_rounded,
+      ));
     }
     if (_movieInFavorites(movieId)) {
-      badges.add(_miniBadge('Favourite', FlixieColors.danger));
+      badges.add(_miniBadge(
+        'Favourite',
+        FlixieColors.danger,
+        icon: Icons.favorite_rounded,
+      ));
     }
     return badges;
   }
 
+  List<Widget> _posterStatusBadges(int movieId) {
+    return [
+      if (_movieInFavorites(movieId))
+        _posterStatusBadge(
+          icon: Icons.favorite_rounded,
+          label: 'Favourite',
+          color: FlixieColors.danger,
+        ),
+      if (_movieInWatchlist(movieId))
+        _posterStatusBadge(
+          icon: Icons.bookmark_rounded,
+          label: 'On watchlist',
+          color: FlixieColors.warning,
+        ),
+      if (_movieInWatched(movieId))
+        _posterStatusBadge(
+          icon: Icons.check_rounded,
+          label: 'Watched',
+          color: FlixieColors.success,
+        ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Rebuild personal movie status badges when the user's lists change.
+    context.watch<AuthProvider>();
     if (_isLoading) {
       return const Scaffold(
         backgroundColor: FlixieColors.background,
@@ -338,16 +415,18 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
         slivers: [
           // ---- App bar with hero portrait ----------------------------------
           SliverAppBar(
-            expandedHeight: 430,
+            expandedHeight: 480,
             pinned: true,
             backgroundColor: FlixieColors.background,
             leading: IconButton(
               icon: const Icon(Icons.arrow_back, color: FlixieColors.light),
               onPressed: () => Navigator.of(context).pop(),
             ),
-            title: const Text(
-              'CAST MEMBER',
-              style: TextStyle(
+            title: Text(
+              (person.department?.trim().isNotEmpty ?? false)
+                  ? person.department!.toUpperCase()
+                  : 'FILM PERSON',
+              style: const TextStyle(
                 color: FlixieColors.light,
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
@@ -384,6 +463,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                       ? CachedNetworkImage(
                           imageUrl: profileUrl,
                           fit: BoxFit.cover,
+                          alignment: Alignment.topCenter,
                           errorWidget: (_, __, ___) =>
                               _portraitFallback(person.name),
                         )
@@ -395,16 +475,19 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                         end: Alignment.bottomCenter,
                         colors: [
                           Color(0x66000000),
-                          Color(0x22000000),
-                          Color(0xF2120A24),
+                          Color(0x00000000),
+                          Color(0x00000000),
+                          Color(0x661C0C36),
+                          FlixieColors.background,
                         ],
+                        stops: [0, 0.18, 0.48, 0.76, 1],
                       ),
                     ),
                   ),
                   Positioned(
                     left: 16,
                     right: 16,
-                    bottom: 24,
+                    bottom: 10,
                     child: _buildHeroSummary(person),
                   ),
                 ],
@@ -424,6 +507,12 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
 
                   const SizedBox(height: 24),
 
+                  // Put recognisable work first; this is usually why someone
+                  // opens a person profile.
+                  if (_credits != null) _buildKnownForSection(_credits!),
+
+                  if (_credits != null) const SizedBox(height: 28),
+
                   // Biography
                   if (person.biography != null && person.biography!.isNotEmpty)
                     _buildBiographyCard(person.biography!)
@@ -434,14 +523,10 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                       Icons.person_outline,
                     ),
 
-                  // External links
-                  const SizedBox(height: 16),
-                  _buildExternalLinks(person),
-
-                  // Credits
+                  // Filmography
                   if (_credits != null) ...[
                     const SizedBox(height: 32),
-                    _buildCreditsSection(_credits!),
+                    _buildFilmographySection(_credits!),
                   ],
 
                   const SizedBox(height: 32),
@@ -487,9 +572,55 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                   Icons.event_busy_outlined, _formatDate(person.dateOfDeath)),
             if (person.placeOfBirth != null && person.placeOfBirth!.isNotEmpty)
               _heroMeta(Icons.place_outlined, person.placeOfBirth!),
+            if (_ageLabel(person) != null)
+              _heroMeta(Icons.cake_outlined, _ageLabel(person)!),
           ],
         ),
+        if ((person.imdbId?.isNotEmpty ?? false) ||
+            (person.instagramId?.isNotEmpty ?? false)) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            children: [
+              if (person.imdbId?.isNotEmpty ?? false)
+                _compactExternalLink(
+                  icon: Icons.movie_filter_outlined,
+                  label: 'IMDb',
+                  onTap: () =>
+                      _launch('https://www.imdb.com/name/${person.imdbId}'),
+                ),
+              if (person.instagramId?.isNotEmpty ?? false)
+                _compactExternalLink(
+                  icon: Icons.camera_alt_outlined,
+                  label: 'Instagram',
+                  onTap: () => _launch(
+                    'https://www.instagram.com/${person.instagramId}',
+                  ),
+                ),
+            ],
+          ),
+        ],
       ],
+    );
+  }
+
+  Widget _compactExternalLink({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return ActionChip(
+      avatar: Icon(icon, size: 15, color: FlixieColors.primaryTint),
+      label: Text(label),
+      onPressed: onTap,
+      backgroundColor: Colors.black.withValues(alpha: 0.55),
+      side: BorderSide(color: Colors.white.withValues(alpha: 0.16)),
+      labelStyle: const TextStyle(
+        color: FlixieColors.light,
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
     );
   }
 
@@ -601,7 +732,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
     );
   }
 
-  Widget _miniBadge(String label, Color color) {
+  Widget _miniBadge(String label, Color color, {IconData? icon}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -609,22 +740,60 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          color: color,
-          fontSize: 10,
-          fontWeight: FontWeight.w800,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, color: color, size: 12),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _posterStatusBadge({
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: Tooltip(
+        message: label,
+        child: Semantics(
+          label: label,
+          child: Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: FlixieColors.background.withValues(alpha: 0.92),
+              shape: BoxShape.circle,
+              border: Border.all(color: color, width: 1.5),
+              boxShadow: const [
+                BoxShadow(color: Colors.black54, blurRadius: 5),
+              ],
+            ),
+            child: Icon(icon, color: color, size: 17),
+          ),
         ),
       ),
     );
   }
 
   Widget _buildBiographyCard(String bio) {
-    const previewLines = 6;
-    final shouldCollapse = bio.length > 620;
+    const previewLines = 4;
+    final shouldCollapse = bio.length > 380;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -746,112 +915,89 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
     );
   }
 
-  Widget _buildExternalLinks(Person person) {
-    final hasImdb = person.imdbId != null && person.imdbId!.isNotEmpty;
-    final hasInstagram =
-        person.instagramId != null && person.instagramId!.isNotEmpty;
-
-    if (!hasImdb && !hasInstagram) return const SizedBox.shrink();
-
-    Widget linkCard({
-      required Widget leading,
-      required String label,
-      required VoidCallback onTap,
-      bool fullWidth = false,
-    }) {
-      return GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: FlixieColors.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: FlixieColors.tabBarBorder),
-          ),
-          child: Row(
-            mainAxisAlignment: fullWidth
-                ? MainAxisAlignment.spaceBetween
-                : MainAxisAlignment.center,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  leading,
-                  const SizedBox(width: 12),
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      color: FlixieColors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              if (fullWidth)
-                const Icon(Icons.open_in_new,
-                    color: FlixieColors.medium, size: 18),
-            ],
-          ),
-        ),
+  Widget _buildKnownForSection(PersonCredits credits) {
+    final knownFor =
+        credits.knownForCredits.where((c) => c.type == 'movie').toList();
+    if (knownFor.isEmpty) {
+      return _emptySection(
+        'No known titles yet',
+        'Recognisable titles will appear here once they are available.',
+        Icons.local_movies_outlined,
       );
     }
 
+    final visible = _showAllKnownFor ? knownFor : knownFor.take(6).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Connect & Resources',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: FlixieColors.white,
-                fontWeight: FontWeight.bold,
-              ),
-        ),
-        const SizedBox(height: 12),
-        if (hasImdb)
-          linkCard(
-            fullWidth: true,
-            leading: Container(
-              width: 36,
-              height: 28,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF5C518),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              alignment: Alignment.center,
-              child: const Text(
-                'IMDb',
-                style: TextStyle(
-                  color: Color(0xFF000000),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.5,
-                ),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Known For',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: FlixieColors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
               ),
             ),
-            label: 'Official Profile',
-            onTap: () => _launch('https://www.imdb.com/name/${person.imdbId}'),
+            if (knownFor.length > 6)
+              TextButton(
+                onPressed: () =>
+                    setState(() => _showAllKnownFor = !_showAllKnownFor),
+                child: Text(_showAllKnownFor ? 'Show less' : 'View all'),
+              ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        _buildMovieStatusLegend(),
+        const SizedBox(height: 12),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 16,
+            childAspectRatio: 0.48,
           ),
-        if (hasImdb && hasInstagram) const SizedBox(height: 10),
-        if (hasInstagram)
-          linkCard(
-            leading: const Icon(Icons.language,
-                color: FlixieColors.medium, size: 20),
-            label: 'INSTAGRAM',
-            onTap: () =>
-                _launch('https://www.instagram.com/${person.instagramId}'),
-          ),
+          itemCount: visible.length,
+          itemBuilder: (context, index) => _knownForCard(visible[index]),
+        ),
       ],
     );
   }
 
-  Widget _buildCreditsSection(PersonCredits credits) {
-    final knownFor =
-        credits.knownForCredits.where((c) => c.type == 'movie').toList();
+  Widget _buildMovieStatusLegend() {
+    return const Wrap(
+      spacing: 12,
+      runSpacing: 7,
+      children: [
+        _StatusLegendItem(
+          icon: Icons.favorite_rounded,
+          label: 'Favourite',
+          color: FlixieColors.danger,
+        ),
+        _StatusLegendItem(
+          icon: Icons.bookmark_rounded,
+          label: 'Watchlist',
+          color: FlixieColors.warning,
+        ),
+        _StatusLegendItem(
+          icon: Icons.check_circle_rounded,
+          label: 'Watched',
+          color: FlixieColors.success,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFilmographySection(PersonCredits credits) {
     final filmography = _filteredCredits(credits);
     final allCredits = _allMovieCredits(credits);
 
-    if (knownFor.isEmpty && allCredits.isEmpty) {
+    if (allCredits.isEmpty) {
       return _emptySection(
         'No movie credits yet',
         'Credits will appear here once they are available.',
@@ -873,24 +1019,6 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ---- Known For -----------------------------------------------
-        if (knownFor.isNotEmpty) ...[
-          sectionTitle('Known For'),
-          SizedBox(
-            height: 236,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: knownFor.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 12),
-              itemBuilder: (context, index) {
-                final item = knownFor[index];
-                return _knownForCard(item);
-              },
-            ),
-          ),
-          const SizedBox(height: 32),
-        ],
-
         // ---- Filmography ---------------------------------------------
         sectionTitle('Filmography'),
         _buildCreditControls(),
@@ -951,7 +1079,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
 
   Widget _knownForCard(PersonCreditItem item) {
     const posterBase = 'https://image.tmdb.org/t/p/w342';
-    final badges = _personalBadges(item.id);
+    final statusBadges = _posterStatusBadges(item.id);
+    final role = _knownForRole(item);
     return GestureDetector(
       onTap: () => context.push('/movies/${item.id}'),
       child: SizedBox(
@@ -974,15 +1103,13 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                         : _posterFallback(),
                   ),
                 ),
-                if (badges.isNotEmpty)
+                if (statusBadges.isNotEmpty)
                   Positioned(
-                    left: 6,
+                    top: 6,
                     right: 6,
-                    bottom: 6,
-                    child: Wrap(
-                      spacing: 4,
-                      runSpacing: 4,
-                      children: badges.take(2).toList(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: statusBadges,
                     ),
                   ),
               ],
@@ -1007,16 +1134,70 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                     const TextStyle(color: FlixieColors.medium, fontSize: 11),
               ),
             ],
+            if (role != null) ...[
+              const SizedBox(height: 3),
+              Text(
+                role,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: FlixieColors.primaryTint,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
+  String? _knownForRole(PersonCreditItem item) {
+    if (item.characters.isNotEmpty) return item.characters.first;
+    final jobs = _credits?.crewCredits
+        .where((credit) => credit.id == item.id)
+        .map((credit) => credit.job)
+        .where((job) => job.trim().isNotEmpty)
+        .toSet()
+        .toList();
+    if (jobs == null || jobs.isEmpty) return null;
+    return jobs.take(2).join(' • ');
+  }
+
   Widget _buildCreditControls() {
+    final years = _credits == null
+        ? <String>[]
+        : _allMovieCredits(_credits!)
+            .map((credit) => credit.year)
+            .whereType<String>()
+            .toSet()
+            .toList()
+      ..sort((a, b) => b.compareTo(a));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        TextField(
+          controller: _filmographySearchController,
+          onChanged: (value) => setState(() => _filmographyQuery = value),
+          style: const TextStyle(color: FlixieColors.white),
+          textInputAction: TextInputAction.search,
+          decoration: InputDecoration(
+            hintText: 'Search titles or roles',
+            prefixIcon: const Icon(Icons.search_rounded),
+            suffixIcon: _filmographyQuery.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: 'Clear search',
+                    onPressed: () {
+                      _filmographySearchController.clear();
+                      setState(() => _filmographyQuery = '');
+                    },
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 12),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
@@ -1047,47 +1228,84 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        PopupMenuButton<_CreditSort>(
-          initialValue: _creditSort,
-          onSelected: (sort) => setState(() => _creditSort = sort),
-          color: FlixieColors.surface,
-          itemBuilder: (context) => _CreditSort.values
-              .map(
-                (sort) => PopupMenuItem(
-                  value: sort,
-                  child: Text(sort.label),
-                ),
-              )
-              .toList(),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-            decoration: BoxDecoration(
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _creditSortMenu(),
+            PopupMenuButton<String?>(
+              initialValue: _filmographyYear,
+              onSelected: (year) => setState(() => _filmographyYear = year),
               color: FlixieColors.surface,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: FlixieColors.tabBarBorder),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.sort_rounded,
-                    color: FlixieColors.medium, size: 16),
-                const SizedBox(width: 8),
-                Text(
-                  _creditSort.label,
-                  style: const TextStyle(
-                    color: FlixieColors.light,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+              itemBuilder: (context) => [
+                const PopupMenuItem<String?>(
+                  value: null,
+                  child: Text('All years'),
+                ),
+                ...years.map(
+                  (year) => PopupMenuItem<String?>(
+                    value: year,
+                    child: Text(year),
                   ),
                 ),
-                const SizedBox(width: 4),
-                const Icon(Icons.keyboard_arrow_down_rounded,
-                    color: FlixieColors.medium, size: 16),
               ],
+              child: _controlChip(
+                Icons.calendar_month_outlined,
+                _filmographyYear ?? 'All years',
+              ),
             ),
-          ),
+          ],
         ),
       ],
+    );
+  }
+
+  Widget _creditSortMenu() {
+    return PopupMenuButton<_CreditSort>(
+      initialValue: _creditSort,
+      onSelected: (sort) => setState(() => _creditSort = sort),
+      color: FlixieColors.surface,
+      itemBuilder: (context) => _CreditSort.values
+          .map(
+            (sort) => PopupMenuItem(
+              value: sort,
+              child: Text(sort.label),
+            ),
+          )
+          .toList(),
+      child: _controlChip(Icons.sort_rounded, _creditSort.label),
+    );
+  }
+
+  Widget _controlChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: FlixieColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: FlixieColors.tabBarBorder),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: FlixieColors.medium, size: 16),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              color: FlixieColors.light,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(width: 4),
+          const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: FlixieColors.medium,
+            size: 16,
+          ),
+        ],
+      ),
     );
   }
 
@@ -1287,6 +1505,37 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
 }
 
 enum _CreditFilter { all, actor, director, writer, producer }
+
+class _StatusLegendItem extends StatelessWidget {
+  const _StatusLegendItem({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: color, size: 15),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: const TextStyle(
+            color: FlixieColors.medium,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 enum _CreditSort { popular, newest, oldest, rating }
 

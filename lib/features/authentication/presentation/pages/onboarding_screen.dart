@@ -110,9 +110,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
 
     if (!mounted || movie == null) return;
-    final selectedMap = bucket == _MovieBucket.favourites
-        ? _favourites
-        : _recentlyWatched;
+    final selectedMap =
+        bucket == _MovieBucket.favourites ? _favourites : _recentlyWatched;
     setState(() {
       if (!canAddOnboardingMovie(selectedMap, movie.id)) {
         return;
@@ -144,15 +143,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
 
     try {
-      await Future.wait(
-        _favourites.keys.map((movieId) => UserService.addToFavorites(userId, movieId)),
-      );
-      if (_recentlyWatched.isNotEmpty) {
-        await Future.wait(
-          _recentlyWatched.keys
-              .map((movieId) => UserService.addToWatched(userId, movieId)),
-        );
-      }
+      // Use the bulk routes: they import any selected TMDB movies that are not
+      // in Flixie's database before creating favourite/watch relationships.
+      await UserService.addMoviesToFavorites(userId, _favourites.keys);
+      await UserService.addMoviesToWatched(userId, _recentlyWatched.keys);
       if (_selectedGenreIds.isNotEmpty) {
         await UserService.addFavoriteGenres(userId, _selectedGenreIds.toList());
       }
@@ -190,7 +184,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return AuthScaffold(
-      topLabel: _step == _OnboardingStep.preferences ? 'Step 2 of 3' : 'Step 3 of 3',
+      topLabel:
+          _step == _OnboardingStep.preferences ? 'Step 2 of 3' : 'Step 3 of 3',
       title: Text(
         _step == _OnboardingStep.preferences
             ? 'Tell us what you love'
@@ -233,7 +228,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           selected: _recentlyWatched,
           maxCount: 5,
           onAdd: () => _pickMovie(_MovieBucket.recentlyWatched),
-          onRemove: (movieId) => setState(() => _recentlyWatched.remove(movieId)),
+          onRemove: (movieId) =>
+              setState(() => _recentlyWatched.remove(movieId)),
         ),
         const SizedBox(height: 18),
         _buildGenreSection(),
@@ -337,7 +333,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           const SizedBox(height: 10),
           SecondaryButton(
-            label: selected.length >= maxCount ? 'Maximum selected' : 'Add movie',
+            label:
+                selected.length >= maxCount ? 'Maximum selected' : 'Add movie',
             onPressed: selected.length >= maxCount ? null : onAdd,
           ),
         ],
@@ -438,7 +435,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: const TextStyle(color: FlixieColors.light, fontSize: 12),
+                  style:
+                      const TextStyle(color: FlixieColors.light, fontSize: 12),
                 ),
               ],
             ),

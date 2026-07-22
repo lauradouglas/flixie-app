@@ -37,6 +37,8 @@ class MovieCastMember {
   final int gender;
   final int order;
 
+  String? get profileImageUrl => resolveCreditProfileImage(profileImage);
+
   const MovieCastMember({
     required this.id,
     required this.name,
@@ -85,6 +87,8 @@ class CrewMember {
   final String department;
   final String job;
 
+  String? get profileImageUrl => resolveCreditProfileImage(profileImage);
+
   const CrewMember({
     required this.id,
     required this.name,
@@ -120,4 +124,12 @@ class CrewMember {
       'job': job,
     };
   }
+}
+
+String? resolveCreditProfileImage(String? value) {
+  final image = value?.trim();
+  if (image == null || image.isEmpty) return null;
+  if (image.startsWith('http://') || image.startsWith('https://')) return image;
+  final path = image.startsWith('/') ? image : '/$image';
+  return 'https://image.tmdb.org/t/p/w185$path';
 }

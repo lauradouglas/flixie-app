@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:flixie_app/models/profile_avatar.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
@@ -108,12 +109,14 @@ class _ProfileAvatarViewState extends State<ProfileAvatarView> {
             );
           }
           return ClipOval(
-            child: Image.network(
-              snapshot.data!,
+            child: CachedNetworkImage(
+              imageUrl: snapshot.data!,
               width: widget.size,
               height: widget.size,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _fallback(),
+              fadeInDuration: const Duration(milliseconds: 120),
+              placeholder: (_, __) => _fallback(),
+              errorWidget: (_, __, ___) => _fallback(),
             ),
           );
         },

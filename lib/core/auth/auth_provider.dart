@@ -7,12 +7,15 @@ import 'package:flutter/widgets.dart';
 import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/models/favorite_movie.dart';
 import 'package:flixie_app/models/friendship.dart';
+import 'package:flixie_app/models/group.dart';
 import 'package:flixie_app/models/movie_rating.dart';
 import 'package:flixie_app/models/movie_short.dart';
+import 'package:flixie_app/models/notification.dart';
 import 'package:flixie_app/models/review.dart';
 import 'package:flixie_app/models/user.dart' as models;
 import 'package:flixie_app/models/watched_movie.dart';
 import 'package:flixie_app/models/watchlist_movie.dart';
+import 'package:flixie_app/models/watch_provider.dart';
 import 'package:flixie_app/models/profile_avatar.dart';
 import 'package:flixie_app/core/auth/auth_notification_poller.dart';
 import 'package:flixie_app/core/auth/auth_prefetch_coordinator.dart';
@@ -77,11 +80,16 @@ class AuthProvider extends ChangeNotifier {
   // Prefetched at login — screens use these to skip spinners
   List<ActivityListItem>? _cachedActivity;
   FriendsData? _cachedFriends;
+  List<Group>? _cachedGroups;
   List<MovieRating>? _cachedRatings;
   List<Review>? _cachedReviews;
   List<MovieShort>? _cachedTrending;
   List<MovieShort>? _cachedNowPlaying;
+  List<FlixieNotification>? _cachedNotifications;
   bool _isPrefetching = false;
+  final Map<int, List<WatchProvider>> _cachedWatchProvidersByMovieId = {};
+  Set<int>? _cachedUserWatchProviderIds;
+  Future<void>? _watchProviderCacheFuture;
 
   int _unreadNotificationCount = 0;
 
@@ -108,16 +116,31 @@ class AuthProvider extends ChangeNotifier {
 
   List<ActivityListItem>? get cachedActivity => _cachedActivity;
   FriendsData? get cachedFriends => _cachedFriends;
+  List<Group>? get cachedGroups => _cachedGroups;
   List<MovieRating>? get cachedRatings => _cachedRatings;
   List<Review>? get cachedReviews => _cachedReviews;
   List<MovieShort>? get cachedTrending => _cachedTrending;
   List<MovieShort>? get cachedNowPlaying => _cachedNowPlaying;
+  List<FlixieNotification>? get cachedNotifications => _cachedNotifications;
   bool get isPrefetching => _isPrefetching;
+  Map<int, List<WatchProvider>> get cachedWatchProvidersByMovieId =>
+      Map.unmodifiable(_cachedWatchProvidersByMovieId);
+  Set<int>? get cachedUserWatchProviderIds =>
+      _cachedUserWatchProviderIds == null
+          ? null
+          : Set.unmodifiable(_cachedUserWatchProviderIds!);
   int get unreadNotificationCount => _unreadNotificationCount;
 
   /// Update the reviews cache, e.g. after writing a new review.
   void updateCachedReviews(List<Review> reviews) {
     _cachedReviews = reviews;
+    notifyListeners();
+  }
+
+  void updateCachedNotifications(List<FlixieNotification> notifications) {
+    _cachedNotifications = List.unmodifiable(notifications);
+    _unreadNotificationCount =
+        notifications.where((item) => !item.isRead).length;
     notifyListeners();
   }
 
@@ -130,6 +153,23 @@ class AuthProvider extends ChangeNotifier {
   /// Update the friends cache, e.g. after accepting/declining a request.
   void updateCachedFriends(FriendsData friends) {
     _cachedFriends = friends;
+    notifyListeners();
+  }
+
+  /// Keeps the Social tab's stale-while-refresh snapshot current.
+  void updateCachedSocialData({
+    required FriendsData friends,
+    required List<ActivityListItem> activity,
+    required List<Group> groups,
+  }) {
+    _cachedFriends = friends;
+    _cachedFriendsActivity = activity;
+    _cachedGroups = groups;
+    notifyListeners();
+  }
+
+  void updateCachedGroups(List<Group> groups) {
+    _cachedGroups = groups;
     notifyListeners();
   }
 
@@ -246,10 +286,15 @@ class AuthProvider extends ChangeNotifier {
       _isPrefetching = false;
       _cachedActivity = null;
       _cachedFriends = null;
+      _cachedGroups = null;
       _cachedRatings = null;
       _cachedReviews = null;
       _cachedTrending = null;
       _cachedNowPlaying = null;
+      _cachedNotifications = null;
+      _cachedWatchProvidersByMovieId.clear();
+      _cachedUserWatchProviderIds = null;
+      _watchProviderCacheFuture = null;
       _notificationPoller.stop();
       _unreadNotificationCount = 0;
     }
@@ -285,7 +330,17 @@ class AuthProvider extends ChangeNotifier {
     // Token registration is independent of home/profile prefetching. Start it
     // immediately so a slow secondary API cannot delay push notifications.
     _initializePushNotifications(_dbUser?.externalId ?? userId);
-    _prefetchCoordinator.prefetch(userId, region: region).then((snapshot) {
+    final watchlistMovieIds = _dbUser?.movieWatchlist
+            ?.where((item) => item.removed != true)
+            .map((item) => item.movieId) ??
+        const <int>[];
+    _prefetchCoordinator
+        .prefetch(
+      userId,
+      region: region,
+      watchlistMovieIds: watchlistMovieIds,
+    )
+        .then((snapshot) {
       _applyPrefetchSnapshot(snapshot);
       logger.i('[AuthProvider] Prefetch complete for $userId');
       _isPrefetching = false;
@@ -327,12 +382,59 @@ class AuthProvider extends ChangeNotifier {
     _cachedActivity = snapshot.activity ?? _cachedActivity;
     _cachedFriends = snapshot.friends ?? _cachedFriends;
     _cachedFriendsActivity = snapshot.friendsActivity ?? _cachedFriendsActivity;
+    _cachedGroups = snapshot.groups ?? _cachedGroups;
     _cachedRatings = snapshot.ratings ?? _cachedRatings;
     _cachedReviews = snapshot.reviews ?? _cachedReviews;
     _cachedTrending = snapshot.trending ?? _cachedTrending;
     _cachedNowPlaying = snapshot.nowPlaying ?? _cachedNowPlaying;
+    _cachedNotifications = snapshot.notifications ?? _cachedNotifications;
     _unreadNotificationCount =
         snapshot.unreadNotificationCount ?? _unreadNotificationCount;
+    if (snapshot.watchProvidersByMovieId != null) {
+      _cachedWatchProvidersByMovieId.addAll(snapshot.watchProvidersByMovieId!);
+    }
+    _cachedUserWatchProviderIds =
+        snapshot.userWatchProviderIds ?? _cachedUserWatchProviderIds;
+  }
+
+  /// Loads only provider entries that are not already in the shared cache.
+  /// Concurrent callers share the same request and re-check afterwards.
+  Future<void> ensureWatchProviderCache({Iterable<int>? movieIds}) async {
+    final user = _dbUser;
+    if (user == null) return;
+    final requestedIds = (movieIds ??
+            user.movieWatchlist
+                ?.where((item) => item.removed != true)
+                .map((item) => item.movieId) ??
+            const <int>[])
+        .toSet();
+    final missing = requestedIds
+        .where((id) => !_cachedWatchProvidersByMovieId.containsKey(id))
+        .toSet();
+    if (missing.isEmpty && _cachedUserWatchProviderIds != null) return;
+
+    if (_watchProviderCacheFuture != null) {
+      await _watchProviderCacheFuture;
+      return ensureWatchProviderCache(movieIds: requestedIds);
+    }
+
+    final future = _prefetchCoordinator
+        .fetchWatchProviders(
+      user.id,
+      missing,
+      region: user.countryAbbreviation ?? 'GB',
+    )
+        .then((value) {
+      _cachedWatchProvidersByMovieId.addAll(value.providersByMovieId);
+      _cachedUserWatchProviderIds = value.userProviderIds;
+      notifyListeners();
+    });
+    _watchProviderCacheFuture = future;
+    try {
+      await future;
+    } finally {
+      _watchProviderCacheFuture = null;
+    }
   }
 
   /// Directly updates the unread count from already-fetched notification data.
@@ -754,6 +856,38 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  /// Reauthenticates, anonymises the backend profile, and asks the backend to
+  /// delete the matching Firebase Authentication account.
+  Future<String?> deactivateAccount(String currentPassword) async {
+    final userId = _dbUser?.id;
+    if (userId == null) return 'No signed-in account was found.';
+
+    _setLoading(true);
+    _setError(null);
+    try {
+      await _authService.reauthenticate(currentPassword);
+      await ApiClient.post('/users/$userId/deactivate', body: {});
+      await _authService.signOut();
+      return null;
+    } on firebase_auth.FirebaseAuthException catch (error) {
+      final message = AuthService.messageFromAuthException(error);
+      _setError(message);
+      return message;
+    } on ApiException catch (error) {
+      final message = error.message.isEmpty
+          ? 'Unable to deactivate your account right now.'
+          : error.message;
+      _setError(message);
+      return message;
+    } catch (_) {
+      const message = 'Unable to deactivate your account right now.';
+      _setError(message);
+      return message;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   /// Reloads and returns the current user profile from Firebase.
   Future<firebase_auth.User?> getUserProfile() => _authService.getUserProfile();
 
@@ -806,6 +940,15 @@ class AuthProvider extends ChangeNotifier {
       favoriteShows: favoriteShows ?? _dbUser!.favoriteShows,
       favoritePeople: favoritePeople ?? _dbUser!.favoritePeople,
     );
+    if (movieWatchlist != null) {
+      final activeIds = movieWatchlist
+          .where((item) => item.removed != true)
+          .map((item) => item.movieId)
+          .toSet();
+      _cachedWatchProvidersByMovieId
+          .removeWhere((movieId, _) => !activeIds.contains(movieId));
+      unawaited(ensureWatchProviderCache(movieIds: activeIds));
+    }
     notifyListeners();
   }
 

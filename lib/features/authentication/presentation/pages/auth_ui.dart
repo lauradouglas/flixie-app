@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flixie_app/models/genre.dart';
 import 'package:flixie_app/models/movie_short.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/core/widgets/movie_search_result_tile.dart';
 
 const Set<String> _unsupportedGenreNames = {
   'action & adventure',
@@ -418,6 +419,7 @@ class PasswordField extends StatefulWidget {
     this.onChanged,
     this.textInputAction,
     this.onFieldSubmitted,
+    this.autofillHints = const [AutofillHints.password],
   });
 
   final TextEditingController controller;
@@ -426,6 +428,7 @@ class PasswordField extends StatefulWidget {
   final ValueChanged<String>? onChanged;
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onFieldSubmitted;
+  final Iterable<String>? autofillHints;
 
   @override
   State<PasswordField> createState() => _PasswordFieldState();
@@ -442,7 +445,7 @@ class _PasswordFieldState extends State<PasswordField> {
       prefixIcon: Icons.lock_outline_rounded,
       obscureText: _obscure,
       textInputAction: widget.textInputAction,
-      autofillHints: const [AutofillHints.password],
+      autofillHints: widget.autofillHints,
       onFieldSubmitted: widget.onFieldSubmitted,
       onChanged: widget.onChanged,
       validator: widget.validator,
@@ -862,16 +865,13 @@ class _MovieSearchSheetState extends State<MovieSearchSheet> {
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : ListView.separated(
+                      padding: EdgeInsets.zero,
                       itemCount: _results.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
                       itemBuilder: (context, index) {
                         final movie = _results[index];
-                        return ListTile(
-                          title: Text(
-                            movie.name,
-                            style: const TextStyle(
-                                color: FlixieColors.textPrimary),
-                          ),
+                        return MovieSearchResultTile(
+                          movie: movie,
                           onTap: () => Navigator.of(context).pop(movie),
                         );
                       },

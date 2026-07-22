@@ -1,3 +1,5 @@
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -40,6 +42,15 @@ Page<void> _calmPage(GoRouterState state, Widget child) {
     key: state.pageKey,
     child: child,
   );
+}
+
+/// A native-feeling page for routes pushed above the main tabs.
+/// CupertinoPageRoute supplies iOS's interactive left-edge back gesture.
+Page<void> _pushPage(GoRouterState state, Widget child) {
+  if (defaultTargetPlatform == TargetPlatform.iOS) {
+    return CupertinoPage<void>(key: state.pageKey, child: child);
+  }
+  return MaterialPage<void>(key: state.pageKey, child: child);
 }
 
 /// Builds the GoRouter, refreshing only when auth status changes (not user data).
@@ -142,21 +153,21 @@ GoRouter buildRouter(AuthProvider authProvider) {
           ),
           GoRoute(
             path: '/movies/:id',
-            pageBuilder: (context, state) => _calmPage(
+            pageBuilder: (context, state) => _pushPage(
               state,
               MovieDetailScreen(movieId: state.pathParameters['id'] ?? '0'),
             ),
           ),
           GoRoute(
             path: '/shows/:id',
-            pageBuilder: (context, state) => _calmPage(
+            pageBuilder: (context, state) => _pushPage(
               state,
               ShowDetailScreen(showId: state.pathParameters['id'] ?? '0'),
             ),
           ),
           GoRoute(
             path: '/people/:id',
-            pageBuilder: (context, state) => _calmPage(
+            pageBuilder: (context, state) => _pushPage(
               state,
               PersonDetailScreen(personId: state.pathParameters['id'] ?? '0'),
             ),

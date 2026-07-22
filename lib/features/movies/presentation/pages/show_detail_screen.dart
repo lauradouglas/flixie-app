@@ -1549,12 +1549,12 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                 SizedBox(
                   height: 14,
                   child: Text(
-                    badge ?? '',
+                    badge ?? label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: isActive ? color : Colors.transparent,
+                      color: isActive ? color : FlixieColors.medium,
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
                     ),

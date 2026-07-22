@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -46,6 +47,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (!mounted) return;
     if (success) {
+      TextInput.finishAutofillContext(shouldSave: true);
       context.go('/');
       return;
     }
@@ -71,111 +73,113 @@ class _LoginScreenState extends State<LoginScreen> {
         textAlign: TextAlign.center,
       ),
       subtitle: 'Sign in to continue to your account',
-      cardChild: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            AppTextField(
-              controller: _emailController,
-              label: 'Email or Username',
-              prefixIcon: Icons.mail_outline_rounded,
-              keyboardType: TextInputType.text,
-              textInputAction: TextInputAction.next,
-              autofillHints: const [
-                AutofillHints.username,
-                AutofillHints.email,
-              ],
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Please enter your email or username.';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            PasswordField(
-              controller: _passwordController,
-              label: 'Password',
-              textInputAction: TextInputAction.done,
-              onFieldSubmitted: (_) => _submit(),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter your password.';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: CheckboxListTile(
-                    value: _rememberMe,
-                    onChanged: (value) => setState(
-                      () => _rememberMe = value ?? false,
-                    ),
-                    title: Text(
-                      'Remember me',
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: FlixieColors.textPrimary,
-                        fontWeight: FontWeight.w500,
+      cardChild: AutofillGroup(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AppTextField(
+                controller: _emailController,
+                label: 'Email or Username',
+                prefixIcon: Icons.mail_outline_rounded,
+                keyboardType: TextInputType.text,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [
+                  AutofillHints.username,
+                  AutofillHints.email,
+                ],
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter your email or username.';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              PasswordField(
+                controller: _passwordController,
+                label: 'Password',
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => _submit(),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter your password.';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: CheckboxListTile(
+                      value: _rememberMe,
+                      onChanged: (value) => setState(
+                        () => _rememberMe = value ?? false,
+                      ),
+                      title: Text(
+                        'Remember me',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: FlixieColors.textPrimary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      activeColor: FlixieColors.primary,
+                      checkColor: Colors.white,
+                      side: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.18),
                       ),
                     ),
-                    controlAffinity: ListTileControlAffinity.leading,
-                    contentPadding: EdgeInsets.zero,
-                    dense: true,
-                    activeColor: FlixieColors.primary,
-                    checkColor: Colors.white,
-                    side: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.18),
+                  ),
+                  TextButton(
+                    onPressed: () => context.push('/auth/forgot-password'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: FlixieColors.primaryTint,
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                    ),
+                    child: const Text(
+                      'Forgot password?',
+                      style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),
-                ),
-                TextButton(
-                  onPressed: () => context.push('/auth/forgot-password'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: FlixieColors.primaryTint,
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                ],
+              ),
+              const SizedBox(height: 20),
+              PrimaryButton(
+                label: 'Sign In',
+                isLoading: isLoading,
+                onPressed: isLoading ? null : _submit,
+              ),
+              const SizedBox(height: 22),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    "Don't have an account?",
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: FlixieColors.light,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  child: const Text(
-                    'Forgot password?',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                  TextButton(
+                    onPressed: () => context.push('/auth/signup'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: FlixieColors.primaryTint,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    child: const Text(
+                      'Create Account',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            PrimaryButton(
-              label: 'Sign In',
-              isLoading: isLoading,
-              onPressed: isLoading ? null : _submit,
-            ),
-            const SizedBox(height: 22),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  "Don't have an account?",
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: FlixieColors.light,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                TextButton(
-                  onPressed: () => context.push('/auth/signup'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: FlixieColors.primaryTint,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                  ),
-                  child: const Text(
-                    'Create Account',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

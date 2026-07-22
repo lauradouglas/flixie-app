@@ -36,10 +36,9 @@ class CastCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: member.profileImage != null
+                child: member.profileImageUrl != null
                     ? CachedNetworkImage(
-                        imageUrl:
-                            'https://image.tmdb.org/t/p/w185${member.profileImage}',
+                        imageUrl: member.profileImageUrl!,
                         fit: BoxFit.cover,
                         errorWidget: (_, __, ___) => _avatarFallback(),
                       )

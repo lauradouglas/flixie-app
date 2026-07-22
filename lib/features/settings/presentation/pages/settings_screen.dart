@@ -139,6 +139,8 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 32),
           const _LogOutButton(),
           const SizedBox(height: 16),
+          const _DeleteAccountButton(),
+          const SizedBox(height: 16),
         ],
       ),
     );
@@ -322,6 +324,285 @@ class _LogOutButton extends StatelessWidget {
           }
         },
       ),
+    );
+  }
+}
+
+class _DeleteAccountButton extends StatelessWidget {
+  const _DeleteAccountButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: FlixieColors.danger.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(kSettingsCornerRadius),
+        border: Border.all(color: FlixieColors.danger.withValues(alpha: 0.2)),
+      ),
+      child: ListTile(
+        leading: const Icon(
+          Icons.delete_forever_outlined,
+          color: FlixieColors.danger,
+        ),
+        title: const Text(
+          'Deactivate and delete account',
+          style: TextStyle(
+            color: FlixieColors.danger,
+            fontWeight: FontWeight.w700,
+            fontSize: 15,
+          ),
+        ),
+        subtitle: const Text(
+          'Anonymises your Flixie profile and deletes your login.',
+          style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+        ),
+        onTap: () async {
+          final password = await showDialog<String>(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => const _DeleteAccountDialog(),
+          );
+          if (password == null || !context.mounted) return;
+
+          final messenger = ScaffoldMessenger.of(context);
+          final authProvider = context.read<AuthProvider>();
+          final rootNavigator = Navigator.of(context, rootNavigator: true);
+
+          showGeneralDialog<void>(
+            context: context,
+            barrierDismissible: false,
+            barrierColor: FlixieColors.background,
+            transitionDuration: const Duration(milliseconds: 220),
+            pageBuilder: (_, __, ___) => const _AccountDeletionProgressScreen(),
+            transitionBuilder: (_, animation, __, child) => FadeTransition(
+              opacity: animation,
+              child: child,
+            ),
+          );
+
+          final error = await authProvider.deactivateAccount(password);
+
+          if (rootNavigator.mounted && rootNavigator.canPop()) {
+            rootNavigator.pop();
+          }
+          if (error != null && messenger.mounted) {
+            messenger.showSnackBar(
+              SnackBar(
+                content: Text(error),
+                backgroundColor: FlixieColors.danger,
+              ),
+            );
+          }
+        },
+      ),
+    );
+  }
+}
+
+class _AccountDeletionProgressScreen extends StatelessWidget {
+  const _AccountDeletionProgressScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: FlixieColors.background,
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 104,
+                    height: 104,
+                    decoration: BoxDecoration(
+                      color: FlixieColors.danger.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: FlixieColors.danger.withValues(alpha: 0.28),
+                      ),
+                    ),
+                    child: const Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        SizedBox(
+                          width: 82,
+                          height: 82,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            color: FlixieColors.danger,
+                            backgroundColor: FlixieColors.tabBarBorder,
+                          ),
+                        ),
+                        Icon(
+                          Icons.shield_outlined,
+                          size: 38,
+                          color: FlixieColors.dangerTint,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  const Text(
+                    'Deleting your account…',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'We’re anonymising your Flixie profile and securely '
+                    'removing your login. Please keep the app open.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: FlixieColors.light,
+                      fontSize: 15,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: FlixieColors.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: FlixieColors.tabBarBorder),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.lock_outline_rounded,
+                          size: 18,
+                          color: FlixieColors.success,
+                        ),
+                        SizedBox(width: 9),
+                        Flexible(
+                          child: Text(
+                            'This may take a few moments',
+                            style: TextStyle(
+                              color: FlixieColors.medium,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DeleteAccountDialog extends StatefulWidget {
+  const _DeleteAccountDialog();
+
+  @override
+  State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
+}
+
+class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
+  final _passwordController = TextEditingController();
+  final _confirmationController = TextEditingController();
+  bool _hidePassword = true;
+
+  bool get _canDelete =>
+      _passwordController.text.isNotEmpty &&
+      _confirmationController.text.trim() == 'DELETE';
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    _confirmationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text(
+        'Delete your account?',
+        style: TextStyle(color: Colors.white),
+      ),
+      content: AutofillGroup(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'This cannot be undone. Your profile will be anonymised, '
+                'your friendships will be removed, and your Firebase login '
+                'will be permanently deleted.',
+                style: TextStyle(color: FlixieColors.light, height: 1.4),
+              ),
+              const SizedBox(height: 18),
+              TextField(
+                controller: _passwordController,
+                obscureText: _hidePassword,
+                autofillHints: const [AutofillHints.password],
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  labelText: 'Current password',
+                  prefixIcon: const Icon(Icons.lock_outline_rounded),
+                  suffixIcon: IconButton(
+                    tooltip: _hidePassword ? 'Show password' : 'Hide password',
+                    onPressed: () =>
+                        setState(() => _hidePassword = !_hidePassword),
+                    icon: Icon(
+                      _hidePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _confirmationController,
+                autocorrect: false,
+                enableSuggestions: false,
+                textCapitalization: TextCapitalization.characters,
+                onChanged: (_) => setState(() {}),
+                decoration: const InputDecoration(
+                  labelText: 'Type DELETE to confirm',
+                  prefixIcon: Icon(Icons.warning_amber_rounded),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _canDelete
+              ? () => Navigator.pop(context, _passwordController.text)
+              : null,
+          style: FilledButton.styleFrom(
+            backgroundColor: FlixieColors.danger,
+            foregroundColor: Colors.white,
+          ),
+          child: const Text('Delete account'),
+        ),
+      ],
     );
   }
 }

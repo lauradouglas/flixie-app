@@ -10,6 +10,7 @@ import 'package:flixie_app/models/person.dart';
 import 'package:flixie_app/models/search_result.dart';
 import 'package:flixie_app/models/show.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
+import 'package:flixie_app/core/widgets/movie_search_result_tile.dart';
 import 'package:flixie_app/features/movies/data/search_service.dart';
 import 'package:flixie_app/features/home/data/trending_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -38,7 +39,6 @@ class _SearchScreenState extends State<SearchScreen> {
   _SearchMode _searchMode = _SearchMode.all;
   Timer? _debounce;
   int _searchRequestId = 0;
-  final List<String> _recentSearches = [];
 
   // Default view data
   List<MovieShort> _trendingMovies = [];
@@ -52,6 +52,11 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void initState() {
     super.initState();
+    final cached = context.read<AuthProvider>().cachedTrending;
+    if (cached != null) {
+      _trendingMovies = cached;
+      _isLoadingDefault = false;
+    }
     _loadDefaultData();
   }
 
@@ -142,9 +147,6 @@ class _SearchScreenState extends State<SearchScreen> {
           _searchResults = results;
           _entityResults = entityResults;
           _isSearching = false;
-          _recentSearches.remove(query);
-          _recentSearches.insert(0, query);
-          if (_recentSearches.length > 8) _recentSearches.removeLast();
         });
       }
     } catch (e) {
@@ -247,8 +249,10 @@ class _SearchScreenState extends State<SearchScreen> {
       _SearchMode.movies,
       _SearchMode.shows,
       _SearchMode.people,
-      _SearchMode.companies,
-      _SearchMode.collections,
+      // TODO: Re-add Studios and Collections when their search experiences
+      // are ready for users.
+      // _SearchMode.companies,
+      // _SearchMode.collections,
     ];
 
     return SizedBox(
@@ -314,44 +318,6 @@ class _SearchScreenState extends State<SearchScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Recent Searches
-          Row(
-            children: [
-              const _SectionHeader(title: 'Recent searches'),
-              const Spacer(),
-              TextButton(
-                onPressed: () => setState(() => _recentSearches.clear()),
-                style: TextButton.styleFrom(
-                  foregroundColor: FlixieColors.primary,
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                ),
-                child: const Text('Clear all', style: TextStyle(fontSize: 13)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          if (_recentSearches.isEmpty)
-            const Text(
-              'No recent searches yet.',
-              style: TextStyle(color: FlixieColors.medium, fontSize: 14),
-            )
-          else
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _recentSearches
-                  .map((term) => _RecentSearchChip(
-                        term: term,
-                        onTap: () {
-                          _controller.text = term;
-                          _submitSearch(term);
-                        },
-                        onRemove: () =>
-                            setState(() => _recentSearches.remove(term)),
-                      ))
-                  .toList(),
-            ),
-          const SizedBox(height: 22),
           // Browse By
           const _SectionHeader(title: 'Browse by'),
           const SizedBox(height: 10),
@@ -359,32 +325,22 @@ class _SearchScreenState extends State<SearchScreen> {
           const SizedBox(height: 22),
           // Trending Now
           if (_trendingMovies.isNotEmpty) ...[
-            Row(
-              children: [
-                const _SectionHeader(title: 'Trending now'),
-                const Spacer(),
-                TextButton(
-                  onPressed: () {},
-                  style: TextButton.styleFrom(
-                    foregroundColor: FlixieColors.primary,
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                  ),
-                  child: const Text('See all', style: TextStyle(fontSize: 13)),
-                ),
-              ],
-            ),
+            const _SectionHeader(title: 'Trending now'),
             const SizedBox(height: 10),
-            SizedBox(
-              height: 225,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: EdgeInsets.zero,
-                itemCount: _trendingMovies.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 10),
-                itemBuilder: (context, i) => _TrendingPosterCard(
-                  movie: _trendingMovies[i],
-                  onTap: () => context.push('/movies/${_trendingMovies[i].id}'),
-                ),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: EdgeInsets.zero,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 16,
+                childAspectRatio: 0.52,
+              ),
+              itemCount: _trendingMovies.length,
+              itemBuilder: (context, i) => _TrendingPosterCard(
+                movie: _trendingMovies[i],
+                onTap: () => context.push('/movies/${_trendingMovies[i].id}'),
               ),
             ),
           ],
@@ -410,16 +366,18 @@ class _SearchScreenState extends State<SearchScreen> {
           icon: Icons.person_outline_rounded,
           color: Color(0xFFF59E0B),
           mode: _SearchMode.people),
-      _BrowseCategory(
-          label: 'Collections',
-          icon: Icons.folder_special_outlined,
-          color: Color(0xFF6366F1),
-          mode: _SearchMode.collections),
-      _BrowseCategory(
-          label: 'Studios',
-          icon: Icons.business_outlined,
-          color: Color(0xFF14B8A6),
-          mode: _SearchMode.companies),
+      // TODO: Re-add Collections and Studios when their search experiences
+      // are ready for users.
+      // _BrowseCategory(
+      //     label: 'Collections',
+      //     icon: Icons.folder_special_outlined,
+      //     color: Color(0xFF6366F1),
+      //     mode: _SearchMode.collections),
+      // _BrowseCategory(
+      //     label: 'Studios',
+      //     icon: Icons.business_outlined,
+      //     color: Color(0xFF14B8A6),
+      //     mode: _SearchMode.companies),
     ];
     return GridView.count(
       crossAxisCount: 3,
@@ -535,7 +493,7 @@ class _SearchScreenState extends State<SearchScreen> {
             onTap: () => context.push('/shows/${item.show!.id}'),
           );
         } else if (item.movie != null) {
-          return _MovieResultTile(
+          return MovieSearchResultTile(
             movie: item.movie!,
             onTap: () => context.push('/movies/${item.movie!.id}'),
           );
@@ -575,46 +533,6 @@ class _SectionHeader extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-// ─── Recent search chip ──────────────────────────────────────────────────────
-
-class _RecentSearchChip extends StatelessWidget {
-  const _RecentSearchChip(
-      {required this.term, required this.onTap, required this.onRemove});
-
-  final String term;
-  final VoidCallback onTap;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: FlixieColors.tabBarBackgroundFocused,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(term,
-                style:
-                    const TextStyle(color: FlixieColors.light, fontSize: 13)),
-            const SizedBox(width: 6),
-            GestureDetector(
-              onTap: onRemove,
-              child: const Icon(Icons.close_rounded,
-                  size: 14, color: FlixieColors.medium),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -861,86 +779,6 @@ class _EntityIconPlaceholder extends StatelessWidget {
     return Container(
       color: FlixieColors.primary.withValues(alpha: 0.18),
       child: Icon(icon, color: FlixieColors.primary),
-    );
-  }
-}
-
-// ─── Search result: movie tile ───────────────────────────────────────────────
-
-class _MovieResultTile extends StatelessWidget {
-  const _MovieResultTile({required this.movie, this.onTap});
-
-  final MovieShort movie;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final year = _extractYear(movie.releaseDate);
-
-    return Card(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: SizedBox(
-                  width: 50,
-                  height: 75,
-                  child: movie.poster != null
-                      ? CachedNetworkImage(
-                          imageUrl:
-                              'https://image.tmdb.org/t/p/w92${movie.poster}',
-                          fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) => Container(
-                            color:
-                                FlixieColors.secondary.withValues(alpha: 0.3),
-                            child: const Icon(Icons.movie,
-                                color: FlixieColors.secondary),
-                          ),
-                        )
-                      : Container(
-                          color: FlixieColors.secondary.withValues(alpha: 0.3),
-                          child: const Icon(Icons.movie,
-                              color: FlixieColors.secondary),
-                        ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      movie.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyLarge
-                          ?.copyWith(fontWeight: FontWeight.w600),
-                    ),
-                    if (year != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        year,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: FlixieColors.medium),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right, color: FlixieColors.medium),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

@@ -84,9 +84,13 @@ class _SocialScreenState extends State<SocialScreen> {
             onChanged: (i) => setState(() => _selectedTab = i),
           ),
           Expanded(
-            child: _selectedTab == 0
-                ? const _FriendsSubView()
-                : const _GroupsSubView(),
+            child: IndexedStack(
+              index: _selectedTab,
+              children: const [
+                _FriendsSubView(),
+                _GroupsSubView(),
+              ],
+            ),
           ),
         ],
       ),
@@ -119,6 +123,11 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
   void initState() {
     super.initState();
     _searchController.addListener(() => setState(() {}));
+    final auth = context.read<AuthProvider>();
+    _friendsData = auth.cachedFriends;
+    _activity = auth.cachedFriendsActivity ?? const [];
+    _groupsPreview = auth.cachedGroups ?? const [];
+    _loading = _friendsData == null;
     _load();
   }
 
@@ -135,20 +144,28 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
         GroupService.getUserGroups(userId).catchError((_) => <Group>[]),
       ]);
       if (mounted) {
+        final friends = results[0] as FriendsData;
+        final activity = results[1] as List<ActivityListItem>;
+        final groups = results[2] as List<Group>;
         setState(() {
-          _friendsData = results[0] as FriendsData;
-          _activity = results[1] as List<ActivityListItem>;
-          _groupsPreview = results[2] as List<Group>;
+          _friendsData = friends;
+          _activity = activity;
+          _groupsPreview = groups;
           _loading = false;
           _error = null;
         });
+        context.read<AuthProvider>().updateCachedSocialData(
+              friends: friends,
+              activity: activity,
+              groups: groups,
+            );
       }
     } catch (e) {
       logger.e('FriendsSubView load error: $e');
       if (mounted) {
         setState(() {
           _loading = false;
-          _error = 'Failed to load friends.';
+          _error = _friendsData == null ? 'Failed to load friends.' : null;
         });
       }
     }
@@ -1062,6 +1079,8 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
   void initState() {
     super.initState();
     _searchController.addListener(() => setState(() {}));
+    _groups = context.read<AuthProvider>().cachedGroups ?? const [];
+    _loading = _groups.isEmpty;
     _load();
   }
 
@@ -1162,13 +1181,14 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
           _loading = false;
           _error = null;
         });
+        context.read<AuthProvider>().updateCachedGroups(groups);
       }
     } catch (e) {
       logger.e('GroupsSubView load error: $e');
       if (mounted) {
         setState(() {
           _loading = false;
-          _error = 'Failed to load groups.';
+          _error = _groups.isEmpty ? 'Failed to load groups.' : null;
         });
       }
     }

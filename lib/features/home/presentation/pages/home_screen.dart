@@ -137,7 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
         TrendingService.getTrendingMovies(),
         movieService.getNowPlayingMovies(region: region),
       ]);
-      if (mounted) {
+      if (context.mounted) {
         setState(() {
           _featuredMovies = results[0];
           _nowPlayingMovies = results[1].take(8).toList();
@@ -330,6 +330,27 @@ class _HomeScreenState extends State<HomeScreen> {
         authProvider.markActivityChanged();
       }
       authProvider.updateUserList(movieWatchlist: currentWatchlist);
+      if (context.mounted) {
+        final messenger = ScaffoldMessenger.of(context);
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                inWatchlist
+                    ? '${movie.name} removed from your watchlist'
+                    : '${movie.name} added to your watchlist',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              duration: const Duration(seconds: 2),
+              backgroundColor:
+                  inWatchlist ? FlixieColors.surface : FlixieColors.success,
+            ),
+          );
+      }
     } catch (e) {
       logger.e('[HomeScreen] watchlist toggle error: $e');
       if (mounted) {
@@ -442,7 +463,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             onSearch: () => context.push('/search'),
                             onWatchlist: () => context.go('/watchlist'),
                             onInvite: () => context.go('/social'),
-                            onRequests: () => context.go('/watch-requests'),
+                            onRequests: () => context.push('/watch-requests'),
                           ),
                         ),
                         _buildWatchPlansShortcut(context),
@@ -491,7 +512,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () => context.go('/watch-requests'),
+          onTap: () => context.push('/watch-requests'),
           borderRadius: BorderRadius.circular(14),
           child: Ink(
             padding: const EdgeInsets.all(14),
@@ -616,7 +637,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final label = _watchRequestsUpcoming == 1 ? 'watch' : 'watches';
       return '$_watchRequestsUpcoming upcoming $label with friends.';
     }
-    return 'Schedule something to watch together.';
+    return 'No watch requests yet. Tap to view your requests.';
   }
 
   // ── Hero carousel ──────────────────────────────────────────────────────────
@@ -814,6 +835,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         icon: inWatchlist
                             ? Icons.bookmark_rounded
                             : Icons.bookmark_outline_rounded,
+                        foregroundColor: FlixieColors.warning,
                         isBusy: isUpdating,
                         onPressed: () => _toggleHeroWatchlist(context, movie),
                       ),
@@ -1474,12 +1496,14 @@ class _HeroIconButton extends StatelessWidget {
     required this.icon,
     required this.onPressed,
     this.isBusy = false,
+    this.foregroundColor = Colors.white,
   });
 
   final String tooltip;
   final IconData icon;
   final VoidCallback onPressed;
   final bool isBusy;
+  final Color foregroundColor;
 
   @override
   Widget build(BuildContext context) {
@@ -1494,14 +1518,44 @@ class _HeroIconButton extends StatelessWidget {
           child: SizedBox(
             width: 48,
             height: 48,
-            child: Icon(
-              icon,
-              color: isBusy ? FlixieColors.medium : Colors.white,
-              size: 22,
-            ),
+            child: isBusy
+                ? _SpinningActionIcon(icon: icon, color: foregroundColor)
+                : Icon(icon, color: foregroundColor, size: 22),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _SpinningActionIcon extends StatefulWidget {
+  const _SpinningActionIcon({required this.icon, required this.color});
+
+  final IconData icon;
+  final Color color;
+
+  @override
+  State<_SpinningActionIcon> createState() => _SpinningActionIconState();
+}
+
+class _SpinningActionIconState extends State<_SpinningActionIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 650),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RotationTransition(
+      turns: _controller,
+      child: Icon(widget.icon, color: widget.color, size: 22),
     );
   }
 }

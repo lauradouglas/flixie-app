@@ -56,9 +56,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
         setState(() {
           _notifications.removeWhere((n) => n.id == id);
         });
-        context.read<AuthProvider>().setUnreadNotificationCount(
-              _notifications.where((n) => !n.isRead).length,
-            );
+        context.read<AuthProvider>().updateCachedNotifications(_notifications);
       }
     } catch (e) {
       logger.e('[NotificationScreen] close error: $e');
@@ -88,7 +86,14 @@ class _NotificationScreenState extends State<NotificationScreen> {
   @override
   void initState() {
     super.initState();
-    _load(showSpinner: true);
+    final auth = context.read<AuthProvider>();
+    final cached = auth.cachedNotifications;
+    final userId = auth.dbUser?.id;
+    if (cached != null && userId != null) {
+      _notifications = _visibleNotificationsForUser(cached, userId);
+      _isLoading = false;
+    }
+    _load(showSpinner: cached == null);
     _startPolling();
   }
 
@@ -121,7 +126,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
       final visible = _visibleNotificationsForUser(fresh, userId);
       if (mounted) {
         setState(() => _notifications = visible);
-        auth.setUnreadNotificationCount(visible.where((n) => !n.isRead).length);
+        auth.updateCachedNotifications(visible);
       }
     } catch (e) {
       // Polling errors are intentionally silent; the user is not disrupted.
@@ -149,9 +154,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
           _isLoading = false;
           _error = null;
         });
-        context
-            .read<AuthProvider>()
-            .setUnreadNotificationCount(visible.where((n) => !n.isRead).length);
+        context.read<AuthProvider>().updateCachedNotifications(visible);
       }
     } catch (e) {
       logger.e('[NotificationScreen] load error: $e');

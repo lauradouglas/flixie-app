@@ -92,6 +92,12 @@ class AuthService {
   /// Throws a [FirebaseAuthException] on failure (e.g. wrong current password).
   Future<void> updatePassword(
       String currentPassword, String newPassword) async {
+    await reauthenticate(currentPassword);
+    await _auth.currentUser!.updatePassword(newPassword);
+  }
+
+  /// Confirms the current email/password credential before a sensitive action.
+  Future<void> reauthenticate(String currentPassword) async {
     final user = _auth.currentUser;
     if (user == null || user.email == null) {
       throw FirebaseAuthException(code: 'no-current-user');
@@ -101,7 +107,6 @@ class AuthService {
       password: currentPassword,
     );
     await user.reauthenticateWithCredential(credential);
-    await user.updatePassword(newPassword);
   }
 
   /// Reloads and returns an up-to-date [User] profile, or `null` if not

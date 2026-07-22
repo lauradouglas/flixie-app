@@ -25,6 +25,7 @@ class FriendSummarySection extends StatelessWidget {
     this.recommendationError,
     this.onRecommendationRetry,
     this.onSeeAllRecommendations,
+    this.activityContent,
   });
 
   final bool isLoading;
@@ -36,6 +37,7 @@ class FriendSummarySection extends StatelessWidget {
   final Object? recommendationError;
   final VoidCallback? onRecommendationRetry;
   final VoidCallback? onSeeAllRecommendations;
+  final Widget? activityContent;
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +45,7 @@ class FriendSummarySection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Friend Summary',
+          'Friends',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 color: FlixieColors.white,
                 fontWeight: FontWeight.bold,
@@ -74,13 +76,29 @@ class FriendSummarySection extends StatelessWidget {
           color: FlixieColors.primary.withValues(alpha: 0.28),
         ),
       ),
-      child: isLoading
-          ? _buildLoading()
-          : error != null && data == null
-              ? _buildError(context)
-              : _hasNoFriendData
-                  ? _buildEmpty()
-                  : _buildContent(context, data),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (isLoading)
+            _buildLoading()
+          else if (error != null && data == null)
+            _buildError(context)
+          else if (_hasNoFriendData)
+            _buildEmpty()
+          else
+            _buildContent(context, data),
+          if (activityContent != null) ...[
+            const SizedBox(height: 16),
+            const Divider(
+              height: 1,
+              thickness: 1,
+              color: FlixieColors.tabBarBorder,
+            ),
+            const SizedBox(height: 14),
+            activityContent!,
+          ],
+        ],
+      ),
     );
   }
 
@@ -559,17 +577,23 @@ class _StatTile extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: TextStyle(
-                color: color,
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: color, size: 18),
+                const SizedBox(width: 6),
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 3),
             Text(
               label,
               style: const TextStyle(
