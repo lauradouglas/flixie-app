@@ -34,6 +34,7 @@ enum AuthStatus { unknown, authenticated, unauthenticated }
 
 typedef BackendProfileCreator = Future<models.User> Function(
     Map<String, dynamic> body);
+typedef BackendProfileLoader = Future<models.User?> Function(String externalId);
 typedef AvatarSelector = Future<ProfileAvatar> Function(int avatarId);
 
 /// Exposes Firebase auth state to the widget tree via [ChangeNotifier].
@@ -49,11 +50,13 @@ class AuthProvider extends ChangeNotifier {
     MovieService movieService, {
     AuthPrefetchCoordinator? prefetchCoordinator,
     BackendProfileCreator? profileCreator,
+    BackendProfileLoader? profileLoader,
     bool prefetchAfterAuth = true,
     AvatarSelector? avatarSelector,
   })  : _prefetchCoordinator = prefetchCoordinator ??
             AuthPrefetchCoordinator(movieService: movieService),
         _profileCreator = profileCreator ?? UserService.createUser {
+    _profileLoader = profileLoader ?? UserService.getUserByExternalId;
     _prefetchAfterAuth = prefetchAfterAuth;
     _avatarSelector = avatarSelector ?? AvatarService.selectAvatar;
     _authStateSubscription = _authService.authStateChanges.listen((user) {
@@ -64,6 +67,7 @@ class AuthProvider extends ChangeNotifier {
   final AuthService _authService;
   final AuthPrefetchCoordinator _prefetchCoordinator;
   final BackendProfileCreator _profileCreator;
+  late final BackendProfileLoader _profileLoader;
   late final bool _prefetchAfterAuth;
   late final AvatarSelector _avatarSelector;
   final AuthNotificationPoller _notificationPoller = AuthNotificationPoller();
@@ -258,7 +262,7 @@ class AuthProvider extends ChangeNotifier {
       // THEN: Fetch the database user using Firebase UID as externalId
       logger.d('Fetching database user with externalId: ${user.uid}');
       try {
-        _dbUser = await UserService.getUserByExternalId(user.uid);
+        _dbUser = await _profileLoader(user.uid);
         logger.i(
             'Database user fetched: ${_dbUser?.username} (id: ${_dbUser?.id})');
         logger.d('Email: ${_dbUser?.email}');
@@ -267,7 +271,9 @@ class AuthProvider extends ChangeNotifier {
         // Kick off background prefetch so screens have data ready immediately
         final region =
             (_dbUser?.country?['isoCode'] as String?)?.toUpperCase() ?? 'US';
-        if (_dbUser?.id != null) _prefetch(_dbUser!.id, region: region);
+        if (_prefetchAfterAuth && _dbUser?.id != null) {
+          _prefetch(_dbUser!.id, region: region);
+        }
       } catch (e, stackTrace) {
         logger.e('Error fetching database user: $e',
             error: e, stackTrace: stackTrace);
@@ -860,9 +866,9 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Reauthenticates, anonymises the backend profile, and asks the backend to
-  /// delete the matching Firebase Authentication account.
-  Future<String?> deactivateAccount(String currentPassword) async {
+  /// Reauthenticates and permanently deletes the user's Flixie data and
+  /// matching Firebase Authentication account.
+  Future<String?> deleteAccount(String currentPassword) async {
     final userId = _dbUser?.id;
     if (userId == null) return 'No signed-in account was found.';
 
@@ -870,7 +876,7 @@ class AuthProvider extends ChangeNotifier {
     _setError(null);
     try {
       await _authService.reauthenticate(currentPassword);
-      await ApiClient.post('/users/$userId/deactivate', body: {});
+      await ApiClient.post('/users/$userId/delete-account', body: {});
       await _authService.signOut();
       return null;
     } on firebase_auth.FirebaseAuthException catch (error) {
@@ -879,12 +885,12 @@ class AuthProvider extends ChangeNotifier {
       return message;
     } on ApiException catch (error) {
       final message = error.message.isEmpty
-          ? 'Unable to deactivate your account right now.'
+          ? 'Unable to delete your account right now.'
           : error.message;
       _setError(message);
       return message;
     } catch (_) {
-      const message = 'Unable to deactivate your account right now.';
+      const message = 'Unable to delete your account right now.';
       _setError(message);
       return message;
     } finally {
@@ -965,7 +971,7 @@ class AuthProvider extends ChangeNotifier {
     }
     try {
       logger.d('Fetching user with externalId: ${_firebaseUser!.uid}');
-      _dbUser = await UserService.getUserByExternalId(_firebaseUser!.uid);
+      _dbUser = await _profileLoader(_firebaseUser!.uid);
       logger.i('Database user refreshed: ${_dbUser?.username}');
       notifyListeners();
     } catch (e, stackTrace) {

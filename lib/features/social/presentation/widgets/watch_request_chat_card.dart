@@ -7,7 +7,8 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/social/presentation/widgets/request_status_badge.dart';
 
 class WatchRequestChatCard extends StatelessWidget {
-  const WatchRequestChatCard({super.key, 
+  const WatchRequestChatCard({
+    super.key,
     required this.msg,
     this.cachedRequest,
     this.currentUserId,
@@ -18,6 +19,7 @@ class WatchRequestChatCard extends StatelessWidget {
     this.onMaybe,
     required this.onTap,
     this.memberUsernames = const {},
+    this.onLongPress,
   });
 
   final ChatMessage msg;
@@ -30,6 +32,7 @@ class WatchRequestChatCard extends StatelessWidget {
   final VoidCallback? onMaybe;
   final VoidCallback onTap;
   final Map<String, String> memberUsernames;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -70,312 +73,322 @@ class WatchRequestChatCard extends StatelessWidget {
         : null;
     final isMyRequest = msg.senderId == currentUserId;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
-      child: Container(
-        decoration: BoxDecoration(
-          color: FlixieColors.tabBarBackgroundFocused,
-          borderRadius: BorderRadius.circular(14),
-          border:
-              Border.all(color: FlixieColors.primary.withValues(alpha: 0.35)),
-        ),
-        clipBehavior: Clip.hardEdge,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header — tappable
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: onTap,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-                child: Row(
-                  children: [
-                    const Icon(Icons.movie_filter_outlined,
-                        size: 13, color: FlixieColors.primary),
-                    const SizedBox(width: 5),
-                    Expanded(
-                      child: Text(
-                        isMyRequest
-                            ? 'Your watch request'
-                            : '@${requesterUsername ?? 'Unknown'} wants to watch',
-                        style: const TextStyle(
-                            color: FlixieColors.primary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const Divider(height: 1, color: FlixieColors.tabBarBorder),
-            // Poster + details — tappable
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: onTap,
-              child: IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(10, 10, 0, 10),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: SizedBox(
-                          width: 64,
-                          child: posterUrl != null
-                              ? CachedNetworkImage(
-                                  imageUrl: posterUrl,
-                                  fit: BoxFit.cover,
-                                  placeholder: (_, __) => Container(
-                                      color: FlixieColors.tabBarBackground,
-                                      child: const Center(
-                                          child: Icon(Icons.movie_outlined,
-                                              color: FlixieColors.medium,
-                                              size: 22))),
-                                  errorWidget: (_, __, ___) => Container(
-                                      color: FlixieColors.tabBarBackground,
-                                      child: const Center(
-                                          child: Icon(Icons.movie_outlined,
-                                              color: FlixieColors.medium,
-                                              size: 22))),
-                                )
-                              : Container(
-                                  color: FlixieColors.tabBarBackground,
-                                  child: const Center(
-                                      child: Icon(Icons.movie_outlined,
-                                          color: FlixieColors.medium,
-                                          size: 22))),
+    return GestureDetector(
+      onLongPress: onLongPress,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+        child: Container(
+          decoration: BoxDecoration(
+            color: FlixieColors.tabBarBackgroundFocused,
+            borderRadius: BorderRadius.circular(14),
+            border:
+                Border.all(color: FlixieColors.primary.withValues(alpha: 0.35)),
+          ),
+          clipBehavior: Clip.hardEdge,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header — tappable
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onTap,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.movie_filter_outlined,
+                          size: 13, color: FlixieColors.primary),
+                      const SizedBox(width: 5),
+                      Expanded(
+                        child: Text(
+                          isMyRequest
+                              ? 'Your watch request'
+                              : '@${requesterUsername ?? 'Unknown'} wants to watch',
+                          style: const TextStyle(
+                              color: FlixieColors.primary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    ),
-                    // Details
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              movieTitle,
-                              style: const TextStyle(
-                                  color: FlixieColors.light,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 14),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 3),
-                            RequestStatusBadge(
-                              status: cachedRequest?.status,
-                            ),
-                            if (requestMessage != null &&
-                                requestMessage.isNotEmpty) ...[
-                              const SizedBox(height: 4),
+                    ],
+                  ),
+                ),
+              ),
+              const Divider(height: 1, color: FlixieColors.tabBarBorder),
+              // Poster + details — tappable
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onTap,
+                child: IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(10, 10, 0, 10),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: SizedBox(
+                            width: 64,
+                            child: posterUrl != null
+                                ? CachedNetworkImage(
+                                    imageUrl: posterUrl,
+                                    fit: BoxFit.cover,
+                                    placeholder: (_, __) => Container(
+                                        color: FlixieColors.tabBarBackground,
+                                        child: const Center(
+                                            child: Icon(Icons.movie_outlined,
+                                                color: FlixieColors.medium,
+                                                size: 22))),
+                                    errorWidget: (_, __, ___) => Container(
+                                        color: FlixieColors.tabBarBackground,
+                                        child: const Center(
+                                            child: Icon(Icons.movie_outlined,
+                                                color: FlixieColors.medium,
+                                                size: 22))),
+                                  )
+                                : Container(
+                                    color: FlixieColors.tabBarBackground,
+                                    child: const Center(
+                                        child: Icon(Icons.movie_outlined,
+                                            color: FlixieColors.medium,
+                                            size: 22))),
+                          ),
+                        ),
+                      ),
+                      // Details
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               Text(
-                                '"$requestMessage"',
+                                movieTitle,
                                 style: const TextStyle(
-                                    color: FlixieColors.medium,
-                                    fontSize: 12,
-                                    fontStyle: FontStyle.italic),
+                                    color: FlixieColors.light,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                            ],
-                            if (expiresLabel != null) ...[
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Icon(
-                                    expiresLabel == 'Expired'
-                                        ? Icons.timer_off_outlined
-                                        : Icons.timer_outlined,
-                                    size: 11,
-                                    color: expiresLabel == 'Expired'
-                                        ? FlixieColors.danger
-                                        : FlixieColors.warning,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    expiresLabel,
-                                    style: TextStyle(
-                                        color: expiresLabel == 'Expired'
-                                            ? FlixieColors.danger
-                                            : FlixieColors.warning,
-                                        fontSize: 11),
-                                  ),
-                                ],
+                              const SizedBox(height: 3),
+                              RequestStatusBadge(
+                                status: cachedRequest?.status,
                               ),
+                              if (requestMessage != null &&
+                                  requestMessage.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  '"$requestMessage"',
+                                  style: const TextStyle(
+                                      color: FlixieColors.medium,
+                                      fontSize: 12,
+                                      fontStyle: FontStyle.italic),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                              if (expiresLabel != null) ...[
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      expiresLabel == 'Expired'
+                                          ? Icons.timer_off_outlined
+                                          : Icons.timer_outlined,
+                                      size: 11,
+                                      color: expiresLabel == 'Expired'
+                                          ? FlixieColors.danger
+                                          : FlixieColors.warning,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      expiresLabel,
+                                      style: TextStyle(
+                                          color: expiresLabel == 'Expired'
+                                              ? FlixieColors.danger
+                                              : FlixieColors.warning,
+                                          fontSize: 11),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                              if (cachedRequest != null &&
+                                  (cachedRequest!.acceptedCount > 0 ||
+                                      cachedRequest!.maybeCount > 0 ||
+                                      cachedRequest!.declinedCount > 0)) ...[
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    if (cachedRequest!.acceptedCount > 0) ...[
+                                      const Icon(Icons.check,
+                                          size: 11,
+                                          color: FlixieColors.success),
+                                      const SizedBox(width: 2),
+                                      Text('${cachedRequest!.acceptedCount}',
+                                          style: const TextStyle(
+                                              color: FlixieColors.success,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700)),
+                                      const SizedBox(width: 10),
+                                    ],
+                                    if (cachedRequest!.maybeCount > 0) ...[
+                                      const Icon(Icons.help_outline,
+                                          size: 11,
+                                          color: FlixieColors.warning),
+                                      const SizedBox(width: 2),
+                                      Text('${cachedRequest!.maybeCount}',
+                                          style: const TextStyle(
+                                              color: FlixieColors.warning,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700)),
+                                      const SizedBox(width: 10),
+                                    ],
+                                    if (cachedRequest!.declinedCount > 0) ...[
+                                      const Icon(Icons.close,
+                                          size: 11, color: FlixieColors.danger),
+                                      const SizedBox(width: 2),
+                                      Text('${cachedRequest!.declinedCount}',
+                                          style: const TextStyle(
+                                              color: FlixieColors.danger,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700)),
+                                    ],
+                                  ],
+                                ),
+                              ],
                             ],
-                            if (cachedRequest != null &&
-                                (cachedRequest!.acceptedCount > 0 ||
-                                    cachedRequest!.maybeCount > 0 ||
-                                    cachedRequest!.declinedCount > 0)) ...[
-                              const SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  if (cachedRequest!.acceptedCount > 0) ...[
-                                    const Icon(Icons.check,
-                                        size: 11, color: FlixieColors.success),
-                                    const SizedBox(width: 2),
-                                    Text('${cachedRequest!.acceptedCount}',
-                                        style: const TextStyle(
-                                            color: FlixieColors.success,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w700)),
-                                    const SizedBox(width: 10),
-                                  ],
-                                  if (cachedRequest!.maybeCount > 0) ...[
-                                    const Icon(Icons.help_outline,
-                                        size: 11, color: FlixieColors.warning),
-                                    const SizedBox(width: 2),
-                                    Text('${cachedRequest!.maybeCount}',
-                                        style: const TextStyle(
-                                            color: FlixieColors.warning,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w700)),
-                                    const SizedBox(width: 10),
-                                  ],
-                                  if (cachedRequest!.declinedCount > 0) ...[
-                                    const Icon(Icons.close,
-                                        size: 11, color: FlixieColors.danger),
-                                    const SizedBox(width: 2),
-                                    Text('${cachedRequest!.declinedCount}',
-                                        style: const TextStyle(
-                                            color: FlixieColors.danger,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w700)),
-                                  ],
-                                ],
-                              ),
-                            ],
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-            // Action row — only for members who aren't the requester
-            if (!isMyRequest) ...[
-              const Divider(height: 1, color: FlixieColors.tabBarBorder),
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                child: myStatus == 'ACCEPTED'
-                    ? _chatStatusChip('You accepted ✓', FlixieColors.success)
-                    : myStatus == 'DECLINED'
-                        ? _chatStatusChip('You declined ✗', FlixieColors.danger)
-                        : myStatus == 'MAYBE'
-                            ? _chatStatusChip(
-                                'You said maybe', FlixieColors.warning)
-                            : isResponding
-                                ? const Center(
-                                    child: SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: FlixieColors.primary),
+              // Action row — only for members who aren't the requester
+              if (!isMyRequest) ...[
+                const Divider(height: 1, color: FlixieColors.tabBarBorder),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: myStatus == 'ACCEPTED'
+                      ? _chatStatusChip('You accepted ✓', FlixieColors.success)
+                      : myStatus == 'DECLINED'
+                          ? _chatStatusChip(
+                              'You declined ✗', FlixieColors.danger)
+                          : myStatus == 'MAYBE'
+                              ? _chatStatusChip(
+                                  'You said maybe', FlixieColors.warning)
+                              : isResponding
+                                  ? const Center(
+                                      child: SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: FlixieColors.primary),
+                                      ),
+                                    )
+                                  : Row(
+                                      children: [
+                                        Expanded(
+                                          child: ElevatedButton(
+                                            onPressed: onDecline,
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: FlixieColors
+                                                  .danger
+                                                  .withValues(alpha: 0.85),
+                                              foregroundColor: Colors.white,
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      vertical: 8),
+                                              shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(8)),
+                                              minimumSize: Size.zero,
+                                              textStyle: const TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600),
+                                            ),
+                                            child: const Text('Decline'),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: ElevatedButton(
+                                            onPressed: onMaybe,
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: FlixieColors
+                                                  .warning
+                                                  .withValues(alpha: 0.85),
+                                              foregroundColor: Colors.black,
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      vertical: 8),
+                                              shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(8)),
+                                              minimumSize: Size.zero,
+                                              textStyle: const TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600),
+                                            ),
+                                            child: const Text('Maybe'),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: ElevatedButton(
+                                            onPressed: onAccept,
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: FlixieColors
+                                                  .success
+                                                  .withValues(alpha: 0.85),
+                                              foregroundColor: Colors.white,
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      vertical: 8),
+                                              shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(8)),
+                                              minimumSize: Size.zero,
+                                              textStyle: const TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600),
+                                            ),
+                                            child: const Text('Accept'),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  )
-                                : Row(
-                                    children: [
-                                      Expanded(
-                                        child: ElevatedButton(
-                                          onPressed: onDecline,
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: FlixieColors.danger
-                                                .withValues(alpha: 0.85),
-                                            foregroundColor: Colors.white,
-                                            padding: const EdgeInsets.symmetric(
-                                                vertical: 8),
-                                            shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(8)),
-                                            minimumSize: Size.zero,
-                                            textStyle: const TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w600),
-                                          ),
-                                          child: const Text('Decline'),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: ElevatedButton(
-                                          onPressed: onMaybe,
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: FlixieColors
-                                                .warning
-                                                .withValues(alpha: 0.85),
-                                            foregroundColor: Colors.black,
-                                            padding: const EdgeInsets.symmetric(
-                                                vertical: 8),
-                                            shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(8)),
-                                            minimumSize: Size.zero,
-                                            textStyle: const TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w600),
-                                          ),
-                                          child: const Text('Maybe'),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: ElevatedButton(
-                                          onPressed: onAccept,
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: FlixieColors
-                                                .success
-                                                .withValues(alpha: 0.85),
-                                            foregroundColor: Colors.white,
-                                            padding: const EdgeInsets.symmetric(
-                                                vertical: 8),
-                                            shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(8)),
-                                            minimumSize: Size.zero,
-                                            textStyle: const TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w600),
-                                          ),
-                                          child: const Text('Accept'),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                ),
+              ],
+              // Footer — tappable to open detail
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onTap,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  color: FlixieColors.tabBarBackground.withValues(alpha: 0.6),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.chat_bubble_outline,
+                          size: 11, color: FlixieColors.medium),
+                      SizedBox(width: 4),
+                      Text('View details & reply',
+                          style: TextStyle(
+                              color: FlixieColors.medium, fontSize: 11)),
+                      Spacer(),
+                      Icon(Icons.chevron_right,
+                          size: 14, color: FlixieColors.medium),
+                    ],
+                  ),
+                ),
               ),
             ],
-            // Footer — tappable to open detail
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: onTap,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                color: FlixieColors.tabBarBackground.withValues(alpha: 0.6),
-                child: const Row(
-                  children: [
-                    Icon(Icons.chat_bubble_outline,
-                        size: 11, color: FlixieColors.medium),
-                    SizedBox(width: 4),
-                    Text('View details & reply',
-                        style: TextStyle(
-                            color: FlixieColors.medium, fontSize: 11)),
-                    Spacer(),
-                    Icon(Icons.chevron_right,
-                        size: 14, color: FlixieColors.medium),
-                  ],
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

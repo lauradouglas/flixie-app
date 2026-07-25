@@ -17,6 +17,7 @@ class Review {
   final String updatedAt;
   final User? user;
   final String? movieTitle;
+  final String? moviePosterPath;
   final Map<String, int> reactions;
   final String? myReaction;
 
@@ -37,6 +38,7 @@ class Review {
     required this.updatedAt,
     this.user,
     this.movieTitle,
+    this.moviePosterPath,
     this.reactions = const {},
     this.myReaction,
   });
@@ -63,6 +65,9 @@ class Review {
       movieTitle: json['movie'] != null
           ? (json['movie'] as Map<String, dynamic>)['title'] as String?
           : json['movieTitle'] as String?,
+      moviePosterPath: json['movie'] is Map<String, dynamic>
+          ? (json['movie'] as Map<String, dynamic>)['posterPath'] as String?
+          : json['moviePosterPath'] as String?,
       reactions: (json['reactions'] as Map<String, dynamic>?)
               ?.map((k, v) => MapEntry(k, (v as num).toInt())) ??
           {},

@@ -78,20 +78,24 @@ class FavoriteMoviesSection extends StatelessWidget {
             ),
           )
         else
-          Row(
-            children: top3.map((item) {
-              final movie = _parseMovie(item);
-              return Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 8),
+          SizedBox(
+            height: 205,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: top3.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (_, index) {
+                final movie = _parseMovie(top3[index]);
+                return SizedBox(
+                  width: 118,
                   child: _MoviePosterCard(
                     movieId: movie.$1,
                     title: movie.$2,
                     posterPath: movie.$3,
                   ),
-                ),
-              );
-            }).toList(),
+                );
+              },
+            ),
           ),
       ],
     );
@@ -140,17 +144,15 @@ class _MoviePosterCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Flexible(
-            child: Text(
-              title.toUpperCase(),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: FlixieColors.light,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.8,
-              ),
+          Text(
+            title.toUpperCase(),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: FlixieColors.light,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.8,
             ),
           ),
         ],

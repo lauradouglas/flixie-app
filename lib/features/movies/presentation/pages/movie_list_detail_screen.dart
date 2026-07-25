@@ -7,7 +7,13 @@ import 'package:provider/provider.dart';
 
 import 'package:flixie_app/models/movie_short.dart';
 import 'package:flixie_app/models/movie_list_movie.dart';
+import 'package:flixie_app/models/movie_list_membership.dart';
+import 'package:flixie_app/models/friendship.dart';
+import 'package:flixie_app/models/user.dart' as models;
 import 'package:flixie_app/core/auth/auth_provider.dart';
+import 'package:flixie_app/features/profile/data/user_service.dart';
+import 'package:flixie_app/features/social/data/friend_service.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/movies/presentation/controllers/movie_lists_controller.dart';
 import 'package:flixie_app/features/movies/data/movie_features_repository.dart';
 import 'package:flixie_app/features/movies/data/search_service.dart';
@@ -21,11 +27,15 @@ class MovieListDetailScreen extends StatelessWidget {
     required this.listId,
     required this.listName,
     this.ownerUserId,
+    this.isOwnerOverride,
+    this.canEditOverride,
   });
 
   final String listId;
   final String listName;
   final String? ownerUserId;
+  final bool? isOwnerOverride;
+  final bool? canEditOverride;
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +56,10 @@ class MovieListDetailScreen extends StatelessWidget {
         listId: listId,
         listName: listName,
         ownerUserId: userId,
-        isOwner: currentUserId != null && currentUserId == userId,
+        isOwner: isOwnerOverride ??
+            (currentUserId != null && currentUserId == userId),
+        canEdit: canEditOverride ??
+            (currentUserId != null && currentUserId == userId),
       ),
     );
   }
@@ -58,12 +71,14 @@ class _MovieListDetailView extends StatefulWidget {
     required this.listName,
     required this.ownerUserId,
     required this.isOwner,
+    required this.canEdit,
   });
 
   final String listId;
   final String listName;
   final String ownerUserId;
   final bool isOwner;
+  final bool canEdit;
 
   @override
   State<_MovieListDetailView> createState() => _MovieListDetailViewState();
@@ -71,8 +86,44 @@ class _MovieListDetailView extends StatefulWidget {
 
 class _MovieListDetailViewState extends State<_MovieListDetailView> {
   _ListSort _sort = _ListSort.recentlyAdded;
+  models.User? _owner;
+  MovieListMembership? _membership;
+
+  @override
+  void initState() {
+    super.initState();
+    final currentUser = context.read<AuthProvider>().dbUser;
+    if (currentUser?.id == widget.ownerUserId) {
+      _owner = currentUser;
+    } else {
+      _loadOwner();
+    }
+    _loadMembership();
+  }
+
+  Future<void> _loadMembership() async {
+    try {
+      final membership = await UserService.getMovieListMembers(
+        widget.ownerUserId,
+        widget.listId,
+      );
+      if (mounted) setState(() => _membership = membership);
+    } catch (_) {
+      // The collection can still render if membership metadata is unavailable.
+    }
+  }
+
+  Future<void> _loadOwner() async {
+    try {
+      final owner = await UserService.getUserById(widget.ownerUserId);
+      if (mounted) setState(() => _owner = owner);
+    } catch (_) {
+      // The list remains usable if profile details cannot be loaded.
+    }
+  }
 
   Future<void> _refresh() {
+    _loadMembership();
     return context.read<MovieListsProvider>().loadListMovies(widget.listId);
   }
 
@@ -96,6 +147,306 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
     }
   }
 
+  Future<void> _deleteList() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete this list?'),
+        content: const Text(
+          'The collection will be removed for everyone. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep list'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: FlixieColors.danger,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await UserService.deleteMovieList(widget.ownerUserId, widget.listId);
+      if (mounted) context.go('/movie-lists');
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to delete this list.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _leaveList() async {
+    final currentUserId = context.read<AuthProvider>().dbUser?.id;
+    if (currentUserId == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Leave this list?'),
+        content: const Text(
+          'It will disappear from your lists, but everyone else keeps access.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Leave'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await UserService.removeMovieListMember(
+        currentUserId,
+        widget.listId,
+        currentUserId,
+      );
+      if (mounted) context.go('/movie-lists');
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to leave this list.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _removeMember(MovieListMember member) async {
+    final currentUserId = context.read<AuthProvider>().dbUser?.id;
+    if (currentUserId == null) return;
+    try {
+      await UserService.removeMovieListMember(
+        currentUserId,
+        widget.listId,
+        member.id,
+      );
+      await _loadMembership();
+      if (mounted) Navigator.of(context).pop();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to remove @${member.username}.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _addMember() async {
+    final currentUserId = context.read<AuthProvider>().dbUser?.id;
+    if (currentUserId == null) return;
+    final friendsData = await FriendService.getFriends(currentUserId);
+    if (!mounted) return;
+    final existingIds =
+        _membership?.members.map((member) => member.id).toSet() ?? <String>{};
+    final available = friendsData.friendships
+        .map((friendship) => friendship.friendUser)
+        .whereType<FriendshipUser>()
+        .where((friend) => !existingIds.contains(friend.id))
+        .toList(growable: false);
+    final searchController = TextEditingController();
+    var query = '';
+    final selected = await showModalBottomSheet<FriendshipUser>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: FlixieColors.surfaceElevated,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          final normalized = query.trim().toLowerCase();
+          final visible = normalized.isEmpty
+              ? available
+              : available
+                  .where((friend) => [
+                        friend.username,
+                        friend.firstName ?? '',
+                        friend.lastName ?? '',
+                      ].join(' ').toLowerCase().contains(normalized))
+                  .toList(growable: false);
+          return SafeArea(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                MediaQuery.viewInsetsOf(context).bottom + 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Add a friend',
+                    style: TextStyle(
+                      color: FlixieColors.light,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: searchController,
+                    autofocus: true,
+                    onChanged: (value) => setSheetState(() => query = value),
+                    decoration: const InputDecoration(
+                      hintText: 'Search friends',
+                      prefixIcon: Icon(Icons.search_rounded),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  if (visible.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: Center(
+                        child: Text(
+                          'No friends available to add.',
+                          style: TextStyle(color: FlixieColors.medium),
+                        ),
+                      ),
+                    )
+                  else
+                    Flexible(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: visible.length,
+                        itemBuilder: (_, index) {
+                          final friend = visible[index];
+                          return ListTile(
+                            onTap: () => Navigator.pop(sheetContext, friend),
+                            leading: ProfileAvatarView(
+                              avatar: friend.avatar,
+                              fallbackText: friend.username.isEmpty
+                                  ? '?'
+                                  : friend.username[0].toUpperCase(),
+                              fallbackColor: FlixieColors.primary,
+                              size: 38,
+                              profileBadges: friend.profileBadges,
+                            ),
+                            title: Text('@${friend.username}'),
+                            trailing:
+                                const Icon(Icons.add_circle_outline_rounded),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    searchController.dispose();
+    if (selected == null || !mounted) return;
+    try {
+      await UserService.addMovieListMember(
+        currentUserId,
+        widget.listId,
+        selected.id,
+      );
+      await _loadMembership();
+      if (mounted) Navigator.of(context).pop();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to add @${selected.username}.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _showMembersSheet() async {
+    final membership = _membership;
+    if (membership == null) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: FlixieColors.surfaceElevated,
+      showDragHandle: true,
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${membership.members.length} member${membership.members.length == 1 ? '' : 's'}',
+                      style: const TextStyle(
+                        color: FlixieColors.light,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  if (membership.canManageMembers)
+                    TextButton.icon(
+                      onPressed: _addMember,
+                      icon: const Icon(Icons.person_add_alt_1_rounded),
+                      label: const Text('Add'),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ...membership.members.map(
+                (member) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: ProfileAvatarView(
+                    avatar: member.avatar,
+                    fallbackText: member.username.isEmpty
+                        ? '?'
+                        : member.username[0].toUpperCase(),
+                    fallbackColor: FlixieColors.primary,
+                    size: 40,
+                    profileBadges: member.profileBadges,
+                  ),
+                  title: Text('@${member.username}'),
+                  subtitle: member.id == membership.ownerId
+                      ? const Text('Owner')
+                      : null,
+                  trailing: membership.canManageMembers &&
+                          member.id != membership.ownerId
+                      ? IconButton(
+                          tooltip: 'Remove member',
+                          onPressed: () => _removeMember(member),
+                          icon: const Icon(
+                            Icons.person_remove_outlined,
+                            color: FlixieColors.danger,
+                          ),
+                        )
+                      : null,
+                ),
+              ),
+              if (membership.canLeave)
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _leaveList();
+                    },
+                    icon: const Icon(Icons.logout_rounded),
+                    label: const Text('Leave list'),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<MovieListsProvider>();
@@ -108,9 +459,15 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
       appBar: AppBar(
         backgroundColor: FlixieColors.background,
         foregroundColor: FlixieColors.light,
-        title: Text(widget.listName),
+        title: Text(
+          widget.isOwner ? 'Your collection' : 'Collection',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         actions: [
-          if (widget.isOwner)
+          if (widget.canEdit)
             IconButton(
               tooltip: 'Add movies',
               onPressed: _showAddMovieSheet,
@@ -119,9 +476,15 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
           PopupMenuButton<String>(
             tooltip: 'List actions',
             color: FlixieColors.tabBarBackgroundFocused,
-            onSelected: (value) {
+            onSelected: (value) async {
               if (value == 'refresh') {
                 _refresh();
+              } else if (value == 'members') {
+                await _showMembersSheet();
+              } else if (value == 'leave') {
+                await _leaveList();
+              } else if (value == 'delete') {
+                await _deleteList();
               } else if (value == 'manage') {
                 context.push('/movie-lists');
               }
@@ -131,7 +494,22 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                 value: 'refresh',
                 child: Text('Refresh'),
               ),
-              if (widget.isOwner)
+              if ((_membership?.members.length ?? 0) > 1)
+                const PopupMenuItem(
+                  value: 'members',
+                  child: Text('View members'),
+                ),
+              if (_membership?.canLeave == true)
+                const PopupMenuItem(
+                  value: 'leave',
+                  child: Text('Leave list'),
+                ),
+              if (_membership?.isOwner == true)
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Text('Delete list'),
+                ),
+              if (_membership?.isOwner == true)
                 const PopupMenuItem(
                   value: 'manage',
                   child: Text('Manage lists'),
@@ -151,13 +529,20 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                   SliverToBoxAdapter(
                     child: _ListHeader(
                       listName: widget.listName,
-                      ownerLabel: widget.isOwner ? 'Your list' : 'Profile list',
+                      owner: _owner,
+                      isOwner: widget.isOwner,
                       movieCount: rawMovies.length,
                       posterUrls: _posterUrls(rawMovies),
-                      isOwner: widget.isOwner,
                       onAddMovies: _showAddMovieSheet,
                     ),
                   ),
+                  if (_membership != null)
+                    SliverToBoxAdapter(
+                      child: _ListMembersStrip(
+                        membership: _membership!,
+                        onTap: _showMembersSheet,
+                      ),
+                    ),
                   SliverToBoxAdapter(
                     child: _SortToolbar(
                       sort: _sort,
@@ -169,7 +554,7 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                     SliverFillRemaining(
                       hasScrollBody: false,
                       child: _EmptyListState(
-                        isOwner: widget.isOwner,
+                        isOwner: widget.canEdit,
                         message: provider.error ?? 'No items in this list yet.',
                         onAddMovies: _showAddMovieSheet,
                       ),
@@ -177,50 +562,40 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                   else
                     SliverPadding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-                      sliver: SliverLayoutBuilder(
-                        builder: (context, constraints) {
-                          final width = constraints.crossAxisExtent;
-                          final columns = width >= 720
-                              ? 4
-                              : width >= 520
-                                  ? 3
-                                  : 2;
-                          return SliverGrid(
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: columns,
-                              childAspectRatio: 0.57,
-                              crossAxisSpacing: 12,
-                              mainAxisSpacing: 14,
-                            ),
-                            delegate: SliverChildBuilderDelegate(
-                              (context, index) {
-                                final entry = movies[index];
-                                return _MovieListPosterCard(
-                                  entry: entry,
-                                  canEdit: widget.isOwner,
-                                  onOpen: () {
-                                    final movieId = _entryMovieId(entry);
-                                    if (movieId > 0) {
-                                      context.push('/movies/$movieId');
-                                      return;
-                                    }
-                                    final showId = _entryShowId(entry);
-                                    if (showId > 0) {
-                                      context.push('/shows/$showId');
-                                    }
-                                  },
-                                  onRemove: () => _confirmRemove(
-                                    context,
-                                    provider,
-                                    entry,
-                                  ),
-                                );
+                      sliver: SliverGrid(
+                        gridDelegate:
+                            const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 190,
+                          childAspectRatio: 0.48,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 18,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final entry = movies[index];
+                            return _MovieListPosterCard(
+                              entry: entry,
+                              canEdit: widget.canEdit,
+                              onOpen: () {
+                                final movieId = _entryMovieId(entry);
+                                if (movieId > 0) {
+                                  context.push('/movies/$movieId');
+                                  return;
+                                }
+                                final showId = _entryShowId(entry);
+                                if (showId > 0) {
+                                  context.push('/shows/$showId');
+                                }
                               },
-                              childCount: movies.length,
-                            ),
-                          );
-                        },
+                              onRemove: () => _confirmRemove(
+                                context,
+                                provider,
+                                entry,
+                              ),
+                            );
+                          },
+                          childCount: movies.length,
+                        ),
                       ),
                     ),
                 ],
@@ -657,87 +1032,224 @@ class _AddMovieResultTile extends StatelessWidget {
   }
 }
 
+class _ListMembersStrip extends StatelessWidget {
+  const _ListMembersStrip({
+    required this.membership,
+    required this.onTap,
+  });
+
+  final MovieListMembership membership;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (membership.members.length <= 1) return const SizedBox.shrink();
+    final preview = membership.members.take(5).toList(growable: false);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: FlixieColors.surfaceElevated.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: FlixieColors.primary.withValues(alpha: 0.2),
+            ),
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 44 + (preview.length - 1) * 25,
+                height: 44,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    for (var index = 0; index < preview.length; index++)
+                      Positioned(
+                        left: 3 + index * 25,
+                        top: 3,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: FlixieColors.surfaceElevated,
+                              width: 2,
+                            ),
+                          ),
+                          child: ProfileAvatarView(
+                            avatar: preview[index].avatar,
+                            fallbackText: preview[index].username.isEmpty
+                                ? '?'
+                                : preview[index].username[0].toUpperCase(),
+                            fallbackColor: FlixieColors.primary,
+                            size: 36,
+                            profileBadges: preview[index].profileBadges,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      membership.scope == 'GROUP'
+                          ? membership.groupName ?? 'Group list'
+                          : '${membership.members.length} people',
+                      style: const TextStyle(
+                        color: FlixieColors.light,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const Text(
+                      'Everyone can add titles',
+                      style: TextStyle(
+                        color: FlixieColors.medium,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: FlixieColors.primary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ListHeader extends StatelessWidget {
   const _ListHeader({
     required this.listName,
-    required this.ownerLabel,
+    required this.owner,
+    required this.isOwner,
     required this.movieCount,
     required this.posterUrls,
-    required this.isOwner,
     required this.onAddMovies,
   });
 
   final String listName;
-  final String ownerLabel;
+  final models.User? owner;
+  final bool isOwner;
   final int movieCount;
   final List<String> posterUrls;
-  final bool isOwner;
   final VoidCallback onAddMovies;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           _PosterCollage(posterUrls: posterUrls),
-          const SizedBox(width: 14),
+          const SizedBox(width: 20),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  ownerLabel,
-                  style: const TextStyle(
-                    color: FlixieColors.primary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: owner == null
+                        ? null
+                        : () => context.push(
+                              isOwner ? '/profile' : '/friends/${owner!.id}',
+                            ),
+                    borderRadius: BorderRadius.circular(999),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(0, 3, 8, 3),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ProfileAvatarView(
+                            avatar: owner?.avatar,
+                            fallbackText: _ownerInitial(owner),
+                            fallbackColor: FlixieColors.primary,
+                            size: 34,
+                            profileBadges: owner?.profileBadges ?? const [],
+                          ),
+                          const SizedBox(width: 9),
+                          Flexible(
+                            child: Text(
+                              owner == null
+                                  ? 'Loading profile…'
+                                  : '@${owner!.username}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: FlixieColors.light,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          if (owner != null) ...[
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.chevron_right_rounded,
+                              color: FlixieColors.medium,
+                              size: 18,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 5),
+                const SizedBox(height: 14),
                 Text(
                   listName,
-                  maxLines: 2,
+                  maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 24,
+                    fontSize: 27,
                     height: 1.05,
                     fontWeight: FontWeight.w900,
+                    letterSpacing: -0.5,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 Row(
                   children: [
                     const Icon(
-                      Icons.local_movies_outlined,
+                      Icons.video_library_outlined,
                       color: FlixieColors.medium,
-                      size: 16,
+                      size: 17,
                     ),
-                    const SizedBox(width: 5),
+                    const SizedBox(width: 6),
                     Text(
-                      '$movieCount ${movieCount == 1 ? 'item' : 'items'}',
+                      '$movieCount ${movieCount == 1 ? 'title' : 'titles'}',
                       style: const TextStyle(
                         color: FlixieColors.medium,
                         fontSize: 13,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
                 if (isOwner) ...[
-                  const SizedBox(height: 10),
-                  OutlinedButton.icon(
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
                     onPressed: onAddMovies,
                     icon: const Icon(Icons.add_rounded, size: 17),
-                    label: const Text('Add movies'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: FlixieColors.primary,
-                      side: const BorderSide(color: FlixieColors.primary),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
+                    label: const Text('Add titles'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: FlixieColors.primary,
+                      foregroundColor: Colors.white,
+                      visualDensity: VisualDensity.compact,
                     ),
                   ),
                 ],
@@ -747,6 +1259,11 @@ class _ListHeader extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _ownerInitial(models.User? user) {
+    final username = user?.username.trim() ?? '';
+    return username.isEmpty ? '?' : username[0].toUpperCase();
   }
 }
 
@@ -759,8 +1276,8 @@ class _PosterCollage extends StatelessWidget {
   Widget build(BuildContext context) {
     if (posterUrls.isEmpty) {
       return Container(
-        width: 92,
-        height: 128,
+        width: 108,
+        height: 162,
         decoration: BoxDecoration(
           color: FlixieColors.surfaceElevated,
           borderRadius: BorderRadius.circular(12),
@@ -774,11 +1291,11 @@ class _PosterCollage extends StatelessWidget {
     }
 
     return SizedBox(
-      width: 96,
-      height: 132,
+      width: 116,
+      height: 166,
       child: Stack(
         children: List.generate(posterUrls.length.clamp(0, 4), (index) {
-          final offset = index * 8.0;
+          final offset = index * 4.0;
           return Positioned(
             left: offset,
             top: offset,
@@ -786,12 +1303,12 @@ class _PosterCollage extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
               child: CachedNetworkImage(
                 imageUrl: posterUrls[index],
-                width: 70,
-                height: 104,
+                width: 104,
+                height: 156,
                 fit: BoxFit.cover,
                 errorWidget: (_, __, ___) => Container(
-                  width: 70,
-                  height: 104,
+                  width: 104,
+                  height: 156,
                   color: FlixieColors.surfaceElevated,
                   child: const Icon(
                     Icons.movie_outlined,
@@ -899,7 +1416,8 @@ class _MovieListPosterCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
+            AspectRatio(
+              aspectRatio: 2 / 3,
               child: Stack(
                 fit: StackFit.expand,
                 children: [

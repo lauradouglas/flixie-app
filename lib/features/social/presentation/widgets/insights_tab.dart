@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:flixie_app/models/group_insights.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 
@@ -982,7 +983,7 @@ class _MiniMetaPill extends StatelessWidget {
   }
 }
 
-class InsightReviewCard extends StatelessWidget {
+class InsightReviewCard extends StatefulWidget {
   const InsightReviewCard({
     super.key,
     required this.review,
@@ -990,153 +991,196 @@ class InsightReviewCard extends StatelessWidget {
 
   final GroupInsightReview review;
 
+  @override
+  State<InsightReviewCard> createState() => _InsightReviewCardState();
+}
+
+class _InsightReviewCardState extends State<InsightReviewCard> {
   static const _posterBase = 'https://image.tmdb.org/t/p/w185';
+  bool _spoilerRevealed = false;
 
   @override
   Widget build(BuildContext context) {
+    final review = widget.review;
     final posterUrl = _resolvePosterUrl(review.moviePosterPath, _posterBase);
+    final handle = review.reviewerUsername.trim().isEmpty
+        ? review.reviewerName
+        : '@${review.reviewerUsername.trim()}';
+    final profileAction = review.userId != null && review.userId!.isNotEmpty
+        ? () => context.push('/friends/${review.userId}')
+        : null;
 
-    return InkWell(
-      onTap: review.userId != null && review.userId!.isNotEmpty
-          ? () => context.push('/friends/${review.userId}')
-          : null,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        decoration: _glassDecoration(),
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                _AvatarBubble(
-                  name: review.reviewerName,
-                  imageUrl: review.reviewerAvatarUrl,
-                  size: 34,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        review.reviewerName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: FlixieColors.light,
-                          fontWeight: FontWeight.w700,
+    return Container(
+      decoration: BoxDecoration(
+        color: FlixieColors.surface.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: FlixieColors.primary.withValues(alpha: 0.18),
+        ),
+      ),
+      padding: const EdgeInsets.all(10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GestureDetector(
+            onTap: review.movieId != null
+                ? () => context.push('/movies/${review.movieId}')
+                : null,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(9),
+              child: SizedBox(
+                width: 62,
+                height: 92,
+                child: posterUrl == null
+                    ? Container(
+                        color: FlixieColors.tabBarBorder,
+                        alignment: Alignment.center,
+                        child: const Icon(Icons.movie_outlined,
+                            size: 20, color: FlixieColors.medium),
+                      )
+                    : CachedNetworkImage(
+                        imageUrl: posterUrl,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) => Container(
+                          color: FlixieColors.tabBarBorder,
+                          alignment: Alignment.center,
+                          child: const Icon(Icons.movie_outlined,
+                              size: 20, color: FlixieColors.medium),
                         ),
                       ),
-                      if (review.reviewerUsername.isNotEmpty)
-                        Text(
-                          '@${review.reviewerUsername}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: FlixieColors.medium,
-                            fontSize: 12,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                Text(
-                  _relativeDate(review.createdAt),
-                  style: const TextStyle(
-                    color: FlixieColors.medium,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
+              ),
             ),
-            const SizedBox(height: 10),
-            Row(
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: SizedBox(
-                    width: 50,
-                    height: 72,
-                    child: posterUrl == null
-                        ? Container(
-                            color: FlixieColors.tabBarBorder,
-                            alignment: Alignment.center,
-                            child: const Icon(Icons.movie_outlined,
-                                size: 18, color: FlixieColors.medium),
-                          )
-                        : CachedNetworkImage(
-                            imageUrl: posterUrl,
-                            fit: BoxFit.cover,
-                            errorWidget: (_, __, ___) => Container(
-                              color: FlixieColors.tabBarBorder,
-                              alignment: Alignment.center,
-                              child: const Icon(Icons.movie_outlined,
-                                  size: 18, color: FlixieColors.medium),
-                            ),
-                          ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      GestureDetector(
-                        onTap: review.movieId != null
-                            ? () => context.push('/movies/${review.movieId}')
-                            : null,
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: profileAction,
+                      child: ProfileAvatarView(
+                        avatar: review.reviewerAvatar,
+                        fallbackText: review.reviewerName.isEmpty
+                            ? '?'
+                            : review.reviewerName[0].toUpperCase(),
+                        fallbackColor: FlixieColors.primary,
+                        size: 28,
+                        profileBadges: review.reviewerProfileBadges,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: profileAction,
                         child: Text(
-                          review.movieTitle,
+                          handle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: FlixieColors.light,
                             fontWeight: FontWeight.w700,
-                            fontSize: 14,
+                            fontSize: 13,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: FlixieColors.primary.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: FlixieColors.primary.withValues(alpha: 0.35),
-                          ),
-                        ),
-                        child: Text(
-                          '${review.rating.toStringAsFixed(1)}/10',
-                          style: const TextStyle(
-                            color: FlixieColors.primary,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 11,
-                          ),
+                    ),
+                    Text(
+                      _relativeDate(review.createdAt),
+                      style: const TextStyle(
+                        color: FlixieColors.medium,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 7),
+                GestureDetector(
+                  onTap: review.movieId != null
+                      ? () => context.push('/movies/${review.movieId}')
+                      : null,
+                  child: Text(
+                    review.movieTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: FlixieColors.light,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    const Icon(Icons.star_rounded,
+                        size: 16, color: Color(0xFFFFC34D)),
+                    const SizedBox(width: 3),
+                    Text(
+                      '${review.rating.toStringAsFixed(1)}/10',
+                      style: const TextStyle(
+                        color: FlixieColors.light,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                    if (review.recommended != null) ...[
+                      const SizedBox(width: 10),
+                      Icon(
+                        review.recommended!
+                            ? Icons.thumb_up_alt_rounded
+                            : Icons.thumb_down_alt_rounded,
+                        size: 14,
+                        color: review.recommended!
+                            ? const Color(0xFF55D69E)
+                            : FlixieColors.medium,
+                      ),
+                    ],
+                    if (review.containsSpoilers) ...[
+                      const Spacer(),
+                      const Text(
+                        'SPOILER',
+                        style: TextStyle(
+                          color: Color(0xFFFFC34D),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: .7,
                         ),
                       ),
                     ],
-                  ),
+                  ],
                 ),
+                if (review.snippet.trim().isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  GestureDetector(
+                    onTap: review.containsSpoilers && !_spoilerRevealed
+                        ? () => setState(() => _spoilerRevealed = true)
+                        : null,
+                    child: Text(
+                      review.containsSpoilers && !_spoilerRevealed
+                          ? 'Tap to reveal review'
+                          : review.snippet.trim(),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: review.containsSpoilers && !_spoilerRevealed
+                            ? FlixieColors.primary
+                            : FlixieColors.medium,
+                        height: 1.25,
+                        fontSize: 12,
+                        fontStyle: review.containsSpoilers && !_spoilerRevealed
+                            ? FontStyle.italic
+                            : FontStyle.normal,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
-            if (review.snippet.trim().isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Text(
-                review.snippet.trim(),
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: FlixieColors.light,
-                  height: 1.3,
-                ),
-              ),
-            ],
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

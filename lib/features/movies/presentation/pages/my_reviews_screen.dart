@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -242,7 +244,7 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
   }
 }
 
-class ReviewCard extends StatelessWidget {
+class ReviewCard extends StatefulWidget {
   final Review review;
   final VoidCallback onTap;
 
@@ -253,14 +255,30 @@ class ReviewCard extends StatelessWidget {
   });
 
   @override
+  State<ReviewCard> createState() => _ReviewCardState();
+}
+
+class _ReviewCardState extends State<ReviewCard> {
+  bool _spoilerRevealed = false;
+
+  void _handleTap() {
+    if (widget.review.containsSpoilers && !_spoilerRevealed) {
+      setState(() => _spoilerRevealed = true);
+      return;
+    }
+    widget.onTap();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final review = widget.review;
     final date = DateTime.tryParse(review.createdAt);
     final formattedDate = date != null
         ? '${date.month}/${date.day}/${date.year.toString().substring(2)}'
         : 'Unknown';
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: _handleTap,
       child: Container(
         decoration: BoxDecoration(
           color: FlixieColors.surface,
@@ -363,16 +381,57 @@ class ReviewCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            // Body preview
-            Text(
-              review.body,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: FlixieColors.light,
-                fontSize: 14,
-                height: 1.5,
-              ),
+            // Spoiler reviews stay blurred until explicitly revealed.
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                ImageFiltered(
+                  imageFilter: review.containsSpoilers && !_spoilerRevealed
+                      ? ImageFilter.blur(sigmaX: 5, sigmaY: 5)
+                      : ImageFilter.blur(sigmaX: 0, sigmaY: 0),
+                  child: Text(
+                    review.body,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: FlixieColors.light,
+                      fontSize: 14,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+                if (review.containsSpoilers && !_spoilerRevealed)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: FlixieColors.surface.withValues(alpha: 0.9),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: FlixieColors.warning.withValues(alpha: 0.6),
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.visibility_outlined,
+                          color: FlixieColors.warning,
+                          size: 15,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          'Tap to reveal spoiler',
+                          style: TextStyle(
+                            color: FlixieColors.warning,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 12),
             // Footer with reactions and spoiler warning

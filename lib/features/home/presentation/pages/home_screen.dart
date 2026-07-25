@@ -11,12 +11,14 @@ import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/models/trending_groups.dart';
 import 'package:flixie_app/models/watch_request.dart';
 import 'package:flixie_app/models/watchlist_movie.dart';
+import 'package:flixie_app/models/continue_watching_show.dart';
 import 'package:flixie_app/models/user.dart' as models;
 import 'package:flixie_app/features/social/presentation/controllers/friend_actions_controller.dart';
 import 'package:flixie_app/features/watchlist/presentation/controllers/watchlist_actions_controller.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/features/movies/data/movie_service.dart';
+import 'package:flixie_app/features/movies/data/show_service.dart';
 import 'package:flixie_app/features/home/data/recommendation_service.dart';
 import 'package:flixie_app/features/social/data/request_service.dart';
 import 'package:flixie_app/features/home/data/trending_service.dart';
@@ -47,6 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<MovieShort> _featuredMovies = [];
   List<MovieShort> _nowPlayingMovies = [];
   List<MovieShort> _forYouMovies = [];
+  List<ContinueWatchingShow> _continueWatchingShows = [];
   List<ActivityListItem> _friendsActivity = [];
   bool _showMoreFriendActivity = false;
   TrendingGroupsResponse? _trendingGroups;
@@ -163,6 +166,7 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _friendsActivity = [];
         _forYouMovies = [];
+        _continueWatchingShows = [];
         _watchlistMovieIds = {};
         _watchRequestsNeedingResponse = 0;
         _watchRequestsScheduledToday = 0;
@@ -185,6 +189,8 @@ class _HomeScreenState extends State<HomeScreen> {
           .catchError((_) => <WatchlistMovie>[]),
       RequestService.getWatchRequests(user.id)
           .catchError((_) => <WatchRequest>[]),
+      ShowService.getContinueWatching(user.id)
+          .catchError((_) => <ContinueWatchingShow>[]),
     ]);
     if (!mounted || _loadedForUserId != user.id) return;
 
@@ -205,6 +211,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _countWatchRequestsScheduledToday(watchRequests);
       _watchRequestsUpcoming = _countUpcomingWatchRequests(watchRequests);
       _watchRequestsLoading = false;
+      _continueWatchingShows = results[5] as List<ContinueWatchingShow>;
     });
   }
 
@@ -477,6 +484,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         _buildBecauseYouRatedSection(context),
                         _buildJustOutSection(context),
                         _buildWatchlistSection(context),
+                        _buildContinueWatchingSection(context),
                         _buildFriendActivitySection(context),
                         TrendingGroupsSection(
                           isLoading: _isTrendingGroupsLoading,
@@ -622,6 +630,35 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildContinueWatchingSection(BuildContext context) {
+    if (_continueWatchingShows.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const HomeSectionHeader(title: 'Continue Watching'),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 322,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: _continueWatchingShows.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final show = _continueWatchingShows[index];
+              return _ContinueWatchingCard(
+                show: show,
+                onTap: () => context.push('/shows/${show.showId}'),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 20),
+      ],
     );
   }
 
@@ -1037,22 +1074,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                   value: 'remove_watchlist',
                                   child: Text('Remove from watchlist'),
                                 ),
-                                PopupMenuItem(
-                                  value: 'add_favourite',
-                                  child: Text('Add to favourites'),
-                                ),
-                                PopupMenuItem(
-                                  value: 'add_list',
-                                  child: Text('Add to list'),
-                                ),
-                                PopupMenuItem(
-                                  value: 'invite',
-                                  child: Text('Invite friends to watch'),
-                                ),
-                                PopupMenuItem(
-                                  value: 'share',
-                                  child: Text('Share movie'),
-                                ),
+                                // TODO(release): Restore favourite, list,
+                                // invite and share quick actions when their
+                                // home-screen flows are implemented.
                               ],
                             ),
                           ),
@@ -1274,34 +1298,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               },
             ),
-            ListTile(
-              leading:
-                  const Icon(Icons.favorite_border, color: FlixieColors.danger),
-              title: const Text('Add to favourites'),
-              onTap: () => _handleNotYetImplementedAction(
-                  sheetContext, 'Add to favourites'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.playlist_add_outlined,
-                  color: FlixieColors.light),
-              title: const Text('Add to list'),
-              onTap: () =>
-                  _handleNotYetImplementedAction(sheetContext, 'Add to list'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.group_add_outlined,
-                  color: FlixieColors.primary),
-              title: const Text('Invite friends to watch'),
-              onTap: () => _handleNotYetImplementedAction(
-                  sheetContext, 'Invite friends to watch'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.share_outlined,
-                  color: FlixieColors.secondary),
-              title: const Text('Share movie'),
-              onTap: () =>
-                  _handleNotYetImplementedAction(sheetContext, 'Share movie'),
-            ),
+            // TODO(release): Restore favourite, list, invite and share quick
+            // actions when their home-screen flows are implemented.
           ],
         ),
       ),
@@ -1332,18 +1330,6 @@ class _HomeScreenState extends State<HomeScreen> {
           posterPath: null,
           currentlyInWatchlist: true,
         );
-        break;
-      case 'add_favourite':
-        _showComingSoonToast(context, 'Add to favourites');
-        break;
-      case 'add_list':
-        _showComingSoonToast(context, 'Add to list');
-        break;
-      case 'invite':
-        _showComingSoonToast(context, 'Invite friends to watch');
-        break;
-      case 'share':
-        _showComingSoonToast(context, 'Share movie');
         break;
     }
   }
@@ -1506,15 +1492,125 @@ class _HomeScreenState extends State<HomeScreen> {
 
     notesController.dispose();
   }
+}
 
-  void _handleNotYetImplementedAction(BuildContext context, String action) {
-    Navigator.of(context).pop();
-    _showComingSoonToast(context, action);
+class _ContinueWatchingCard extends StatelessWidget {
+  const _ContinueWatchingCard({
+    required this.show,
+    required this.onTap,
+  });
+
+  final ContinueWatchingShow show;
+  final VoidCallback onTap;
+
+  static const double _cardWidth = 168;
+  static const double _posterHeight = _cardWidth * 1.5;
+
+  @override
+  Widget build(BuildContext context) {
+    final episode = show.lastWatchedEpisode;
+    final episodeLabel = episode == null
+        ? '${show.watchedEpisodes} episodes watched'
+        : 'S${episode.seasonNumber} E${episode.episodeNumber} watched';
+    final progress = (show.completionPercent / 100).clamp(0.0, 1.0);
+    final posterUrl = show.posterPath == null
+        ? null
+        : 'https://image.tmdb.org/t/p/w342${show.posterPath}';
+
+    return SizedBox(
+      width: _cardWidth,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SizedBox(
+                      width: _cardWidth,
+                      height: _posterHeight,
+                      child: posterUrl == null
+                          ? _posterFallback()
+                          : CachedNetworkImage(
+                              imageUrl: posterUrl,
+                              fit: BoxFit.cover,
+                              placeholder: (_, __) => _posterFallback(),
+                              errorWidget: (_, __, ___) => _posterFallback(),
+                            ),
+                    ),
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.72),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.play_arrow_rounded,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ),
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 5,
+                        backgroundColor: Colors.black54,
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          FlixieColors.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                show.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                episodeLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: FlixieColors.medium,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
-  void _showComingSoonToast(BuildContext context, String action) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$action coming soon')),
+  Widget _posterFallback() {
+    return Container(
+      color: FlixieColors.tabBarBackgroundFocused,
+      alignment: Alignment.center,
+      child: const Icon(
+        Icons.tv_rounded,
+        color: FlixieColors.medium,
+        size: 38,
+      ),
     );
   }
 }

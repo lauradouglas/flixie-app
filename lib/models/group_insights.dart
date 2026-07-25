@@ -1,3 +1,5 @@
+import 'package:flixie_app/models/profile_avatar.dart';
+
 class GroupInsightsResponse {
   final List<GroupInsightMovie> mostWatchedThisMonth;
   final List<GroupInsightMovie> mostDiscussedMovies;
@@ -170,11 +172,15 @@ class GroupInsightReview {
   final String reviewerName;
   final String reviewerUsername;
   final String? reviewerAvatarUrl;
+  final ProfileAvatar? reviewerAvatar;
+  final List<String> reviewerProfileBadges;
   final int? movieId;
   final String movieTitle;
   final String? moviePosterPath;
   final double rating;
   final String snippet;
+  final bool containsSpoilers;
+  final bool? recommended;
   final String? createdAt;
 
   const GroupInsightReview({
@@ -183,11 +189,15 @@ class GroupInsightReview {
     required this.reviewerName,
     required this.reviewerUsername,
     this.reviewerAvatarUrl,
+    this.reviewerAvatar,
+    this.reviewerProfileBadges = const [],
     this.movieId,
     required this.movieTitle,
     this.moviePosterPath,
     this.rating = 0,
     this.snippet = '',
+    this.containsSpoilers = false,
+    this.recommended,
     this.createdAt,
   });
 
@@ -195,24 +205,45 @@ class GroupInsightReview {
     final user = json['user'] as Map<String, dynamic>?;
     final movie = json['movie'] as Map<String, dynamic>?;
 
-    final reviewerName =
-        (user?['username'] ?? user?['firstName'] ?? '').toString().trim();
+    final reviewerUsername = (json['reviewerUsername'] ??
+            json['reviewer_username'] ??
+            json['username'] ??
+            user?['username'] ??
+            '')
+        .toString()
+        .trim();
+    final reviewerName = (json['displayName'] ??
+            json['display_name'] ??
+            user?['displayName'] ??
+            user?['firstName'] ??
+            reviewerUsername)
+        .toString()
+        .trim();
+    final avatarJson = (json['avatar'] ?? user?['avatar']);
+    final badgesRaw =
+        (json['profileBadges'] ?? user?['profileBadges']) as List<dynamic>? ??
+            const [];
 
     return GroupInsightReview(
       id: (json['id'] ?? '').toString(),
       userId: (json['userId'] ?? user?['id']) as String?,
       reviewerName: reviewerName.isEmpty ? 'User' : reviewerName,
-      reviewerUsername: (json['reviewerUsername'] ??
-              json['reviewer_username'] ??
-              user?['username'] ??
-              '')
-          .toString(),
+      reviewerUsername: reviewerUsername,
       reviewerAvatarUrl: _firstNonEmptyString([
         json['reviewerAvatarUrl'],
         json['reviewer_avatar_url'],
         user?['avatarUrl'],
         user?['avatar_url'],
       ]),
+      reviewerAvatar: avatarJson is Map<String, dynamic>
+          ? ProfileAvatar.fromJson(avatarJson)
+          : null,
+      reviewerProfileBadges: badgesRaw
+          .map((badge) => badge is Map<String, dynamic>
+              ? (badge['badge'] ?? '').toString()
+              : badge.toString())
+          .where((badge) => badge.isNotEmpty)
+          .toList(growable: false),
       movieId: _parseInt(json['movieId'] ?? movie?['id']),
       movieTitle: (json['movieTitle'] ??
               json['movie_title'] ??
@@ -231,7 +262,16 @@ class GroupInsightReview {
         movie?['poster_url'],
       ]),
       rating: _parseDouble(json['rating']) ?? 0,
-      snippet: (json['snippet'] ?? json['body'] ?? '').toString(),
+      snippet: (json['reviewSnippet'] ??
+              json['review_snippet'] ??
+              json['snippet'] ??
+              json['body'] ??
+              '')
+          .toString(),
+      containsSpoilers:
+          json['containsSpoilers'] == true || json['contains_spoilers'] == true,
+      recommended:
+          json['recommended'] is bool ? json['recommended'] as bool : null,
       createdAt: (json['createdAt'] ?? json['created_at']) as String?,
     );
   }

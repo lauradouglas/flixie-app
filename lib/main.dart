@@ -14,6 +14,7 @@ import 'package:flixie_app/core/auth/push_notification_service.dart';
 import 'package:flixie_app/core/storage/movie_cache_service.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/features/movies/data/movie_service.dart';
+import 'package:flixie_app/features/social/data/watch_request_cache.dart';
 
 bool _hasFirebaseDartDefines(FirebaseOptions options) {
   return options.apiKey.isNotEmpty &&
@@ -84,6 +85,14 @@ void main() async {
             AuthService(),
             context.read<MovieService>(),
           ),
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, WatchRequestCache>(
+          create: (_) => WatchRequestCache(),
+          update: (_, auth, cache) {
+            final requestCache = cache ?? WatchRequestCache();
+            requestCache.syncUser(auth.dbUser?.id);
+            return requestCache;
+          },
         ),
       ],
       child: const FlixieApp(),

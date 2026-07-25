@@ -5,26 +5,29 @@ import 'package:flixie_app/features/profile/presentation/widgets/edit_profile_sh
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/change_avatar_sheet.dart';
 import 'package:flixie_app/models/profile_avatar.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_badges.dart';
 
 class ProfileHeader extends StatelessWidget {
   const ProfileHeader({
     super.key,
     required this.displayName,
     required this.username,
-    required this.email,
-    this.photoUrl,
+    this.memberSince,
+    this.onPreview,
     this.bio,
     this.iconColor,
     this.avatar,
+    this.profileBadges = const [],
   });
 
   final String displayName;
   final String username;
-  final String email;
-  final String? photoUrl;
+  final String? memberSince;
+  final VoidCallback? onPreview;
   final String? bio;
   final Map<String, dynamic>? iconColor;
   final ProfileAvatar? avatar;
+  final List<String> profileBadges;
 
   Color get _avatarColor {
     final hex = ((iconColor?['hexCode'] ?? iconColor?['hex']) as String? ?? '')
@@ -63,114 +66,137 @@ class ProfileHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final color = _avatarColor;
-    return Column(
-      children: [
-        // Banner with avatar overlaid using Stack
-        Stack(
-          clipBehavior: Clip.none,
-          alignment: Alignment.bottomCenter,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: FlixieColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: FlixieColors.tabBarBorder),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              height: 130,
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFF1B3A70),
-                    FlixieColors.secondary,
-                    FlixieColors.primary,
-                  ],
-                  stops: [0.0, 0.5, 1.0],
-                ),
-              ),
-              child: Stack(
-                children: [
-                  // Subtle pattern overlay
-                  Opacity(
-                    opacity: 0.06,
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        gradient: RadialGradient(
-                          center: Alignment(0.8, -0.6),
-                          radius: 1.2,
-                          colors: [Colors.white, Colors.transparent],
+            Row(
+              children: [
+                GestureDetector(
+                  onTap: () => _openAvatarSheet(context),
+                  child: Stack(
+                    alignment: Alignment.bottomRight,
+                    children: [
+                      ProfileAvatarView(
+                        avatar: avatar,
+                        fallbackText: displayName.isEmpty
+                            ? '?'
+                            : displayName[0].toUpperCase(),
+                        fallbackColor: color,
+                        size: 88,
+                        profileBadges: profileBadges,
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: const BoxDecoration(
+                          color: FlixieColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.edit_rounded,
+                          size: 13,
+                          color: Colors.white,
                         ),
                       ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Positioned(
-              bottom: -52,
-              child: Container(
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [
-                      FlixieColors.primary.withValues(alpha: 0.6),
-                      FlixieColors.secondary.withValues(alpha: 0.4),
                     ],
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: FlixieColors.primary.withValues(alpha: 0.3),
-                      blurRadius: 16,
-                      spreadRadius: 2,
-                    ),
-                  ],
                 ),
-                child: GestureDetector(
-                  onTap: () => _openAvatarSheet(context),
-                  child: ProfileAvatarView(
-                    avatar: avatar,
-                    fallbackText: displayName.isEmpty
-                        ? '?'
-                        : displayName[0].toUpperCase(),
-                    fallbackColor: color,
-                    size: 96,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '@$username',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: textTheme.headlineSmall?.copyWith(
+                                color: FlixieColors.light,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          if (profileBadges.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            ProfileBadgePills(
+                              badges: profileBadges,
+                              compact: true,
+                              featuredOnly: true,
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (displayName.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          displayName,
+                          style: textTheme.bodyLarge?.copyWith(
+                            color: FlixieColors.light,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                      if (memberSince != null) ...[
+                        const SizedBox(height: 7),
+                        Text(
+                          memberSince!,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: FlixieColors.medium,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
+              ],
+            ),
+            if (bio case final bioText
+                when bioText != null && bioText.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(
+                bioText,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: FlixieColors.light,
+                  height: 1.45,
+                ),
               ),
+            ],
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () => _openEditSheet(context),
+                    icon: const Icon(Icons.edit_outlined, size: 17),
+                    label: const Text('Edit profile'),
+                  ),
+                ),
+                if (onPreview != null) ...[
+                  const SizedBox(width: 10),
+                  OutlinedButton.icon(
+                    onPressed: onPreview,
+                    icon: const Icon(Icons.visibility_outlined, size: 17),
+                    label: const Text('Preview'),
+                  ),
+                ],
+              ],
             ),
           ],
         ),
-        const SizedBox(
-            height: 62), // accounts for avatar overlap (48 radius + 14 padding)
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(displayName, style: textTheme.headlineMedium),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: () => _openEditSheet(context),
-              child: const Icon(
-                Icons.edit_outlined,
-                size: 18,
-                color: FlixieColors.medium,
-              ),
-            ),
-          ],
-        ),
-        if (email.isNotEmpty) Text(email, style: textTheme.bodySmall),
-        if (bio case final bioText
-            when bioText != null && bioText.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Text(
-              bioText,
-              textAlign: TextAlign.center,
-              style: textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
-              maxLines: 5,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ],
+      ),
     );
   }
 }

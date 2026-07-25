@@ -193,6 +193,8 @@ class MovieService {
     final data = await ApiClient.get('/movies/id/$movieId/friends-activity',
         queryParams: {'userId': userId});
     final activities = (data as List<dynamic>)
+        .where(
+            (entry) => entry is Map<String, dynamic> && entry['list'] == null)
         .map((e) => MovieFriendActivity.fromJson(e as Map<String, dynamic>))
         .toList();
     return rankMovieFriendActivities(activities);

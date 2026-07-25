@@ -4,6 +4,12 @@ class MovieList {
   final String name;
   final String? description;
   final String visibility;
+  final String scope;
+  final String? groupId;
+  final String? groupName;
+  final List<MovieListCollaborator> collaborators;
+  final bool canEdit;
+  final bool isOwner;
   final String? coverImageUrl;
   final String whoCanAddMovies;
   final List<String> previewPosterUrls;
@@ -20,6 +26,12 @@ class MovieList {
     required this.name,
     this.description,
     this.visibility = ListVisibility.private,
+    this.scope = ListScope.personal,
+    this.groupId,
+    this.groupName,
+    this.collaborators = const [],
+    this.canEdit = true,
+    this.isOwner = true,
     this.coverImageUrl,
     this.whoCanAddMovies = 'owner',
     this.previewPosterUrls = const [],
@@ -38,6 +50,15 @@ class MovieList {
       name: json['name'] as String? ?? '',
       description: json['description'] as String?,
       visibility: _parseVisibility(json['visibility']?.toString()),
+      scope: (json['scope'] ?? ListScope.personal).toString().toUpperCase(),
+      groupId: json['groupId']?.toString(),
+      groupName: (json['group'] as Map<String, dynamic>?)?['name']?.toString(),
+      collaborators: (json['collaborators'] as List<dynamic>? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(MovieListCollaborator.fromJson)
+          .toList(growable: false),
+      canEdit: json['canEdit'] as bool? ?? true,
+      isOwner: json['isOwner'] as bool? ?? true,
       coverImageUrl: json['coverImageUrl']?.toString(),
       whoCanAddMovies:
           (json['whoCanAddMovies']?.toString().trim().isNotEmpty ?? false)
@@ -62,6 +83,12 @@ class MovieList {
       'name': name,
       'description': description,
       'visibility': visibility,
+      'scope': scope,
+      'groupId': groupId,
+      'groupName': groupName,
+      'collaborators': collaborators.map((entry) => entry.toJson()).toList(),
+      'canEdit': canEdit,
+      'isOwner': isOwner,
       'coverImageUrl': coverImageUrl,
       'whoCanAddMovies': whoCanAddMovies,
       'previewPosterUrls': previewPosterUrls,
@@ -83,6 +110,9 @@ class CreateMovieListRequest {
   final String visibility;
   final String? coverImageUrl;
   final String whoCanAddMovies;
+  final String scope;
+  final String? groupId;
+  final List<String> collaboratorIds;
 
   const CreateMovieListRequest({
     required this.name,
@@ -92,6 +122,9 @@ class CreateMovieListRequest {
     this.visibility = ListVisibility.private,
     this.coverImageUrl,
     this.whoCanAddMovies = 'owner',
+    this.scope = ListScope.personal,
+    this.groupId,
+    this.collaboratorIds = const [],
   });
 
   Map<String, dynamic> toJson() => {
@@ -104,6 +137,9 @@ class CreateMovieListRequest {
         if (coverImageUrl != null && coverImageUrl!.trim().isNotEmpty)
           'coverImageUrl': coverImageUrl,
         'whoCanAddItems': whoCanAddMovies,
+        'scope': scope,
+        if (groupId != null) 'groupId': groupId,
+        if (collaboratorIds.isNotEmpty) 'collaboratorIds': collaboratorIds,
       };
 }
 
@@ -135,6 +171,30 @@ class ListVisibility {
   static const String private = 'PRIVATE';
   static const String friends = 'FRIENDS';
   static const String public = 'PUBLIC';
+}
+
+class ListScope {
+  static const String personal = 'PERSONAL';
+  static const String friends = 'FRIENDS';
+  static const String group = 'GROUP';
+}
+
+class MovieListCollaborator {
+  const MovieListCollaborator({
+    required this.id,
+    required this.username,
+  });
+
+  final String id;
+  final String username;
+
+  factory MovieListCollaborator.fromJson(Map<String, dynamic> json) =>
+      MovieListCollaborator(
+        id: json['id']?.toString() ?? '',
+        username: json['username']?.toString() ?? '',
+      );
+
+  Map<String, dynamic> toJson() => {'id': id, 'username': username};
 }
 
 String _parseVisibility(String? value) {

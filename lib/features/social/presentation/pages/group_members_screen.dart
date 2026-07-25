@@ -540,6 +540,7 @@ class _MemberTile extends StatelessWidget {
         fallbackText: initials,
         fallbackColor: color,
         size: 44,
+        profileBadges: member.profileBadges,
       ),
       title: Row(
         children: [

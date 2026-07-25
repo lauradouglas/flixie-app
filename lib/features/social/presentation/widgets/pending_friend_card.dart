@@ -53,6 +53,7 @@ class PendingFriendCard extends StatelessWidget {
                       : '?'),
               fallbackColor: color,
               size: 44,
+              profileBadges: user?.profileBadges ?? const [],
             ),
             const SizedBox(width: 12),
             Expanded(

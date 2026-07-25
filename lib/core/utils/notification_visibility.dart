@@ -34,6 +34,12 @@ int visibleUnreadNotificationCount(
         .length;
 
 String? _watchLifecycleKey(FlixieNotification notification) {
+  if (notification.type == FlixieNotification.groupRequest &&
+      notification.action == FlixieNotification.actionSent) {
+    final requestId = notification.linkedRequestId;
+    if (requestId == null || requestId.isEmpty) return null;
+    return '${notification.type}:$requestId:${notification.action}';
+  }
   if (notification.type != FlixieNotification.movieWatchRequest &&
       notification.type != FlixieNotification.showWatchRequest) {
     return null;

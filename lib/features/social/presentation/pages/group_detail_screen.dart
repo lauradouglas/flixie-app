@@ -10,6 +10,7 @@ import 'package:flixie_app/models/group_watch_request.dart'
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/features/social/data/chat_service.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
+import 'package:flixie_app/features/social/data/watch_request_cache.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
@@ -89,18 +90,19 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
   }
 
   Future<void> _loadGroup() async {
+    final requestCache = context.read<WatchRequestCache>();
+    final cachedRequests = requestCache.forGroup(widget.groupId);
     setState(() {
       _loadingGroup = true;
       _loadError = null;
+      if (cachedRequests.isNotEmpty) _watchRequests = cachedRequests;
     });
     try {
-      final coreResults = await Future.wait([
+      final results = await Future.wait([
         GroupService.getGroup(widget.groupId),
         GroupService.getGroupMembers(widget.groupId),
-      ]);
-
-      final secondaryResults = await Future.wait([
-        GroupService.getGroupWatchRequests(widget.groupId)
+        requestCache
+            .refreshGroup(widget.groupId)
             .catchError((_) => <GroupWatchRequest>[]),
         GroupService.getGroupActivity(widget.groupId)
             .catchError((_) => <ActivityListItem>[]),
@@ -108,12 +110,12 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
 
       if (mounted) {
         setState(() {
-          _group = coreResults[0] as Group;
-          final members = coreResults[1] as List<GroupMember>;
+          _group = results[0] as Group;
+          final members = results[1] as List<GroupMember>;
           _memberCount = members.where((m) => m.isAccepted).length;
           _groupMembers = members;
-          _watchRequests = secondaryResults[0] as List<GroupWatchRequest>;
-          _memberActivity = secondaryResults[1] as List<ActivityListItem>;
+          _watchRequests = results[2] as List<GroupWatchRequest>;
+          _memberActivity = results[3] as List<ActivityListItem>;
           _loadingGroup = false;
         });
         // Resolve the Firestore conversationId once group + members are known.
@@ -261,9 +263,10 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
             ? null
             : TabBar(
                 controller: _tabController,
-                isScrollable: true,
-                tabAlignment: TabAlignment.start,
-                padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
+                isScrollable: false,
+                tabAlignment: TabAlignment.fill,
+                padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+                labelPadding: EdgeInsets.zero,
                 indicator: BoxDecoration(
                   color: FlixieColors.primary.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(18),

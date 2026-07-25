@@ -10,6 +10,7 @@ class FriendshipUser {
   final String? initials;
   final Map<String, dynamic>? iconColor;
   final ProfileAvatar? avatar;
+  final List<String> profileBadges;
 
   const FriendshipUser({
     required this.id,
@@ -19,6 +20,7 @@ class FriendshipUser {
     this.initials,
     this.iconColor,
     this.avatar,
+    this.profileBadges = const [],
   });
 
   factory FriendshipUser.fromJson(Map<String, dynamic> json) {
@@ -32,6 +34,10 @@ class FriendshipUser {
       avatar: json['avatar'] == null
           ? null
           : ProfileAvatar.fromJson(json['avatar'] as Map<String, dynamic>),
+      profileBadges: (json['profileBadges'] as List<dynamic>? ?? const [])
+          .map((badge) => badge is Map ? badge['badge'] : badge)
+          .whereType<String>()
+          .toList(),
     );
   }
 

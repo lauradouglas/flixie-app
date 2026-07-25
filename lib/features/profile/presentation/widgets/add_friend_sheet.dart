@@ -250,6 +250,7 @@ class _AddFriendSheetState extends State<AddFriendSheet> {
                                   : '?'),
                           fallbackColor: color,
                           size: 40,
+                          profileBadges: user.profileBadges,
                         ),
                         title: Text(user.username,
                             style: const TextStyle(color: FlixieColors.light)),

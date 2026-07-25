@@ -3,7 +3,8 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('priority screens do not import UserService or FriendService directly', () {
+  test('priority screens do not import UserService or FriendService directly',
+      () {
     const targets = <String>[
       'lib/features/home/presentation/pages/home_screen.dart',
       'lib/features/movies/presentation/pages/movie_detail_screen.dart',
@@ -14,17 +15,20 @@ void main() {
 
     for (final path in targets) {
       final content = File(path).readAsStringSync();
-      final importLines = RegExp(r'^\s*import\s+[\'"].+['"]', multiLine: true)
-          .allMatches(content)
-          .map((m) => m.group(0) ?? '')
-          .toList(growable: false);
+      final importLines =
+          RegExp(r'''^\s*import\s+['"].+['"]''', multiLine: true)
+              .allMatches(content)
+              .map((m) => m.group(0) ?? '')
+              .toList(growable: false);
       expect(
-        importLines.any((line) => line.contains('profile/data/user_service.dart')),
+        importLines
+            .any((line) => line.contains('profile/data/user_service.dart')),
         isFalse,
         reason: '$path imports user_service directly',
       );
       expect(
-        importLines.any((line) => line.contains('social/data/friend_service.dart')),
+        importLines
+            .any((line) => line.contains('social/data/friend_service.dart')),
         isFalse,
         reason: '$path imports friend_service directly',
       );

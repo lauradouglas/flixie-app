@@ -13,6 +13,7 @@ class ListsPreviewSection extends StatelessWidget {
     required this.emptyMessage,
     this.allowManage = false,
     this.embedded = false,
+    this.publicOnly = false,
   });
 
   final String userId;
@@ -20,13 +21,19 @@ class ListsPreviewSection extends StatelessWidget {
   final String emptyMessage;
   final bool allowManage;
   final bool embedded;
+  final bool publicOnly;
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<MovieList>>(
       future: UserService.getMovieLists(userId),
       builder: (context, snapshot) {
-        final lists = snapshot.data ?? const <MovieList>[];
+        final loadedLists = snapshot.data ?? const <MovieList>[];
+        final lists = publicOnly
+            ? loadedLists
+                .where((list) => list.visibility == ListVisibility.public)
+                .toList(growable: false)
+            : loadedLists;
         final content = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

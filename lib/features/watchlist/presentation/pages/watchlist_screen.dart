@@ -18,11 +18,8 @@ import 'package:flixie_app/features/movies/presentation/widgets/watch_request_sh
 import 'package:flixie_app/features/watchlist/presentation/widgets/filter_sheet.dart';
 import 'package:flixie_app/models/watch_provider.dart';
 import 'package:flixie_app/models/movie_watch_entry.dart';
-import 'package:flixie_app/models/review.dart';
 import 'package:flixie_app/features/watchlist/presentation/controllers/watchlist_actions_controller.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_sheet.dart';
-import 'package:flixie_app/features/movies/presentation/widgets/watch_follow_up_sheet.dart';
-import 'package:flixie_app/features/movies/presentation/widgets/write_review_sheet.dart';
 
 class WatchlistScreen extends StatefulWidget {
   const WatchlistScreen({super.key});
@@ -361,68 +358,40 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     }
   }
 
-  Future<void> _showWatchedFollowUps(
+  Future<bool> _confirmWatchEntry(
     WatchlistMovie item,
     String userId,
   ) async {
-    final movie = item.movie;
-    final choice = await showModalBottomSheet<WatchFollowUpChoice>(
+    var didSubmit = false;
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => WatchFollowUpSheet(
-        movieTitle: movie?.title ?? 'This movie',
-        posterPath: movie?.posterPath,
+      builder: (_) => RewatchLogSheet(
+        onSubmit: ({
+          required String watchedAt,
+          required double? rating,
+          required bool? recommended,
+          required String? notes,
+        }) async {
+          await WatchlistActionsController.instance.logMovieWatch(
+            userId,
+            LogMovieWatchRequest(
+              movieId: item.movieId,
+              watchedAt: watchedAt,
+              rating: rating,
+              recommended: recommended,
+              notes: notes,
+            ),
+          );
+          didSubmit = true;
+          if (mounted) {
+            context.read<AuthProvider>().markActivityChanged();
+          }
+        },
       ),
     );
-    if (!mounted || choice == null) return;
-
-    if (choice.addWatchEntry) {
-      await showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (_) => RewatchLogSheet(
-          onSubmit: ({
-            required String watchedAt,
-            required double? rating,
-            required bool? recommended,
-            required String? notes,
-          }) async {
-            await WatchlistActionsController.instance.logMovieWatch(
-              userId,
-              LogMovieWatchRequest(
-                movieId: item.movieId,
-                watchedAt: watchedAt,
-                rating: rating,
-                recommended: recommended,
-                notes: notes,
-              ),
-            );
-            if (mounted) {
-              context.read<AuthProvider>().markActivityChanged();
-            }
-          },
-        ),
-      );
-    }
-
-    if (mounted && choice.writeReview) {
-      await showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (_) => WriteReviewSheet(
-          movieId: item.movieId,
-          userId: userId,
-          onSubmitted: (Review review) {
-            final auth = context.read<AuthProvider>();
-            auth.invalidateCachedReviews();
-            auth.markActivityChanged();
-          },
-        ),
-      );
-    }
+    return didSubmit;
   }
 
   WatchlistMovie _entryWithMovieFallback(
@@ -478,9 +447,12 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     final authProvider = context.read<AuthProvider>();
     final user = authProvider.dbUser;
     if (user == null) return;
+    final committed = await _confirmWatchEntry(item, user.id);
+    if (!committed || !mounted) return;
 
     try {
-      // Remove from watchlist and add to watched
+      // The submitted watch entry marks the movie as watched. Only now remove
+      // it from the watchlist and update local state.
       await UserService.removeFromWatchlist(user.id, item.movieId);
       final watchedMovie =
           await UserService.addToWatched(user.id, item.movieId);
@@ -520,7 +492,6 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
             backgroundColor: FlixieColors.success,
           ),
         );
-        await _showWatchedFollowUps(item, user.id);
       }
     } catch (e) {
       debugPrint('Error marking as watched: $e');
@@ -593,6 +564,8 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
           ),
         );
         if (markWatched == true && mounted) {
+          final committed = await _confirmWatchEntry(item, user.id);
+          if (!committed || !mounted) return;
           final watchedResult =
               await UserService.addToWatched(user.id, item.movieId);
           final currentWatched =
@@ -1791,13 +1764,6 @@ class WatchlistMovieRow extends StatelessWidget {
                                 onAddToList?.call();
                               } else if (value == 'request_watch') {
                                 onRequestToWatch?.call();
-                              } else if (value == 'share') {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Share is coming soon'),
-                                    duration: Duration(seconds: 2),
-                                  ),
-                                );
                               }
                             },
                             itemBuilder: (_) => const [
@@ -1849,18 +1815,8 @@ class WatchlistMovieRow extends StatelessWidget {
                                   ),
                                 ]),
                               ),
-                              PopupMenuItem(
-                                value: 'share',
-                                child: Row(children: [
-                                  Icon(Icons.share_outlined,
-                                      color: FlixieColors.secondary, size: 20),
-                                  SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text('Share',
-                                        style: TextStyle(color: Colors.white)),
-                                  ),
-                                ]),
-                              ),
+                              // TODO(release): Restore Share when native sharing
+                              // is implemented and tested on iOS and Android.
                               PopupMenuItem(
                                 value: 'remove',
                                 child: Row(children: [

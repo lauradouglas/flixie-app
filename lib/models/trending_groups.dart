@@ -12,11 +12,9 @@ class TrendingGroupsResponse {
 
   factory TrendingGroupsResponse.fromJson(Map<String, dynamic> json) {
     return TrendingGroupsResponse(
-      summary: TrendingSummary.fromJson(
-        (json['summary'] as Map<String, dynamic>?) ?? const {},
-      ),
+      summary: TrendingSummary.fromJson(_asStringMap(json['summary'])),
       groups: (json['groups'] as List<dynamic>? ?? const <dynamic>[])
-          .whereType<Map<String, dynamic>>()
+          .map(_asStringMap)
           .map(TrendingGroup.fromJson)
           .toList(),
     );
@@ -89,9 +87,9 @@ class TrendingGroup {
       activityCount: _toInt(json['activityCount']) ?? 0,
       trendingMovies:
           (_firstValue(json, const ['trendingMovies', 'trending_movies'])
-                  as List<dynamic>? ??
-              const <dynamic>[])
-              .whereType<Map<String, dynamic>>()
+                      as List<dynamic>? ??
+                  const <dynamic>[])
+              .map(_asStringMap)
               .map(TrendingMovie.fromJson)
               .toList(),
     );
@@ -126,9 +124,9 @@ class TrendingMovie {
       tmdbId: _toInt(_firstValue(json, const ['tmdbId', 'tmdb_id'])) ??
           _toInt(_firstValue(nestedMovie, const ['id', 'tmdbId', 'tmdb_id'])),
       title: (_firstValue(
-                json,
-                const ['title', 'name', 'movieTitle'],
-              ) as String?) ??
+            json,
+            const ['title', 'name', 'movieTitle'],
+          ) as String?) ??
           (_firstValue(nestedMovie, const ['title', 'name']) as String?) ??
           '',
       posterUrl: _toImageUrl(_firstValue(json, const [
@@ -155,8 +153,11 @@ class TrendingMovie {
             'backdrop_path',
           ])),
       year: _toInt(json['year']),
-      activityCount: _toInt(_firstValue(json, const ['activityCount', 'activity_count'])) ?? 0,
-      averageRating: _toDouble(_firstValue(json, const ['averageRating', 'average_rating'])),
+      activityCount: _toInt(
+              _firstValue(json, const ['activityCount', 'activity_count'])) ??
+          0,
+      averageRating: _toDouble(
+          _firstValue(json, const ['averageRating', 'average_rating'])),
     );
   }
 }
@@ -187,6 +188,14 @@ dynamic _firstValue(Map<String, dynamic>? json, List<String> keys) {
     if (json.containsKey(key)) return json[key];
   }
   return null;
+}
+
+Map<String, dynamic> _asStringMap(dynamic value) {
+  if (value is Map<String, dynamic>) return value;
+  if (value is Map) {
+    return value.map((key, entry) => MapEntry(key.toString(), entry));
+  }
+  return const <String, dynamic>{};
 }
 
 String? _toImageUrl(dynamic value) {

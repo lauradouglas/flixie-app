@@ -182,6 +182,7 @@ class _FriendPreviewCard extends StatelessWidget {
                     : '?'),
             fallbackColor: _avatarColor,
             size: 50,
+            profileBadges: user.profileBadges,
           ),
           const SizedBox(height: 8),
           Text(

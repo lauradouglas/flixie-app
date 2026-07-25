@@ -470,6 +470,7 @@ class _FriendStoryStrip extends StatelessWidget {
                   fallbackText: initial,
                   fallbackColor: _avatarColor(friend.iconColor),
                   size: 42,
+                  profileBadges: friend.profileBadges,
                 ),
                 const SizedBox(height: 4),
                 SizedBox(
@@ -907,6 +908,7 @@ class _EnhancedFriendCard extends StatelessWidget {
                   fallbackText: initial,
                   fallbackColor: _avatarColor,
                   size: 48,
+                  profileBadges: friend.profileBadges,
                 ),
                 const Spacer(),
                 PopupMenuButton<String>(

@@ -165,11 +165,13 @@ class NotificationRequestCard extends StatelessWidget {
                   const TextSpan(text: ' for '),
                   _linkedTitleSpan(context, target),
                 ],
-                if (groupName != null && groupName.isNotEmpty)
+                if (groupName != null && groupName.isNotEmpty) ...[
+                  const TextSpan(text: ' in '),
                   TextSpan(
-                    text: ' in $groupName',
+                    text: groupName,
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
+                ],
               ],
             ),
           ),
@@ -374,11 +376,13 @@ class NotificationRequestCard extends StatelessWidget {
               const TextSpan(text: ' '),
               _linkedTitleSpan(context, title),
             ],
-            if (groupName != null && groupName.isNotEmpty)
+            if (groupName != null && groupName.isNotEmpty) ...[
+              const TextSpan(text: ' in '),
               TextSpan(
-                text: ' in $groupName',
+                text: groupName,
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
+            ],
           ],
         ),
       );

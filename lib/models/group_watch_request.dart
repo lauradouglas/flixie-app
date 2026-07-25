@@ -1,3 +1,5 @@
+import 'package:flixie_app/models/profile_avatar.dart';
+
 /// Status of a watch request in a group or friend conversation.
 enum WatchRequestStatus {
   open,
@@ -171,6 +173,8 @@ class GroupRequestMessage {
   final int downVotes;
   final String? createdAt;
   final String? username;
+  final ProfileAvatar? avatar;
+  final List<String> profileBadges;
 
   const GroupRequestMessage({
     required this.id,
@@ -180,6 +184,8 @@ class GroupRequestMessage {
     this.downVotes = 0,
     this.createdAt,
     this.username,
+    this.avatar,
+    this.profileBadges = const [],
   });
 
   factory GroupRequestMessage.fromJson(Map<String, dynamic> json) {
@@ -200,22 +206,38 @@ class GroupRequestMemberStatus {
   final String status;
   final String? response;
   final String? username;
+  final ProfileAvatar? avatar;
+  final List<String> profileBadges;
 
   const GroupRequestMemberStatus({
     required this.memberId,
     required this.status,
     this.response,
     this.username,
+    this.avatar,
+    this.profileBadges = const [],
   });
 
   factory GroupRequestMemberStatus.fromJson(Map<String, dynamic> json) {
+    final responder = json['responder'] as Map<String, dynamic>?;
     return GroupRequestMemberStatus(
       memberId: (json['responderId'] ?? json['memberId'])?.toString() ?? '',
       status: _normalizedResponseStatus(
         json['status'] ?? json['decision'] ?? json['response'],
       ),
       response: json['response']?.toString(),
-      username: json['username'] as String?,
+      username: (responder?['username'] ?? json['username']) as String?,
+      avatar: (responder?['avatar'] ?? json['avatar']) == null
+          ? null
+          : ProfileAvatar.fromJson(
+              (responder?['avatar'] ?? json['avatar']) as Map<String, dynamic>,
+            ),
+      profileBadges: ((responder?['profileBadges'] ?? json['profileBadges'])
+                  as List<dynamic>? ??
+              const [])
+          .map((badge) => badge is Map ? badge['badge'] : badge)
+          .whereType<String>()
+          .toList(),
     );
   }
 }
@@ -235,6 +257,8 @@ class GroupWatchRequest {
   final String? movieTitle;
   final String? moviePosterPath;
   final String? requesterUsername;
+  final ProfileAvatar? requesterAvatar;
+  final List<String> requesterProfileBadges;
   final List<GroupRequestMemberStatus> memberStatuses;
   final List<GroupRequestMessage> messages;
 
@@ -271,6 +295,8 @@ class GroupWatchRequest {
     this.movieTitle,
     this.moviePosterPath,
     this.requesterUsername,
+    this.requesterAvatar,
+    this.requesterProfileBadges = const [],
     this.memberStatuses = const [],
     this.messages = const [],
     this.status = WatchRequestStatus.open,
@@ -343,6 +369,16 @@ class GroupWatchRequest {
           json['moviePosterPath'] as String?,
       requesterUsername: requester?['username'] as String? ??
           json['requesterUsername'] as String?,
+      requesterAvatar: requester?['avatar'] == null
+          ? null
+          : ProfileAvatar.fromJson(
+              requester!['avatar'] as Map<String, dynamic>,
+            ),
+      requesterProfileBadges:
+          (requester?['profileBadges'] as List<dynamic>? ?? const [])
+              .map((badge) => badge is Map ? badge['badge'] : badge)
+              .whereType<String>()
+              .toList(),
       memberStatuses: statusList,
       messages: messagesRaw
           .map((e) => GroupRequestMessage.fromJson(e as Map<String, dynamic>))

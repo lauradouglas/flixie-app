@@ -222,15 +222,13 @@ class _GroupsSubViewState extends State<GroupsSubView> {
           onChanged: (i) => setState(() => _innerTab = i),
         ),
         Expanded(
-          child: _innerTab == 1
-              ? _buildDiscoverTab()
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  color: FlixieColors.primary,
-                  child: _innerTab == 2
-                      ? _buildRequestsTab(pendingGroups)
-                      : _buildMyGroupsTab(pendingGroups, myGroups),
-                ),
+          child: RefreshIndicator(
+            onRefresh: _load,
+            color: FlixieColors.primary,
+            child: _innerTab == 1
+                ? _buildRequestsTab(pendingGroups)
+                : _buildMyGroupsTab(pendingGroups, myGroups),
+          ),
         ),
       ],
     );
@@ -303,19 +301,8 @@ class _GroupsSubViewState extends State<GroupsSubView> {
     );
   }
 
-  Widget _buildDiscoverTab() {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(32),
-        child: Text(
-          'Discover groups\ncoming soon',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: FlixieColors.medium, fontSize: 15),
-        ),
-      ),
-    );
-  }
-
+  // TODO(release): Restore the Discover tab when public group discovery is
+  // implemented, moderated, and ready for App Review.
   Widget _buildRequestsTab(List<Group> pendingGroups) {
     if (pendingGroups.isEmpty) {
       return const Center(
@@ -365,9 +352,9 @@ class _GroupsTabBar extends StatelessWidget {
         children: [
           _tab(0, 'My Groups'),
           const SizedBox(width: 8),
-          _tab(1, 'Discover'),
-          const SizedBox(width: 8),
-          _tab(2, 'Requests'),
+          // TODO(release): Restore Discover when public group discovery is
+          // implemented and moderated.
+          _tab(1, 'Requests'),
         ],
       ),
     );
@@ -375,7 +362,7 @@ class _GroupsTabBar extends StatelessWidget {
 
   Widget _tab(int index, String label) {
     final selected = index == selectedIndex;
-    final showBadge = index == 2 && pendingCount > 0;
+    final showBadge = index == 1 && pendingCount > 0;
     return GestureDetector(
       onTap: () => onChanged(index),
       child: AnimatedContainer(

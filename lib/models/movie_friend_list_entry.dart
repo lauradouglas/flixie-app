@@ -1,7 +1,10 @@
+import 'package:flixie_app/models/profile_avatar.dart';
+
 class MovieFriendListEntry {
   final String friendUserId;
   final String friendName;
   final String? friendAvatarUrl;
+  final ProfileAvatar? friendAvatar;
   final String listId;
   final String listName;
   final int? movieCount;
@@ -12,6 +15,7 @@ class MovieFriendListEntry {
     required this.friendUserId,
     required this.friendName,
     this.friendAvatarUrl,
+    this.friendAvatar,
     required this.listId,
     required this.listName,
     this.movieCount,
@@ -20,12 +24,16 @@ class MovieFriendListEntry {
   });
 
   factory MovieFriendListEntry.fromJson(Map<String, dynamic> json) {
-    final user = (json['friend'] ?? json['user']) as Map<String, dynamic>? ?? {};
+    final user =
+        (json['friend'] ?? json['user']) as Map<String, dynamic>? ?? {};
     final list = json['list'] as Map<String, dynamic>? ?? json;
     return MovieFriendListEntry(
       friendUserId: user['id']?.toString() ?? '',
       friendName: (user['username'] ?? user['firstName'] ?? '').toString(),
       friendAvatarUrl: user['profilePictureUrl']?.toString(),
+      friendAvatar: user['avatar'] is Map<String, dynamic>
+          ? ProfileAvatar.fromJson(user['avatar'] as Map<String, dynamic>)
+          : null,
       listId: list['id']?.toString() ?? '',
       listName: (list['name'] ?? '').toString(),
       movieCount: _parseInt(list['movieCount']),

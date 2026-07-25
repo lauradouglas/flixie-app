@@ -27,6 +27,7 @@ import 'package:flixie_app/features/movies/presentation/widgets/friend_summary_s
 import 'package:flixie_app/features/movies/presentation/widgets/external_links_section.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/film_info_card.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/friend_activity_row.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/genre_chip.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/hero_backdrop.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/add_to_list_sheet.dart';
@@ -36,7 +37,6 @@ import 'package:flixie_app/features/movies/presentation/widgets/similar_card.dar
 import 'package:flixie_app/features/movies/presentation/widgets/video_card.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/watch_provider_card.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/watch_request_sheet.dart';
-import 'package:flixie_app/features/movies/presentation/widgets/watch_follow_up_sheet.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/write_review_sheet.dart';
 
 // ---------------------------------------------------------------------------
@@ -369,21 +369,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               ),
             );
             if (markWatched == true && mounted) {
-              final watchedResult = await WatchlistActionsController.instance
-                  .addToWatched(user.id, movieId);
-              final updatedWatched =
-                  List<WatchedMovie>.from(user.watchedMovies ?? []);
-              updatedWatched.removeWhere((item) => item.movieId == movieId);
-              updatedWatched.add(watchedResult ??
-                  WatchedMovie(
-                    id: '',
-                    userId: user.id,
-                    movieId: movieId,
-                    watchedAt: DateTime.now().toIso8601String(),
-                  ));
-              setState(() => _isWatched = true);
-              authProvider.updateUserList(watchedMovies: updatedWatched);
-              authProvider.markActivityChanged();
+              final committed = await _showLogWatchSheet();
+              if (committed && mounted) {
+                setState(() => _isWatched = true);
+              }
             }
           }
         }
@@ -406,38 +395,16 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
     if (user == null || movieId == null) return;
 
-    // Mark it first, then let the user optionally add a detailed watch entry
-    // and/or public review through the same flow used by watch requests.
     if (!_isWatched) {
       setState(() => _currentlyUpdating = ListUpdateType.watched);
       try {
-        final watchedResult = await WatchlistActionsController.instance
-            .addToWatched(user.id, movieId);
+        final committed = await _showLogWatchSheet();
         if (!mounted) return;
-        final updatedWatched = List<WatchedMovie>.from(user.watchedMovies ?? [])
-          ..removeWhere((item) => item.movieId == movieId)
-          ..add(watchedResult ??
-              WatchedMovie(
-                id: '',
-                userId: user.id,
-                movieId: movieId,
-                watchedAt: DateTime.now().toIso8601String(),
-              ));
         setState(() {
-          _isWatched = true;
+          if (committed) _isWatched = true;
           _currentlyUpdating = null;
         });
-        authProvider.updateUserList(watchedMovies: updatedWatched);
-        authProvider.markActivityChanged();
-        // The backend represents a watched movie with a MovieWatchEntry. Load
-        // the entry it just created so the optional details form updates that
-        // same watch instead of logging a second watch.
-        await _loadWatchHistory(user.id, movieId);
-        HapticFeedback.lightImpact();
-        await _showWatchedFollowUps(
-          initialEntry:
-              _movieWatchHistory.isEmpty ? null : _movieWatchHistory.first,
-        );
+        if (committed) HapticFeedback.lightImpact();
       } catch (e) {
         logger.e('Error marking movie watched: $e');
         if (mounted) {
@@ -479,23 +446,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         );
       }
     }
-  }
-
-  Future<void> _showWatchedFollowUps({MovieWatchEntry? initialEntry}) async {
-    final choice = await showModalBottomSheet<WatchFollowUpChoice>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => WatchFollowUpSheet(
-        movieTitle: _movie?.title ?? 'This movie',
-        posterPath: _movie?.posterPath,
-      ),
-    );
-    if (!mounted || choice == null) return;
-    if (choice.addWatchEntry) {
-      await _showLogWatchSheet(entry: initialEntry);
-    }
-    if (mounted && choice.writeReview) await _showWriteReviewSheet(context);
   }
 
   Future<void> _toggleFavorite() async {
@@ -577,12 +527,13 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     }
   }
 
-  Future<void> _showLogWatchSheet({MovieWatchEntry? entry}) async {
+  Future<bool> _showLogWatchSheet({MovieWatchEntry? entry}) async {
     final movieId = int.tryParse(widget.movieId);
     final authProvider = context.read<AuthProvider>();
     final movieService = context.read<MovieService>();
     final userId = authProvider.dbUser?.id;
-    if (movieId == null || userId == null) return;
+    if (movieId == null || userId == null) return false;
+    var didSubmit = false;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -624,6 +575,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   ));
               authProvider.updateUserList(watchedMovies: updatedWatched);
               authProvider.markActivityChanged();
+              didSubmit = true;
               // Offer watchlist removal if applicable
               if (_inWatchlist && mounted) {
                 final remove = await showDialog<bool>(
@@ -672,6 +624,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   notes: notes,
                 ),
               );
+              didSubmit = true;
             }
             await _loadWatchHistory(userId, movieId);
             // Evict the cache and re-fetch the movie so the updated
@@ -701,6 +654,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         },
       ),
     );
+    return didSubmit;
   }
 
   Future<void> _deleteWatchEntry(MovieWatchEntry entry) async {
@@ -747,7 +701,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     (FriendActivityTab.watchlist, 'Watchlist'),
     (FriendActivityTab.ratings, 'Ratings'),
     (FriendActivityTab.reviews, 'Recommendations'),
-    (FriendActivityTab.lists, 'Lists'),
+    // TODO(release): Restore the Lists filter when list activity is returned
+    // by the friends activity API.
   ];
 
   String _contentRating(Movie movie) {
@@ -950,17 +905,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                         const Spacer(),
                         Row(
                           children: [
-                            _heroIconButton(
-                              icon: Icons.share_outlined,
-                              onTap: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Share is coming soon'),
-                                  ),
-                                );
-                              },
-                            ),
-                            const SizedBox(width: 10),
+                            // TODO(release): Restore the Share action when
+                            // native sharing is implemented and tested.
                             PopupMenuButton<String>(
                               tooltip: 'More actions',
                               padding: EdgeInsets.zero,
@@ -2316,9 +2262,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               Text(
                 _friendsActivity.isEmpty
                     ? 'No friend activity yet for this movie.'
-                    : _friendsActivityTab == FriendActivityTab.lists
-                        ? 'Lists activity is coming soon.'
-                        : 'No ${_friendTabLabel(_friendsActivityTab).toLowerCase()} activity yet.',
+                    : 'No ${_friendTabLabel(_friendsActivityTab).toLowerCase()} activity yet.',
                 style: const TextStyle(color: FlixieColors.medium),
               )
             else
@@ -2556,7 +2500,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                         (list) => ListTile(
                           contentPadding: EdgeInsets.zero,
                           title: Text(list.name),
-                          subtitle: Text('${list.movieCount ?? 0} films'),
+                          subtitle: Text('${list.movieCount ?? 0} film(s)t'),
                           trailing: const Icon(
                             Icons.check_circle,
                             color: FlixieColors.primary,
@@ -2623,19 +2567,14 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                         ..._friendsListsContainingMovie.take(6).map(
                               (entry) => ListTile(
                                 contentPadding: EdgeInsets.zero,
-                                leading: CircleAvatar(
-                                  backgroundColor: FlixieColors.primary
-                                      .withValues(alpha: 0.2),
-                                  child: Text(
-                                    (entry.friendName.isNotEmpty
-                                            ? entry.friendName[0]
-                                            : '?')
-                                        .toUpperCase(),
-                                    style: const TextStyle(
-                                      color: FlixieColors.primary,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                leading: ProfileAvatarView(
+                                  avatar: entry.friendAvatar,
+                                  fallbackText: (entry.friendName.isNotEmpty
+                                          ? entry.friendName[0]
+                                          : '?')
+                                      .toUpperCase(),
+                                  fallbackColor: FlixieColors.primary,
+                                  size: 40,
                                 ),
                                 title: Text(
                                   "${entry.friendName} · ${entry.listName}",
@@ -2646,6 +2585,15 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                                 ),
                                 subtitle:
                                     Text('${entry.movieCount ?? 0} films'),
+                                trailing: const Icon(
+                                  Icons.chevron_right_rounded,
+                                  color: FlixieColors.medium,
+                                ),
+                                onTap: () => context.push(
+                                  '/movie-lists/${entry.listId}'
+                                  '?name=${Uri.encodeComponent(entry.listName)}'
+                                  '&owner=${Uri.encodeComponent(entry.friendUserId)}',
+                                ),
                               ),
                             ),
                       ],

@@ -11,6 +11,7 @@ class GroupMember {
   final Map<String, dynamic>? iconColor;
   final String? initials;
   final ProfileAvatar? avatar;
+  final List<String> profileBadges;
 
   const GroupMember({
     required this.groupId,
@@ -23,6 +24,7 @@ class GroupMember {
     this.iconColor,
     this.initials,
     this.avatar,
+    this.profileBadges = const [],
   });
 
   factory GroupMember.fromJson(Map<String, dynamic> json) {
@@ -42,6 +44,12 @@ class GroupMember {
           ? null
           : ProfileAvatar.fromJson(
               (user?['avatar'] ?? json['avatar']) as Map<String, dynamic>),
+      profileBadges: ((user?['profileBadges'] ?? json['profileBadges'])
+                  as List<dynamic>? ??
+              const [])
+          .map((badge) => badge is Map ? badge['badge'] : badge)
+          .whereType<String>()
+          .toList(),
     );
   }
 
@@ -57,6 +65,7 @@ class GroupMember {
       'iconColor': iconColor,
       'initials': initials,
       'avatar': avatar?.toJson(),
+      'profileBadges': profileBadges,
     };
   }
 

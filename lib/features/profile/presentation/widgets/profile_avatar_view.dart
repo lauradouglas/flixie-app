@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flixie_app/models/profile_avatar.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/features/profile/data/avatar_service.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_badges.dart';
 
 class ProfileAvatarView extends StatefulWidget {
   const ProfileAvatarView({
@@ -12,12 +13,14 @@ class ProfileAvatarView extends StatefulWidget {
     required this.fallbackText,
     required this.fallbackColor,
     this.size = 44,
+    this.profileBadges = const [],
   });
 
   final ProfileAvatar? avatar;
   final String fallbackText;
   final Color fallbackColor;
   final double size;
+  final List<String> profileBadges;
 
   @override
   State<ProfileAvatarView> createState() => _ProfileAvatarViewState();
@@ -61,6 +64,14 @@ class _ProfileAvatarViewState extends State<ProfileAvatarView> {
 
   @override
   Widget build(BuildContext context) {
+    final avatar = _buildAvatar();
+    return SpecialAvatarFrame(
+      badges: widget.profileBadges,
+      child: avatar,
+    );
+  }
+
+  Widget _buildAvatar() {
     if (_url == null) return _fallback();
     return Semantics(
       image: true,

@@ -19,6 +19,9 @@ class MovieFeaturesRepository {
     String visibility = ListVisibility.private,
     String? coverImageUrl,
     String whoCanAddMovies = 'owner',
+    String scope = ListScope.personal,
+    String? groupId,
+    List<String> collaboratorIds = const [],
   }) {
     return UserService.createMovieList(
       userId,
@@ -28,6 +31,9 @@ class MovieFeaturesRepository {
         visibility: visibility,
         coverImageUrl: coverImageUrl,
         whoCanAddMovies: whoCanAddMovies,
+        scope: scope,
+        groupId: groupId,
+        collaboratorIds: collaboratorIds,
       ),
     );
   }

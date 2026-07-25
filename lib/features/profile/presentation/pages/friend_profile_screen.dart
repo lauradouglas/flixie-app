@@ -9,6 +9,7 @@ import 'package:flixie_app/features/social/data/friend_service.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_badges.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/mini_stats.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/taste_compatibility_card.dart';
@@ -18,13 +19,19 @@ import 'package:flixie_app/features/profile/presentation/widgets/lists_preview_s
 import 'package:flixie_app/features/profile/presentation/widgets/movie_taste_badge.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_stats_row.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/friend_wrapped_section.dart';
+import 'package:flixie_app/core/safety/safety_actions.dart';
 
 enum _FriendshipStatus { none, pending, requested, friends }
 
 class FriendProfileScreen extends StatefulWidget {
   final String userId;
+  final bool previewMode;
 
-  const FriendProfileScreen({super.key, required this.userId});
+  const FriendProfileScreen({
+    super.key,
+    required this.userId,
+    this.previewMode = false,
+  });
 
   @override
   State<FriendProfileScreen> createState() => _FriendProfileScreenState();
@@ -76,29 +83,6 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     }
   }
 
-  Widget _buildTopStat({required String label, required String value}) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            color: FlixieColors.light,
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: const TextStyle(
-            color: FlixieColors.medium,
-            fontSize: 11,
-          ),
-        ),
-      ],
-    );
-  }
-
   Future<void> _loadReviews() async {
     try {
       final reviews = await UserService.getUserMovieReviews(widget.userId);
@@ -115,7 +99,9 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
   }
 
   Future<void> _loadCompatibility() async {
-    final myId = context.read<AuthProvider>().dbUser?.id;
+    final currentUser = context.read<AuthProvider>().dbUser;
+    final myId = currentUser?.id;
+    final myFavoriteMovies = currentUser?.favoriteMovies;
     if (myId == null) {
       if (mounted) setState(() => _compatibilityLoading = false);
       return;
@@ -132,8 +118,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       final sharedIds = myMap.keys.where(friendMap.containsKey).toList();
 
       // Factor in favourite movies
-      final myFavIds = _extractFavMovieIds(
-          context.read<AuthProvider>().dbUser?.favoriteMovies);
+      final myFavIds = _extractFavMovieIds(myFavoriteMovies);
       final friendFavIds = _extractFavMovieIds(_user?.favoriteMovies);
       final sharedFavIds = myFavIds.intersection(friendFavIds);
 
@@ -441,6 +426,26 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     return FlixieColors.primary;
   }
 
+  String get _memberSinceLabel {
+    final joined = DateTime.tryParse(_user?.createdAt ?? '');
+    if (joined == null) return 'Member';
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
+    return 'Member since ${months[joined.month - 1]} ${joined.year}';
+  }
+
   void _openWrappedSheet() {
     final user = _user;
     if (user == null) return;
@@ -478,9 +483,12 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final profileName = _user?.firstName?.trim().isNotEmpty == true
+    final profileName = _user?.username ?? 'Profile';
+    final visibleFirstName = !widget.previewMode &&
+            _friendshipStatus == _FriendshipStatus.friends &&
+            _user?.firstName?.trim().isNotEmpty == true
         ? _user!.firstName!.trim()
-        : _user?.username ?? 'Profile';
+        : null;
     final visibleReviews = _showAllReviews
         ? _reviews
         : _reviews.take(_initialReviewCount).toList();
@@ -493,11 +501,56 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(profileName),
+        title:
+            Text(widget.previewMode ? 'Public profile preview' : profileName),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
         ),
+        actions: [
+          if (!widget.previewMode && _user != null)
+            PopupMenuButton<String>(
+              tooltip: 'Profile actions',
+              onSelected: (action) async {
+                if (action == 'report') {
+                  await SafetyActions.report(
+                    context,
+                    targetType: 'USER',
+                    targetId: widget.userId,
+                    reportedUserId: widget.userId,
+                  );
+                } else if (action == 'block') {
+                  final blocked = await SafetyActions.block(
+                    context,
+                    userId: widget.userId,
+                    username: _user!.username,
+                  );
+                  if (blocked && context.mounted) context.pop();
+                }
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(
+                  value: 'report',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.flag_outlined),
+                    title: Text('Report user'),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'block',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.block, color: FlixieColors.danger),
+                    title: Text(
+                      'Block user',
+                      style: TextStyle(color: FlixieColors.danger),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+        ],
       ),
       body: _userLoading
           ? const Center(child: CircularProgressIndicator())
@@ -507,68 +560,116 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                 children: [
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+                    padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(18),
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          FlixieColors.surfaceElevated,
-                          FlixieColors.surface,
-                        ],
-                      ),
+                      color: FlixieColors.surface,
                       border: Border.all(
                         color: FlixieColors.tabBarBorder.withValues(alpha: 0.9),
                       ),
                     ),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        ProfileAvatarView(
-                          avatar: _user?.avatar,
-                          fallbackText: _user?.initials ??
-                              (_user?.username.isNotEmpty == true
-                                  ? _user!.username[0].toUpperCase()
-                                  : '?'),
-                          fallbackColor: _avatarColor,
-                          size: 92,
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          profileName,
-                          style: textTheme.headlineSmall,
+                        Row(
+                          children: [
+                            ProfileAvatarView(
+                              avatar: _user?.avatar,
+                              fallbackText: _user?.initials ??
+                                  (_user?.username.isNotEmpty == true
+                                      ? _user!.username[0].toUpperCase()
+                                      : '?'),
+                              fallbackColor: _avatarColor,
+                              size: 88,
+                              profileBadges: _user?.profileBadges ?? const [],
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          '@${_user?.username ?? 'user'}',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style:
+                                              textTheme.headlineSmall?.copyWith(
+                                            color: FlixieColors.light,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                      ),
+                                      if (_user?.profileBadges.isNotEmpty ==
+                                          true) ...[
+                                        const SizedBox(width: 8),
+                                        ProfileBadgePills(
+                                          badges: _user!.profileBadges,
+                                          compact: true,
+                                          featuredOnly: true,
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  if (visibleFirstName != null) ...[
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      visibleFirstName,
+                                      style: textTheme.bodyLarge?.copyWith(
+                                        color: FlixieColors.light,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 7),
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.calendar_month_outlined,
+                                        size: 15,
+                                        color: FlixieColors.medium,
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        _memberSinceLabel,
+                                        style: textTheme.bodySmall?.copyWith(
+                                          color: FlixieColors.medium,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                         if (_user?.bio case final bioText
                             when bioText != null && bioText.isNotEmpty) ...[
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 16),
                           Text(
                             bioText,
-                            textAlign: TextAlign.center,
-                            style: textTheme.bodySmall
-                                ?.copyWith(color: FlixieColors.light),
-                            maxLines: 3,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: FlixieColors.light,
+                              height: 1.45,
+                            ),
+                            maxLines: 4,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ],
-                        const SizedBox(height: 14),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            _buildTopStat(
-                                label: 'Reviews', value: '${_reviews.length}'),
-                            _buildTopStat(
-                                label: 'Watchlist', value: '$watchlistCount'),
-                            _buildTopStat(
-                                label: 'Favourites', value: '$favoritesCount'),
-                          ],
-                        ),
                       ],
                     ),
                   ),
 
-                  const SizedBox(height: 14),
-                  SizedBox(
-                      width: double.infinity, child: _buildFriendshipButton()),
+                  if (!widget.previewMode) ...[
+                    const SizedBox(height: 14),
+                    SizedBox(
+                        width: double.infinity,
+                        child: _buildFriendshipButton()),
+                  ],
                   const SizedBox(height: 16),
 
                   ProfileStatsRow(
@@ -583,6 +684,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                     title: "${_user?.username ?? 'Friend'}'s Lists",
                     emptyMessage:
                         "No visible lists yet or this friend hasn't created one.",
+                    publicOnly: widget.previewMode,
                   ),
 
                   // Taste compatibility

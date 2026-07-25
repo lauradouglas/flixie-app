@@ -29,6 +29,7 @@ class FriendAvatar extends StatelessWidget {
               (user.username.isNotEmpty ? user.username[0].toUpperCase() : '?'),
           fallbackColor: _avatarColor,
           size: 76,
+          profileBadges: user.profileBadges,
         ),
         const SizedBox(height: 4),
         SizedBox(

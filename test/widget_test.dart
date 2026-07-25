@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:flixie_app/models/group_watch_request.dart';
+import 'package:flixie_app/models/user.dart' as model;
 import 'package:flixie_app/core/auth/auth_provider.dart' as app_auth;
 import 'package:flixie_app/core/auth/auth_service.dart';
 import 'package:flixie_app/features/movies/data/movie_service.dart';
@@ -23,7 +24,21 @@ class _FakeUser extends Fake implements User {
   String? get email => 'test@example.com';
   @override
   String? get photoURL => null;
+
+  @override
+  Future<String?> getIdToken([bool forceRefresh = false]) async => 'test-token';
 }
+
+const _databaseUser = model.User(
+  id: 'database-user-id',
+  firstName: 'Test',
+  lastName: 'User',
+  username: 'test-user',
+  email: 'test@example.com',
+  iconColorId: 1,
+  completedSetup: true,
+  darkMode: true,
+);
 
 class _FakeAuthService extends Fake implements AuthService {
   final _controller = StreamController<User?>.broadcast();
@@ -43,6 +58,8 @@ class _FakeAuthService extends Fake implements AuthService {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('FlixieColors', () {
     test('primary color has correct value', () {
       expect(FlixieColors.primary, const Color(0xFF9B6BFF));
@@ -99,10 +116,18 @@ void main() {
 
     setUp(() {
       fakeAuth = _FakeAuthService();
-      authProvider = app_auth.AuthProvider(fakeAuth, MovieService());
+      authProvider = app_auth.AuthProvider(
+        fakeAuth,
+        MovieService(),
+        prefetchAfterAuth: false,
+        profileLoader: (_) async => _databaseUser,
+      );
     });
 
-    tearDown(() => fakeAuth.close());
+    tearDown(() {
+      authProvider.dispose();
+      fakeAuth.close();
+    });
 
     test('initial status is unknown', () {
       expect(authProvider.status, app_auth.AuthStatus.unknown);
@@ -110,7 +135,7 @@ void main() {
 
     test('status becomes authenticated when user emitted', () async {
       fakeAuth.emitUser(_FakeUser());
-      await Future<void>.delayed(Duration.zero);
+      await pumpEventQueue();
       expect(authProvider.status, app_auth.AuthStatus.authenticated);
       expect(authProvider.isAuthenticated, isTrue);
       expect(authProvider.firebaseUser?.email, 'test@example.com');
@@ -118,9 +143,9 @@ void main() {
 
     test('status becomes unauthenticated when null emitted', () async {
       fakeAuth.emitUser(_FakeUser());
-      await Future<void>.delayed(Duration.zero);
+      await pumpEventQueue();
       fakeAuth.emitUser(null);
-      await Future<void>.delayed(Duration.zero);
+      await pumpEventQueue();
       expect(authProvider.status, app_auth.AuthStatus.unauthenticated);
       expect(authProvider.isAuthenticated, isFalse);
       expect(authProvider.firebaseUser, isNull);

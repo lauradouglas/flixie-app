@@ -1,9 +1,25 @@
 import 'package:flixie_app/models/show.dart';
+import 'package:flixie_app/models/continue_watching_show.dart';
 import 'package:flixie_app/models/review.dart';
 import 'package:flixie_app/models/watch_provider.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 
 class ShowService {
+  static Future<List<ContinueWatchingShow>> getContinueWatching(
+    String userId, {
+    int limit = 10,
+  }) async {
+    final data = await ApiClient.get(
+      '/users/$userId/shows/continue-watching',
+      queryParams: {'limit': '$limit'},
+    );
+    return (data as List<dynamic>)
+        .map((item) => ContinueWatchingShow.fromJson(
+              item as Map<String, dynamic>,
+            ))
+        .toList();
+  }
+
   static Future<TvShow> getShowById(int id, {String? userId}) async {
     final data = await ApiClient.get(
       '/shows/id/$id',

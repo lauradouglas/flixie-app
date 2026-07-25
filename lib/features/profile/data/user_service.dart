@@ -1,5 +1,6 @@
 import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/models/movie_list.dart';
+import 'package:flixie_app/models/movie_list_membership.dart';
 import 'package:flixie_app/models/movie_friend_list_entry.dart';
 import 'package:flixie_app/models/movie_list_movie.dart';
 import 'package:flixie_app/models/movie_watch_entry.dart';
@@ -504,6 +505,43 @@ class UserService {
     await _withMovieListsBasePath(
       userId,
       (basePath) => ApiClient.delete('$basePath/$listId'),
+    );
+  }
+
+  static Future<MovieListMembership> getMovieListMembers(
+    String userId,
+    String listId,
+  ) async {
+    final data = await _withMovieListsBasePath(
+      userId,
+      (basePath) => ApiClient.get('$basePath/$listId/members'),
+    );
+    return MovieListMembership.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<void> addMovieListMember(
+    String userId,
+    String listId,
+    String collaboratorId,
+  ) async {
+    await _withMovieListsBasePath(
+      userId,
+      (basePath) => ApiClient.post(
+        '$basePath/$listId/members',
+        body: {'collaboratorId': collaboratorId},
+      ),
+    );
+  }
+
+  static Future<void> removeMovieListMember(
+    String userId,
+    String listId,
+    String collaboratorId,
+  ) async {
+    await _withMovieListsBasePath(
+      userId,
+      (basePath) =>
+          ApiClient.delete('$basePath/$listId/members/$collaboratorId'),
     );
   }
 

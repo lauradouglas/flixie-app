@@ -40,6 +40,9 @@ class MovieListsProvider extends ChangeNotifier {
     String visibility = ListVisibility.private,
     String? coverImageUrl,
     String whoCanAddMovies = 'owner',
+    String scope = ListScope.personal,
+    String? groupId,
+    List<String> collaboratorIds = const [],
   }) async {
     try {
       final created = await repository.createMovieList(
@@ -49,6 +52,9 @@ class MovieListsProvider extends ChangeNotifier {
         visibility: visibility,
         coverImageUrl: coverImageUrl,
         whoCanAddMovies: whoCanAddMovies,
+        scope: scope,
+        groupId: groupId,
+        collaboratorIds: collaboratorIds,
       );
       lists = [...lists, created]
         ..sort((a, b) => (a.createdAt ?? '').compareTo(b.createdAt ?? ''));

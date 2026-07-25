@@ -72,7 +72,8 @@ void main() {
       expect(removed, isTrue);
     });
 
-    testWidgets('overflow menu includes expanded quick actions', (tester) async {
+    testWidgets('overflow menu includes expanded quick actions',
+        (tester) async {
       await tester.pumpWidget(
         _wrap(
           WatchlistMovieRow(
@@ -92,7 +93,7 @@ void main() {
       expect(find.text('Add to favourites'), findsOneWidget);
       expect(find.text('Add to list'), findsOneWidget);
       expect(find.text('Invite friends'), findsOneWidget);
-      expect(find.text('Share'), findsOneWidget);
+      expect(find.text('Share'), findsNothing);
       expect(find.text('Remove'), findsOneWidget);
     });
   });

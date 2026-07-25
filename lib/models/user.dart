@@ -26,6 +26,7 @@ class User {
   final Map<String, dynamic>? language;
   final Map<String, dynamic>? iconColor;
   final ProfileAvatar? avatar;
+  final List<String> profileBadges;
 
   // Lists
   final List<WatchedMovie>? watchedMovies;
@@ -57,6 +58,7 @@ class User {
     this.language,
     this.iconColor,
     this.avatar,
+    this.profileBadges = const [],
     this.watchedMovies,
     this.watchedShows,
     this.movieWatchlist,
@@ -90,6 +92,10 @@ class User {
       avatar: json['avatar'] == null
           ? null
           : ProfileAvatar.fromJson(json['avatar'] as Map<String, dynamic>),
+      profileBadges: (json['profileBadges'] as List<dynamic>? ?? const [])
+          .map((badge) => badge is Map ? badge['badge'] : badge)
+          .whereType<String>()
+          .toList(),
       watchedMovies: json['watchedMovies'] != null
           ? (json['watchedMovies'] as List<dynamic>)
               .map((e) => WatchedMovie.fromJson(e as Map<String, dynamic>))
@@ -168,6 +174,7 @@ class User {
     Map<String, dynamic>? language,
     Map<String, dynamic>? iconColor,
     ProfileAvatar? avatar,
+    List<String>? profileBadges,
     bool clearAvatar = false,
     List<WatchedMovie>? watchedMovies,
     List<dynamic>? watchedShows,
@@ -198,6 +205,7 @@ class User {
       language: language ?? this.language,
       iconColor: iconColor ?? this.iconColor,
       avatar: clearAvatar ? null : avatar ?? this.avatar,
+      profileBadges: profileBadges ?? this.profileBadges,
       watchedMovies: watchedMovies ?? this.watchedMovies,
       watchedShows: watchedShows ?? this.watchedShows,
       movieWatchlist: movieWatchlist ?? this.movieWatchlist,
@@ -230,6 +238,7 @@ class User {
       'language': language,
       'iconColor': iconColor,
       'avatar': avatar?.toJson(),
+      'profileBadges': profileBadges,
       'watchedMovies': watchedMovies?.map((e) => e.toJson()).toList(),
       'watchedShows': watchedShows,
       'movieWatchlist': movieWatchlist?.map((e) => e.toJson()).toList(),

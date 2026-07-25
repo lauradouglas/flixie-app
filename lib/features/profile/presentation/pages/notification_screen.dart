@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'package:flixie_app/models/notification.dart';
@@ -822,6 +823,15 @@ class _NotificationScreenState extends State<NotificationScreen> {
       notification: notification,
       formatDate: _formatDate,
       onClose: () => _closeNotification(notification),
+      onOpen: notification.route == null
+          ? null
+          : () async {
+              final id = notification.id;
+              if (id != null && !notification.isRead) {
+                await NotificationService.updateNotification(id, read: true);
+              }
+              if (mounted) context.push(notification.route!);
+            },
     );
   }
 }

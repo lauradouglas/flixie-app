@@ -11,11 +11,14 @@ import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/features/social/data/chat_service.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/features/profile/data/notification_service.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/features/social/presentation/widgets/chat_bubble.dart';
 import 'package:flixie_app/features/social/presentation/widgets/chat_input.dart';
 import 'package:flixie_app/features/social/presentation/widgets/watch_request_chat_card.dart';
+import 'package:flixie_app/core/safety/safety_actions.dart';
+import 'package:flixie_app/core/safety/safety_service.dart';
 
 class GroupChatTab extends StatefulWidget {
   const GroupChatTab({super.key, required this.groupId});
@@ -35,6 +38,7 @@ class GroupChatTabState extends State<GroupChatTab> {
   AuthProvider? _authProvider;
   // userId → username, populated from the members subcollection
   Map<String, String> _memberUsernames = {};
+  Map<String, GroupMember> _membersById = {};
 
   // Watch-request card state: postgres UUID → full GroupWatchRequest from API
   final Map<String, GroupWatchRequest> _requestCache = {};
@@ -71,7 +75,12 @@ class GroupChatTabState extends State<GroupChatTab> {
     super.initState();
     // Use addPostFrameCallback so context is fully ready
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _initConversation();
+      if (mounted) {
+        _initConversation();
+        SafetyService.blockedUsers().then<void>((_) {
+          if (mounted) setState(() {});
+        }).catchError((_) {});
+      }
     });
   }
 
@@ -125,6 +134,9 @@ class GroupChatTabState extends State<GroupChatTab> {
           setState(() {
             _conversationId = conversationId;
             _memberUsernames = usernames;
+            _membersById = {
+              for (final member in members) member.memberId: member,
+            };
             for (final r in requests) {
               _requestCache[r.id] = r;
             }
@@ -482,18 +494,14 @@ class GroupChatTabState extends State<GroupChatTab> {
                                 padding: const EdgeInsets.only(bottom: 8),
                                 child: Row(
                                   children: [
-                                    CircleAvatar(
-                                      radius: 14,
-                                      backgroundColor:
-                                          group.$2.withValues(alpha: 0.15),
-                                      child: Text(
-                                          name.isNotEmpty
-                                              ? name[0].toUpperCase()
-                                              : '?',
-                                          style: TextStyle(
-                                              color: group.$2,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w700)),
+                                    ProfileAvatarView(
+                                      avatar: s.avatar,
+                                      fallbackText: name.isNotEmpty
+                                          ? name[0].toUpperCase()
+                                          : '?',
+                                      fallbackColor: group.$2,
+                                      size: 28,
+                                      profileBadges: s.profileBadges,
                                     ),
                                     const SizedBox(width: 10),
                                     Expanded(
@@ -638,7 +646,7 @@ class GroupChatTabState extends State<GroupChatTab> {
                                     Navigator.pop(sheetCtx);
                                   }
                                 } catch (_) {
-                                  if (mounted) {
+                                  if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
                                           content: Text('Failed to send reply'),
@@ -711,6 +719,9 @@ class GroupChatTabState extends State<GroupChatTab> {
                 itemBuilder: (_, i) {
                   final msg = messages[i];
                   final isMe = msg.senderId == currentUserId;
+                  if (!isMe && SafetyService.isBlocked(msg.senderId)) {
+                    return const SizedBox.shrink();
+                  }
 
                   if (msg.type == 'watch_request') {
                     // Resolve to a postgres UUID.
@@ -754,6 +765,21 @@ class GroupChatTabState extends State<GroupChatTab> {
                           respondKey, WatchResponseDecision.maybe),
                       onTap: () => _showWatchRequestDetail(
                           context, msg, messages, cachedReq, currentUserId),
+                      onLongPress: isMe
+                          ? null
+                          : () => SafetyActions.contentMenu(
+                                context,
+                                targetType: 'WATCH_REQUEST_MESSAGE',
+                                targetId: msg.id,
+                                reportedUserId: msg.senderId,
+                                username: msg.senderUsername ??
+                                    _memberUsernames[msg.senderId] ??
+                                    'User',
+                                contentPreview:
+                                    msg.watchRequestPayload?['message']
+                                            as String? ??
+                                        msg.text,
+                              ),
                     );
                   }
 
@@ -762,11 +788,25 @@ class GroupChatTabState extends State<GroupChatTab> {
                   final username = msg.senderUsername ??
                       _memberUsernames[sid] ??
                       sid.substring(0, sid.length.clamp(0, 6));
+                  final member = _membersById[sid];
                   return ChatBubble(
                     message: msg.text,
                     senderUsername: username,
                     isMe: isMe,
+                    avatar: member?.avatar,
+                    initials: member?.initials,
+                    profileBadges: member?.profileBadges ?? const [],
                     replyTo: msg.replyToMessageId != null ? '↩ replied' : null,
+                    onLongPress: isMe
+                        ? null
+                        : () => SafetyActions.contentMenu(
+                              context,
+                              targetType: 'GROUP_MESSAGE',
+                              targetId: msg.id,
+                              reportedUserId: sid,
+                              username: username,
+                              contentPreview: msg.text,
+                            ),
                   );
                 },
               );

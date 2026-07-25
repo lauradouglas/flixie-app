@@ -296,7 +296,9 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                             )
                           : Text(
                               widget.initial == null
-                                  ? 'Log Watch'
+                                  ? _rating == null
+                                      ? 'Mark watched without rating'
+                                      : 'Rate & mark watched'
                                   : 'Save Changes',
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,

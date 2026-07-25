@@ -7,6 +7,7 @@ class FlixieNotification {
   static const String groupInvite = 'GROUP_INVITE';
   static const String movieWatchRequest = 'MOVIE_WATCH_REQUEST';
   static const String showWatchRequest = 'SHOW_WATCH_REQUEST';
+  static const String listShared = 'LIST_SHARED';
 
   // Notification action constants
   static const String actionSent = 'SENT';
@@ -32,6 +33,7 @@ class FlixieNotification {
 
   /// The raw link object from the API (contains embedded request/groupRequest).
   final Map<String, dynamic>? link;
+  final Map<String, dynamic>? data;
 
   const FlixieNotification({
     this.id,
@@ -48,6 +50,7 @@ class FlixieNotification {
     this.updatedAt,
     this.senderUser,
     this.link,
+    this.data,
   });
 
   /// Whether this notification is a request type that can be accepted/declined.
@@ -62,6 +65,11 @@ class FlixieNotification {
   bool get isPending => action == actionReceived;
 
   bool get isRead => read ?? false;
+
+  String? get route {
+    final value = data?['route']?.toString();
+    return value == null || value.isEmpty ? null : value;
+  }
 
   String get receivedAt => notificationReceived ?? createdAt ?? updatedAt ?? '';
 
@@ -273,7 +281,8 @@ class FlixieNotification {
   String? get linkedRequestId {
     final l = link;
     if (l == null) return relatedId;
-    final request = (l['request']) as Map<String, dynamic>?;
+    final request =
+        (l['request'] ?? l['groupRequest']) as Map<String, dynamic>?;
     return request?['id'] as String? ?? relatedId;
   }
 
@@ -291,8 +300,11 @@ class FlixieNotification {
       notificationReceived: json['notificationReceived'] as String?,
       createdAt: json['createdAt'] as String?,
       updatedAt: json['updatedAt'] as String?,
-      senderUser: json['user'] as Map<String, dynamic>?,
+      senderUser: (json['data'] as Map<String, dynamic>?)?['sender']
+              as Map<String, dynamic>? ??
+          json['user'] as Map<String, dynamic>?,
       link: json['link'] as Map<String, dynamic>?,
+      data: json['data'] as Map<String, dynamic>?,
     );
   }
 
@@ -311,6 +323,7 @@ class FlixieNotification {
     String? updatedAt,
     Map<String, dynamic>? senderUser,
     Map<String, dynamic>? link,
+    Map<String, dynamic>? data,
   }) {
     return FlixieNotification(
       id: id ?? this.id,
@@ -327,6 +340,7 @@ class FlixieNotification {
       updatedAt: updatedAt ?? this.updatedAt,
       senderUser: senderUser ?? this.senderUser,
       link: link ?? this.link,
+      data: data ?? this.data,
     );
   }
 
@@ -344,6 +358,7 @@ class FlixieNotification {
       'notificationReceived': notificationReceived,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
+      'data': data,
     };
   }
 }

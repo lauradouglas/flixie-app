@@ -18,6 +18,7 @@ import 'package:flixie_app/features/settings/presentation/widgets/icon_color_she
 import 'package:flixie_app/features/settings/presentation/widgets/settings_tile.dart';
 import 'package:flixie_app/features/settings/presentation/widgets/watch_providers_sheet.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/change_avatar_sheet.dart';
+import 'package:flixie_app/core/safety/safety_service.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -64,6 +65,12 @@ class SettingsScreen extends StatelessWidget {
                 icon: Icons.lock_outline,
                 label: 'Change Password',
                 onTap: () => _showChangePasswordSheet(context),
+              ),
+              SettingsTile(
+                icon: Icons.block_outlined,
+                label: 'Blocked Users',
+                onTap: () => _showBlockedUsers(context),
+                isLast: true,
               ),
               // TODO: implement Privacy screen
               // SettingsTile(
@@ -124,14 +131,14 @@ class SettingsScreen extends StatelessWidget {
               ),
               SettingsTile(
                 icon: Icons.info_outline,
-                label: 'About Flixie',
-                onTap: () => _showAboutDialog(context),
+                label: 'About & Credits',
+                onTap: () => context.push('/about-credits'),
                 isLast: true,
               ),
               SettingsTile(
                 icon: Icons.privacy_tip_outlined,
                 label: 'Privacy Policy',
-                onTap: () => _showPrivacyPolicySheet(context),
+                onTap: () => _openPrivacyPolicy(context),
                 isLast: true,
               ),
             ],
@@ -180,6 +187,19 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
+  void _showBlockedUsers(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: FlixieColors.background,
+      builder: (_) => const FractionallySizedBox(
+        heightFactor: .75,
+        child: _BlockedUsersSheet(),
+      ),
+    );
+  }
+
   void _showFavoriteGenresSheet(BuildContext context) {
     final dbUser = context.read<AuthProvider>().dbUser;
     if (dbUser == null) return;
@@ -206,13 +226,18 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  void _showPrivacyPolicySheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const _PrivacyPolicySheet(),
+  Future<void> _openPrivacyPolicy(BuildContext context) async {
+    final opened = await launchUrl(
+      Uri.parse('https://www.flixie.co.uk/privacy'),
+      mode: LaunchMode.externalApplication,
     );
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not open the privacy policy.'),
+        ),
+      );
+    }
   }
 
   Future<void> _sendFeedback() async {
@@ -221,15 +246,6 @@ class SettingsScreen extends StatelessWidget {
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     }
-  }
-
-  void _showAboutDialog(BuildContext context) {
-    showAboutDialog(
-      context: context,
-      applicationName: 'Flixie',
-      applicationVersion: '1.0.1',
-      applicationLegalese: '© 2026 Flixie',
-    );
   }
 
   void _showWatchProvidersSheet(BuildContext context) {
@@ -241,6 +257,86 @@ class SettingsScreen extends StatelessWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => WatchProvidersSheet(userId: dbUser.id),
+    );
+  }
+}
+
+class _BlockedUsersSheet extends StatefulWidget {
+  const _BlockedUsersSheet();
+
+  @override
+  State<_BlockedUsersSheet> createState() => _BlockedUsersSheetState();
+}
+
+class _BlockedUsersSheetState extends State<_BlockedUsersSheet> {
+  late Future<List<BlockedUser>> _users = SafetyService.blockedUsers();
+
+  Future<void> _unblock(BlockedUser user) async {
+    await SafetyService.unblock(user.id);
+    if (mounted) {
+      setState(() => _users = SafetyService.blockedUsers(refresh: true));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
+          child: Text(
+            'Blocked Users',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
+        ),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, 16),
+          child: Text(
+            'Blocked users cannot contact or interact with you.',
+            style: TextStyle(color: FlixieColors.medium),
+          ),
+        ),
+        Expanded(
+          child: FutureBuilder<List<BlockedUser>>(
+            future: _users,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final users = snapshot.data ?? const [];
+              if (users.isEmpty) {
+                return const Center(
+                  child: Text(
+                    'You have not blocked anyone.',
+                    style: TextStyle(color: FlixieColors.medium),
+                  ),
+                );
+              }
+              return ListView.separated(
+                itemCount: users.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final user = users[index];
+                  return ListTile(
+                    leading: CircleAvatar(
+                      child: Text(user.username[0].toUpperCase()),
+                    ),
+                    title: Text('@${user.username}'),
+                    subtitle: user.firstName?.isNotEmpty == true
+                        ? Text(user.firstName!)
+                        : null,
+                    trailing: TextButton(
+                      onPressed: () => _unblock(user),
+                      child: const Text('Unblock'),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }
@@ -345,7 +441,7 @@ class _DeleteAccountButton extends StatelessWidget {
           color: FlixieColors.danger,
         ),
         title: const Text(
-          'Deactivate and delete account',
+          'Delete account',
           style: TextStyle(
             color: FlixieColors.danger,
             fontWeight: FontWeight.w700,
@@ -353,7 +449,7 @@ class _DeleteAccountButton extends StatelessWidget {
           ),
         ),
         subtitle: const Text(
-          'Anonymises your Flixie profile and deletes your login.',
+          'Permanently deletes your account and Flixie data.',
           style: TextStyle(color: FlixieColors.medium, fontSize: 12),
         ),
         onTap: () async {
@@ -380,7 +476,7 @@ class _DeleteAccountButton extends StatelessWidget {
             ),
           );
 
-          final error = await authProvider.deactivateAccount(password);
+          final error = await authProvider.deleteAccount(password);
 
           if (rootNavigator.mounted && rootNavigator.canPop()) {
             rootNavigator.pop();
@@ -457,8 +553,8 @@ class _AccountDeletionProgressScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   const Text(
-                    'We’re anonymising your Flixie profile and securely '
-                    'removing your login. Please keep the app open.',
+                    'We’re securely deleting your Flixie data and login. '
+                    'Please keep the app open.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: FlixieColors.light,
@@ -545,9 +641,9 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'This cannot be undone. Your profile will be anonymised, '
-                'your friendships will be removed, and your Firebase login '
-                'will be permanently deleted.',
+                'This cannot be undone. Your profile, reviews, ratings, '
+                'watch history, lists, friendships, messages and Firebase '
+                'login will be permanently deleted.',
                 style: TextStyle(color: FlixieColors.light, height: 1.4),
               ),
               const SizedBox(height: 18),
@@ -1042,185 +1138,6 @@ class _SettingsCountryPickerSheetState
                     onTap: () => Navigator.of(context).pop(country),
                   );
                 },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PrivacyPolicySheet extends StatelessWidget {
-  const _PrivacyPolicySheet();
-
-  Widget _section(String title, String body) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 17,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            body,
-            style: const TextStyle(
-              color: FlixieColors.light,
-              fontSize: 14,
-              height: 1.6,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.sizeOf(context).height * 0.9,
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-      decoration: const BoxDecoration(
-        color: FlixieColors.surface,
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(20),
-        ),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: FlixieColors.medium,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Privacy Policy',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(
-                    Icons.close,
-                    color: FlixieColors.medium,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: FlixieColors.tabBarBackgroundFocused,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Text(
-                        'Last Updated: 7 June 2026',
-                        style: TextStyle(
-                          color: FlixieColors.medium,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    _section(
-                      'Welcome to Flixie',
-                      'This Privacy Policy explains how Flixie collects, uses, stores, and protects your information when you use the app.',
-                    ),
-                    _section(
-                      'Information We Collect',
-                      'When you create an account, we collect your first name, last name, email address, username, and authentication information through Firebase Authentication.\n\n'
-                          'We may also store information that you choose to add to Flixie including watchlists, watched history, ratings, reviews, favourite movies, favourite TV shows, favourite genres, selected watch providers, profile preferences, friends, groups, and watch requests.',
-                    ),
-                    _section(
-                      'How We Use Your Information',
-                      'We use your information to:\n\n'
-                          '• Create and manage your account\n'
-                          '• Personalise your experience\n'
-                          '• Store your watchlists, ratings and preferences\n'
-                          '• Enable social features such as friends and groups\n'
-                          '• Improve Flixie and develop new features\n'
-                          '• Respond to support requests',
-                    ),
-                    _section(
-                      'TMDB Integration',
-                      'Flixie uses data provided by The Movie Database (TMDB).\n\n'
-                          'When you submit movie or TV ratings through Flixie, ratings may be sent to TMDB using anonymous guest sessions. These ratings are not linked to your personal identity by Flixie when submitted.\n\n'
-                          'Flixie is not endorsed, sponsored, or certified by TMDB.',
-                    ),
-                    _section(
-                      'Third-Party Services',
-                      'Flixie uses trusted third-party services to operate the platform, including:\n\n'
-                          '• Firebase Authentication\n'
-                          '• Firebase Cloud Messaging\n'
-                          '• The Movie Database (TMDB)\n'
-                          '• Hosting and infrastructure providers\n\n'
-                          'These services may process limited information required to provide their functionality.',
-                    ),
-                    _section(
-                      'Sharing of Information',
-                      'We do not sell your personal information.\n\n'
-                          'Information is only shared with third-party providers where necessary to operate Flixie or where required by law.',
-                    ),
-                    _section(
-                      'Data Storage & Security',
-                      'We take reasonable technical and organisational measures to protect your information from unauthorised access, loss, misuse, or disclosure. However, no online service can guarantee absolute security.',
-                    ),
-                    _section(
-                      'Data Retention',
-                      'We retain your information while your account remains active or as necessary to provide Flixie services.\n\n'
-                          'If you request account deletion, personal information will be deleted or anonymised within a reasonable period unless retention is required for legal or operational reasons.',
-                    ),
-                    _section(
-                      'Your Rights',
-                      'Depending on your location, you may have rights to:\n\n'
-                          '• Access your personal information\n'
-                          '• Correct inaccurate information\n'
-                          '• Request deletion of your data\n'
-                          '• Restrict or object to certain processing activities\n'
-                          '• Request a copy of your information',
-                    ),
-                    _section(
-                      'Children\'s Privacy',
-                      'Flixie is not intended for children under the age of 13. We do not knowingly collect personal information from children under 13.',
-                    ),
-                    _section(
-                      'Changes to this Policy',
-                      'We may update this Privacy Policy from time to time. Any updates will be posted within the application and become effective immediately upon publication.',
-                    ),
-                    _section(
-                      'Contact Us',
-                      'If you have any questions regarding this Privacy Policy, please contact:\n\nflixieadmin@gmail.com',
-                    ),
-                  ],
-                ),
               ),
             ),
           ],

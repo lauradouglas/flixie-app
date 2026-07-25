@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
 
+import 'package:flixie_app/core/auth/auth_provider.dart';
+import 'package:flixie_app/features/movies/data/movie_service.dart';
+import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/models/group.dart';
+import 'package:flixie_app/models/watch_provider.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/features/social/data/request_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -44,11 +50,119 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
 
   List<Group> _groups = [];
   bool _loadingGroups = false;
+  bool _loadingProviders = true;
+  bool _loadingFriendProviders = false;
+  bool _providerLoadStarted = false;
+  List<WatchProvider> _streamingProviders = [];
+  Set<int> _myProviderIds = {};
+  Set<int> _friendProviderIds = {};
+  Map<int, int> _groupProviderCounts = {};
+  int _groupMemberCount = 0;
+  bool _loadingGroupProviders = false;
 
   @override
   void initState() {
     super.initState();
     _fetchGroups();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_providerLoadStarted) return;
+    _providerLoadStarted = true;
+    _loadProviders();
+  }
+
+  Future<void> _loadProviders() async {
+    final movieId = widget.movieId;
+    if (movieId == null) {
+      if (mounted) setState(() => _loadingProviders = false);
+      return;
+    }
+    final auth = context.read<AuthProvider>();
+    final region = auth.dbUser?.countryAbbreviation ?? 'GB';
+    try {
+      final results = await Future.wait([
+        MovieService().getMovieWatchProviders(movieId, region),
+        UserService.getUserWatchProviders(widget.requesterId),
+      ]);
+      if (!mounted) return;
+      final available =
+          results[0].where((provider) => provider.isStreaming).toList()
+            ..sort(
+              (a, b) => a.displayPriority.compareTo(b.displayPriority),
+            );
+      setState(() {
+        _streamingProviders = {
+          for (final provider in available) provider.id: provider,
+        }.values.toList();
+        _myProviderIds = results[1].map((provider) => provider.id).toSet();
+        _loadingProviders = false;
+      });
+    } catch (error) {
+      logger.w('Unable to load watch-request providers: $error');
+      if (mounted) setState(() => _loadingProviders = false);
+    }
+  }
+
+  Future<void> _selectFriend(String friendId) async {
+    setState(() {
+      _selectedFriendId = friendId;
+      _friendProviderIds = {};
+      _loadingFriendProviders = true;
+    });
+    try {
+      final providers = await UserService.getUserWatchProviders(friendId);
+      if (!mounted || _selectedFriendId != friendId) return;
+      setState(() {
+        _friendProviderIds = providers.map((provider) => provider.id).toSet();
+        _loadingFriendProviders = false;
+      });
+    } catch (error) {
+      logger.w('Unable to load friend watch providers: $error');
+      if (mounted && _selectedFriendId == friendId) {
+        setState(() => _loadingFriendProviders = false);
+      }
+    }
+  }
+
+  Future<void> _selectGroup(String groupId) async {
+    setState(() {
+      _selectedGroupId = groupId;
+      _groupProviderCounts = {};
+      _groupMemberCount = 0;
+      _loadingGroupProviders = true;
+    });
+    try {
+      final members = (await GroupService.getGroupMembers(groupId))
+          .where((member) => member.isAccepted)
+          .toList();
+      final providerLists = await Future.wait(
+        members.map(
+          (member) => UserService.getUserWatchProviders(member.memberId)
+              .catchError((_) => <WatchProvider>[]),
+        ),
+      );
+      if (!mounted || _selectedGroupId != groupId) return;
+      final counts = <int, int>{};
+      for (final providers in providerLists) {
+        for (final providerId
+            in providers.map((provider) => provider.id).toSet()) {
+          counts[providerId] = (counts[providerId] ?? 0) + 1;
+        }
+      }
+      setState(() {
+        _groupProviderCounts = counts;
+        _groupMemberCount = members.length;
+        _loadingGroupProviders = false;
+      });
+    } catch (error) {
+      logger.w('Unable to compare group watch providers: $error');
+      if (mounted && _selectedGroupId == groupId) {
+        setState(() => _loadingGroupProviders = false);
+      }
+    }
   }
 
   Future<void> _fetchGroups() async {
@@ -261,8 +375,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                           avatarColor:
                               avatarColorFromIconColor(friend.iconColor),
                           selected: isSelected,
-                          onTap: () =>
-                              setState(() => _selectedFriendId = friend.id),
+                          onTap: () => _selectFriend(friend.id),
                         );
                       },
                     ),
@@ -306,13 +419,27 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                           selected: isSelected,
                           group: true,
                           groupModel: group,
-                          onTap: () =>
-                              setState(() => _selectedGroupId = group.id),
+                          onTap: () => _selectGroup(group.id!),
                         );
                       },
                     ),
                   ),
               ],
+              const SizedBox(height: 16),
+              _WatchRequestProviders(
+                providers: _streamingProviders,
+                myProviderIds: _myProviderIds,
+                friendProviderIds: _friendProviderIds,
+                friendName: _selectedFriendName,
+                loading: _loadingProviders,
+                loadingFriend: _loadingFriendProviders,
+                showFriendMatch: !_isGroupMode && _selectedFriendId != null,
+                groupMode: _isGroupMode,
+                groupSelected: _selectedGroupId != null,
+                groupProviderCounts: _groupProviderCounts,
+                groupMemberCount: _groupMemberCount,
+                loadingGroup: _loadingGroupProviders,
+              ),
               const SizedBox(height: 20),
               const Text(
                 'MESSAGE (OPTIONAL)',
@@ -395,6 +522,276 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
       }
     }
     return 'Select someone to invite';
+  }
+
+  String? get _selectedFriendName {
+    for (final friendship in widget.friends) {
+      final friend = friendship.friendUser;
+      if (friend?.id == _selectedFriendId) return friend?.displayName;
+    }
+    return null;
+  }
+}
+
+class _WatchRequestProviders extends StatelessWidget {
+  const _WatchRequestProviders({
+    required this.providers,
+    required this.myProviderIds,
+    required this.friendProviderIds,
+    required this.friendName,
+    required this.loading,
+    required this.loadingFriend,
+    required this.showFriendMatch,
+    required this.groupMode,
+    required this.groupSelected,
+    required this.groupProviderCounts,
+    required this.groupMemberCount,
+    required this.loadingGroup,
+  });
+
+  final List<WatchProvider> providers;
+  final Set<int> myProviderIds;
+  final Set<int> friendProviderIds;
+  final String? friendName;
+  final bool loading;
+  final bool loadingFriend;
+  final bool showFriendMatch;
+  final bool groupMode;
+  final bool groupSelected;
+  final Map<int, int> groupProviderCounts;
+  final int groupMemberCount;
+  final bool loadingGroup;
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading) {
+      return const _ProviderPanel(
+        child: Row(
+          children: [
+            SizedBox.square(
+              dimension: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 9),
+            Text(
+              'Checking streaming availability…',
+              style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+            ),
+          ],
+        ),
+      );
+    }
+    if (providers.isEmpty) {
+      return const _ProviderPanel(
+        child: Row(
+          children: [
+            Icon(Icons.tv_off_outlined, size: 17, color: FlixieColors.medium),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Not currently available on a streaming subscription.',
+                style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final shared = providers
+        .where((provider) =>
+            myProviderIds.contains(provider.id) &&
+            friendProviderIds.contains(provider.id))
+        .toList();
+    return _ProviderPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'WHERE TO WATCH',
+            style: TextStyle(
+              color: FlixieColors.medium,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 9),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final provider in providers.take(8))
+                _ProviderMatchLogo(
+                  provider: provider,
+                  youHaveIt: myProviderIds.contains(provider.id),
+                  friendHasIt: friendProviderIds.contains(provider.id),
+                  compareFriend: showFriendMatch && !loadingFriend,
+                ),
+            ],
+          ),
+          const SizedBox(height: 9),
+          if (groupMode && !groupSelected)
+            const Text(
+              'Select a group to compare everyone’s streaming services.',
+              style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+            )
+          else if (groupMode && loadingGroup)
+            const Text(
+              'Checking group members’ services…',
+              style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+            )
+          else if (groupMode)
+            Text(
+              _groupSummary,
+              style: TextStyle(
+                color: _hasGroupMatch
+                    ? FlixieColors.success
+                    : FlixieColors.warning,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            )
+          else if (!showFriendMatch)
+            const Text(
+              'Select a friend to compare your streaming services.',
+              style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+            )
+          else if (loadingFriend)
+            const Text(
+              'Checking your friend’s services…',
+              style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+            )
+          else
+            Text(
+              shared.isNotEmpty
+                  ? 'You and ${friendName ?? 'your friend'} can both stream it on ${shared.map((provider) => provider.providerName).join(', ')}.'
+                  : 'No shared streaming service for you and ${friendName ?? 'your friend'}.',
+              style: TextStyle(
+                color: shared.isNotEmpty
+                    ? FlixieColors.success
+                    : FlixieColors.warning,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  bool get _hasGroupMatch => providers.any(
+        (provider) =>
+            groupMemberCount > 0 &&
+            groupProviderCounts[provider.id] == groupMemberCount,
+      );
+
+  String get _groupSummary {
+    if (groupMemberCount == 0) return 'No eligible group members found.';
+    final everyone = providers
+        .where(
+          (provider) => groupProviderCounts[provider.id] == groupMemberCount,
+        )
+        .map((provider) => provider.providerName)
+        .toList();
+    if (everyone.isNotEmpty) {
+      return 'Everyone can stream it on ${everyone.join(', ')}.';
+    }
+    final best = [...providers]..sort(
+        (a, b) => (groupProviderCounts[b.id] ?? 0)
+            .compareTo(groupProviderCounts[a.id] ?? 0),
+      );
+    final provider = best.first;
+    final count = groupProviderCounts[provider.id] ?? 0;
+    return count == 0
+        ? 'No group members have a matching streaming service.'
+        : '$count of $groupMemberCount members have ${provider.providerName}.';
+  }
+}
+
+class _ProviderPanel extends StatelessWidget {
+  const _ProviderPanel({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: FlixieColors.surfaceElevated,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: FlixieColors.tabBarBorder),
+        ),
+        child: child,
+      );
+}
+
+class _ProviderMatchLogo extends StatelessWidget {
+  const _ProviderMatchLogo({
+    required this.provider,
+    required this.youHaveIt,
+    required this.friendHasIt,
+    required this.compareFriend,
+  });
+
+  final WatchProvider provider;
+  final bool youHaveIt;
+  final bool friendHasIt;
+  final bool compareFriend;
+
+  @override
+  Widget build(BuildContext context) {
+    final shared = compareFriend && youHaveIt && friendHasIt;
+    return Tooltip(
+      message: shared
+          ? 'You both have ${provider.providerName}'
+          : youHaveIt
+              ? 'You have ${provider.providerName}'
+              : provider.providerName,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: shared
+                    ? FlixieColors.success
+                    : youHaveIt
+                        ? FlixieColors.primary
+                        : FlixieColors.tabBarBorder,
+                width: shared ? 2 : 1,
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(7),
+              child: CachedNetworkImage(
+                imageUrl: provider.logoUrl,
+                fit: BoxFit.cover,
+                errorWidget: (_, __, ___) => const Icon(
+                  Icons.live_tv_outlined,
+                  color: FlixieColors.medium,
+                ),
+              ),
+            ),
+          ),
+          if (shared)
+            const Positioned(
+              right: -4,
+              top: -4,
+              child: Icon(
+                Icons.check_circle_rounded,
+                size: 15,
+                color: FlixieColors.success,
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }
 

@@ -162,6 +162,7 @@ class ActivityTile extends StatelessWidget {
       fallbackText: initial,
       fallbackColor: FlixieColors.primary,
       size: compact ? 36 : 40,
+      profileBadges: item.profileBadges,
     );
   }
 

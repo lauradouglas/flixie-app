@@ -34,18 +34,16 @@ class HelpSupportScreen extends StatelessWidget {
           _FaqTile(
             question: 'Is registration required to use Flixie?',
             answer:
-                'You can browse and search for movies without creating an account. '
-                'However, we highly recommend registering for a free account to unlock '
-                'personalised features — create watchlists, mark content as watched, '
-                'add favourites, leave reviews, connect with friends, and receive '
-                'tailored recommendations. It\'s free and only takes a moment!',
+                'Yes. A free Flixie account is required because your movie activity, '
+                'preferences, lists, reviews, friendships, groups, and watch requests '
+                'are connected to your profile.',
           ),
           _FaqTile(
             question: 'Where does Flixie\'s data come from?',
             answer:
                 'All movie details, cast and crew information, release dates, and more '
-                'are sourced from The Movie Database (TMDb) — a reliable and comprehensive '
-                'database dedicated to film and television. Any updates made on TMDb are '
+                'are sourced from The Movie Database (TMDB) — a reliable and comprehensive '
+                'database dedicated to film and television. Any updates made on TMDB are '
                 'reflected in Flixie to ensure you always have the most current information. '
                 'Streaming availability data is powered by JustWatch, an international '
                 'streaming guide used by over 20 million people per month.',
@@ -128,6 +126,29 @@ class HelpSupportScreen extends StatelessWidget {
             question: 'Where can I see all my reviews?',
             answer:
                 'Go to Profile → My Reviews to see every movie you\'ve rated.',
+          ),
+          SizedBox(height: 12),
+          _SectionHeader('Safety & Moderation'),
+          _FaqTile(
+            question: 'How do I report a user or content?',
+            answer:
+                'Open the menu on a user profile, review, message, or other social '
+                'content and choose Report. Select the reason and the Flixie team '
+                'will review it. Reports are confidential.',
+          ),
+          _FaqTile(
+            question: 'How do I block someone?',
+            answer:
+                'Open their profile menu and choose Block user. Blocking removes '
+                'the friendship, hides their content, and prevents further direct '
+                'interaction. Manage blocked users in Settings → Blocked Users.',
+          ),
+          _FaqTile(
+            question: 'How do I contact Flixie about a safety issue?',
+            answer:
+                'Email flixieadmin@gmail.com. Include the username and a short '
+                'description of the issue. If anyone is in immediate danger, '
+                'contact your local emergency services.',
           ),
           SizedBox(height: 24),
         ],

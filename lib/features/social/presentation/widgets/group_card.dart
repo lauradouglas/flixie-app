@@ -114,36 +114,21 @@ class _MemberAvatars extends StatelessWidget {
   Widget build(BuildContext context) {
     final shown = members.where((member) => member.isAccepted).take(5).toList();
     return SizedBox(
-      height: 28,
+      height: 34,
       child: Stack(
         children: [
           for (var index = 0; index < shown.length; index++)
             Positioned(
               left: index * 20,
-              child: Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: FlixieColors.tabBarBackgroundFocused,
-                    width: 2,
-                  ),
-                ),
-                child: shown[index].avatar != null
-                    ? ProfileAvatarView(
-                        avatar: shown[index].avatar,
-                        fallbackText: '',
-                        fallbackColor: FlixieColors.primary,
-                        size: 28,
-                      )
-                    : const CircleAvatar(
-                        radius: 14,
-                        backgroundColor: FlixieColors.primary,
-                        child: Icon(
-                          Icons.person_rounded,
-                          size: 17,
-                          color: FlixieColors.light,
-                        ),
-                      ),
+              child: ProfileAvatarView(
+                avatar: shown[index].avatar,
+                fallbackText: shown[index].initials ??
+                    (shown[index].username?.isNotEmpty == true
+                        ? shown[index].username![0].toUpperCase()
+                        : '?'),
+                fallbackColor: FlixieColors.primary,
+                size: 28,
+                profileBadges: shown[index].profileBadges,
               ),
             ),
         ],

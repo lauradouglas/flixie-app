@@ -636,10 +636,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                           onTap: () => context.pop(),
                         ),
                         const Spacer(),
-                        _heroIconButton(
-                          icon: Icons.share_outlined,
-                          onTap: () => _showSnack('Share is coming soon'),
-                        ),
+                        // TODO(release): Restore the Share action when native
+                        // sharing is implemented and tested.
                       ],
                     ),
                     const Spacer(),
@@ -1467,19 +1465,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
               onTap: _updatingAction != null ? null : _showAddToListSheet,
             ),
           ),
-          _statusDivider(),
-          Expanded(
-            child: _statusActionItem(
-              icon: Icons.group_add_outlined,
-              label: 'Invite',
-              color: FlixieColors.primary,
-              isActive: false,
-              isLoading: false,
-              onTap: _updatingAction != null
-                  ? null
-                  : () => _showSnack('Watch invites coming soon'),
-            ),
-          ),
+          // TODO(release): Restore show watch invitations when their request
+          // flow is fully implemented and tested.
         ],
       ),
     );

@@ -5,6 +5,8 @@ import 'package:flixie_app/models/review.dart';
 import 'package:flixie_app/features/profile/presentation/controllers/review_reactions_controller.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
+import 'package:flixie_app/core/safety/safety_actions.dart';
+import 'package:flixie_app/core/safety/safety_service.dart';
 
 class ReviewCard extends StatefulWidget {
   const ReviewCard({
@@ -32,12 +34,18 @@ const _kReactions = [
 class _ReviewCardState extends State<ReviewCard> {
   late Map<String, int> _reactions;
   String? _myReaction;
+  bool _blocked = false;
 
   @override
   void initState() {
     super.initState();
     _reactions = Map<String, int>.from(widget.review.reactions);
     _myReaction = widget.review.myReaction;
+    SafetyService.blockedUsers().then<void>((_) {
+      if (mounted && SafetyService.isBlocked(widget.review.userId)) {
+        setState(() => _blocked = true);
+      }
+    }).catchError((_) {});
   }
 
   String _getInitials() {
@@ -110,6 +118,9 @@ class _ReviewCardState extends State<ReviewCard> {
 
   @override
   Widget build(BuildContext context) {
+    if (_blocked || SafetyService.isBlocked(widget.review.userId)) {
+      return const SizedBox.shrink();
+    }
     final review = widget.review;
     final hasSpoilers = review.containsSpoilers;
 
@@ -194,6 +205,48 @@ class _ReviewCardState extends State<ReviewCard> {
                     ),
                   ],
                 ),
+                if (widget.currentUserId != null &&
+                    widget.currentUserId != review.userId)
+                  PopupMenuButton<String>(
+                    tooltip: 'Review actions',
+                    padding: EdgeInsets.zero,
+                    onSelected: (action) async {
+                      if (action == 'report') {
+                        await SafetyActions.report(
+                          context,
+                          targetType: review.showId == null
+                              ? 'MOVIE_REVIEW'
+                              : 'SHOW_REVIEW',
+                          targetId: review.id,
+                          reportedUserId: review.userId,
+                          contentPreview: '${review.title}\n${review.body}',
+                        );
+                      } else if (action == 'block') {
+                        final blocked = await SafetyActions.block(
+                          context,
+                          userId: review.userId,
+                          username: _getDisplayName(),
+                        );
+                        if (blocked && mounted) {
+                          setState(() => _blocked = true);
+                        }
+                      }
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                        value: 'report',
+                        child: Text('Report review'),
+                      ),
+                      PopupMenuItem(
+                        value: 'block',
+                        child: Text(
+                          'Block user',
+                          style: TextStyle(color: FlixieColors.danger),
+                        ),
+                      ),
+                    ],
+                    icon: const Icon(Icons.more_vert, size: 20),
+                  ),
               ],
             ),
             const SizedBox(height: 10),

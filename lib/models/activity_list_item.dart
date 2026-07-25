@@ -57,6 +57,7 @@ class ActivityListItem {
   final Review? reviewData;
   final int activityScore;
   final ProfileAvatar? avatar;
+  final List<String> profileBadges;
 
   String get timestamp {
     if (watchedAt != null && watchedAt!.isNotEmpty) return watchedAt!;
@@ -88,6 +89,7 @@ class ActivityListItem {
     this.reviewData,
     this.activityScore = 0,
     this.avatar,
+    this.profileBadges = const [],
   });
 
   ActivityListItem copyWith({ProfileAvatar? avatar}) => ActivityListItem(
@@ -114,6 +116,7 @@ class ActivityListItem {
         reviewData: reviewData,
         activityScore: activityScore,
         avatar: avatar ?? this.avatar,
+        profileBadges: profileBadges,
       );
 
   factory ActivityListItem.fromJson(Map<String, dynamic> json) {
@@ -205,6 +208,12 @@ class ActivityListItem {
           ? null
           : ProfileAvatar.fromJson(
               (user?['avatar'] ?? json['avatar']) as Map<String, dynamic>),
+      profileBadges: ((user?['profileBadges'] ?? json['profileBadges'])
+                  as List<dynamic>? ??
+              const [])
+          .map((badge) => badge is Map ? badge['badge'] : badge)
+          .whereType<String>()
+          .toList(),
       activityScore: _parseInt(json['activityScore']) ?? 0,
     );
   }

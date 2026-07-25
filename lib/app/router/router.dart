@@ -18,6 +18,7 @@ import 'package:flixie_app/features/movies/presentation/pages/my_reviews_screen.
 import 'package:flixie_app/features/profile/presentation/pages/notification_screen.dart';
 import 'package:flixie_app/features/settings/presentation/pages/help_support_screen.dart';
 import 'package:flixie_app/features/settings/presentation/pages/settings_screen.dart';
+import 'package:flixie_app/features/settings/presentation/pages/about_credits_screen.dart';
 import 'package:flixie_app/features/movies/presentation/pages/stats_screen.dart';
 import 'package:flixie_app/features/movies/presentation/pages/watch_history_screen.dart';
 import 'package:flixie_app/features/social/presentation/pages/watch_requests_screen.dart';
@@ -188,7 +189,10 @@ GoRouter buildRouter(AuthProvider authProvider) {
             path: '/friends/:id',
             pageBuilder: (context, state) => _calmPage(
               state,
-              FriendProfileScreen(userId: state.pathParameters['id'] ?? ''),
+              FriendProfileScreen(
+                userId: state.pathParameters['id'] ?? '',
+                previewMode: state.uri.queryParameters['preview'] == 'true',
+              ),
             ),
           ),
           GoRoute(
@@ -214,8 +218,19 @@ GoRouter buildRouter(AuthProvider authProvider) {
                 listId: state.pathParameters['id'] ?? '',
                 listName: state.uri.queryParameters['name'] ?? 'List',
                 ownerUserId: state.uri.queryParameters['owner'],
+                isOwnerOverride: state.uri.queryParameters['isOwner'] == null
+                    ? null
+                    : state.uri.queryParameters['isOwner'] == 'true',
+                canEditOverride: state.uri.queryParameters['canEdit'] == null
+                    ? null
+                    : state.uri.queryParameters['canEdit'] == 'true',
               ),
             ),
+          ),
+          GoRoute(
+            path: '/about-credits',
+            pageBuilder: (context, state) =>
+                _calmPage(state, const AboutCreditsScreen()),
           ),
           GoRoute(
             path: '/stats',

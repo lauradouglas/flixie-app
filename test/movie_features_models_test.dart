@@ -49,7 +49,8 @@ void main() {
         'description': 'Mind-bending favorites',
         'visibility': ListVisibility.public,
         'coverImageUrl': 'https://img.example/scifi.jpg',
-        'whoCanAddMovies': 'friends',
+        'whoCanAddItems': 'friends',
+        'scope': ListScope.personal,
       });
     });
 
@@ -58,7 +59,8 @@ void main() {
       expect(request.toJson(), {
         'name': 'Watch Later',
         'visibility': ListVisibility.private,
-        'whoCanAddMovies': 'owner',
+        'whoCanAddItems': 'owner',
+        'scope': ListScope.personal,
       });
     });
 

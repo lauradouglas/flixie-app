@@ -1,13 +1,113 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
+import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/models/group_watch_request.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
+import 'package:flixie_app/features/social/data/watch_request_cache.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/calendar/watch_calendar_service.dart';
 import 'package:flixie_app/features/social/presentation/widgets/request_poster_placeholder.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
+import 'package:flixie_app/features/movies/data/movie_service.dart';
+import 'package:flixie_app/features/profile/data/user_service.dart';
+import 'package:flixie_app/models/watch_provider.dart';
+
+class _GroupRequestProviderSummary extends StatefulWidget {
+  const _GroupRequestProviderSummary({
+    required this.groupId,
+    required this.movieId,
+  });
+
+  final String groupId;
+  final int movieId;
+
+  @override
+  State<_GroupRequestProviderSummary> createState() =>
+      _GroupRequestProviderSummaryState();
+}
+
+class _GroupRequestProviderSummaryState
+    extends State<_GroupRequestProviderSummary> {
+  String? _summary;
+  bool _allMembers = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  Future<void> _load() async {
+    final region =
+        context.read<AuthProvider>().dbUser?.countryAbbreviation ?? 'GB';
+    try {
+      final available =
+          (await MovieService().getMovieWatchProviders(widget.movieId, region))
+              .where((provider) => provider.isStreaming)
+              .toList();
+      final memberList = (await GroupService.getGroupMembers(widget.groupId))
+          .where((member) => member.isAccepted)
+          .toList();
+      if (available.isEmpty || memberList.isEmpty) return;
+      final savedProviders = await Future.wait(
+        memberList.map(
+          (member) => UserService.getUserWatchProviders(member.memberId)
+              .catchError((_) => <WatchProvider>[]),
+        ),
+      );
+      final counts = <int, int>{};
+      for (final providers in savedProviders) {
+        for (final id in providers.map((provider) => provider.id).toSet()) {
+          counts[id] = (counts[id] ?? 0) + 1;
+        }
+      }
+      available.sort(
+        (a, b) => (counts[b.id] ?? 0).compareTo(counts[a.id] ?? 0),
+      );
+      final best = available.first;
+      final count = counts[best.id] ?? 0;
+      if (!mounted || count == 0) return;
+      setState(() {
+        _allMembers = count == memberList.length;
+        _summary = _allMembers
+            ? 'Everyone has ${best.providerName}'
+            : '$count of ${memberList.length} have ${best.providerName}';
+      });
+    } catch (_) {
+      // Provider compatibility is helpful metadata, not a blocking action.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final summary = _summary;
+    if (summary == null) return const SizedBox.shrink();
+    return Row(
+      children: [
+        Icon(
+          Icons.live_tv_rounded,
+          size: 15,
+          color: _allMembers ? FlixieColors.success : FlixieColors.medium,
+        ),
+        const SizedBox(width: 7),
+        Expanded(
+          child: Text(
+            summary,
+            style: TextStyle(
+              color: _allMembers ? FlixieColors.success : FlixieColors.medium,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 const List<String> _kRequestMonths = [
   'Jan',
@@ -112,7 +212,9 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
   void initState() {
     super.initState();
     _requests = widget.initialRequests;
-    if (_requests.isEmpty) _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _load();
+    });
   }
 
   @override
@@ -129,7 +231,7 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
   }
 
   Future<void> _load() async {
-    if (mounted) setState(() => _loading = true);
+    if (mounted && _requests.isEmpty) setState(() => _loading = true);
     try {
       final List<GroupWatchRequest> requests;
       final conversationId = widget.conversationId;
@@ -142,7 +244,9 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
           userId: widget.currentUserId,
         );
       } else {
-        requests = await GroupService.getGroupWatchRequests(widget.groupId);
+        requests = await context
+            .read<WatchRequestCache>()
+            .refreshGroup(widget.groupId);
       }
       if (mounted) {
         final focusedId = widget.initialRequestId;
@@ -273,6 +377,18 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
             req.id, userId, '', status);
       }
       if (mounted) setState(() => _myResponses[req.id] = status);
+      if (status == 'ACCEPTED' && mounted) {
+        final auth = context.read<AuthProvider>();
+        final cached = auth.cachedNotifications;
+        if (cached != null) {
+          auth.updateCachedNotifications(
+            cached.where((notification) {
+              final linkedId = notification.linkedRequestId;
+              return linkedId == null || !req.matchesId(linkedId);
+            }).toList(growable: false),
+          );
+        }
+      }
       await _load();
     } catch (e) {
       logger.e('Respond to watch request error: $e');
@@ -597,64 +713,6 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
     );
   }
 
-  Widget _buildMemberStatuses(List<GroupRequestMemberStatus> statuses) {
-    if (statuses.isEmpty) return const SizedBox.shrink();
-    final acceptedCount = statuses.where((s) => s.status == 'ACCEPTED').length;
-    final declinedCount = statuses.where((s) => s.status == 'DECLINED').length;
-    final maybeCount = statuses.where((s) => s.status == 'MAYBE').length;
-    final pendingCount = statuses
-        .where((s) =>
-            s.status != 'ACCEPTED' &&
-            s.status != 'DECLINED' &&
-            s.status != 'MAYBE')
-        .length;
-
-    Widget responsePill(String label, IconData icon, Color color) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.11),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withValues(alpha: 0.35)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 13, color: color),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Wrap(
-      spacing: 7,
-      runSpacing: 7,
-      children: [
-        if (acceptedCount > 0)
-          responsePill('$acceptedCount accepted', Icons.check_circle_outline,
-              FlixieColors.success),
-        if (maybeCount > 0)
-          responsePill(
-              '$maybeCount maybe', Icons.help_outline, FlixieColors.warning),
-        if (declinedCount > 0)
-          responsePill('$declinedCount declined', Icons.cancel_outlined,
-              FlixieColors.danger),
-        if (pendingCount > 0)
-          responsePill(
-              '$pendingCount pending', Icons.schedule, FlixieColors.medium),
-      ],
-    );
-  }
-
   void _showMemberStatusSheet(BuildContext context, GroupWatchRequest req) {
     // Build a userId -> username map from all known requesters in the list
     final knownNames = <String, String>{};
@@ -709,16 +767,13 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
               ...members.map((s) => Padding(
                     padding: const EdgeInsets.only(left: 4, bottom: 6),
                     child: Row(children: [
-                      CircleAvatar(
-                        radius: 14,
-                        backgroundColor: color.withValues(alpha: 0.15),
-                        child: Text(
-                          name(s).isNotEmpty ? name(s)[0].toUpperCase() : '?',
-                          style: TextStyle(
-                              color: color,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold),
-                        ),
+                      ProfileAvatarView(
+                        avatar: s.avatar,
+                        fallbackText:
+                            name(s).isNotEmpty ? name(s)[0].toUpperCase() : '?',
+                        fallbackColor: color,
+                        size: 28,
+                        profileBadges: s.profileBadges,
                       ),
                       const SizedBox(width: 8),
                       Text('@${name(s)}',
@@ -892,8 +947,8 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
       child: SizedBox(
-        width: 74,
-        height: 110,
+        width: 82,
+        height: 123,
         child: posterUrl != null
             ? CachedNetworkImage(
                 imageUrl: posterUrl,
@@ -909,17 +964,16 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
   Widget _messageBubble(String message) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
       decoration: BoxDecoration(
-        color: FlixieColors.primary.withValues(alpha: 0.08),
+        color: Colors.white.withValues(alpha: 0.035),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: FlixieColors.primary.withValues(alpha: 0.28)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.chat_bubble_outline,
-              size: 14, color: FlixieColors.primary),
+          const Icon(Icons.format_quote_rounded,
+              size: 16, color: FlixieColors.medium),
           const SizedBox(width: 7),
           Expanded(
             child: Text(
@@ -1021,6 +1075,7 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
             ),
             const SizedBox(width: 8),
             Expanded(
+              flex: 2,
               child: _responseButton(
                 label: 'Accept',
                 icon: Icons.check_circle_outline,
@@ -1040,7 +1095,6 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
     final showScheduling =
         req.canScheduleFor(userId) || _canScheduleAsParticipant(req);
     final showComplete = req.canCompleteFor(userId);
-    final showCancel = req.canCancelFor(userId);
 
     return Wrap(
       spacing: 8,
@@ -1101,17 +1155,134 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
               onPressed: () => _markWatched(req),
             ),
           ),
-        if (showCancel)
-          SizedBox(
-            width: 130,
-            child: _responseButton(
-              label: 'Cancel',
-              icon: Icons.cancel_outlined,
-              color: FlixieColors.danger,
-              onPressed: () => _cancelRequest(req),
-            ),
-          ),
       ],
+    );
+  }
+
+  Widget _responsePreview(GroupWatchRequest req) {
+    final statuses = req.memberStatuses;
+    final acceptedMembers =
+        statuses.where((status) => status.status == 'ACCEPTED').toList();
+    final waitingMembers = statuses
+        .where((status) =>
+            status.status != 'ACCEPTED' &&
+            status.status != 'DECLINED' &&
+            status.status != 'MAYBE')
+        .toList();
+    final preview = [...acceptedMembers, ...waitingMembers].take(4).toList();
+    final pending = statuses
+        .where((status) =>
+            status.status != 'ACCEPTED' &&
+            status.status != 'DECLINED' &&
+            status.status != 'MAYBE')
+        .length;
+    final acceptedLabel = acceptedMembers.isEmpty
+        ? null
+        : acceptedMembers.length == 1
+            ? '@${acceptedMembers.first.username ?? 'member'} accepted'
+            : '@${acceptedMembers.first.username ?? 'member'} +${acceptedMembers.length - 1} accepted';
+    return InkWell(
+      onTap: () => _showMemberStatusSheet(context, req),
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            SizedBox(
+              width: preview.isEmpty ? 0 : 34 + (preview.length - 1) * 22,
+              height: 36,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  for (var index = 0; index < preview.length; index++)
+                    Positioned(
+                      left: index * 22,
+                      top: 1,
+                      child: Tooltip(
+                        message:
+                            '@${preview[index].username ?? 'member'} · ${preview[index].status == 'ACCEPTED' ? 'Accepted' : 'Waiting'}',
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: preview[index].status == 'ACCEPTED'
+                                      ? FlixieColors.success
+                                      : FlixieColors.surface,
+                                  width: 2,
+                                ),
+                              ),
+                              child: ProfileAvatarView(
+                                avatar: preview[index].avatar,
+                                fallbackText:
+                                    (preview[index].username?.isNotEmpty == true
+                                            ? preview[index].username![0]
+                                            : '?')
+                                        .toUpperCase(),
+                                fallbackColor:
+                                    preview[index].status == 'ACCEPTED'
+                                        ? FlixieColors.success
+                                        : FlixieColors.primary,
+                                size: 28,
+                                profileBadges: preview[index].profileBadges,
+                              ),
+                            ),
+                            if (preview[index].status == 'ACCEPTED')
+                              Positioned(
+                                left: -2,
+                                top: -1,
+                                child: Container(
+                                  width: 13,
+                                  height: 13,
+                                  decoration: const BoxDecoration(
+                                    color: FlixieColors.success,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.check_rounded,
+                                    size: 10,
+                                    color: FlixieColors.surface,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (preview.isNotEmpty) const SizedBox(width: 9),
+            Expanded(
+              child: Text(
+                acceptedLabel == null
+                    ? '$pending waiting'
+                    : pending > 0
+                        ? '$acceptedLabel · $pending waiting'
+                        : acceptedLabel,
+                style: const TextStyle(
+                  color: FlixieColors.medium,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const Text(
+              'View responses',
+              style: TextStyle(
+                color: FlixieColors.primary,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right_rounded,
+                size: 17, color: FlixieColors.primary),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1130,11 +1301,9 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
     final currentUserId = widget.currentUserId;
     final isMyRequest = req.userId == currentUserId;
     final canDelete = isMyRequest || widget.isAdmin;
-    final canManage = isMyRequest ||
-        widget.isAdmin ||
-        req.canScheduleFor(currentUserId) ||
+    final canCancelRequest = (isMyRequest || widget.isAdmin) && req.isActive;
+    final canManage = req.canScheduleFor(currentUserId) ||
         req.canCompleteFor(currentUserId) ||
-        req.canCancelFor(currentUserId) ||
         _canScheduleAsParticipant(req);
     final isProcessing = _processing[req.id] == true;
     final myStatus = _currentUserStatus(req);
@@ -1148,10 +1317,10 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: FlixieColors.tabBarBackgroundFocused,
-        borderRadius: BorderRadius.circular(14),
+        color: FlixieColors.surface,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: _statusBorderColor(req.status).withValues(alpha: 0.35),
+          color: FlixieColors.tabBarBorder.withValues(alpha: 0.75),
         ),
       ),
       child: InkWell(
@@ -1192,48 +1361,80 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
                                 textScaler: TextScaler.noScaling,
                               ),
                             ),
-                            if (canDelete && isFocused) ...[
+                            if ((canDelete || canCancelRequest) &&
+                                isFocused) ...[
                               const SizedBox(width: 6),
-                              IconButton(
-                                tooltip: 'Delete request',
-                                visualDensity: VisualDensity.compact,
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(
-                                  minWidth: 32,
-                                  minHeight: 32,
-                                ),
-                                onPressed:
-                                    isProcessing ? null : () => _delete(req),
+                              PopupMenuButton<String>(
+                                tooltip: 'Request actions',
+                                enabled: !isProcessing,
+                                color: FlixieColors.surfaceElevated,
+                                onSelected: (value) {
+                                  if (value == 'cancel') {
+                                    _cancelRequest(req);
+                                  } else if (value == 'delete') {
+                                    _delete(req);
+                                  }
+                                },
+                                itemBuilder: (_) => [
+                                  if (canCancelRequest)
+                                    const PopupMenuItem(
+                                      value: 'cancel',
+                                      child: Text('Cancel request'),
+                                    ),
+                                  if (canDelete)
+                                    const PopupMenuItem(
+                                      value: 'delete',
+                                      child: Text('Delete request'),
+                                    ),
+                                ],
                                 icon: const Icon(
-                                  Icons.delete_outline,
-                                  color: FlixieColors.danger,
-                                  size: 19,
+                                  Icons.more_horiz_rounded,
+                                  color: FlixieColors.medium,
                                 ),
                               ),
                             ],
                           ],
                         ),
                         const SizedBox(height: 7),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 6,
-                          crossAxisAlignment: WrapCrossAlignment.center,
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            _statusPill(req.status),
-                            Text(
-                              'By @${req.requesterUsername ?? 'Unknown'}',
-                              style: const TextStyle(
-                                color: FlixieColors.medium,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
+                            ProfileAvatarView(
+                              avatar: req.requesterAvatar,
+                              fallbackText:
+                                  (req.requesterUsername?.isNotEmpty == true
+                                          ? req.requesterUsername![0]
+                                          : '?')
+                                      .toUpperCase(),
+                              fallbackColor: FlixieColors.primary,
+                              size: 24,
+                              profileBadges: req.requesterProfileBadges,
+                            ),
+                            const SizedBox(width: 7),
+                            Flexible(
+                              child: Text(
+                                isMyRequest
+                                    ? 'You invited the group'
+                                    : '@${req.requesterUsername ?? 'Member'}',
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: FlixieColors.light,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
+                            const SizedBox(width: 7),
+                            _statusPill(req.status),
                             if (_formatDate(req.createdAt).isNotEmpty)
-                              Text(
-                                _formatDate(req.createdAt),
-                                style: const TextStyle(
-                                  color: FlixieColors.medium,
-                                  fontSize: 12,
+                              Flexible(
+                                child: Text(
+                                  ' · ${_formatDate(req.createdAt)}',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: FlixieColors.medium,
+                                    fontSize: 11,
+                                  ),
                                 ),
                               ),
                           ],
@@ -1290,15 +1491,20 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
                   ),
                 ],
               ),
-              if (isFocused &&
-                  req.message != null &&
-                  req.message!.isNotEmpty) ...[
+              if (req.message != null && req.message!.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 _messageBubble(req.message!),
               ],
               if (isFocused && req.memberStatuses.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                _buildMemberStatuses(req.memberStatuses),
+                const SizedBox(height: 9),
+                _responsePreview(req),
+              ],
+              if (isFocused && req.mediaId != null) ...[
+                const SizedBox(height: 9),
+                _GroupRequestProviderSummary(
+                  groupId: widget.groupId,
+                  movieId: req.mediaId!,
+                ),
               ],
               if (isFocused && !isMyRequest && req.canRespond) ...[
                 const SizedBox(height: 12),
