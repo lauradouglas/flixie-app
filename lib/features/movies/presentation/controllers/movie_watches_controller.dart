@@ -37,7 +37,8 @@ class MovieWatchesProvider extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      movieWatches[movieId] = await repository.getMovieWatchHistory(userId, movieId);
+      movieWatches[movieId] =
+          await repository.getMovieWatchHistory(userId, movieId);
     } catch (e) {
       error = _friendlyError(e);
     } finally {
@@ -86,9 +87,11 @@ class MovieWatchesProvider extends ChangeNotifier {
         rating: rating,
         notes: notes,
       );
-      userWatches = userWatches.map((e) => e.id == watchEntryId ? updated : e).toList();
-      movieWatches[movieId] =
-          (movieWatches[movieId] ?? []).map((e) => e.id == watchEntryId ? updated : e).toList();
+      userWatches =
+          userWatches.map((e) => e.id == watchEntryId ? updated : e).toList();
+      movieWatches[movieId] = (movieWatches[movieId] ?? [])
+          .map((e) => e.id == watchEntryId ? updated : e)
+          .toList();
       notifyListeners();
       return updated;
     } catch (e) {
@@ -102,8 +105,9 @@ class MovieWatchesProvider extends ChangeNotifier {
     try {
       await repository.deleteMovieWatch(userId, watchEntryId);
       userWatches = userWatches.where((e) => e.id != watchEntryId).toList();
-      movieWatches[movieId] =
-          (movieWatches[movieId] ?? []).where((e) => e.id != watchEntryId).toList();
+      movieWatches[movieId] = (movieWatches[movieId] ?? [])
+          .where((e) => e.id != watchEntryId)
+          .toList();
       notifyListeners();
       return true;
     } catch (e) {

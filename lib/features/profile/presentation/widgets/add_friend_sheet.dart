@@ -8,6 +8,7 @@ import 'package:flixie_app/features/social/presentation/controllers/friend_actio
 import 'package:flixie_app/features/profile/presentation/controllers/profile_lookup_controller.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 
 class AddFriendSheet extends StatefulWidget {
   const AddFriendSheet({super.key, this.onRequestSent});
@@ -87,6 +88,7 @@ class _AddFriendSheetState extends State<AddFriendSheet> {
 
   Future<void> _sendRequest(User user) async {
     final auth = context.read<AuthProvider>();
+    final analytics = context.read<AnalyticsController>();
     final myId = auth.dbUser?.id;
     if (myId == null) return;
 
@@ -100,6 +102,7 @@ class _AddFriendSheetState extends State<AddFriendSheet> {
         'message': '',
         'type': 'FRIEND_REQUEST',
       });
+      await analytics.friendRequestSent();
       // Notify parent so the Sent tab updates immediately
       widget.onRequestSent?.call(
         FriendshipUser(

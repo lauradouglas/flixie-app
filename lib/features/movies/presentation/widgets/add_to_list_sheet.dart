@@ -6,6 +6,7 @@ import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/features/movies/presentation/controllers/movie_lists_controller.dart';
 import 'package:flixie_app/features/movies/data/movie_features_repository.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 
 class AddToListSheet extends StatelessWidget {
   const AddToListSheet({
@@ -284,6 +285,7 @@ class _AddToListSheetBodyState extends State<_AddToListSheetBody> {
   }
 
   Future<void> _applyChanges(MovieListsProvider provider) async {
+    final analytics = context.read<AnalyticsController>();
     setState(() => _saving = true);
     final toAdd = _selectedListIds.difference(_initialListIds).toList();
     final toRemove = _initialListIds.difference(_selectedListIds).toList();
@@ -291,11 +293,19 @@ class _AddToListSheetBodyState extends State<_AddToListSheetBody> {
 
     for (final listId in toAdd) {
       final ok = await provider.addMovieToList(listId, widget.movieId);
-      if (!ok) failed.add(listId);
+      if (ok) {
+        await analytics.movieAddedToList();
+      } else {
+        failed.add(listId);
+      }
     }
     for (final listId in toRemove) {
       final ok = await provider.removeMovieFromList(listId, widget.movieId);
-      if (!ok) failed.add(listId);
+      if (ok) {
+        await analytics.movieRemovedFromList();
+      } else {
+        failed.add(listId);
+      }
     }
 
     if (!mounted) return;

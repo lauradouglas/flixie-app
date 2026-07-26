@@ -15,6 +15,7 @@ import 'package:flixie_app/features/movies/presentation/widgets/add_show_to_list
 import 'package:flixie_app/features/movies/presentation/widgets/genre_chip.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/hero_backdrop.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/watch_provider_card.dart';
+import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 
 enum _ShowAction { watchlist, favorite }
 
@@ -211,6 +212,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
 
   Future<void> _toggleWatchlist() async {
     final user = context.read<AuthProvider>().dbUser;
+    final analytics = context.read<AnalyticsController>();
     final showId = _show?.id;
     if (user == null || showId == null) return;
 
@@ -219,8 +221,12 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       final nextInWatchlist = !_inWatchlist;
       if (_inWatchlist) {
         await ShowService.removeFromWatchlist(user.id, showId);
+        await analytics.watchlistItemRemoved(source: 'show_detail');
+        await analytics.showRemovedFromWatchlist();
       } else {
         await ShowService.addToWatchlist(user.id, showId);
+        await analytics.watchlistItemAdded(source: 'show_detail');
+        await analytics.showAddedToWatchlist();
       }
       if (!mounted) return;
       HapticFeedback.lightImpact();
@@ -246,6 +252,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
 
   Future<void> _toggleFavorite() async {
     final user = context.read<AuthProvider>().dbUser;
+    final analytics = context.read<AnalyticsController>();
     final showId = _show?.id;
     if (user == null || showId == null) return;
 
@@ -254,8 +261,10 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       final nextIsFavorite = !_isFavorite;
       if (_isFavorite) {
         await ShowService.removeFromFavourites(user.id, showId);
+        await analytics.showUnfavourited();
       } else {
         await ShowService.addToFavourites(user.id, showId);
+        await analytics.showFavourited();
       }
       if (!mounted) return;
       HapticFeedback.lightImpact();
@@ -361,12 +370,14 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
 
   Future<void> _setUserRating(int rating) async {
     final user = context.read<AuthProvider>().dbUser;
+    final analytics = context.read<AnalyticsController>();
     final showId = _show?.id;
     if (user == null || showId == null) return;
 
     setState(() => _isRatingLoading = true);
     try {
       final response = await ShowService.addShowRating(showId, user.id, rating);
+      await analytics.ratingSaved(source: 'show_detail');
       final updatedVoteAverage = _parseDouble(response['voteAverage']);
       final updatedVoteCount = _parseInt(response['voteCount']);
       if (!mounted) return;

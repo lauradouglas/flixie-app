@@ -38,15 +38,21 @@ import 'package:flixie_app/features/movies/presentation/widgets/video_card.dart'
 import 'package:flixie_app/features/movies/presentation/widgets/watch_provider_card.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/watch_request_sheet.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/write_review_sheet.dart';
+import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
 
 class MovieDetailScreen extends StatefulWidget {
-  const MovieDetailScreen({super.key, required this.movieId});
+  const MovieDetailScreen({
+    super.key,
+    required this.movieId,
+    this.fromMovieMatch = false,
+  });
 
   final String movieId;
+  final bool fromMovieMatch;
 
   @override
   State<MovieDetailScreen> createState() => _MovieDetailScreenState();
@@ -309,6 +315,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   Future<void> _toggleWatchlist() async {
     final authProvider = context.read<AuthProvider>();
+    final analytics = context.read<AnalyticsController>();
     final user = authProvider.dbUser;
     final movieId = int.tryParse(widget.movieId);
 
@@ -322,6 +329,13 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               .removeFromWatchlist(user.id, movieId)
           : WatchlistActionsController.instance
               .addToWatchlist(user.id, movieId));
+      if (_inWatchlist) {
+        await analytics.watchlistItemRemoved(source: 'movie_detail');
+        await analytics.movieRemovedFromWatchlist();
+      } else {
+        await analytics.watchlistItemAdded(source: 'movie_detail');
+        await analytics.movieAddedToWatchlist();
+      }
 
       // Successfully updated on server, toggle UI state and update user list
       if (mounted) {
@@ -450,6 +464,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   Future<void> _toggleFavorite() async {
     final authProvider = context.read<AuthProvider>();
+    final analytics = context.read<AnalyticsController>();
     final user = authProvider.dbUser;
     final movieId = int.tryParse(widget.movieId);
 
@@ -461,10 +476,12 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       if (_isFavorite) {
         await WatchlistActionsController.instance
             .removeFromFavorites(user.id, movieId);
+        await analytics.movieUnfavourited();
         addedFavorite = null;
       } else {
         addedFavorite = await WatchlistActionsController.instance
             .addToFavorites(user.id, movieId);
+        await analytics.movieFavourited();
       }
 
       // Successfully updated on server, toggle UI state and update user list
@@ -530,6 +547,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   Future<bool> _showLogWatchSheet({MovieWatchEntry? entry}) async {
     final movieId = int.tryParse(widget.movieId);
     final authProvider = context.read<AuthProvider>();
+    final analytics = context.read<AnalyticsController>();
     final movieService = context.read<MovieService>();
     final userId = authProvider.dbUser?.id;
     if (movieId == null || userId == null) return false;
@@ -603,6 +621,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 if (remove == true && mounted) {
                   await WatchlistActionsController.instance
                       .removeFromWatchlist(userId, movieId);
+                  await analytics.watchlistItemRemoved(source: 'movie_detail');
+                  await analytics.movieRemovedFromWatchlist();
                   final updatedWatchlist =
                       (authProvider.dbUser?.movieWatchlist ?? [])
                           .where((item) => item.movieId != movieId)
@@ -1259,6 +1279,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   Future<void> _setUserRating(int rating, bool recommended) async {
     final authProvider = context.read<AuthProvider>();
+    final analytics = context.read<AnalyticsController>();
     final user = authProvider.dbUser;
     final movieId = int.tryParse(widget.movieId);
     if (user == null || movieId == null || _movie == null) return;
@@ -1269,6 +1290,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       // Add rating and get updated vote average and count
       final response = await movieService.addMovieRating(
           movieId, user.id, rating, recommended);
+      await analytics.ratingSaved(source: 'movie_detail');
 
       // Extract updated vote data from response (safely parse types)
       final newVoteAverage = _parseDouble(response['voteAverage']);
@@ -1728,6 +1750,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         movieTitle: _movie?.title,
         requesterId: userId,
         friends: friends,
+        fromMovieMatch: widget.fromMovieMatch,
         onSuccess: () {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(

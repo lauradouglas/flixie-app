@@ -7,16 +7,21 @@ class FriendActionsUseCase {
 
   final SocialRepository _socialRepository;
 
-  Future<FriendsData> getFriends(String userId) => _socialRepository.getFriends(userId);
+  Future<FriendsData> getFriends(String userId) =>
+      _socialRepository.getFriends(userId);
 
   Future<List<ActivityListItem>> getFriendsActivityLists(String userId) =>
       _socialRepository.getFriendsActivityLists(userId);
 
-  Future<void> acceptRequest(String requestId) => _socialRepository.updateRequest(requestId, 'ACCEPTED');
+  Future<void> acceptRequest(String requestId) =>
+      _socialRepository.updateRequest(requestId, 'ACCEPTED');
 
-  Future<void> declineRequest(String requestId) => _socialRepository.updateRequest(requestId, 'DECLINED');
+  Future<void> declineRequest(String requestId) =>
+      _socialRepository.updateRequest(requestId, 'DECLINED');
 
-  Future<void> sendFriendRequest(Map<String, dynamic> body) => _socialRepository.sendFriendRequest(body);
+  Future<void> sendFriendRequest(Map<String, dynamic> body) =>
+      _socialRepository.sendFriendRequest(body);
 
-  Future<void> removeFriend(String userId, String friendId) => _socialRepository.removeFriend(userId, friendId);
+  Future<void> removeFriend(String userId, String friendId) =>
+      _socialRepository.removeFriend(userId, friendId);
 }

@@ -1,7 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
-import 'package:flixie_app/models/group_watch_request.dart' show GroupWatchRequest;
+import 'package:flixie_app/models/group_watch_request.dart'
+    show GroupWatchRequest;
 import 'package:flixie_app/app/theme/app_theme.dart';
 
 class PendingRequestPreviewTile extends StatelessWidget {

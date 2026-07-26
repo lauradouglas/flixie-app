@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'package:flixie_app/models/group_watch_request.dart' show WatchRequestStatus;
+import 'package:flixie_app/models/group_watch_request.dart'
+    show WatchRequestStatus;
 import 'package:flixie_app/app/theme/app_theme.dart';
 
 class RequestStatusBadge extends StatelessWidget {

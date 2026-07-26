@@ -60,7 +60,8 @@ class _FavoriteGenresSheetState extends State<FavoriteGenresSheet> {
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
-      await _settingsController.addFavoriteGenres(widget.userId, _selectedIds.toList());
+      await _settingsController.addFavoriteGenres(
+          widget.userId, _selectedIds.toList());
       if (!mounted) return;
       await context.read<AuthProvider>().refreshUserData();
       if (!mounted) return;

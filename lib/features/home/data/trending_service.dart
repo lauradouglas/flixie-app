@@ -19,10 +19,10 @@ class TrendingService {
     final trendingMovies = (data as List<dynamic>)
         .map((e) => MovieShort.fromJson(e as Map<String, dynamic>))
         .toList();
-    
+
     // Cache the trending movies
     _cache.cacheTrendingMovies(timeWindow, trendingMovies);
-    
+
     return trendingMovies;
   }
 

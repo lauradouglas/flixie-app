@@ -16,6 +16,7 @@ import 'package:flixie_app/core/utils/color_utils.dart';
 import 'package:flixie_app/models/profile_avatar.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/social/presentation/widgets/group_avatar.dart';
+import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 
 class MovieWatchRequestSheet extends StatefulWidget {
   const MovieWatchRequestSheet({
@@ -26,6 +27,7 @@ class MovieWatchRequestSheet extends StatefulWidget {
     required this.friends,
     required this.onSuccess,
     required this.onError,
+    this.fromMovieMatch = false,
   });
 
   final int? movieId;
@@ -34,6 +36,7 @@ class MovieWatchRequestSheet extends StatefulWidget {
   final List<Friendship> friends;
   final VoidCallback onSuccess;
   final VoidCallback onError;
+  final bool fromMovieMatch;
 
   @override
   State<MovieWatchRequestSheet> createState() => _MovieWatchRequestSheetState();
@@ -187,6 +190,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
     final canSend =
         _isGroupMode ? _selectedGroupId != null : _selectedFriendId != null;
     if (!canSend || _isSending) return;
+    final analytics = context.read<AnalyticsController>();
     setState(() => _isSending = true);
     try {
       if (_isGroupMode) {
@@ -212,6 +216,12 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
         });
         final notification = result?['notification'] as Map<String, dynamic>?;
         logger.d('[WatchRequest] notification created: $notification');
+      }
+      await analytics.watchInvitationSent(
+        recipientType: _isGroupMode ? 'group' : 'friend',
+      );
+      if (widget.fromMovieMatch) {
+        await analytics.matchedMovieInvitationSent();
       }
       if (mounted) Navigator.pop(context);
       widget.onSuccess();

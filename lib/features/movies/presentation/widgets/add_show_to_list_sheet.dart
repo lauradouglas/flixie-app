@@ -5,6 +5,7 @@ import 'package:flixie_app/models/show_list.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 
 class AddShowToListSheet extends StatefulWidget {
   const AddShowToListSheet({
@@ -255,6 +256,7 @@ class _AddShowToListSheetState extends State<AddShowToListSheet> {
 
   Future<void> _applyChanges() async {
     final userId = context.read<AuthProvider>().dbUser?.id;
+    final analytics = context.read<AnalyticsController>();
     if (userId == null) return;
     setState(() => _saving = true);
     final toAdd = _selectedListIds.difference(_initialListIds).toList();
@@ -262,9 +264,11 @@ class _AddShowToListSheetState extends State<AddShowToListSheet> {
     try {
       for (final listId in toAdd) {
         await UserService.addShowToList(userId, listId, widget.showId);
+        await analytics.showAddedToList();
       }
       for (final listId in toRemove) {
         await UserService.removeShowFromList(userId, listId, widget.showId);
+        await analytics.showRemovedFromList();
       }
       if (!mounted) return;
       Navigator.pop(context, true);

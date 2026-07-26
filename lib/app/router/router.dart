@@ -19,6 +19,7 @@ import 'package:flixie_app/features/profile/presentation/pages/notification_scre
 import 'package:flixie_app/features/settings/presentation/pages/help_support_screen.dart';
 import 'package:flixie_app/features/settings/presentation/pages/settings_screen.dart';
 import 'package:flixie_app/features/settings/presentation/pages/about_credits_screen.dart';
+import 'package:flixie_app/features/settings/presentation/pages/invite_friend_screen.dart';
 import 'package:flixie_app/features/movies/presentation/pages/stats_screen.dart';
 import 'package:flixie_app/features/movies/presentation/pages/watch_history_screen.dart';
 import 'package:flixie_app/features/social/presentation/pages/watch_requests_screen.dart';
@@ -163,7 +164,11 @@ GoRouter buildRouter(AuthProvider authProvider) {
             path: '/movies/:id',
             pageBuilder: (context, state) => _pushPage(
               state,
-              MovieDetailScreen(movieId: state.pathParameters['id'] ?? '0'),
+              MovieDetailScreen(
+                movieId: state.pathParameters['id'] ?? '0',
+                fromMovieMatch:
+                    state.uri.queryParameters['source'] == 'movie_match',
+              ),
             ),
           ),
           GoRoute(
@@ -268,6 +273,11 @@ GoRouter buildRouter(AuthProvider authProvider) {
             path: '/settings',
             pageBuilder: (context, state) =>
                 _calmPage(state, const SettingsScreen()),
+          ),
+          GoRoute(
+            path: '/invite-friend',
+            pageBuilder: (context, state) =>
+                _pushPage(state, const InviteFriendScreen()),
           ),
           // Widget deep-link targets
           GoRoute(

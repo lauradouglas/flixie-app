@@ -19,6 +19,7 @@ import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_shee
 import 'package:flixie_app/features/movies/presentation/widgets/watch_follow_up_sheet.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/write_review_sheet.dart';
 import 'package:flixie_app/features/social/presentation/widgets/group_watch_requests_overview.dart';
+import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 
 const List<String> _kMonths = [
   'Jan',
@@ -376,6 +377,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
   }
 
   Future<void> _respond(WatchRequest request, String response) async {
+    final analytics = context.read<AnalyticsController>();
     final action = switch (response) {
       'ACCEPTED' => _RequestAction.accepting,
       'DECLINED' => _RequestAction.declining,
@@ -384,6 +386,11 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     await _withRequestAction(request, action, () async {
       try {
         await RequestService.updateRequest(request.id, response);
+        if (response == 'ACCEPTED') {
+          await analytics.watchInvitationAccepted(
+            recipientType: request.groupId == null ? 'friend' : 'group',
+          );
+        }
         await _load();
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -580,6 +587,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     String decision,
   ) async {
     final userId = context.read<AuthProvider>().dbUser?.id;
+    final analytics = context.read<AnalyticsController>();
     if (userId == null || userId.isEmpty) return;
 
     await _withRequestAction(request, _RequestAction.scheduling, () async {
@@ -592,6 +600,11 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         );
         _replaceRequest(state.request);
         final agreedTime = state.request.scheduledFor ?? proposal.proposedFor;
+        if (decision == 'accepted' && agreedTime != null) {
+          await analytics.watchScheduled(
+            recipientType: request.groupId == null ? 'friend' : 'group',
+          );
+        }
         if (!mounted) return;
         if (decision == 'accepted' && agreedTime != null) {
           final addToCalendar = await showDialog<bool>(

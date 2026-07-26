@@ -20,6 +20,7 @@ import 'package:flixie_app/models/watch_provider.dart';
 import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'package:flixie_app/features/watchlist/presentation/controllers/watchlist_actions_controller.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_sheet.dart';
+import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 
 class WatchlistScreen extends StatefulWidget {
   const WatchlistScreen({super.key});
@@ -299,6 +300,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
 
   Future<void> _openAddMovieSheet() async {
     final authProvider = context.read<AuthProvider>();
+    final analytics = context.read<AnalyticsController>();
     final user = authProvider.dbUser;
     if (user == null) return;
 
@@ -324,6 +326,8 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     try {
       final addedResponse =
           await UserService.addToWatchlist(user.id, selected.id);
+      await analytics.watchlistItemAdded(source: 'watchlist');
+      await analytics.movieAddedToWatchlist();
       final added = _entryWithMovieFallback(addedResponse, selected);
       final currentWatchlist =
           List<WatchlistMovie>.from(user.movieWatchlist ?? []);
@@ -363,6 +367,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     String userId,
   ) async {
     var didSubmit = false;
+    final analytics = context.read<AnalyticsController>();
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -384,6 +389,9 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
               notes: notes,
             ),
           );
+          if (rating != null) {
+            await analytics.ratingSaved(source: 'watchlist');
+          }
           didSubmit = true;
           if (mounted) {
             context.read<AuthProvider>().markActivityChanged();
@@ -445,6 +453,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
 
   Future<void> _markAsWatched(WatchlistMovie item) async {
     final authProvider = context.read<AuthProvider>();
+    final analytics = context.read<AnalyticsController>();
     final user = authProvider.dbUser;
     if (user == null) return;
     final committed = await _confirmWatchEntry(item, user.id);
@@ -454,6 +463,8 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       // The submitted watch entry marks the movie as watched. Only now remove
       // it from the watchlist and update local state.
       await UserService.removeFromWatchlist(user.id, item.movieId);
+      await analytics.watchlistItemRemoved(source: 'watchlist');
+      await analytics.movieRemovedFromWatchlist();
       final watchedMovie =
           await UserService.addToWatched(user.id, item.movieId);
 
@@ -508,6 +519,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
 
   Future<void> _removeFromWatchlist(WatchlistMovie item) async {
     final authProvider = context.read<AuthProvider>();
+    final analytics = context.read<AnalyticsController>();
     final user = authProvider.dbUser;
     if (user == null) return;
 
@@ -516,6 +528,8 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
 
     try {
       await UserService.removeFromWatchlist(user.id, item.movieId);
+      await analytics.watchlistItemRemoved(source: 'watchlist');
+      await analytics.movieRemovedFromWatchlist();
 
       // Update the local user list
       final currentWatchlist =
@@ -605,6 +619,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
 
   Future<void> _clearWatchedFromWatchlist() async {
     final authProvider = context.read<AuthProvider>();
+    final analytics = context.read<AnalyticsController>();
     final user = authProvider.dbUser;
     if (user == null) return;
     final watchedIds =
@@ -643,6 +658,8 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       await Future.wait(watchedItems.map(
         (item) => UserService.removeFromWatchlist(user.id, item.movieId),
       ));
+      await analytics.watchlistItemRemoved(source: 'watchlist');
+      await analytics.movieRemovedFromWatchlist();
       final idsToRemove = watchedItems.map((item) => item.movieId).toSet();
       final updatedWatchlist = (user.movieWatchlist ?? [])
           .where((item) => !idsToRemove.contains(item.movieId))
@@ -674,6 +691,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
 
   Future<void> _addToFavorites(WatchlistMovie item) async {
     final authProvider = context.read<AuthProvider>();
+    final analytics = context.read<AnalyticsController>();
     final user = authProvider.dbUser;
     if (user == null) return;
 
@@ -693,6 +711,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
 
     try {
       final addedFavorite = await UserService.addToFavorites(user.id, movieId);
+      await analytics.movieFavourited();
       final updatedFavorites =
           List<FavoriteMovie>.from(user.favoriteMovies ?? []);
       if (!updatedFavorites.any((f) => f.movieId == movieId)) {

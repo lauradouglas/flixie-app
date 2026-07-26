@@ -19,6 +19,8 @@ import 'package:flixie_app/features/settings/presentation/widgets/settings_tile.
 import 'package:flixie_app/features/settings/presentation/widgets/watch_providers_sheet.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/change_avatar_sheet.dart';
 import 'package:flixie_app/core/safety/safety_service.dart';
+import 'package:flixie_app/core/analytics/analytics_consent.dart';
+import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -82,9 +84,35 @@ class SettingsScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
+          _sectionLabel('Social'),
+          _SettingsGroup(
+            children: [
+              SettingsTile(
+                icon: Icons.person_add_alt_1_outlined,
+                label: 'Invite a friend',
+                onTap: () => context.push('/invite-friend'),
+                isLast: true,
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
           _sectionLabel('Preferences'),
           _SettingsGroup(
             children: [
+              Consumer<AnalyticsController>(
+                builder: (context, analytics, _) => SettingsTile(
+                  icon: Icons.analytics_outlined,
+                  label: 'Share anonymous analytics',
+                  onTap: () => analytics.isEnabled
+                      ? analytics.decline()
+                      : analytics.allow(),
+                  trailing: Switch.adaptive(
+                    value: analytics.consent == AnalyticsConsent.accepted,
+                    onChanged: (enabled) =>
+                        enabled ? analytics.allow() : analytics.decline(),
+                  ),
+                ),
+              ),
               // TODO: implement Notifications settings
               // SettingsTile(
               //   icon: Icons.notifications_outlined,

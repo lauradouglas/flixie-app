@@ -1,5 +1,7 @@
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +13,10 @@ import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/core/auth/auth_service.dart';
 import 'package:flixie_app/core/auth/firebase_options.dart';
 import 'package:flixie_app/core/auth/push_notification_service.dart';
+import 'package:flixie_app/core/analytics/analytics_backend.dart';
+import 'package:flixie_app/core/analytics/analytics_consent_prompt.dart';
+import 'package:flixie_app/core/analytics/flixie_analytics.dart';
+import 'package:flixie_app/core/analytics/shared_preferences_analytics_consent_store.dart';
 import 'package:flixie_app/core/storage/movie_cache_service.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/features/movies/data/movie_service.dart';
@@ -21,6 +27,26 @@ bool _hasFirebaseDartDefines(FirebaseOptions options) {
       options.appId.isNotEmpty &&
       options.messagingSenderId.isNotEmpty &&
       options.projectId.isNotEmpty;
+}
+
+Future<void> _activateFirebaseAppCheck() async {
+  try {
+    await FirebaseAppCheck.instance.activate(
+      androidProvider:
+          kReleaseMode ? AndroidProvider.playIntegrity : AndroidProvider.debug,
+      appleProvider: kReleaseMode
+          ? AppleProvider.appAttestWithDeviceCheckFallback
+          : AppleProvider.debug,
+    );
+    logger.i(
+      'Firebase App Check activated with '
+      '${kReleaseMode ? 'production' : 'debug'} providers',
+    );
+  } catch (error) {
+    // App Check should protect Firebase resources without preventing the app
+    // from starting if a provider is temporarily unavailable.
+    logger.e('Firebase App Check activation error: $error');
+  }
 }
 
 void main() async {
@@ -52,11 +78,21 @@ void main() async {
     }
   }
 
+  if (Firebase.apps.isNotEmpty) {
+    await _activateFirebaseAppCheck();
+  }
+
   // Register FCM background message handler (must be called before runApp).
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
   // Clear stale movie cache from previous days
   MovieCacheService().clearStaleCache();
+
+  final analyticsController = AnalyticsController(
+    backend: FirebaseAnalyticsBackend(),
+    consentStore: SharedPreferencesAnalyticsConsentStore(),
+  );
+  await analyticsController.initialize();
 
   // Lock to portrait + landscape orientations, allow both
   SystemChrome.setPreferredOrientations([
@@ -79,6 +115,9 @@ void main() async {
   runApp(
     MultiProvider(
       providers: [
+        ChangeNotifierProvider<AnalyticsController>.value(
+          value: analyticsController,
+        ),
         Provider<MovieService>(create: (_) => MovieService()),
         ChangeNotifierProvider(
           create: (context) => AuthProvider(
@@ -140,9 +179,11 @@ class _FlixieAppState extends State<FlixieApp> {
             focus.unfocus();
           }
         },
-        child: ColoredBox(
-          color: isDark ? FlixieColors.background : const Color(0xFFF5F7FA),
-          child: child ?? const SizedBox.shrink(),
+        child: AnalyticsConsentPrompt(
+          child: ColoredBox(
+            color: isDark ? FlixieColors.background : const Color(0xFFF5F7FA),
+            child: child ?? const SizedBox.shrink(),
+          ),
         ),
       ),
     );

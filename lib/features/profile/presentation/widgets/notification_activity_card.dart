@@ -153,9 +153,11 @@ class NotificationActivityCard extends StatelessWidget {
                   ],
                   if (onOpen != null) ...[
                     const SizedBox(height: 8),
-                    const Text(
-                      'View list',
-                      style: TextStyle(
+                    Text(
+                      notification.type == FlixieNotification.referralJoined
+                          ? 'View profile'
+                          : 'View list',
+                      style: const TextStyle(
                         color: FlixieColors.primary,
                         fontSize: 12,
                         fontWeight: FontWeight.w800,

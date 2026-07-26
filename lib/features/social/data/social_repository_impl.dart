@@ -5,19 +5,23 @@ import 'package:flixie_app/features/social/data/friend_service.dart';
 
 class SocialRepositoryImpl implements SocialRepository {
   @override
-  Future<FriendsData> getFriends(String userId) => FriendService.getFriends(userId);
+  Future<FriendsData> getFriends(String userId) =>
+      FriendService.getFriends(userId);
 
   @override
   Future<List<ActivityListItem>> getFriendsActivityLists(String userId) =>
       FriendService.getFriendsActivityLists(userId);
 
   @override
-  Future<void> updateRequest(String requestId, String status, {String response = ''}) =>
+  Future<void> updateRequest(String requestId, String status,
+          {String response = ''}) =>
       FriendService.updateRequest(requestId, status, response: response);
 
   @override
-  Future<void> sendFriendRequest(Map<String, dynamic> body) => FriendService.sendFriendRequest(body);
+  Future<void> sendFriendRequest(Map<String, dynamic> body) =>
+      FriendService.sendFriendRequest(body);
 
   @override
-  Future<void> removeFriend(String userId, String friendId) => FriendService.removeFriend(userId, friendId);
+  Future<void> removeFriend(String userId, String friendId) =>
+      FriendService.removeFriend(userId, friendId);
 }

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/features/social/data/friend_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 
 class AllFriendsSheet extends StatefulWidget {
   const AllFriendsSheet({
@@ -49,8 +51,10 @@ class _AllFriendsSheetState extends State<AllFriendsSheet>
   }
 
   Future<void> _acceptRequest(Friendship friendship) async {
+    final analytics = context.read<AnalyticsController>();
     try {
       await FriendService.updateRequest(friendship.id, 'ACCEPTED');
+      await analytics.friendConnected();
       if (mounted) {
         setState(() {
           _pendingFriends.removeWhere((f) => f.id == friendship.id);

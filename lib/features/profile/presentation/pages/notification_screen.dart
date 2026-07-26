@@ -12,6 +12,7 @@ import 'package:flixie_app/features/social/data/request_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/utils/notification_visibility.dart';
+import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/core/calendar/watch_calendar_service.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/notification_activity_card.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/notification_request_card.dart';
@@ -173,6 +174,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     final id = notification.id;
     if (id == null) return;
     setState(() => _processingIds.add(id));
+    final analytics = context.read<AnalyticsController>();
     try {
       final auth = context.read<AuthProvider>();
       final userId = auth.dbUser?.id;
@@ -214,6 +216,14 @@ class _NotificationScreenState extends State<NotificationScreen> {
         action: action,
         read: true,
       );
+      if (action == FlixieNotification.actionAccepted) {
+        if (notification.type == FlixieNotification.friendRequest) {
+          await analytics.friendConnected();
+        } else if (notification.type == FlixieNotification.movieWatchRequest ||
+            notification.type == FlixieNotification.showWatchRequest) {
+          await analytics.watchInvitationAccepted(recipientType: 'friend');
+        }
+      }
 
       if (mounted) {
         setState(() {
@@ -268,6 +278,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     final proposalId =
         notification.latestWatchScheduleProposal?['id']?.toString();
     final userId = context.read<AuthProvider>().dbUser?.id;
+    final analytics = context.read<AnalyticsController>();
     final notificationId = notification.id;
     if (requestId == null ||
         proposalId == null ||
@@ -289,6 +300,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
       if (!mounted) return;
       final scheduledFor = state.request.scheduledFor;
       if (decision == 'accepted' && scheduledFor != null) {
+        await analytics.watchScheduled(recipientType: 'friend');
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Watch time agreed'),

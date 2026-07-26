@@ -5,22 +5,22 @@ import 'package:flixie_app/features/authentication/presentation/pages/onboarding
 
 void main() {
   group('validateFavouriteMovieCount', () {
-    test('returns error when fewer than 3 favourites selected', () {
+    test('returns error when no favourites are selected', () {
       expect(
-        validateFavouriteMovieCount(2),
-        'Please select between 3 and 5 favourite movies.',
+        validateFavouriteMovieCount(0),
+        'Please select between 1 and 5 favourite movies.',
       );
     });
 
     test('returns null when within supported range', () {
-      expect(validateFavouriteMovieCount(3), isNull);
+      expect(validateFavouriteMovieCount(1), isNull);
       expect(validateFavouriteMovieCount(5), isNull);
     });
 
     test('returns error when more than 5 favourites selected', () {
       expect(
         validateFavouriteMovieCount(6),
-        'Please select between 3 and 5 favourite movies.',
+        'Please select between 1 and 5 favourite movies.',
       );
     });
   });

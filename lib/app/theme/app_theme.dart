@@ -503,8 +503,7 @@ class AppTheme {
         displayMedium: TextStyle(color: textDark, fontWeight: FontWeight.bold),
         displaySmall: TextStyle(color: textDark, fontWeight: FontWeight.bold),
         headlineLarge: TextStyle(color: textDark, fontWeight: FontWeight.bold),
-        headlineMedium:
-            TextStyle(color: textDark, fontWeight: FontWeight.w600),
+        headlineMedium: TextStyle(color: textDark, fontWeight: FontWeight.w600),
         headlineSmall: TextStyle(color: textDark, fontWeight: FontWeight.w600),
         titleLarge: TextStyle(color: textDark, fontWeight: FontWeight.w600),
         titleMedium: TextStyle(color: textDark),

@@ -10,6 +10,7 @@ import 'package:flixie_app/features/movies/data/search_service.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/authentication/presentation/pages/auth_ui.dart';
+import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 
 enum _OnboardingStep { preferences, success }
 
@@ -29,8 +30,8 @@ const _popularGenres = [
 ];
 
 String? validateFavouriteMovieCount(int count) {
-  if (count < 3 || count > 5) {
-    return 'Please select between 3 and 5 favourite movies.';
+  if (count < 1 || count > 5) {
+    return 'Please select between 1 and 5 favourite movies.';
   }
   return null;
 }
@@ -53,6 +54,7 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   _OnboardingStep _step = _OnboardingStep.preferences;
   bool _saving = false;
+  bool _onboardingStartedLogged = false;
 
   final Map<int, MovieShort> _favourites = {};
   final Map<int, MovieShort> _recentlyWatched = {};
@@ -66,6 +68,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void initState() {
     super.initState();
     _loadGenres();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_onboardingStartedLogged) return;
+    _onboardingStartedLogged = true;
+    context.read<AnalyticsController>().onboardingStarted();
   }
 
   @override
@@ -112,12 +122,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (!mounted || movie == null) return;
     final selectedMap =
         bucket == _MovieBucket.favourites ? _favourites : _recentlyWatched;
+    final isNewFavourite =
+        bucket == _MovieBucket.favourites && !selectedMap.containsKey(movie.id);
     setState(() {
       if (!canAddOnboardingMovie(selectedMap, movie.id)) {
         return;
       }
       selectedMap[movie.id] = movie;
     });
+    if (isNewFavourite) {
+      await context
+          .read<AnalyticsController>()
+          .favouriteSelected(favouriteCount: _favourites.length);
+    }
   }
 
   Future<void> _savePreferences() async {
@@ -136,6 +153,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
     setState(() => _saving = true);
     final auth = context.read<AuthProvider>();
+    final analytics = context.read<AnalyticsController>();
     final userId = auth.dbUser?.id;
     if (userId == null) {
       if (mounted) setState(() => _saving = false);
@@ -150,7 +168,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       if (_selectedGenreIds.isNotEmpty) {
         await UserService.addFavoriteGenres(userId, _selectedGenreIds.toList());
       }
-      await auth.completeOnboarding();
+      final referralQualified = await auth.completeOnboarding();
+      await analytics.onboardingCompleted(favouriteCount: _favourites.length);
+      if (referralQualified) {
+        await analytics.referralQualified();
+        await analytics.rewardUnlocked();
+      }
       if (!mounted) return;
       setState(() => _step = _OnboardingStep.success);
     } catch (_) {
@@ -215,7 +238,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         const SizedBox(height: 18),
         _buildMovieSection(
           title: 'Favourite Movies ⭐',
-          subtitle: 'Select 3–5 movies',
+          subtitle: 'Select at least 1 movie (up to 5)',
           selected: _favourites,
           maxCount: 5,
           onAdd: () => _pickMovie(_MovieBucket.favourites),

@@ -3,8 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 
 const List<String> _kMonthNames = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ];
 
 class MonthlyBarChart extends StatelessWidget {

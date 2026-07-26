@@ -61,6 +61,11 @@ class _SocialScreenState extends State<SocialScreen> {
         ),
         actions: [
           IconButton(
+            onPressed: () => context.push('/invite-friend'),
+            icon: const Icon(Icons.ios_share_outlined),
+            tooltip: 'Invite a friend to Flixie',
+          ),
+          IconButton(
             onPressed: () {
               if (_selectedTab == 0) {
                 _showAddFriendSheet();

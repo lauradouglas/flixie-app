@@ -115,32 +115,25 @@ class ProfileHeader extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '@$username',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: textTheme.headlineSmall?.copyWith(
-                                color: FlixieColors.light,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                          if (profileBadges.isNotEmpty) ...[
-                            const SizedBox(width: 8),
-                            ProfileBadgePills(
-                              badges: profileBadges,
-                              compact: true,
-                              featuredOnly: true,
-                            ),
-                          ],
-                        ],
+                      Text(
+                        '@$username',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.headlineSmall?.copyWith(
+                          color: FlixieColors.light,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
+                      if (profileBadges.isNotEmpty) ...[
+                        const SizedBox(height: 7),
+                        ProfileBadgePills(
+                          badges: profileBadges,
+                          compact: true,
+                          featuredOnly: true,
+                        ),
+                      ],
                       if (displayName.isNotEmpty) ...[
-                        const SizedBox(height: 3),
+                        const SizedBox(height: 7),
                         Text(
                           displayName,
                           style: textTheme.bodyLarge?.copyWith(

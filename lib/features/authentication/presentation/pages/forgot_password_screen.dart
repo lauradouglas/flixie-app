@@ -26,8 +26,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     final auth = context.read<AuthProvider>();
-    final success =
-        await auth.sendPasswordResetEmail(_emailController.text);
+    final success = await auth.sendPasswordResetEmail(_emailController.text);
     if (!mounted) return;
     if (success) {
       setState(() => _emailSent = true);
@@ -55,7 +54,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-            child: _emailSent ? _buildSuccessState(textTheme) : _buildForm(textTheme, isLoading),
+            child: _emailSent
+                ? _buildSuccessState(textTheme)
+                : _buildForm(textTheme, isLoading),
           ),
         ),
       ),
@@ -86,7 +87,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 32),
-
           TextFormField(
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
@@ -107,7 +107,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             },
           ),
           const SizedBox(height: 24),
-
           ElevatedButton(
             onPressed: isLoading ? null : _submit,
             style: ElevatedButton.styleFrom(
@@ -122,7 +121,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 : const Text('Send Reset Email'),
           ),
           const SizedBox(height: 16),
-
           TextButton(
             onPressed: () => context.pop(),
             child: const Text('Back to Sign In'),

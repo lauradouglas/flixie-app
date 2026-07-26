@@ -588,35 +588,26 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          '@${_user?.username ?? 'user'}',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style:
-                                              textTheme.headlineSmall?.copyWith(
-                                            color: FlixieColors.light,
-                                            fontWeight: FontWeight.w800,
-                                          ),
-                                        ),
-                                      ),
-                                      if (_user?.profileBadges.isNotEmpty ==
-                                          true) ...[
-                                        const SizedBox(width: 8),
-                                        ProfileBadgePills(
-                                          badges: _user!.profileBadges,
-                                          compact: true,
-                                          featuredOnly: true,
-                                        ),
-                                      ],
-                                    ],
+                                  Text(
+                                    '@${_user?.username ?? 'user'}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: textTheme.headlineSmall?.copyWith(
+                                      color: FlixieColors.light,
+                                      fontWeight: FontWeight.w800,
+                                    ),
                                   ),
+                                  if (_user?.profileBadges.isNotEmpty ==
+                                      true) ...[
+                                    const SizedBox(height: 7),
+                                    ProfileBadgePills(
+                                      badges: _user!.profileBadges,
+                                      compact: true,
+                                      featuredOnly: true,
+                                    ),
+                                  ],
                                   if (visibleFirstName != null) ...[
-                                    const SizedBox(height: 3),
+                                    const SizedBox(height: 7),
                                     Text(
                                       visibleFirstName,
                                       style: textTheme.bodyLarge?.copyWith(

@@ -16,11 +16,15 @@ abstract class WatchlistRepository {
   Future<FavoriteMovie> addToFavorites(String userId, int movieId);
   Future<void> removeFromFavorites(String userId, int movieId);
 
-  Future<List<MovieWatchEntry>> getMovieWatchHistory(String userId, int movieId);
-  Future<MovieWatchEntry> logMovieWatch(String userId, LogMovieWatchRequest request);
-  Future<MovieWatchEntry> updateMovieWatch(String userId, String watchEntryId, UpdateMovieWatchRequest request);
+  Future<List<MovieWatchEntry>> getMovieWatchHistory(
+      String userId, int movieId);
+  Future<MovieWatchEntry> logMovieWatch(
+      String userId, LogMovieWatchRequest request);
+  Future<MovieWatchEntry> updateMovieWatch(
+      String userId, String watchEntryId, UpdateMovieWatchRequest request);
   Future<void> deleteMovieWatch(String userId, String watchEntryId);
 
   Future<List<MovieList>> getMyListsContainingMovie(String userId, int movieId);
-  Future<List<MovieFriendListEntry>> getFriendsListsContainingMovie(String userId, int movieId);
+  Future<List<MovieFriendListEntry>> getFriendsListsContainingMovie(
+      String userId, int movieId);
 }

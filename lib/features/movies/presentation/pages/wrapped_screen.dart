@@ -89,9 +89,7 @@ class _WrappedViewState extends State<_WrappedView> {
       items: List.generate(
         DateTime.now().year - widget.joinYear + 1,
         (i) => DateTime.now().year - i,
-      )
-          .map((y) => DropdownMenuItem(value: y, child: Text('$y')))
-          .toList(),
+      ).map((y) => DropdownMenuItem(value: y, child: Text('$y'))).toList(),
       onChanged: (value) {
         if (value == null) return;
         setState(() => _year = value);
@@ -162,8 +160,7 @@ class _WrappedViewState extends State<_WrappedView> {
                         Expanded(
                           child: WrappedHeadlineCard(
                             title: 'Hours',
-                            value:
-                                wrapped.totalHoursWatched.toStringAsFixed(1),
+                            value: wrapped.totalHoursWatched.toStringAsFixed(1),
                             icon: Icons.schedule_outlined,
                           ),
                         ),
@@ -189,7 +186,8 @@ class _WrappedViewState extends State<_WrappedView> {
                     const HomeSectionHeader(title: 'Top Directors'),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: WrappedDirectorList(directors: wrapped.topDirectors),
+                      child:
+                          WrappedDirectorList(directors: wrapped.topDirectors),
                     ),
                   ],
                   if (wrapped.highestRatedMovies.isNotEmpty) ...[

@@ -27,6 +27,7 @@ import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
 import 'package:flixie_app/core/widgets/flixie_wordmark.dart';
+import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/features/home/presentation/widgets/featured_card.dart';
 import 'package:flixie_app/features/home/presentation/widgets/greeting_header.dart';
 import 'package:flixie_app/features/home/presentation/widgets/section_header.dart';
@@ -309,6 +310,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _toggleHeroWatchlist(
       BuildContext context, MovieShort movie) async {
     final authProvider = context.read<AuthProvider>();
+    final analytics = context.read<AnalyticsController>();
     final user = authProvider.dbUser;
     if (user == null) {
       context.push('/movies/${movie.id}');
@@ -330,9 +332,13 @@ class _HomeScreenState extends State<HomeScreen> {
           List<WatchlistMovie>.from(user.movieWatchlist ?? []);
       if (inWatchlist) {
         await _watchlistActions.removeFromWatchlist(user.id, movieId);
+        await analytics.watchlistItemRemoved(source: 'home');
+        await analytics.movieRemovedFromWatchlist();
         currentWatchlist.removeWhere((item) => item.movieId == movieId);
       } else {
         final added = await _watchlistActions.addToWatchlist(user.id, movieId);
+        await analytics.watchlistItemAdded(source: 'home');
+        await analytics.movieAddedToWatchlist();
         currentWatchlist.removeWhere((item) => item.movieId == movieId);
         currentWatchlist.add(added);
         authProvider.markActivityChanged();
@@ -1196,6 +1202,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required bool currentlyInWatchlist,
   }) async {
     final auth = context.read<AuthProvider>();
+    final analytics = context.read<AnalyticsController>();
     final userId = auth.dbUser?.id;
     if (userId == null) return;
 
@@ -1206,11 +1213,15 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       if (currentlyInWatchlist) {
         await _watchlistActions.removeFromWatchlist(userId, movieId);
+        await analytics.watchlistItemRemoved(source: 'home');
+        await analytics.movieRemovedFromWatchlist();
         auth.updateUserList(
           movieWatchlist: existing.where((w) => w.movieId != movieId).toList(),
         );
       } else {
         await _watchlistActions.addToWatchlist(userId, movieId);
+        await analytics.watchlistItemAdded(source: 'home');
+        await analytics.movieAddedToWatchlist();
         final now = DateTime.now().toIso8601String();
         auth.updateUserList(
           movieWatchlist: [
@@ -1341,6 +1352,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required bool isInWatchlist,
   }) async {
     final auth = context.read<AuthProvider>();
+    final analytics = context.read<AnalyticsController>();
     final userId = auth.dbUser?.id;
     if (userId == null) return;
 
@@ -1357,6 +1369,8 @@ class _HomeScreenState extends State<HomeScreen> {
         await _watchlistActions.addToWatched(userId, movieId);
         if (isInWatchlist) {
           await _watchlistActions.removeFromWatchlist(userId, movieId);
+          await analytics.watchlistItemRemoved(source: 'home');
+          await analytics.movieRemovedFromWatchlist();
           final currentWatchlist = auth.dbUser?.movieWatchlist ?? [];
           auth.updateUserList(
             movieWatchlist: currentWatchlist

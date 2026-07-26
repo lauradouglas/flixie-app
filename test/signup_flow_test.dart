@@ -121,6 +121,31 @@ void main() {
     );
   });
 
+  test('signup forwards a normalized referral code', () async {
+    Map<String, dynamic>? receivedBody;
+    final provider = AuthProvider(
+      authService,
+      MovieService(),
+      prefetchAfterAuth: false,
+      profileCreator: (body) async {
+        receivedBody = Map<String, dynamic>.from(body);
+        return _createdUser();
+      },
+    );
+
+    final result = await provider.signUp(
+      email: 'laura@example.com',
+      password: 'Password1!',
+      firstName: 'Laura',
+      lastName: 'Douglas',
+      username: 'Movie_User.99',
+      referralCode: ' flxabc123 ',
+    );
+
+    expect(result, isTrue);
+    expect(receivedBody?['referralCode'], 'FLXABC123');
+  });
+
   test('unavailable username surfaces backend validation code', () async {
     final provider = AuthProvider(
       authService,

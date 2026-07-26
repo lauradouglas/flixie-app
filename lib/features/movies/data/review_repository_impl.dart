@@ -21,5 +21,6 @@ class ReviewRepositoryImpl implements ReviewRepository {
   }
 
   @override
-  Future<Review> addMovieReview(Review review) => UserService.addMovieReview(review);
+  Future<Review> addMovieReview(Review review) =>
+      UserService.addMovieReview(review);
 }

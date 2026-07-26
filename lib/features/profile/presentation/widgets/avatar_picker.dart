@@ -72,16 +72,21 @@ class AvatarPicker extends StatelessWidget {
                   width: selected ? 3 : 1,
                 ),
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  ProfileAvatarView(
-                    avatar: avatar,
-                    fallbackText: avatar.displayName.substring(0, 1),
-                    fallbackColor: FlixieColors.primary,
-                    size: 64,
-                  ),
-                ],
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final avatarSize =
+                      constraints.maxWidth < constraints.maxHeight
+                          ? constraints.maxWidth
+                          : constraints.maxHeight;
+                  return Center(
+                    child: ProfileAvatarView(
+                      avatar: avatar,
+                      fallbackText: avatar.displayName.substring(0, 1),
+                      fallbackColor: FlixieColors.primary,
+                      size: avatarSize,
+                    ),
+                  );
+                },
               ),
             ),
           ),

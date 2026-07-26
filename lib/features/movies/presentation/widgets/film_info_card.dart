@@ -83,8 +83,8 @@ class FilmInfoCard extends StatelessWidget {
     if (hasDirector) rows.add(row('Director', director!));
     if (hasWriters) {
       if (rows.isNotEmpty) rows.add(divider);
-      rows.add(row(
-          writers.length == 1 ? 'Writer' : 'Writers', writers.join(', ')));
+      rows.add(
+          row(writers.length == 1 ? 'Writer' : 'Writers', writers.join(', ')));
     }
     if (hasBudget) {
       if (rows.isNotEmpty) rows.add(divider);

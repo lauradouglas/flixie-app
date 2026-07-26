@@ -26,5 +26,6 @@ class ReviewReactionsController {
     );
   }
 
-  Future<Review> addMovieReview(Review review) => _useCase.addMovieReview(review);
+  Future<Review> addMovieReview(Review review) =>
+      _useCase.addMovieReview(review);
 }

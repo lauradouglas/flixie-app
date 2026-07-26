@@ -81,6 +81,7 @@ class AuthProvider extends ChangeNotifier {
   String? _errorMessage;
   String? _errorCode;
   int _activityVersion = 0;
+  bool _pendingReferralQualification = false;
 
   // Prefetched at login — screens use these to skip spinners
   List<ActivityListItem>? _cachedActivity;
@@ -490,12 +491,12 @@ class AuthProvider extends ChangeNotifier {
 
   /// Marks onboarding as complete on the backend and updates the cached user.
   /// Called when the user finishes or skips the post-signup onboarding flow.
-  Future<void> completeOnboarding() async {
+  Future<bool> completeOnboarding() async {
     final userId = _dbUser?.id;
-    if (userId == null) return;
+    if (userId == null) return false;
+    final qualifiedReferral = _pendingReferralQualification;
     try {
-      final updated =
-          await UserService.updateUserField(userId, 'completedSetup', true);
+      final updated = await UserService.completeUserSetup(userId);
       _dbUser = updated;
     } catch (e) {
       // Optimistically mark complete locally so the user isn't stuck
@@ -504,7 +505,9 @@ class AuthProvider extends ChangeNotifier {
       }
       logger.w('[AuthProvider] completeOnboarding error: $e');
     }
+    _pendingReferralQualification = false;
     notifyListeners();
+    return qualifiedReferral;
   }
 
   void _setLoading(bool value) {
@@ -600,6 +603,7 @@ class AuthProvider extends ChangeNotifier {
     int? languageId,
     int? countryId,
     List<int> genreIds = const [],
+    String? referralCode,
   }) async {
     if (_isLoading) return false;
     _setLoading(true);
@@ -616,6 +620,8 @@ class AuthProvider extends ChangeNotifier {
         'bio': '',
         'countryId': countryId,
         'languageId': languageId,
+        if (referralCode?.trim().isNotEmpty == true)
+          'referralCode': referralCode!.trim().toUpperCase(),
       };
 
       final canRetryProfile = _pendingSignupProfile != null &&
@@ -693,6 +699,7 @@ class AuthProvider extends ChangeNotifier {
     required String username,
     int? languageId,
     int? countryId,
+    String? referralCode,
   }) async {
     if (_isLoading) return false;
     _setLoading(true);
@@ -708,7 +715,10 @@ class AuthProvider extends ChangeNotifier {
         'bio': '',
         'countryId': countryId,
         'languageId': languageId,
+        if (referralCode?.trim().isNotEmpty == true)
+          'referralCode': referralCode!.trim().toUpperCase(),
       };
+      _pendingReferralQualification = referralCode?.trim().isNotEmpty == true;
       _pendingSignupEmail = normalizedEmail;
       if (_authService.currentUser == null) {
         await _authService.signUp(

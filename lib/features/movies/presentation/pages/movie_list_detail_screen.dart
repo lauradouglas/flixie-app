@@ -18,6 +18,7 @@ import 'package:flixie_app/features/movies/presentation/controllers/movie_lists_
 import 'package:flixie_app/features/movies/data/movie_features_repository.dart';
 import 'package:flixie_app/features/movies/data/search_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 
 enum _ListSort { recentlyAdded, title, rating }
 
@@ -92,6 +93,9 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
   @override
   void initState() {
     super.initState();
+    if (widget.listName.startsWith('Movie Match with @')) {
+      context.read<AnalyticsController>().tasteMatchViewed();
+    }
     final currentUser = context.read<AuthProvider>().dbUser;
     if (currentUser?.id == widget.ownerUserId) {
       _owner = currentUser;
@@ -579,7 +583,11 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                               onOpen: () {
                                 final movieId = _entryMovieId(entry);
                                 if (movieId > 0) {
-                                  context.push('/movies/$movieId');
+                                  final source = widget.listName
+                                          .startsWith('Movie Match with @')
+                                      ? '?source=movie_match'
+                                      : '';
+                                  context.push('/movies/$movieId$source');
                                   return;
                                 }
                                 final showId = _entryShowId(entry);
@@ -657,9 +665,15 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
       ),
     );
     if (confirmed != true || !context.mounted) return;
+    final analytics = context.read<AnalyticsController>();
     final ok = movieId > 0
         ? await provider.removeMovieFromList(widget.listId, movieId)
         : await provider.removeShowFromList(widget.listId, showId);
+    if (ok) {
+      await (movieId > 0
+          ? analytics.movieRemovedFromList()
+          : analytics.showRemovedFromList());
+    }
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -744,11 +758,13 @@ class _AddMovieToListSheetState extends State<_AddMovieToListSheet> {
 
   Future<void> _addMovie(MovieShort movie) async {
     final provider = context.read<MovieListsProvider>();
+    final analytics = context.read<AnalyticsController>();
     setState(() {
       _addingMovieId = movie.id;
       _error = null;
     });
     final ok = await provider.addMovieToList(widget.listId, movie.id);
+    if (ok) await analytics.movieAddedToList();
     if (!mounted) return;
     setState(() => _addingMovieId = null);
     if (ok) {

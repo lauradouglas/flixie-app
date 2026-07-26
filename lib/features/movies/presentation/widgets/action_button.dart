@@ -20,6 +20,7 @@ class MovieActionButton extends StatelessWidget {
   final bool isLoading;
   final int bounceKey;
   final VoidCallback? onPressed;
+
   /// Optional subtitle shown under the primary label (e.g. watch count).
   final String? subtitle;
 
@@ -32,12 +33,14 @@ class MovieActionButton extends StatelessWidget {
         curve: Curves.easeInOut,
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
         decoration: BoxDecoration(
-          color:
-              isActive ? color.withValues(alpha: 0.18) : Colors.white.withValues(alpha: 0.05),
+          color: isActive
+              ? color.withValues(alpha: 0.18)
+              : Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color:
-                isActive ? color.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.12),
+            color: isActive
+                ? color.withValues(alpha: 0.5)
+                : Colors.white.withValues(alpha: 0.12),
             width: 1,
           ),
           boxShadow: isActive

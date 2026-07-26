@@ -22,5 +22,6 @@ class ReviewReactionsUseCase {
     );
   }
 
-  Future<Review> addMovieReview(Review review) => _reviewRepository.addMovieReview(review);
+  Future<Review> addMovieReview(Review review) =>
+      _reviewRepository.addMovieReview(review);
 }

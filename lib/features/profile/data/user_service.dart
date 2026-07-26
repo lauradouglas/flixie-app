@@ -10,6 +10,7 @@ import 'package:flixie_app/models/show.dart';
 import 'package:flixie_app/models/show_list.dart';
 import 'package:flixie_app/models/show_watch_entry.dart';
 import 'package:flixie_app/models/watch_provider.dart';
+import 'package:flixie_app/models/referral_summary.dart';
 
 import 'package:flixie_app/models/user.dart';
 import 'package:flixie_app/models/favorite_movie.dart';
@@ -21,6 +22,28 @@ import 'package:flixie_app/core/utils/activity_feed_ranking.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 
 class UserService {
+  static Future<ReferralSummary> getMyReferral() async {
+    final data = await ApiClient.get('/users/me/referral');
+    return ReferralSummary.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<String> lookupReferralUsername(String code) async {
+    final normalizedCode = code.trim().toUpperCase();
+    final data = await ApiClient.get(
+      '/referrals/${Uri.encodeComponent(normalizedCode)}',
+      authenticated: false,
+    );
+    return (data as Map<String, dynamic>)['username'] as String;
+  }
+
+  static Future<User> completeUserSetup(String userId) async {
+    final data = await ApiClient.post(
+      '/users/$userId/setup-complete',
+      body: {'status': true},
+    );
+    return User.fromJson(data as Map<String, dynamic>);
+  }
+
   static const List<String> _movieWatchlistSuffixCandidates = [
     '/movie/watchlist',
   ];
@@ -105,6 +128,7 @@ class UserService {
       'bio': body['bio'] ?? '',
       'countryId': body['countryId'],
       'languageId': body['languageId'],
+      if (body['referralCode'] != null) 'referralCode': body['referralCode'],
     };
     final data = await ApiClient.post('/users/', body: profileBody);
     return User.fromJson(data as Map<String, dynamic>);
