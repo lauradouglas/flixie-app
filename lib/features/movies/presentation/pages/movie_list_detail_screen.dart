@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'package:flixie_app/models/movie_short.dart';
+import 'package:flixie_app/models/movie_list.dart';
 import 'package:flixie_app/models/movie_list_movie.dart';
 import 'package:flixie_app/models/movie_list_membership.dart';
 import 'package:flixie_app/models/friendship.dart';
@@ -100,7 +101,7 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
     if (currentUser?.id == widget.ownerUserId) {
       _owner = currentUser;
     } else {
-      _loadOwner();
+      _loadOwner(widget.ownerUserId);
     }
     _loadMembership();
   }
@@ -111,15 +112,20 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
         widget.ownerUserId,
         widget.listId,
       );
-      if (mounted) setState(() => _membership = membership);
+      if (mounted) {
+        setState(() => _membership = membership);
+        if (_owner?.id != membership.ownerId) {
+          _loadOwner(membership.ownerId);
+        }
+      }
     } catch (_) {
       // The collection can still render if membership metadata is unavailable.
     }
   }
 
-  Future<void> _loadOwner() async {
+  Future<void> _loadOwner(String ownerId) async {
     try {
-      final owner = await UserService.getUserById(widget.ownerUserId);
+      final owner = await UserService.getUserById(ownerId);
       if (mounted) setState(() => _owner = owner);
     } catch (_) {
       // The list remains usable if profile details cannot be loaded.
@@ -463,13 +469,6 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
       appBar: AppBar(
         backgroundColor: FlixieColors.background,
         foregroundColor: FlixieColors.light,
-        title: Text(
-          widget.isOwner ? 'Your collection' : 'Collection',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
         actions: [
           if (widget.canEdit)
             IconButton(
@@ -534,6 +533,7 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                     child: _ListHeader(
                       listName: widget.listName,
                       owner: _owner,
+                      membership: _membership,
                       isOwner: widget.isOwner,
                       movieCount: rawMovies.length,
                       posterUrls: _posterUrls(rawMovies),
@@ -550,7 +550,12 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                   SliverToBoxAdapter(
                     child: _SortToolbar(
                       sort: _sort,
-                      movieCount: rawMovies.length,
+                      movieCount: rawMovies
+                          .where((entry) => _entryMovieId(entry) > 0)
+                          .length,
+                      showCount: rawMovies
+                          .where((entry) => _entryShowId(entry) > 0)
+                          .length,
                       onSortChanged: (sort) => setState(() => _sort = sort),
                     ),
                   ),
@@ -580,6 +585,8 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                             return _MovieListPosterCard(
                               entry: entry,
                               canEdit: widget.canEdit,
+                              showContributor:
+                                  _membership?.scope != ListScope.personal,
                               onOpen: () {
                                 final movieId = _entryMovieId(entry);
                                 if (movieId > 0) {
@@ -1149,6 +1156,7 @@ class _ListHeader extends StatelessWidget {
   const _ListHeader({
     required this.listName,
     required this.owner,
+    required this.membership,
     required this.isOwner,
     required this.movieCount,
     required this.posterUrls,
@@ -1157,6 +1165,7 @@ class _ListHeader extends StatelessWidget {
 
   final String listName;
   final models.User? owner;
+  final MovieListMembership? membership;
   final bool isOwner;
   final int movieCount;
   final List<String> posterUrls;
@@ -1164,6 +1173,7 @@ class _ListHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isGroupList = membership?.scope == ListScope.group;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       child: Row(
@@ -1175,55 +1185,133 @@ class _ListHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: owner == null
-                        ? null
-                        : () => context.push(
-                              isOwner ? '/profile' : '/friends/${owner!.id}',
+                if (isGroupList)
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: membership?.groupId == null
+                          ? null
+                          : () =>
+                              context.push('/groups/${membership!.groupId}'),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 3),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.groups_2_rounded,
+                                  color: FlixieColors.primary,
+                                  size: 24,
+                                ),
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    membership?.groupName ?? 'Group list',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: FlixieColors.light,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                                if (membership?.groupId != null)
+                                  const Icon(
+                                    Icons.chevron_right_rounded,
+                                    color: FlixieColors.medium,
+                                    size: 18,
+                                  ),
+                              ],
                             ),
-                    borderRadius: BorderRadius.circular(999),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(0, 3, 8, 3),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          ProfileAvatarView(
-                            avatar: owner?.avatar,
-                            fallbackText: _ownerInitial(owner),
-                            fallbackColor: FlixieColors.primary,
-                            size: 34,
-                            profileBadges: owner?.profileBadges ?? const [],
-                          ),
-                          const SizedBox(width: 9),
-                          Flexible(
-                            child: Text(
-                              owner == null
-                                  ? 'Loading profile…'
-                                  : '@${owner!.username}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: FlixieColors.light,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          if (owner != null) ...[
-                            const SizedBox(width: 4),
-                            const Icon(
-                              Icons.chevron_right_rounded,
-                              color: FlixieColors.medium,
-                              size: 18,
+                            const SizedBox(height: 5),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ProfileAvatarView(
+                                  avatar: owner?.avatar,
+                                  fallbackText: _ownerInitial(owner),
+                                  fallbackColor: FlixieColors.primary,
+                                  size: 22,
+                                  profileBadges:
+                                      owner?.profileBadges ?? const [],
+                                ),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    owner == null
+                                        ? 'Loading creator…'
+                                        : 'Created by @${owner!.username}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: FlixieColors.medium,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
-                        ],
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: owner == null
+                          ? null
+                          : () => context.push(
+                                isOwner ? '/profile' : '/friends/${owner!.id}',
+                              ),
+                      borderRadius: BorderRadius.circular(999),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(0, 3, 8, 3),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ProfileAvatarView(
+                              avatar: owner?.avatar,
+                              fallbackText: _ownerInitial(owner),
+                              fallbackColor: FlixieColors.primary,
+                              size: 34,
+                              profileBadges: owner?.profileBadges ?? const [],
+                            ),
+                            const SizedBox(width: 9),
+                            Flexible(
+                              child: Text(
+                                owner == null
+                                    ? 'Loading profile…'
+                                    : '@${owner!.username}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: FlixieColors.light,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            if (owner != null) ...[
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.chevron_right_rounded,
+                                color: FlixieColors.medium,
+                                size: 18,
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
                 const SizedBox(height: 14),
                 Text(
                   listName,
@@ -1344,11 +1432,13 @@ class _SortToolbar extends StatelessWidget {
   const _SortToolbar({
     required this.sort,
     required this.movieCount,
+    required this.showCount,
     required this.onSortChanged,
   });
 
   final _ListSort sort;
   final int movieCount;
+  final int showCount;
   final ValueChanged<_ListSort> onSortChanged;
 
   @override
@@ -1358,7 +1448,7 @@ class _SortToolbar extends StatelessWidget {
       child: Row(
         children: [
           Text(
-            movieCount == 0 ? 'Collection' : '$movieCount in this collection',
+            _mediaCountLabel(movieCount, showCount),
             style: const TextStyle(
               color: FlixieColors.medium,
               fontSize: 13,
@@ -1402,12 +1492,14 @@ class _MovieListPosterCard extends StatelessWidget {
   const _MovieListPosterCard({
     required this.entry,
     required this.canEdit,
+    required this.showContributor,
     required this.onOpen,
     required this.onRemove,
   });
 
   final MovieListMovie entry;
   final bool canEdit;
+  final bool showContributor;
   final VoidCallback onOpen;
   final VoidCallback onRemove;
 
@@ -1462,33 +1554,82 @@ class _MovieListPosterCard extends StatelessWidget {
                         ),
                   if (canEdit)
                     Positioned(
-                      right: 6,
-                      top: 6,
-                      child: PopupMenuButton<String>(
-                        tooltip: 'List item actions',
-                        color: FlixieColors.tabBarBackgroundFocused,
-                        icon: Container(
-                          width: 30,
-                          height: 30,
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.58),
-                            borderRadius: BorderRadius.circular(15),
+                      right: 4,
+                      top: 4,
+                      child: SizedBox(
+                        width: 32,
+                        height: 32,
+                        child: PopupMenuButton<String>(
+                          padding: EdgeInsets.zero,
+                          tooltip: 'List item actions',
+                          color: FlixieColors.tabBarBackgroundFocused,
+                          icon: Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.7),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.16),
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.more_horiz_rounded,
+                              color: Colors.white,
+                              size: 17,
+                            ),
                           ),
-                          child: const Icon(
-                            Icons.more_horiz_rounded,
-                            color: Colors.white,
-                            size: 18,
+                          onSelected: (value) {
+                            if (value == 'remove') onRemove();
+                          },
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(
+                              value: 'remove',
+                              height: 40,
+                              padding: EdgeInsets.symmetric(horizontal: 12),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.remove_circle_outline_rounded,
+                                    color: FlixieColors.danger,
+                                    size: 18,
+                                  ),
+                                  SizedBox(width: 9),
+                                  Text('Remove from list'),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (showContributor && entry.addedBy != null)
+                    Positioned(
+                      left: 7,
+                      bottom: 7,
+                      child: Tooltip(
+                        message: 'Added by @${entry.addedBy!.username}',
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.72),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: FlixieColors.primary,
+                              width: 1.5,
+                            ),
+                          ),
+                          child: ProfileAvatarView(
+                            avatar: entry.addedBy!.avatar,
+                            fallbackText: entry.addedBy!.username.isEmpty
+                                ? '?'
+                                : entry.addedBy!.username[0].toUpperCase(),
+                            fallbackColor: FlixieColors.primary,
+                            size: 27,
+                            profileBadges: entry.addedBy!.profileBadges,
                           ),
                         ),
-                        onSelected: (value) {
-                          if (value == 'remove') onRemove();
-                        },
-                        itemBuilder: (_) => const [
-                          PopupMenuItem(
-                            value: 'remove',
-                            child: Text('Remove from list'),
-                          ),
-                        ],
                       ),
                     ),
                 ],
@@ -1609,6 +1750,17 @@ String _entryTitle(MovieListMovie entry) {
 
 double? _entryRating(MovieListMovie entry) {
   return entry.movie?.voteAverage ?? entry.show?.voteAverage;
+}
+
+String _mediaCountLabel(int movieCount, int showCount) {
+  final parts = <String>[];
+  if (movieCount > 0) {
+    parts.add('$movieCount ${movieCount == 1 ? 'movie' : 'movies'}');
+  }
+  if (showCount > 0) {
+    parts.add('$showCount ${showCount == 1 ? 'show' : 'shows'}');
+  }
+  return parts.isEmpty ? 'Empty collection' : parts.join(' & ');
 }
 
 String? _extractYear(String? releaseDate) {

@@ -5,6 +5,7 @@ class MovieShort {
   final String? poster;
   final String? releaseDate;
   final String? overview;
+  final String? tagline;
   final Trailer? trailer;
   final String? mediaType;
   final double? voteAverage;
@@ -16,6 +17,7 @@ class MovieShort {
     this.poster,
     this.releaseDate,
     this.overview,
+    this.tagline,
     this.trailer,
     this.mediaType,
     this.voteAverage,
@@ -37,6 +39,7 @@ class MovieShort {
           json['poster'] ?? json['posterPath'] ?? json['poster_path']),
       releaseDate: stringValue(json['releaseDate'] ?? json['release_date']),
       overview: json['overview'] as String?,
+      tagline: stringValue(json['tagline']),
       trailer: json['trailer'] != null
           ? Trailer.fromJson(json['trailer'] as Map<String, dynamic>)
           : null,
@@ -54,6 +57,7 @@ class MovieShort {
       'poster': poster,
       'releaseDate': releaseDate,
       'overview': overview,
+      'tagline': tagline,
       'trailer': trailer?.toJson(),
       'mediaType': mediaType,
       'voteAverage': voteAverage,

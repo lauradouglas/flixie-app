@@ -325,11 +325,16 @@ class MainNavigationShell extends StatelessWidget {
   final Widget child;
 
   static int _indexFromLocation(String location) {
-    if (location.startsWith('/watchlist')) return 1;
-    if (location.startsWith('/social') || location.startsWith('/groups')) {
-      return 2;
+    if (location.startsWith('/invite-friend')) {
+      final uri = Uri.tryParse(location);
+      return uri?.queryParameters['from'] == 'settings' ? 4 : 3;
     }
-    if (location.startsWith('/profile')) return 3;
+    if (location.startsWith('/watchlist')) return 1;
+    if (location.startsWith('/search')) return 2;
+    if (location.startsWith('/social') || location.startsWith('/groups')) {
+      return 3;
+    }
+    if (location.startsWith('/profile')) return 4;
     if (location.startsWith('/settings')) return 4;
     return 0;
   }
@@ -337,14 +342,14 @@ class MainNavigationShell extends StatelessWidget {
   static const List<String> _routes = [
     '/',
     '/watchlist',
+    '/search',
     '/social',
     '/profile',
-    '/settings',
   ];
 
   @override
   Widget build(BuildContext context) {
-    final location = GoRouterState.of(context).matchedLocation;
+    final location = GoRouterState.of(context).uri.toString();
     final selectedIndex = _indexFromLocation(location);
 
     return Container(
@@ -388,13 +393,13 @@ class _FlixieNavBar extends StatelessWidget {
         activeIcon: Icons.bookmark,
         label: 'Watchlist'),
     _NavDest(
+        icon: Icons.search_outlined,
+        activeIcon: Icons.search_rounded,
+        label: 'Search'),
+    _NavDest(
         icon: Icons.people_outline, activeIcon: Icons.people, label: 'Social'),
     _NavDest(
         icon: Icons.person_outline, activeIcon: Icons.person, label: 'Profile'),
-    _NavDest(
-        icon: Icons.settings_outlined,
-        activeIcon: Icons.settings,
-        label: 'Settings'),
   ];
 
   @override

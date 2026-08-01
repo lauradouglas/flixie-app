@@ -18,7 +18,7 @@ import 'package:flixie_app/features/profile/presentation/widgets/notification_ac
 import 'package:flixie_app/features/profile/presentation/widgets/notification_request_card.dart';
 
 /// How often the screen silently re-fetches notifications in the background.
-const Duration _kPollInterval = Duration(seconds: 30);
+const Duration _kPollInterval = Duration(seconds: 60);
 
 const List<String> _kMonths = [
   'Jan',

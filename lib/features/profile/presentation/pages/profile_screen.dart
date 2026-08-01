@@ -295,6 +295,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: const Text('Profile'),
         actions: [
           IconButton(
+            tooltip: 'Settings',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => context.push('/settings'),
+          ),
+          IconButton(
             icon: Badge(
               isLabelVisible: auth.unreadNotificationCount > 0,
               label: auth.unreadNotificationCount < 100

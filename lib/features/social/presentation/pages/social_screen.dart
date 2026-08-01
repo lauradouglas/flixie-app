@@ -61,7 +61,7 @@ class _SocialScreenState extends State<SocialScreen> {
         ),
         actions: [
           IconButton(
-            onPressed: () => context.push('/invite-friend'),
+            onPressed: () => context.push('/invite-friend?from=social'),
             icon: const Icon(Icons.ios_share_outlined),
             tooltip: 'Invite a friend to Flixie',
           ),
@@ -1408,7 +1408,11 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
                 itemBuilder: (_, i) {
                   final g = recentGroups[i];
                   return GestureDetector(
-                    onTap: () => context.push('/groups/${g.id}'),
+                    onTap: () async {
+                      final deleted =
+                          await context.push<bool>('/groups/${g.id}');
+                      if (deleted == true) await _load();
+                    },
                     child: Column(
                       children: [
                         GroupAvatar(group: g, radius: 20),
@@ -1480,6 +1484,10 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
                   statusLabel: _pendingInvites.containsKey(g.id)
                       ? 'Invite pending'
                       : _groupFreshnessLabel(g),
+                  onTap: () async {
+                    final deleted = await context.push<bool>('/groups/${g.id}');
+                    if (deleted == true) await _load();
+                  },
                 )),
           const SizedBox(height: 24),
         ],

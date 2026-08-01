@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:flixie_app/models/movie_short.dart';
 import 'package:flixie_app/models/activity_list_item.dart';
+import 'package:flixie_app/models/friend_media_interaction.dart';
 import 'package:flixie_app/models/trending_groups.dart';
 import 'package:flixie_app/models/watch_request.dart';
 import 'package:flixie_app/models/watchlist_movie.dart';
@@ -16,6 +18,7 @@ import 'package:flixie_app/models/user.dart' as models;
 import 'package:flixie_app/features/social/presentation/controllers/friend_actions_controller.dart';
 import 'package:flixie_app/features/watchlist/presentation/controllers/watchlist_actions_controller.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
+import 'package:flixie_app/features/social/data/friend_service.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/features/movies/data/movie_service.dart';
 import 'package:flixie_app/features/movies/data/show_service.dart';
@@ -33,6 +36,7 @@ import 'package:flixie_app/features/home/presentation/widgets/greeting_header.da
 import 'package:flixie_app/features/home/presentation/widgets/section_header.dart';
 import 'package:flixie_app/features/home/presentation/widgets/trending_groups_section.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -52,6 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<MovieShort> _forYouMovies = [];
   List<ContinueWatchingShow> _continueWatchingShows = [];
   List<ActivityListItem> _friendsActivity = [];
+  final Map<int, List<FriendMediaInteraction>> _heroFriendInteractions = {};
   bool _showMoreFriendActivity = false;
   TrendingGroupsResponse? _trendingGroups;
   bool _isTrendingGroupsLoading = true;
@@ -59,9 +64,6 @@ class _HomeScreenState extends State<HomeScreen> {
   final Set<int> _watchlistUpdatesInFlight = <int>{};
   Set<int> _watchlistMovieIds = {};
   int _watchRequestsNeedingResponse = 0;
-  int _watchRequestsScheduledToday = 0;
-  int _watchRequestsUpcoming = 0;
-  bool _watchRequestsLoading = true;
   bool _isLoading = true;
   String? _error;
   String? _loadedForUserId;
@@ -70,7 +72,8 @@ class _HomeScreenState extends State<HomeScreen> {
       FriendActionsController.instance;
   final WatchlistActionsController _watchlistActions =
       WatchlistActionsController.instance;
-  final PageController _heroPageController = PageController();
+  final PageController _heroPageController =
+      PageController(viewportFraction: 0.84);
   int _heroPage = 0;
 
   List<MovieShort> get _heroMovies {
@@ -119,7 +122,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _error = null;
       _isTrendingGroupsLoading = true;
       _trendingGroupsError = null;
-      _watchRequestsLoading = true;
     });
     final auth = context.read<AuthProvider>();
     final movieService = context.read<MovieService>();
@@ -148,17 +150,47 @@ class _HomeScreenState extends State<HomeScreen> {
           _nowPlayingMovies = results[1].take(8).toList();
           _isLoading = false;
         });
+        if (user != null) {
+          unawaited(_loadHeroFriendInteractions(results[0], user.id));
+        }
       }
     } catch (e) {
       logger.e('[HomeScreen] load error: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _watchRequestsLoading = false;
           _error = 'Couldn\'t load content. Check your connection.';
         });
       }
     }
+  }
+
+  Future<void> _loadHeroFriendInteractions(
+    List<MovieShort> movies,
+    String userId,
+  ) async {
+    final results = await Future.wait(
+      movies.take(_maxHeroCarouselItems).map((movie) async {
+        try {
+          final interactions = await FriendService.getFriendsMovieInteractions(
+            userId,
+            movie.id,
+          );
+          return MapEntry(movie.id, interactions);
+        } catch (error) {
+          logger.w(
+            '[HomeScreen] friend interactions unavailable for ${movie.id}: $error',
+          );
+          return MapEntry(movie.id, <FriendMediaInteraction>[]);
+        }
+      }),
+    );
+    if (!mounted || _loadedForUserId != userId) return;
+    setState(() {
+      _heroFriendInteractions
+        ..clear()
+        ..addEntries(results);
+    });
   }
 
   Future<void> _loadSecondaryContent(models.User? user) async {
@@ -170,9 +202,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _continueWatchingShows = [];
         _watchlistMovieIds = {};
         _watchRequestsNeedingResponse = 0;
-        _watchRequestsScheduledToday = 0;
-        _watchRequestsUpcoming = 0;
-        _watchRequestsLoading = false;
       });
       return;
     }
@@ -208,10 +237,6 @@ class _HomeScreenState extends State<HomeScreen> {
           .toSet();
       _watchRequestsNeedingResponse =
           _countWatchRequestsNeedingResponse(watchRequests, user.id);
-      _watchRequestsScheduledToday =
-          _countWatchRequestsScheduledToday(watchRequests);
-      _watchRequestsUpcoming = _countUpcomingWatchRequests(watchRequests);
-      _watchRequestsLoading = false;
       _continueWatchingShows = results[5] as List<ContinueWatchingShow>;
     });
   }
@@ -231,40 +256,6 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       return request.canConfirmWatchedFor(userId);
     }).length;
-  }
-
-  int _countWatchRequestsScheduledToday(List<WatchRequest> requests) {
-    return requests.where((request) {
-      if (!_hasActiveAgreedSchedule(request)) return false;
-      final scheduledFor = request.scheduledFor?.toLocal();
-      if (scheduledFor == null) return false;
-      return _isSameLocalDate(scheduledFor, DateTime.now());
-    }).length;
-  }
-
-  int _countUpcomingWatchRequests(List<WatchRequest> requests) {
-    final now = DateTime.now();
-    return requests.where((request) {
-      if (!_hasActiveAgreedSchedule(request)) return false;
-      final scheduledFor = request.scheduledFor?.toLocal();
-      return scheduledFor != null && scheduledFor.isAfter(now);
-    }).length;
-  }
-
-  bool _hasActiveAgreedSchedule(WatchRequest request) {
-    final watchedStatus = request.normalizedWatchedStatus;
-    return request.isWatchRequest &&
-        request.normalizedScheduleStatus == 'AGREED' &&
-        request.scheduledFor != null &&
-        watchedStatus != 'WATCHED' &&
-        watchedStatus != 'NOT_WATCHED' &&
-        !request.isTerminal;
-  }
-
-  bool _isSameLocalDate(DateTime left, DateTime right) {
-    return left.year == right.year &&
-        left.month == right.month &&
-        left.day == right.day;
   }
 
   Future<void> _loadTrendingGroups() async {
@@ -381,25 +372,28 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _playTrailer(BuildContext context, MovieShort movie) async {
-    final movieId = movie.id;
+  Future<void> _openHeroTrailer(
+    BuildContext context,
+    MovieShort movie,
+  ) async {
+    final rawUrl = movie.trailer?.key;
+    if (rawUrl == null || rawUrl.isEmpty) return;
+    final watchUrl = rawUrl.replaceFirst(
+      'youtube.com/embed/',
+      'youtube.com/watch?v=',
+    );
+    final uri = Uri.tryParse(watchUrl);
+    var opened = false;
     try {
-      final movieService = context.read<MovieService>();
-      final full = await movieService.getMovieById(movieId);
-      final trailer = (full.videos ?? []).firstWhere(
-        (v) => v.videoTypeName.toLowerCase().contains('trailer'),
-        orElse: () => (full.videos ?? []).isNotEmpty
-            ? full.videos!.first
-            : throw Exception('no video'),
+      opened = uri != null &&
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (error) {
+      logger.w('[HomeScreen] trailer launch failed for ${movie.id}: $error');
+    }
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Couldn’t open this trailer.')),
       );
-      final uri = Uri.parse(trailer.youtubeUrl);
-      if (context.mounted) {
-        if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-          if (context.mounted) context.push('/movies/${movie.id}');
-        }
-      }
-    } catch (_) {
-      if (context.mounted) context.push('/movies/${movie.id}');
     }
   }
 
@@ -422,14 +416,6 @@ class _HomeScreenState extends State<HomeScreen> {
         actionsIconTheme: const IconThemeData(color: FlixieColors.light),
         title: const FlixieWordmark(),
         actions: [
-          IconButton(
-            icon: const Icon(
-              Icons.search_outlined,
-              color: FlixieColors.light,
-            ),
-            tooltip: 'Search',
-            onPressed: () => context.push('/search'),
-          ),
           IconButton(
             icon: Badge(
               isLabelVisible: unreadCount > 0,
@@ -474,14 +460,21 @@ class _HomeScreenState extends State<HomeScreen> {
                           padding: const EdgeInsets.only(top: 8),
                           child: GreetingHeader(
                             name: greetingName,
+                            avatar: user?.avatar,
+                            profileBadges: user?.profileBadges ?? const [],
+                            requestCount: _watchRequestsNeedingResponse,
                             onSearch: () => context.push('/search'),
                             onWatchlist: () => context.go('/watchlist'),
                             onInvite: () => context.go('/social'),
                             onRequests: () => context.push('/watch-requests'),
                           ),
                         ),
-                        _buildWatchPlansShortcut(context),
                         if (heroMovies.isNotEmpty) ...[
+                          HomeSectionHeader(
+                            title: 'Trending now',
+                            onSeeAll: () => context.push('/search'),
+                          ),
+                          const SizedBox(height: 4),
                           _buildHeroCarousel(context, heroMovies),
                           const SizedBox(height: 10),
                           _buildCarouselDots(heroMovies),
@@ -508,134 +501,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-    );
-  }
-
-  Widget _buildWatchPlansShortcut(BuildContext context) {
-    final needsResponse = _watchRequestsNeedingResponse > 0;
-    final hasToday = _watchRequestsScheduledToday > 0;
-    final hasUpcoming = _watchRequestsUpcoming > 0;
-    final accent = needsResponse
-        ? FlixieColors.warning
-        : hasToday
-            ? FlixieColors.secondary
-            : FlixieColors.primary;
-    final subtitle = _watchPlansSubtitle;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => context.push('/watch-requests'),
-          borderRadius: BorderRadius.circular(14),
-          child: Ink(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: FlixieColors.tabBarBackgroundFocused,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: accent.withValues(alpha: 0.38)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    hasToday
-                        ? Icons.event_available_outlined
-                        : Icons.video_camera_back_outlined,
-                    color: accent,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Flexible(
-                            child: Text(
-                              'Watch plans',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                          if (needsResponse) ...[
-                            const SizedBox(width: 8),
-                            _WatchPlanBadge(
-                              label: '$_watchRequestsNeedingResponse',
-                              color: FlixieColors.warning,
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: FlixieColors.light,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          height: 1.25,
-                        ),
-                      ),
-                      if (!_watchRequestsLoading &&
-                          (needsResponse || hasToday || hasUpcoming)) ...[
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            if (needsResponse)
-                              _WatchPlanChip(
-                                icon: Icons.reply_outlined,
-                                label:
-                                    '$_watchRequestsNeedingResponse to answer',
-                                color: FlixieColors.warning,
-                              ),
-                            if (hasToday)
-                              _WatchPlanChip(
-                                icon: Icons.today_outlined,
-                                label: '$_watchRequestsScheduledToday today',
-                                color: FlixieColors.secondary,
-                              ),
-                            if (hasUpcoming)
-                              _WatchPlanChip(
-                                icon: Icons.schedule_outlined,
-                                label: '$_watchRequestsUpcoming upcoming',
-                                color: FlixieColors.primary,
-                              ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: FlixieColors.light,
-                  size: 28,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 
@@ -668,55 +533,52 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  String get _watchPlansSubtitle {
-    if (_watchRequestsLoading) return 'Checking your watch requests...';
-    if (_watchRequestsNeedingResponse > 0) {
-      return 'You have watch requests or schedule times waiting.';
-    }
-    if (_watchRequestsScheduledToday > 0) {
-      final label = _watchRequestsScheduledToday == 1 ? 'watch' : 'watches';
-      return 'You have $_watchRequestsScheduledToday $label scheduled today.';
-    }
-    if (_watchRequestsUpcoming > 0) {
-      final label = _watchRequestsUpcoming == 1 ? 'watch' : 'watches';
-      return '$_watchRequestsUpcoming upcoming $label with friends.';
-    }
-    return 'No watch requests yet. Tap to view your requests.';
-  }
-
   // ── Hero carousel ──────────────────────────────────────────────────────────
 
   Widget _buildHeroCarousel(BuildContext context, List<MovieShort> movies) {
     final count = movies.length.clamp(0, _maxHeroCarouselItems);
     return SizedBox(
-      height: 438,
+      height: 560,
       child: Stack(
         children: [
-          PageView.builder(
-            controller: _heroPageController,
-            onPageChanged: (i) => setState(() => _heroPage = i),
-            itemCount: count,
-            itemBuilder: (context, index) =>
-                _buildHeroCard(context, movies[index]),
-          ),
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: IgnorePointer(
-              child: Container(
-                height: 72,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      FlixieColors.background.withValues(alpha: 0.96),
-                      FlixieColors.background.withValues(alpha: 0.0),
-                    ],
+          Padding(
+            padding: const EdgeInsets.only(left: 14),
+            child: PageView.builder(
+              controller: _heroPageController,
+              padEnds: false,
+              onPageChanged: (i) => setState(() => _heroPage = i),
+              itemCount: count,
+              itemBuilder: (context, index) {
+                final posterCard =
+                    _buildInactiveHeroCard(context, movies[index]);
+                final detailCard = _buildHeroCard(context, movies[index]);
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: AnimatedBuilder(
+                    animation: _heroPageController,
+                    builder: (context, _) {
+                      final page = _heroPageController.hasClients
+                          ? (_heroPageController.page ?? _heroPage.toDouble())
+                          : _heroPage.toDouble();
+                      final detailOpacity =
+                          (1 - (page - index).abs()).clamp(0.0, 1.0);
+                      return Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          posterCard,
+                          IgnorePointer(
+                            ignoring: detailOpacity < 0.98,
+                            child: Opacity(
+                              opacity: detailOpacity,
+                              child: detailCard,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ),
         ],
@@ -747,149 +609,290 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildHeroCard(BuildContext context, MovieShort movie) {
+  Widget _buildHeroCard(
+    BuildContext context,
+    MovieShort movie,
+  ) {
     final inWatchlist = _watchlistMovieIds.contains(movie.id);
     final isUpdating = _watchlistUpdatesInFlight.contains(movie.id);
+    final interactions = _heroFriendInteractions[movie.id] ?? const [];
+    final watchlistedBy =
+        interactions.where((interaction) => interaction.onWatchlist).toList();
+    final favouritedBy =
+        interactions.where((interaction) => interaction.favourited).toList();
+    final posterHeight = movie.name.length <= 20 ? 375.0 : 350.0;
 
-    return GestureDetector(
-      onTap: () => context.push('/movies/${movie.id}'),
-      child: ColoredBox(
-        color: FlixieColors.background,
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      color: FlixieColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: InkWell(
+        onTap: () => context.push('/movies/${movie.id}'),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
+            SizedBox(
+              height: posterHeight,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
                   if (movie.poster != null)
-                    CachedNetworkImage(
-                      imageUrl:
-                          'https://image.tmdb.org/t/p/w780${movie.poster}',
-                      fit: BoxFit.cover,
-                      alignment: Alignment.topCenter,
-                      errorWidget: (_, __, ___) => _heroFallback(),
+                    Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        ImageFiltered(
+                          imageFilter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                          child: CachedNetworkImage(
+                            imageUrl:
+                                'https://image.tmdb.org/t/p/w780${movie.poster}',
+                            fit: BoxFit.cover,
+                            color: Colors.black.withValues(alpha: 0.38),
+                            colorBlendMode: BlendMode.darken,
+                            errorWidget: (_, __, ___) => _heroFallback(),
+                          ),
+                        ),
+                        Center(
+                          child: FractionallySizedBox(
+                            widthFactor: 0.62,
+                            heightFactor: 1,
+                            child: ClipRect(
+                              child: CachedNetworkImage(
+                                imageUrl:
+                                    'https://image.tmdb.org/t/p/w780${movie.poster}',
+                                fit: BoxFit.cover,
+                                alignment: Alignment.center,
+                                errorWidget: (_, __, ___) => _heroFallback(),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     )
                   else
                     _heroFallback(),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        stops: const [0.0, 0.58, 0.82, 1.0],
-                        colors: [
-                          Colors.black.withValues(alpha: 0.08),
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.16),
-                          FlixieColors.background,
-                        ],
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: 16,
-                    bottom: 14,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.16),
-                        ),
-                      ),
-                      child: Text(
-                        _forYouMovies.isNotEmpty
-                            ? 'Trending you might like'
-                            : 'Trending now',
-                        style: const TextStyle(
-                          color: FlixieColors.light,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 13, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    movie.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      height: 1.08,
-                    ),
-                  ),
-                  if ((movie.overview ?? '').isNotEmpty) ...[
-                    const SizedBox(height: 5),
-                    Text(
-                      movie.overview!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: FlixieColors.light,
-                        fontSize: 14,
-                        height: 1.25,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () => _playTrailer(context, movie),
-                          icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                          label: const Text(
-                            'Play Trailer',
-                            style: TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: FlixieColors.primary,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 13),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            elevation: 0,
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                movie.name,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w900,
+                                  height: 1.08,
+                                ),
+                              ),
+                              if ((movie.releaseDate ?? '').isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  _formatHeroDate(movie.releaseDate!),
+                                  style: const TextStyle(
+                                    color: FlixieColors.medium,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      _HeroIconButton(
-                        tooltip: 'Movie details',
-                        icon: Icons.info_outline_rounded,
-                        onPressed: () => context.push('/movies/${movie.id}'),
-                      ),
-                      const SizedBox(width: 10),
-                      _HeroIconButton(
-                        tooltip:
-                            inWatchlist ? 'Remove from watchlist' : 'Watchlist',
-                        icon: inWatchlist
-                            ? Icons.bookmark_rounded
-                            : Icons.bookmark_outline_rounded,
-                        foregroundColor: FlixieColors.warning,
-                        isBusy: isUpdating,
-                        onPressed: () => _toggleHeroWatchlist(context, movie),
+                        const SizedBox(width: 6),
+                        _HeroCompactIconButton(
+                          tooltip: inWatchlist
+                              ? 'Remove from watchlist'
+                              : 'Watchlist',
+                          icon: inWatchlist
+                              ? Icons.bookmark_rounded
+                              : Icons.bookmark_outline_rounded,
+                          foregroundColor: FlixieColors.warning,
+                          isBusy: isUpdating,
+                          onPressed: () => _toggleHeroWatchlist(context, movie),
+                        ),
+                      ],
+                    ),
+                    if ((movie.overview ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        movie.overview!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: FlixieColors.light,
+                          fontSize: 12,
+                          height: 1.35,
+                        ),
                       ),
                     ],
-                  ),
-                ],
+                    const Spacer(),
+                    Row(
+                      children: [
+                        if ((movie.voteAverage ?? 0) > 0) ...[
+                          const Icon(Icons.star_rounded,
+                              color: FlixieColors.warning, size: 19),
+                          const SizedBox(width: 4),
+                          Text(
+                            movie.voteAverage!.toStringAsFixed(1),
+                            style: const TextStyle(
+                              color: FlixieColors.warning,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                        if ((movie.trailer?.key ?? '').isNotEmpty) ...[
+                          const SizedBox(width: 10),
+                          Container(
+                            width: 1,
+                            height: 22,
+                            color: Colors.white.withValues(alpha: 0.18),
+                          ),
+                          const SizedBox(width: 10),
+                          TextButton.icon(
+                            onPressed: () => _openHeroTrailer(context, movie),
+                            icon: const Icon(
+                              Icons.play_arrow_rounded,
+                              size: 18,
+                            ),
+                            label: const Text('Trailer'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.redAccent,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
+                                vertical: 5,
+                              ),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              side: BorderSide(
+                                color: Colors.redAccent.withValues(alpha: 0.35),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(width: 6),
+                        _HeroCompactIconButton(
+                          tooltip: 'Details',
+                          icon: Icons.info_outline_rounded,
+                          foregroundColor: FlixieColors.light,
+                          onPressed: () => context.push('/movies/${movie.id}'),
+                        ),
+                      ],
+                    ),
+                    if (watchlistedBy.isNotEmpty ||
+                        favouritedBy.isNotEmpty) ...[
+                      const SizedBox(height: 7),
+                      Row(
+                        children: [
+                          if (watchlistedBy.isNotEmpty)
+                            Expanded(
+                              flex: 2,
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.bookmark_rounded,
+                                    color: FlixieColors.warning,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  _FriendInteractionAvatarStack(
+                                    interactions: watchlistedBy,
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            const Spacer(flex: 2),
+                          if (watchlistedBy.isNotEmpty &&
+                              favouritedBy.isNotEmpty) ...[
+                            Container(
+                              width: 1,
+                              height: 30,
+                              color: Colors.white.withValues(alpha: 0.16),
+                            ),
+                            const SizedBox(width: 14),
+                          ],
+                          if (favouritedBy.isNotEmpty) ...[
+                            Expanded(
+                              flex: 1,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  const Icon(
+                                    Icons.favorite_rounded,
+                                    color: Colors.redAccent,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerRight,
+                                      child: _FriendInteractionAvatarStack(
+                                        interactions: favouritedBy,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildInactiveHeroCard(BuildContext context, MovieShort movie) {
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      color: FlixieColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: InkWell(
+        onTap: () => context.push('/movies/${movie.id}'),
+        child: movie.poster != null
+            ? CachedNetworkImage(
+                imageUrl: 'https://image.tmdb.org/t/p/w780${movie.poster}',
+                width: double.infinity,
+                height: double.infinity,
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
+                errorWidget: (_, __, ___) => _heroFallback(),
+              )
+            : _heroFallback(),
       ),
     );
   }
@@ -1629,8 +1632,96 @@ class _ContinueWatchingCard extends StatelessWidget {
   }
 }
 
-class _HeroIconButton extends StatelessWidget {
-  const _HeroIconButton({
+String _formatHeroDate(String raw) {
+  final date = DateTime.tryParse(raw);
+  if (date == null) return raw;
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec'
+  ];
+  return '${date.day} ${months[date.month - 1]} ${date.year}';
+}
+
+class _FriendInteractionAvatarStack extends StatelessWidget {
+  const _FriendInteractionAvatarStack({required this.interactions});
+
+  final List<FriendMediaInteraction> interactions;
+
+  @override
+  Widget build(BuildContext context) {
+    const avatarSize = 30.0;
+    const avatarSpacing = 22.0;
+    final visible = interactions.take(3).toList(growable: false);
+    final overflow = interactions.length - visible.length;
+    final itemCount = visible.length + (overflow > 0 ? 1 : 0);
+    return SizedBox(
+      width: avatarSize + ((itemCount - 1).clamp(0, 3) * avatarSpacing),
+      height: avatarSize,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          for (var index = 0; index < visible.length; index++)
+            Positioned(
+              left: index * avatarSpacing,
+              child: Container(
+                width: avatarSize,
+                height: avatarSize,
+                padding: const EdgeInsets.all(1.5),
+                decoration: const BoxDecoration(
+                  color: FlixieColors.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: ProfileAvatarView(
+                  avatar: visible[index].avatar,
+                  fallbackText: visible[index].username.isEmpty
+                      ? '?'
+                      : visible[index].username[0].toUpperCase(),
+                  fallbackColor: FlixieColors.surfaceElevated,
+                  size: 27,
+                  profileBadges: visible[index].profileBadges,
+                ),
+              ),
+            ),
+          if (overflow > 0)
+            Positioned(
+              left: visible.length * avatarSpacing,
+              child: Container(
+                width: avatarSize,
+                height: avatarSize,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: FlixieColors.surfaceElevated,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: FlixieColors.primary, width: 1.5),
+                ),
+                child: Text(
+                  '+$overflow',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeroCompactIconButton extends StatelessWidget {
+  const _HeroCompactIconButton({
     required this.tooltip,
     required this.icon,
     required this.onPressed,
@@ -1655,8 +1746,8 @@ class _HeroIconButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
           onTap: isBusy ? null : onPressed,
           child: SizedBox(
-            width: 48,
-            height: 48,
+            width: 36,
+            height: 36,
             child: isBusy
                 ? _SpinningActionIcon(icon: icon, color: foregroundColor)
                 : Icon(icon, color: foregroundColor, size: 22),
@@ -1695,76 +1786,6 @@ class _SpinningActionIconState extends State<_SpinningActionIcon>
     return RotationTransition(
       turns: _controller,
       child: Icon(widget.icon, color: widget.color, size: 22),
-    );
-  }
-}
-
-class _WatchPlanBadge extends StatelessWidget {
-  const _WatchPlanBadge({
-    required this.label,
-    required this.color,
-  });
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minWidth: 24),
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-          color: Colors.black,
-          fontSize: 12,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-    );
-  }
-}
-
-class _WatchPlanChip extends StatelessWidget {
-  const _WatchPlanChip({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 15),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

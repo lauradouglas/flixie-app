@@ -74,9 +74,12 @@ class MovieListsProvider extends ChangeNotifier {
     String? visibility,
     String? coverImageUrl,
     String? whoCanAddMovies,
+    String? scope,
+    String? groupId,
+    List<String>? collaboratorIds,
   }) async {
     try {
-      final updated = await repository.renameMovieList(
+      await repository.renameMovieList(
         userId,
         listId,
         name,
@@ -84,8 +87,13 @@ class MovieListsProvider extends ChangeNotifier {
         visibility: visibility,
         coverImageUrl: coverImageUrl,
         whoCanAddMovies: whoCanAddMovies,
+        scope: scope,
+        groupId: groupId,
+        collaboratorIds: collaboratorIds,
       );
-      lists = lists.map((l) => l.id == listId ? updated : l).toList();
+      // PATCH returns a deliberately small list record. Refresh the collection
+      // so counts and poster previews are not temporarily replaced with zeroes.
+      lists = await repository.getMovieLists(userId);
       notifyListeners();
       return true;
     } catch (e) {

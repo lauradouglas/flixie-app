@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/models/group.dart';
@@ -11,6 +13,7 @@ import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
 import 'package:flixie_app/features/social/presentation/widgets/group_hero_banner.dart';
 import 'package:flixie_app/features/social/presentation/widgets/pending_request_preview_tile.dart';
+import 'package:flixie_app/models/movie_list.dart';
 
 class GroupActivityTab extends StatefulWidget {
   const GroupActivityTab({
@@ -21,6 +24,7 @@ class GroupActivityTab extends StatefulWidget {
     this.conversationId,
     required this.initialRequests,
     required this.initialActivity,
+    required this.groupLists,
     required this.onRefresh,
   });
 
@@ -30,6 +34,7 @@ class GroupActivityTab extends StatefulWidget {
   final String? conversationId;
   final List<GroupWatchRequest> initialRequests;
   final List<ActivityListItem> initialActivity;
+  final List<MovieList> groupLists;
   final Future<void> Function() onRefresh;
 
   @override
@@ -121,6 +126,168 @@ class GroupActivityTabState extends State<GroupActivityTab> {
               GroupHeroBanner(group: group, memberCount: widget.memberCount),
 
             const SizedBox(height: 12),
+
+            // ---- Group lists ----------------------------------------------
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 4,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: FlixieColors.primary,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'GROUP LISTS',
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${widget.groupLists.length}',
+                    style: const TextStyle(color: FlixieColors.medium),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            if (widget.groupLists.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Text(
+                  'No lists have been created for this group yet.',
+                  style: TextStyle(color: FlixieColors.medium),
+                ),
+              )
+            else
+              SizedBox(
+                height: 90,
+                child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  scrollDirection: Axis.horizontal,
+                  itemCount: widget.groupLists.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 10),
+                  itemBuilder: (context, index) {
+                    final list = widget.groupLists[index];
+                    final movieCount = list.movieCount ?? 0;
+                    final showCount = list.showCount ?? 0;
+                    return InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () => context.push(
+                        '/movie-lists/${list.id}?name=${Uri.encodeComponent(list.name)}&isOwner=${list.isOwner}&canEdit=${list.canEdit}',
+                      ),
+                      child: Container(
+                        width: 214,
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: FlixieColors.surfaceElevated,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: FlixieColors.tabBarBorder),
+                        ),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 60,
+                              height: 72,
+                              child: list.previewPosterUrls.isEmpty
+                                  ? Container(
+                                      decoration: BoxDecoration(
+                                        color: FlixieColors.background,
+                                        borderRadius: BorderRadius.circular(9),
+                                      ),
+                                      child: const Icon(
+                                        Icons.movie_filter_outlined,
+                                        color: FlixieColors.medium,
+                                      ),
+                                    )
+                                  : Stack(
+                                      children: [
+                                        for (var posterIndex =
+                                                list.previewPosterUrls.length >
+                                                        1
+                                                    ? 1
+                                                    : 0;
+                                            posterIndex >= 0;
+                                            posterIndex--)
+                                          Positioned(
+                                            left: posterIndex * 11,
+                                            child: ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(9),
+                                              child: CachedNetworkImage(
+                                                imageUrl:
+                                                    list.previewPosterUrls[
+                                                        posterIndex],
+                                                width: 48,
+                                                height: 72,
+                                                fit: BoxFit.cover,
+                                                errorWidget: (_, __, ___) =>
+                                                    Container(
+                                                  width: 48,
+                                                  height: 72,
+                                                  color:
+                                                      FlixieColors.background,
+                                                  child: const Icon(
+                                                    Icons.movie_outlined,
+                                                    color: FlixieColors.medium,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    list.name,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: FlixieColors.light,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _groupListMediaCountLabel(
+                                      movieCount,
+                                      showCount,
+                                    ),
+                                    style: const TextStyle(
+                                      color: FlixieColors.medium,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(
+                              Icons.chevron_right_rounded,
+                              color: FlixieColors.primary,
+                              size: 20,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+            const SizedBox(height: 18),
 
             // ---- Search bar -------------------------------------------------
             if (_activity.isNotEmpty || _searchQuery.isNotEmpty)
@@ -305,4 +472,15 @@ class GroupActivityTabState extends State<GroupActivityTab> {
       ),
     );
   }
+}
+
+String _groupListMediaCountLabel(int movieCount, int showCount) {
+  final parts = <String>[];
+  if (movieCount > 0) {
+    parts.add('$movieCount ${movieCount == 1 ? 'movie' : 'movies'}');
+  }
+  if (showCount > 0) {
+    parts.add('$showCount ${showCount == 1 ? 'show' : 'shows'}');
+  }
+  return parts.isEmpty ? 'Empty list' : parts.join(' & ');
 }

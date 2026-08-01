@@ -13,7 +13,7 @@ class HomeSectionHeader extends StatelessWidget {
     return FlixieSectionHeader(
       title: title,
       uppercase: false,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
       trailingLabel: onSeeAll != null ? 'See all' : null,
       trailingColor: FlixieColors.primary,
       onTrailingTap: onSeeAll,

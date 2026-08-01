@@ -149,6 +149,9 @@ class UpdateMovieListRequest {
   final String? visibility;
   final String? coverImageUrl;
   final String? whoCanAddMovies;
+  final String? scope;
+  final String? groupId;
+  final List<String>? collaboratorIds;
 
   const UpdateMovieListRequest({
     this.name,
@@ -156,6 +159,9 @@ class UpdateMovieListRequest {
     this.visibility,
     this.coverImageUrl,
     this.whoCanAddMovies,
+    this.scope,
+    this.groupId,
+    this.collaboratorIds,
   });
 
   Map<String, dynamic> toJson() => {
@@ -164,6 +170,9 @@ class UpdateMovieListRequest {
         if (visibility != null) 'visibility': visibility,
         if (coverImageUrl != null) 'coverImageUrl': coverImageUrl,
         if (whoCanAddMovies != null) 'whoCanAddItems': whoCanAddMovies,
+        if (scope != null) 'scope': scope,
+        'groupId': groupId,
+        if (collaboratorIds != null) 'collaboratorIds': collaboratorIds,
       };
 }
 

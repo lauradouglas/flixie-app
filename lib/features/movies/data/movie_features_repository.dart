@@ -46,6 +46,9 @@ class MovieFeaturesRepository {
     String? visibility,
     String? coverImageUrl,
     String? whoCanAddMovies,
+    String? scope,
+    String? groupId,
+    List<String>? collaboratorIds,
   }) {
     return UserService.renameMovieList(
       userId,
@@ -56,6 +59,9 @@ class MovieFeaturesRepository {
         visibility: visibility,
         coverImageUrl: coverImageUrl,
         whoCanAddMovies: whoCanAddMovies,
+        scope: scope,
+        groupId: groupId,
+        collaboratorIds: collaboratorIds,
       ),
     );
   }

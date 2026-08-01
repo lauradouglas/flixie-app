@@ -184,6 +184,24 @@ class AppTheme {
         ),
       ),
 
+      popupMenuTheme: PopupMenuThemeData(
+        color: FlixieColors.surfaceElevated,
+        surfaceTintColor: Colors.transparent,
+        elevation: 14,
+        shadowColor: Colors.black.withValues(alpha: 0.55),
+        position: PopupMenuPosition.under,
+        menuPadding: const EdgeInsets.symmetric(vertical: 4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: FlixieColors.tabBarBorder),
+        ),
+        textStyle: const TextStyle(
+          color: FlixieColors.light,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+
       // Elevated buttons
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -428,6 +446,23 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: const BorderSide(color: outline),
+        ),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 10,
+        shadowColor: Colors.black.withValues(alpha: 0.18),
+        position: PopupMenuPosition.under,
+        menuPadding: const EdgeInsets.symmetric(vertical: 4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: outline),
+        ),
+        textStyle: const TextStyle(
+          color: textDark,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(

@@ -8,6 +8,7 @@ import 'package:flixie_app/features/movies/presentation/controllers/movie_lists_
 import 'package:flixie_app/features/movies/data/movie_features_repository.dart';
 import 'package:flixie_app/features/social/data/friend_service.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
+import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/models/group.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -149,6 +150,9 @@ class _MovieListsView extends StatelessWidget {
                                       initialVisibility: list.visibility,
                                       initialWhoCanAddMovies:
                                           list.whoCanAddMovies,
+                                      initialScope: list.scope,
+                                      initialGroupId: list.groupId,
+                                      initialCollaborators: list.collaborators,
                                     );
                                     return;
                                   }
@@ -189,6 +193,9 @@ class _MovieListsView extends StatelessWidget {
     String? initialDescription,
     String? initialVisibility,
     String? initialWhoCanAddMovies,
+    String initialScope = ListScope.personal,
+    String? initialGroupId,
+    List<MovieListCollaborator> initialCollaborators = const [],
   }) async {
     final provider = context.read<MovieListsProvider>();
     final controller = TextEditingController(text: initialName ?? '');
@@ -197,14 +204,16 @@ class _MovieListsView extends StatelessWidget {
     final friendSearchController = TextEditingController();
     String visibility = initialVisibility ?? ListVisibility.private;
     String whoCanAddMovies = initialWhoCanAddMovies ?? 'owner';
-    String scope = ListScope.personal;
-    String? selectedGroupId;
+    String scope = initialScope;
+    String? selectedGroupId = initialGroupId;
     String friendSearch = '';
-    final selectedFriendIds = <String>{};
+    final selectedFriendIds =
+        initialCollaborators.map((collaborator) => collaborator.id).toSet();
+    final originalFriendIds = Set<String>.from(selectedFriendIds);
     final isEdit = listId != null;
     var friends = const <FriendshipUser>[];
     var groups = const <Group>[];
-    if (!isEdit) {
+    if (!isEdit || scope != ListScope.group) {
       final userId = context.read<AuthProvider>().dbUser?.id;
       if (userId != null) {
         final results = await Future.wait([
@@ -290,6 +299,129 @@ class _MovieListsView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
+                if (isEdit)
+                  StatefulBuilder(
+                    builder: (context, setInnerState) {
+                      final query = friendSearch.trim().toLowerCase();
+                      final visibleFriends = query.isEmpty
+                          ? friends
+                          : friends
+                              .where((friend) => [
+                                    friend.username,
+                                    friend.firstName ?? '',
+                                    friend.lastName ?? '',
+                                  ].join(' ').toLowerCase().contains(query))
+                              .toList(growable: false);
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          DropdownButtonFormField<String>(
+                            initialValue: scope,
+                            decoration: const InputDecoration(
+                              labelText: 'Who can add to this list',
+                            ),
+                            items: initialScope == ListScope.group
+                                ? const [
+                                    DropdownMenuItem(
+                                      value: ListScope.group,
+                                      child: Text('Group members'),
+                                    ),
+                                  ]
+                                : const [
+                                    DropdownMenuItem(
+                                      value: ListScope.personal,
+                                      child: Text('Just me'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: ListScope.friends,
+                                      child: Text('Selected friends'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: ListScope.group,
+                                      child: Text('A group'),
+                                    ),
+                                  ],
+                            onChanged: initialScope == ListScope.group
+                                ? null
+                                : (value) => setInnerState(() {
+                                      scope = value ?? ListScope.personal;
+                                      if (scope != ListScope.group) {
+                                        selectedGroupId = null;
+                                      }
+                                      if (scope == ListScope.personal) {
+                                        selectedFriendIds.clear();
+                                      }
+                                    }),
+                          ),
+                          if (scope == ListScope.friends) ...[
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: friendSearchController,
+                              onChanged: (value) => setInnerState(
+                                () => friendSearch = value,
+                              ),
+                              decoration: const InputDecoration(
+                                hintText: 'Search friends',
+                                prefixIcon:
+                                    Icon(Icons.search_rounded, size: 20),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            if (friends.isEmpty)
+                              const Text('No accepted friends available.')
+                            else
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 6,
+                                children: visibleFriends
+                                    .map(
+                                      (friend) => FilterChip(
+                                        label: Text('@${friend.username}'),
+                                        selected: selectedFriendIds
+                                            .contains(friend.id),
+                                        onSelected: (selected) =>
+                                            setInnerState(() {
+                                          if (selected) {
+                                            selectedFriendIds.add(friend.id);
+                                          } else {
+                                            selectedFriendIds.remove(friend.id);
+                                          }
+                                        }),
+                                      ),
+                                    )
+                                    .toList(growable: false),
+                              ),
+                          ],
+                          if (scope == ListScope.group &&
+                              initialScope != ListScope.group) ...[
+                            const SizedBox(height: 12),
+                            DropdownButtonFormField<String>(
+                              initialValue: selectedGroupId,
+                              decoration: const InputDecoration(
+                                  labelText: 'Choose group'),
+                              items: groups
+                                  .where((group) => group.id != null)
+                                  .map((group) => DropdownMenuItem(
+                                        value: group.id,
+                                        child: Text(group.name),
+                                      ))
+                                  .toList(growable: false),
+                              onChanged: (value) =>
+                                  setInnerState(() => selectedGroupId = value),
+                            ),
+                          ],
+                          if (initialScope == ListScope.group)
+                            const Padding(
+                              padding: EdgeInsets.only(top: 8),
+                              child: Text(
+                                'Group lists cannot be changed to solo lists.',
+                                style: TextStyle(color: FlixieColors.medium),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
                 if (!isEdit)
                   StatefulBuilder(
                     builder: (context, setInnerState) {
@@ -432,9 +564,10 @@ class _MovieListsView extends StatelessWidget {
                   child: ElevatedButton(
                     onPressed: () async {
                       final name = controller.text.trim();
+                      final editorUserId =
+                          context.read<AuthProvider>().dbUser?.id;
                       if (name.isEmpty) return;
-                      if (!isEdit &&
-                          scope == ListScope.friends &&
+                      if (scope == ListScope.friends &&
                           selectedFriendIds.isEmpty) {
                         ScaffoldMessenger.of(ctx).showSnackBar(
                           const SnackBar(
@@ -443,21 +576,22 @@ class _MovieListsView extends StatelessWidget {
                         );
                         return;
                       }
-                      if (!isEdit &&
-                          scope == ListScope.group &&
-                          selectedGroupId == null) {
+                      if (scope == ListScope.group && selectedGroupId == null) {
                         ScaffoldMessenger.of(ctx).showSnackBar(
                           const SnackBar(content: Text('Choose a group')),
                         );
                         return;
                       }
-                      final ok = isEdit
+                      var ok = isEdit
                           ? await provider.renameList(
                               listId,
                               name,
                               description: descriptionController.text.trim(),
                               visibility: visibility,
                               whoCanAddMovies: whoCanAddMovies,
+                              scope: scope,
+                              groupId: selectedGroupId,
+                              collaboratorIds: selectedFriendIds.toList(),
                             )
                           : (await provider.createList(
                                 name,
@@ -469,6 +603,31 @@ class _MovieListsView extends StatelessWidget {
                                 collaboratorIds: selectedFriendIds.toList(),
                               )) !=
                               null;
+                      if (ok && isEdit && scope == ListScope.friends) {
+                        if (editorUserId == null) {
+                          ok = false;
+                        } else {
+                          try {
+                            final added =
+                                selectedFriendIds.difference(originalFriendIds);
+                            final removed =
+                                originalFriendIds.difference(selectedFriendIds);
+                            for (final friendId in added) {
+                              await UserService.addMovieListMember(
+                                  editorUserId, listId, friendId);
+                            }
+                            for (final friendId in removed) {
+                              await UserService.removeMovieListMember(
+                                  editorUserId, listId, friendId);
+                            }
+                            if (added.isNotEmpty || removed.isNotEmpty) {
+                              await provider.loadLists();
+                            }
+                          } catch (_) {
+                            ok = false;
+                          }
+                        }
+                      }
                       if (ctx.mounted) Navigator.pop(ctx);
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(

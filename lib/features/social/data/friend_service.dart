@@ -2,6 +2,7 @@ import 'package:flixie_app/models/friend.dart';
 import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/models/profile_avatar.dart';
+import 'package:flixie_app/models/friend_media_interaction.dart';
 import 'package:flixie_app/core/utils/activity_feed_ranking.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 import 'package:flixie_app/features/social/data/request_service.dart';
@@ -77,5 +78,20 @@ class FriendService {
       }
     }
     return rankActivitiesForFeed(activities);
+  }
+
+  static Future<List<FriendMediaInteraction>> getFriendsMovieInteractions(
+    String userId,
+    int movieId,
+  ) async {
+    final data = await ApiClient.get(
+      '/friends/$userId/interactions/movie/$movieId',
+    );
+    return (data as List<dynamic>)
+        .whereType<Map<String, dynamic>>()
+        .map(FriendMediaInteraction.fromJson)
+        .where(
+            (interaction) => interaction.onWatchlist || interaction.favourited)
+        .toList(growable: false);
   }
 }

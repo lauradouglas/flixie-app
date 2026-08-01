@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/models/profile_avatar.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 
 String greeting() {
   final hour = DateTime.now().hour;
@@ -13,6 +15,9 @@ class GreetingHeader extends StatelessWidget {
   const GreetingHeader({
     super.key,
     this.name,
+    this.avatar,
+    this.profileBadges = const [],
+    this.requestCount = 0,
     required this.onSearch,
     required this.onWatchlist,
     required this.onInvite,
@@ -20,6 +25,9 @@ class GreetingHeader extends StatelessWidget {
   });
 
   final String? name;
+  final ProfileAvatar? avatar;
+  final List<String> profileBadges;
+  final int requestCount;
   final VoidCallback onSearch;
   final VoidCallback onWatchlist;
   final VoidCallback onInvite;
@@ -41,17 +49,12 @@ class GreetingHeader extends StatelessWidget {
         children: [
           Row(
             children: [
-              CircleAvatar(
-                radius: 14,
-                backgroundColor: FlixieColors.surfaceElevated,
-                child: Text(
-                  initial,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
-                  ),
-                ),
+              ProfileAvatarView(
+                avatar: avatar,
+                fallbackText: initial,
+                fallbackColor: FlixieColors.surfaceElevated,
+                size: 30,
+                profileBadges: profileBadges,
               ),
               const SizedBox(width: 9),
               Expanded(
@@ -94,6 +97,7 @@ class GreetingHeader extends StatelessWidget {
                 icon: Icons.local_activity_rounded,
                 label: 'Requests',
                 onTap: onRequests,
+                badgeCount: requestCount,
               ),
             ],
           ),
@@ -108,11 +112,13 @@ class _ActionButton extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.badgeCount = 0,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final int badgeCount;
 
   @override
   Widget build(BuildContext context) {
@@ -128,7 +134,13 @@ class _ActionButton extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, color: FlixieColors.primary, size: 18),
+                Badge(
+                  isLabelVisible: badgeCount > 0,
+                  label: Text(badgeCount > 99 ? '99+' : '$badgeCount'),
+                  backgroundColor: FlixieColors.tertiary,
+                  textColor: Colors.black,
+                  child: Icon(icon, color: FlixieColors.primary, size: 18),
+                ),
                 const SizedBox(height: 3),
                 Text(
                   label,

@@ -90,7 +90,7 @@ class SettingsScreen extends StatelessWidget {
               SettingsTile(
                 icon: Icons.person_add_alt_1_outlined,
                 label: 'Invite a friend',
-                onTap: () => context.push('/invite-friend'),
+                onTap: () => context.push('/invite-friend?from=settings'),
                 isLast: true,
               ),
             ],

@@ -14,12 +14,14 @@ class GroupCard extends StatelessWidget {
     this.memberCount,
     this.members = const [],
     this.statusLabel,
+    this.onTap,
   });
 
   final Group group;
   final int? memberCount;
   final List<GroupMember> members;
   final String? statusLabel;
+  final VoidCallback? onTap;
 
   static String _formatCount(int count) {
     if (count >= 1000000) return '${(count / 1000000).toStringAsFixed(1)}M';
@@ -33,7 +35,7 @@ class GroupCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final count = memberCount ?? group.memberCount;
     return GestureDetector(
-      onTap: () => context.push('/groups/${group.id}'),
+      onTap: onTap ?? () => context.push('/groups/${group.id}'),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
