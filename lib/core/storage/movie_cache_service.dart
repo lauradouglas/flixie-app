@@ -2,9 +2,11 @@ import 'package:flixie_app/models/movie.dart';
 import 'package:flixie_app/models/movie_credits.dart';
 import 'package:flixie_app/models/similar_movie.dart';
 import 'package:flixie_app/models/movie_short.dart';
+import 'package:flixie_app/models/watch_provider.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 
-/// Simple in-memory cache for movies, credits, recommendations, and trending movies viewed during the current day.
+/// Simple in-memory cache for movies, credits, recommendations, trending movies
+/// and watch providers viewed during the current day.
 /// Cache is cleared when the day changes or when the app restarts.
 class MovieCacheService {
   static final MovieCacheService _instance = MovieCacheService._internal();
@@ -15,6 +17,7 @@ class MovieCacheService {
   final Map<int, _CachedCredits> _creditsCache = {};
   final Map<int, _CachedRecommendations> _recommendationsCache = {};
   final Map<String, _CachedTrendingMovies> _trendingMoviesCache = {};
+  final Map<String, _CachedWatchProviders> _watchProvidersCache = {};
 
   // ---- Movie Caching ----
 
@@ -41,6 +44,10 @@ class MovieCacheService {
     _movieCache.remove(movieId);
     return null;
   }
+
+  /// Returns the cached movie regardless of age (stale-while-revalidate /
+  /// error-fallback). Returns null only when no cached entry exists at all.
+  Movie? getStaleCachedMovie(int movieId) => _movieCache[movieId]?.movie;
 
   /// Cache a movie with the current timestamp
   void cacheMovie(Movie movie) {
@@ -137,9 +144,40 @@ class MovieCacheService {
     logger.d('Cached ${movies.length} trending movies ($timeWindow)');
   }
 
+  // ---- Watch Providers Caching ----
+
+  /// Key used to look up cached watch providers: "<movieId>:<region>".
+  static String _watchProvidersKey(int movieId, String region) =>
+      '$movieId:$region';
+
+  /// Returns cached watch providers for [movieId] + [region] if fetched today.
+  List<WatchProvider>? getWatchProviders(int movieId, String region) {
+    final cached = _watchProvidersCache[_watchProvidersKey(movieId, region)];
+    if (cached == null) return null;
+
+    if (_isToday(cached.timestamp)) {
+      return cached.providers;
+    }
+
+    logger.d('Removing stale watch providers cache for movie $movieId/$region');
+    _watchProvidersCache.remove(_watchProvidersKey(movieId, region));
+    return null;
+  }
+
+  /// Cache watch providers for [movieId] + [region].
+  void cacheWatchProviders(
+      int movieId, String region, List<WatchProvider> providers) {
+    _watchProvidersCache[_watchProvidersKey(movieId, region)] =
+        _CachedWatchProviders(
+      providers: providers,
+      timestamp: DateTime.now(),
+    );
+    logger.d(
+        'Cached ${providers.length} watch providers for movie $movieId/$region');
+  }
+
   // ---- Cache Management ----
 
-  /// Clear all cached data
   /// Remove cached data for a single movie (movie, credits, recommendations).
   void evictMovie(int movieId) {
     _movieCache.remove(movieId);
@@ -152,14 +190,16 @@ class MovieCacheService {
     final creditsCount = _creditsCache.length;
     final recommendationsCount = _recommendationsCache.length;
     final trendingCount = _trendingMoviesCache.length;
+    final watchProvidersCount = _watchProvidersCache.length;
 
     _movieCache.clear();
     _creditsCache.clear();
     _recommendationsCache.clear();
     _trendingMoviesCache.clear();
+    _watchProvidersCache.clear();
 
     logger.d(
-        'Cleared all cache ($movieCount movies, $creditsCount credits, $recommendationsCount recommendations, $trendingCount trending)');
+        'Cleared all cache ($movieCount movies, $creditsCount credits, $recommendationsCount recommendations, $trendingCount trending, $watchProvidersCount watch-provider entries)');
   }
 
   /// Clear only stale cache entries (older than today)
@@ -168,6 +208,7 @@ class MovieCacheService {
     final beforeCredits = _creditsCache.length;
     final beforeRecommendations = _recommendationsCache.length;
     final beforeTrending = _trendingMoviesCache.length;
+    final beforeWatchProviders = _watchProvidersCache.length;
 
     _movieCache.removeWhere((_, cached) => !_isToday(cached.timestamp));
     _creditsCache.removeWhere((_, cached) => !_isToday(cached.timestamp));
@@ -175,20 +216,25 @@ class MovieCacheService {
         .removeWhere((_, cached) => !_isToday(cached.timestamp));
     _trendingMoviesCache
         .removeWhere((_, cached) => !_isToday(cached.timestamp));
+    _watchProvidersCache
+        .removeWhere((_, cached) => !_isToday(cached.timestamp));
 
     final removedMovies = beforeMovies - _movieCache.length;
     final removedCredits = beforeCredits - _creditsCache.length;
     final removedRecommendations =
         beforeRecommendations - _recommendationsCache.length;
     final removedTrending = beforeTrending - _trendingMoviesCache.length;
+    final removedWatchProviders =
+        beforeWatchProviders - _watchProvidersCache.length;
     final totalRemoved = removedMovies +
         removedCredits +
         removedRecommendations +
-        removedTrending;
+        removedTrending +
+        removedWatchProviders;
 
     if (totalRemoved > 0) {
       logger.d(
-          'Removed $totalRemoved stale entries ($removedMovies movies, $removedCredits credits, $removedRecommendations recommendations, $removedTrending trending)');
+          'Removed $totalRemoved stale entries ($removedMovies movies, $removedCredits credits, $removedRecommendations recommendations, $removedTrending trending, $removedWatchProviders watch-provider entries)');
     }
   }
 
@@ -199,14 +245,16 @@ class MovieCacheService {
       'credits': _creditsCache.length,
       'recommendations': _recommendationsCache.length,
       'trending': _trendingMoviesCache.length,
+      'watchProviders': _watchProvidersCache.length,
       'total': _movieCache.length +
           _creditsCache.length +
           _recommendationsCache.length +
-          _trendingMoviesCache.length,
+          _trendingMoviesCache.length +
+          _watchProvidersCache.length,
     };
 
     logger.d(
-        'Cache stats: ${stats['movies']} movies, ${stats['credits']} credits, ${stats['recommendations']} recommendations, ${stats['trending']} trending');
+        'Cache stats: ${stats['movies']} movies, ${stats['credits']} credits, ${stats['recommendations']} recommendations, ${stats['trending']} trending, ${stats['watchProviders']} watch-provider entries');
     return stats;
   }
 
@@ -256,6 +304,16 @@ class _CachedTrendingMovies {
 
   _CachedTrendingMovies({
     required this.movies,
+    required this.timestamp,
+  });
+}
+
+class _CachedWatchProviders {
+  final List<WatchProvider> providers;
+  final DateTime timestamp;
+
+  _CachedWatchProviders({
+    required this.providers,
     required this.timestamp,
   });
 }

@@ -29,11 +29,26 @@ class MovieService {
 
     apiLogger.d('Fetching movie $id.');
     final queryParams = userId != null ? {'userId': userId} : null;
-    final data =
-        await ApiClient.get('/movies/id/$id', queryParams: queryParams);
-    final movie = Movie.fromJson(data as Map<String, dynamic>);
-    _cache.cacheMovie(movie);
-    return movie;
+    try {
+      final data =
+          await ApiClient.get('/movies/id/$id', queryParams: queryParams);
+      final movie = Movie.fromJson(data as Map<String, dynamic>);
+      _cache.cacheMovie(movie);
+      return movie;
+    } on ApiException catch (e) {
+      // On a DATABASE_ERROR serve any stale cached copy so the UI doesn't
+      // crash with "Failed to load movie". The retry logic in ApiClient will
+      // already have attempted the request up to _maxRetries times.
+      if (e.statusCode == 500 && e.code == 'DATABASE_ERROR') {
+        final stale = _cache.getStaleCachedMovie(id);
+        if (stale != null) {
+          apiLogger.w(
+              'DATABASE_ERROR for movie $id — serving stale cache to avoid blank screen.');
+          return stale;
+        }
+      }
+      rethrow;
+    }
   }
 
   Future<List<Movie>> getMoviesByIds(List<int> ids) async {
@@ -123,6 +138,9 @@ class MovieService {
 
   Future<List<WatchProvider>> getMovieWatchProviders(
       int movieId, String region) async {
+    final cached = _cache.getWatchProviders(movieId, region);
+    if (cached != null) return cached;
+
     apiLogger
         .d('Fetching watch providers for movie $movieId in region $region.');
 
@@ -156,7 +174,9 @@ class MovieService {
     try {
       final detailData =
           await ApiClient.get('/movies/$movieId/$region/watch/providers');
-      return parseProviders(detailData);
+      final providers = parseProviders(detailData);
+      _cache.cacheWatchProviders(movieId, region, providers);
+      return providers;
     } catch (detailError) {
       apiLogger.w(
         'Detail watch-provider endpoint failed for movie $movieId/$region: $detailError. Trying cache endpoint.',
@@ -165,7 +185,9 @@ class MovieService {
         '/movies/$movieId/watch-providers',
         queryParams: {'region': region},
       );
-      return parseProviders(cacheData);
+      final providers = parseProviders(cacheData);
+      _cache.cacheWatchProviders(movieId, region, providers);
+      return providers;
     }
   }
 
