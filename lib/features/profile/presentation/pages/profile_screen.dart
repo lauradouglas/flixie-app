@@ -1028,21 +1028,19 @@ class _RecentReviewsSummary extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text(
-              'Recent reviews',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: FlixieColors.light,
-                    fontWeight: FontWeight.w800,
-                  ),
-            ),
-            const Spacer(),
-            TextButton(
-              onPressed: () => context.push('/my-reviews'),
-              child: const Text('See all'),
-            ),
-          ],
+        FlixieSectionHeader(
+          title: 'Recent reviews',
+          uppercase: false,
+          accentHeight: 22,
+          titleStyle: const TextStyle(
+            color: FlixieColors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            letterSpacing: .5,
+          ),
+          trailingLabel: 'See all',
+          trailingColor: FlixieColors.primary,
+          onTrailingTap: () => context.push('/my-reviews'),
         ),
         ...recent.map((review) => Padding(
               padding: const EdgeInsets.only(bottom: 10),

@@ -65,11 +65,18 @@ class MediaListsSection extends StatelessWidget {
       return const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            SkeletonBox(width: 86, height: 20),
-            Spacer(),
-            SkeletonBox(width: 58, height: 28, borderRadius: 14),
-          ]),
+          FlixieSectionHeader(
+            title: 'Lists',
+            uppercase: false,
+            accentHeight: 22,
+            titleStyle: TextStyle(
+              color: FlixieColors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+            trailingLabel: 'See all',
+            trailingColor: FlixieColors.primary,
+          ),
           SizedBox(height: 8),
           SkeletonBox(width: 128, height: 13),
           SizedBox(height: 12),

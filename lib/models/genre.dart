@@ -9,9 +9,27 @@ class Genre {
 
   factory Genre.fromJson(Map<String, dynamic> json) {
     return Genre(
-      id: json['id'] as int,
-      name: json['name'] as String,
+      id: _intValue(json['id']) ?? 0,
+      name: _stringOrFallback(json['name'], fallback: 'Unknown'),
     );
+  }
+
+  static String? _nullableString(dynamic value) {
+    if (value == null) return null;
+    final text = value.toString().trim();
+    return text.isEmpty ? null : text;
+  }
+
+  static String _stringOrFallback(dynamic value, {required String fallback}) {
+    return _nullableString(value) ?? fallback;
+  }
+
+  static int? _intValue(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
   }
 
   Map<String, dynamic> toJson() {

@@ -144,21 +144,52 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     try {
       final movieService = context.read<MovieService>();
       final region = authProvider.dbUser?.countryAbbreviation ?? 'GB';
+
+      Future<T> withStep<T>(String step, Future<T> future) async {
+        try {
+          return await future;
+        } catch (e) {
+          apiLogger.e('Movie detail load failed at $step for movie $id: $e');
+          rethrow;
+        }
+      }
+
       final futures = <Future>[
-        movieService.getMovieById(id, userId: userId),
-        movieService.getMovieRecommendations(id),
-        movieService.getMovieCredits(id),
-        movieService.getMovieWatchProviders(id, region),
+        withStep(
+          'GET /movies/id/$id',
+          movieService.getMovieById(id, userId: userId),
+        ),
+        withStep(
+          'GET /movies/$id/recommendations',
+          movieService.getMovieRecommendations(id),
+        ),
+        withStep(
+          'GET /movies/$id/credits',
+          movieService.getMovieCredits(id),
+        ),
+        withStep(
+          'GET /movies/$id/$region/watch/providers',
+          movieService.getMovieWatchProviders(id, region),
+        ),
         if (userId != null)
-          WatchlistActionsController.instance
-              .getUserWatchProviders(userId)
-              .catchError((_) => <WatchProvider>[])
+          withStep(
+            'GET user watch providers',
+            WatchlistActionsController.instance
+                .getUserWatchProviders(userId)
+                .catchError((_) => <WatchProvider>[]),
+          )
         else
           Future.value(<WatchProvider>[]),
       ];
       if (userId != null) {
-        futures.add(movieService.getUserMovieRating(id, userId));
-        futures.add(movieService.getFriendsMovieActivity(id, userId));
+        futures.add(withStep(
+          'POST /movies/$id/user/rating',
+          movieService.getUserMovieRating(id, userId),
+        ));
+        futures.add(withStep(
+          'GET /movies/id/$id/friends-activity',
+          movieService.getFriendsMovieActivity(id, userId),
+        ));
       }
       final results = await Future.wait(futures);
       if (mounted) {

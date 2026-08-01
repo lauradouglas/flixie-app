@@ -45,34 +45,52 @@ class Review {
 
   factory Review.fromJson(Map<String, dynamic> json) {
     return Review(
-      id: json['id'] as String,
-      userId: json['userId'] as String,
-      movieId: json['movieId'] as int?,
-      showId: json['showId'] as int?,
-      rating: json['rating'] as int,
-      title: json['title'] as String,
-      body: json['body'] as String,
-      upvotes: json['upvotes'] as int? ?? 0,
-      downvotes: json['downvotes'] as int? ?? 0,
+      id: _stringOrFallback(json['id']),
+      userId: _stringOrFallback(json['userId']),
+      movieId: _intValue(json['movieId']),
+      showId: _intValue(json['showId']),
+      rating: _intValue(json['rating']) ?? 0,
+      title: _stringOrFallback(json['title'], fallback: 'Untitled review'),
+      body: _stringOrFallback(json['body']),
+      upvotes: _intValue(json['upvotes']) ?? 0,
+      downvotes: _intValue(json['downvotes']) ?? 0,
       containsSpoilers: json['containsSpoilers'] as bool? ?? false,
-      language: json['language'] as String? ?? 'en',
+      language: _stringOrFallback(json['language'], fallback: 'en'),
       recommended: json['recommended'] as bool? ?? true,
-      createdAt: json['createdAt'] as String,
-      updatedAt: json['updatedAt'] as String,
+      createdAt: _stringOrFallback(json['createdAt']),
+      updatedAt: _stringOrFallback(json['updatedAt']),
       user: json['user'] != null
           ? User.fromJson(json['user'] as Map<String, dynamic>)
           : null,
       movieTitle: json['movie'] != null
-          ? (json['movie'] as Map<String, dynamic>)['title'] as String?
-          : json['movieTitle'] as String?,
+          ? _nullableString((json['movie'] as Map<String, dynamic>)['title'])
+          : _nullableString(json['movieTitle']),
       moviePosterPath: json['movie'] is Map<String, dynamic>
-          ? (json['movie'] as Map<String, dynamic>)['posterPath'] as String?
-          : json['moviePosterPath'] as String?,
+          ? _nullableString((json['movie'] as Map<String, dynamic>)['posterPath'])
+          : _nullableString(json['moviePosterPath']),
       reactions: (json['reactions'] as Map<String, dynamic>?)
               ?.map((k, v) => MapEntry(k, (v as num).toInt())) ??
           {},
-      myReaction: json['myReaction'] as String?,
+      myReaction: _nullableString(json['myReaction']),
     );
+  }
+
+  static String? _nullableString(dynamic value) {
+    if (value == null) return null;
+    final text = value.toString().trim();
+    return text.isEmpty ? null : text;
+  }
+
+  static String _stringOrFallback(dynamic value, {String fallback = ''}) {
+    return _nullableString(value) ?? fallback;
+  }
+
+  static int? _intValue(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
   }
 
   Map<String, dynamic> toJson() {

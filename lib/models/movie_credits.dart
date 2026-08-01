@@ -52,10 +52,14 @@ class MovieCastMember {
   factory MovieCastMember.fromJson(Map<String, dynamic> json) {
     return MovieCastMember(
       id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
-      name: json['name'] as String,
-      character: json['character'] as String,
-      profileImage: json['profileImage'] as String?,
-      knownForDepartment: json['knownForDepartment'] as String,
+      name: _stringOrFallback(json['name'], fallback: 'Unknown'),
+      character: _stringOrFallback(
+        json['character'],
+        fallback: 'Unknown Character',
+      ),
+      profileImage: _nullableString(json['profileImage']),
+      knownForDepartment:
+          _stringOrFallback(json['knownForDepartment'], fallback: 'Unknown'),
       gender: json['gender'] is int
           ? json['gender']
           : int.parse(json['gender'].toString()),
@@ -102,14 +106,15 @@ class CrewMember {
   factory CrewMember.fromJson(Map<String, dynamic> json) {
     return CrewMember(
       id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
-      name: json['name'] as String,
-      profileImage: json['profileImage'] as String?,
-      knownForDepartment: json['knownForDepartment'] as String,
+      name: _stringOrFallback(json['name'], fallback: 'Unknown'),
+      profileImage: _nullableString(json['profileImage']),
+      knownForDepartment:
+          _stringOrFallback(json['knownForDepartment'], fallback: 'Unknown'),
       gender: json['gender'] is int
           ? json['gender']
           : int.parse(json['gender'].toString()),
-      department: json['department'] as String,
-      job: json['job'] as String,
+      department: _stringOrFallback(json['department'], fallback: 'Unknown'),
+      job: _stringOrFallback(json['job'], fallback: 'Unknown'),
     );
   }
 
@@ -124,6 +129,17 @@ class CrewMember {
       'job': job,
     };
   }
+}
+
+String _stringOrFallback(dynamic value, {required String fallback}) {
+  final text = _nullableString(value);
+  return text ?? fallback;
+}
+
+String? _nullableString(dynamic value) {
+  if (value == null) return null;
+  final text = value.toString().trim();
+  return text.isEmpty ? null : text;
 }
 
 String? resolveCreditProfileImage(String? value) {

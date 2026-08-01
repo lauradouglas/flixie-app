@@ -25,4 +25,13 @@ void main() {
 
     expect(movie.backdropPath, '/canonical.jpg');
   });
+
+  test('Movie falls back when title is null', () {
+    final movie = Movie.fromJson({
+      'id': 1,
+      'title': null,
+    });
+
+    expect(movie.title, 'Untitled');
+  });
 }

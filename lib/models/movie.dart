@@ -52,9 +52,12 @@ class Movie {
   factory Movie.fromJson(Map<String, dynamic> json) {
     return Movie(
       id: json['id'] as int,
-      title: json['title'] as String,
-      releaseDate: json['releaseDate'] as String?,
-      overview: json['overview'] as String?,
+      title: _stringOrFallback(
+        json['title'] ?? json['name'] ?? json['originalTitle'],
+        fallback: 'Untitled',
+      ),
+      releaseDate: _nullableString(json['releaseDate']),
+      overview: _nullableString(json['overview']),
       posterPath: _cleanImagePath(json['posterPath']),
       backdropPath:
           _cleanImagePath(json['backdropPath'] ?? json['backdropUrl']),
@@ -62,8 +65,8 @@ class Movie {
       voteAverage: _parseDouble(json['voteAverage']),
       voteCount: _parseInt(json['voteCount']),
       runtime: _parseInt(json['runtime']),
-      tagline: json['tagline'] as String?,
-      status: json['status'] as String?,
+      tagline: _nullableString(json['tagline']),
+      status: _nullableString(json['status']),
       budget: _parseInt(json['budget']),
       genres: json['genres'] != null
           ? (json['genres'] as List<dynamic>)
@@ -75,10 +78,10 @@ class Movie {
               .map((e) => MovieVideo.fromJson(e as Map<String, dynamic>))
               .toList()
           : null,
-      imdbId: json['imdbId'] as String?,
-      homepage: json['homepage'] as String?,
-      instagramId: json['instagramId'] as String?,
-      twitterId: json['twitterId'] as String?,
+      imdbId: _nullableString(json['imdbId']),
+      homepage: _nullableString(json['homepage']),
+      instagramId: _nullableString(json['instagramId']),
+      twitterId: _nullableString(json['twitterId']),
       collection: json['collection'] as Map<String, dynamic>?,
       reviews: json['reviews'] != null
           ? (json['reviews'] as List<dynamic>)
@@ -108,6 +111,16 @@ class Movie {
     if (value is! String) return null;
     final cleaned = value.trim();
     return cleaned.isEmpty ? null : cleaned;
+  }
+
+  static String? _nullableString(dynamic value) {
+    if (value == null) return null;
+    final text = value.toString().trim();
+    return text.isEmpty ? null : text;
+  }
+
+  static String _stringOrFallback(dynamic value, {required String fallback}) {
+    return _nullableString(value) ?? fallback;
   }
 
   Movie copyWith({

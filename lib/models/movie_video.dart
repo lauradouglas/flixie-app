@@ -29,19 +29,40 @@ class MovieVideo {
 
   factory MovieVideo.fromJson(Map<String, dynamic> json) {
     return MovieVideo(
-      id: json['id'] as int,
-      movieId: json['movieId'] as int,
-      name: json['name'] as String,
-      key: json['key'] as String,
-      size: json['size'] as int,
-      official: json['official'] as bool,
-      languageAbr: json['languageAbr'] as String,
-      countryAbr: json['countryAbr'] as String,
-      publishedAt: json['publishedAt'] as String,
-      videoTypeName: json['videoTypeName'] as String,
-      createdAt: json['createdAt'] as String,
-      updatedAt: json['updatedAt'] as String,
+      id: _intValue(json['id']) ?? 0,
+      movieId: _intValue(json['movieId']) ?? 0,
+      name: _stringOrFallback(json['name'], fallback: 'Trailer'),
+      key: _stringOrFallback(json['key']),
+      size: _intValue(json['size']) ?? 0,
+      official: json['official'] as bool? ?? false,
+      languageAbr: _stringOrFallback(json['languageAbr'], fallback: 'en'),
+      countryAbr: _stringOrFallback(json['countryAbr'], fallback: 'US'),
+      publishedAt: _stringOrFallback(json['publishedAt']),
+      videoTypeName: _stringOrFallback(
+        json['videoTypeName'],
+        fallback: 'Trailer',
+      ),
+      createdAt: _stringOrFallback(json['createdAt']),
+      updatedAt: _stringOrFallback(json['updatedAt']),
     );
+  }
+
+  static String? _nullableString(dynamic value) {
+    if (value == null) return null;
+    final text = value.toString().trim();
+    return text.isEmpty ? null : text;
+  }
+
+  static String _stringOrFallback(dynamic value, {String fallback = ''}) {
+    return _nullableString(value) ?? fallback;
+  }
+
+  static int? _intValue(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
   }
 
   Map<String, dynamic> toJson() {

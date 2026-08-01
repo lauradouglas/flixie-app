@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:flixie_app/models/movie_rating.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 
 class RatingsSection extends StatelessWidget {
   const RatingsSection({
@@ -33,37 +34,20 @@ class RatingsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            children: [
-              Container(
-                width: 4,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: FlixieColors.primary,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                'MY RATINGS',
-                style: textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.5,
-                ),
-              ),
-              const Spacer(),
-              if (ratings.length > 6)
-                TextButton(
-                  onPressed: () => _showAllRatingsSheet(context),
-                  child: const Text(
-                    'See All',
-                    style: TextStyle(color: FlixieColors.primary),
-                  ),
-                ),
-            ],
+        FlixieSectionHeader(
+          title: 'My ratings',
+          uppercase: false,
+          accentHeight: 22,
+          titleStyle: const TextStyle(
+            color: FlixieColors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            letterSpacing: .5,
           ),
+          trailingLabel: ratings.length > 6 ? 'See all' : null,
+          trailingColor: FlixieColors.primary,
+          onTrailingTap:
+              ratings.length > 6 ? () => _showAllRatingsSheet(context) : null,
         ),
         if (recentRatings.isEmpty)
           Padding(
