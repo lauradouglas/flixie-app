@@ -778,6 +778,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
                   onChanged: (value) => setState(() => _audience = value),
                 ),
               ),
+              if (_audience == _RequestAudience.friends) _buildFriendFilters(),
               Expanded(
                 child: _audience == _RequestAudience.friends
                     ? directBody
@@ -847,84 +848,75 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
                       ),
                     ),
                   ],
-        bottom: isFocused || _audience == _RequestAudience.groups
-            ? null
-            : PreferredSize(
-                preferredSize: Size.fromHeight(_showSearch ? 104 : 52),
-                child: Column(
-                  children: [
-                    if (_showSearch)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                        child: TextField(
-                          controller: _searchController,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            hintText: 'Search by movie or username...',
-                            hintStyle:
-                                const TextStyle(color: FlixieColors.medium),
-                            prefixIcon: const Icon(Icons.search,
-                                color: FlixieColors.medium),
-                            filled: true,
-                            fillColor: FlixieColors.tabBarBackgroundFocused,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide.none,
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 12),
-                          ),
-                        ),
-                      ),
-                    // Status filter chips
-                    Container(
-                      width: double.infinity,
-                      color: FlixieColors.tabBarBackgroundFocused,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: const [
-                            _StatusFilter.needsResponse,
-                            _StatusFilter.scheduled,
-                            _StatusFilter.planning,
-                            _StatusFilter.completed,
-                          ].map((f) {
-                            final selected = _statusFilter == f;
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: ChoiceChip(
-                                label: Text(_filterLabel(f)),
-                                selected: selected,
-                                onSelected: (_) {
-                                  setState(() => _statusFilter =
-                                      selected ? _StatusFilter.active : f);
-                                  _applyFilter();
-                                },
-                                selectedColor: FlixieColors.primary,
-                                backgroundColor: FlixieColors.tabBarBorder,
-                                labelStyle: TextStyle(
-                                  color: selected
-                                      ? Colors.white
-                                      : FlixieColors.light,
-                                  fontWeight: selected
-                                      ? FontWeight.w600
-                                      : FontWeight.normal,
-                                  fontSize: 13,
-                                ),
-                                side: BorderSide.none,
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+        bottom: null,
       ),
       body: body,
+    );
+  }
+
+  Widget _buildFriendFilters() {
+    const filters = [
+      _StatusFilter.needsResponse,
+      _StatusFilter.scheduled,
+      _StatusFilter.planning,
+      _StatusFilter.completed,
+    ];
+    return Column(
+      children: [
+        if (_showSearch)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+            child: TextField(
+              controller: _searchController,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Search by movie or username...',
+                prefixIcon: const Icon(Icons.search_rounded),
+                filled: true,
+                fillColor: FlixieColors.tabBarBackgroundFocused,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+        SizedBox(
+          height: 48,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            itemCount: filters.length,
+            itemBuilder: (_, index) {
+              final filter = filters[index];
+              final selected = _statusFilter == filter;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  label: Text(_filterLabel(filter)),
+                  selected: selected,
+                  onSelected: (_) {
+                    setState(() => _statusFilter =
+                        selected ? _StatusFilter.active : filter);
+                    _applyFilter();
+                  },
+                  selectedColor: FlixieColors.primary,
+                  backgroundColor: FlixieColors.tabBarBackgroundFocused,
+                  side: BorderSide(
+                    color: FlixieColors.primary.withValues(
+                      alpha: selected ? 1 : 0.3,
+                    ),
+                  ),
+                  labelStyle: TextStyle(
+                    color: selected ? Colors.white : FlixieColors.medium,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
