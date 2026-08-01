@@ -223,7 +223,7 @@ class MovieTasteBadge extends StatelessWidget {
                       children: genreNames
                           .map((name) => _GenreChip(
                                 name: name,
-                                color: personality.color,
+                                color: _genreColor(name),
                               ))
                           .toList(),
                     ),
@@ -236,6 +236,40 @@ class MovieTasteBadge extends StatelessWidget {
       ],
     );
   }
+}
+
+Color _genreColor(String name) {
+  const named = <String, Color>{
+    'action': FlixieColors.danger,
+    'adventure': FlixieColors.success,
+    'animation': Color(0xFF4DD0E1),
+    'comedy': FlixieColors.warning,
+    'crime': Color(0xFFE573A7),
+    'documentary': Color(0xFF66BB6A),
+    'drama': Color(0xFFAB76FF),
+    'family': Color(0xFFFFB86B),
+    'fantasy': FlixieColors.primary,
+    'history': Color(0xFFD4A373),
+    'horror': Color(0xFFE85D75),
+    'music': Color(0xFFEC6BD6),
+    'mystery': Color(0xFF7986CB),
+    'romance': Color(0xFFFF6B9A),
+    'science fiction': Color(0xFF5B8DEF),
+    'sci-fi': Color(0xFF5B8DEF),
+    'thriller': Color(0xFFFF8A65),
+    'war': Color(0xFF9E9D6B),
+    'western': Color(0xFFC68B59),
+  };
+  final normalized = name.trim().toLowerCase();
+  if (named[normalized] case final color?) return color;
+  const fallback = [
+    FlixieColors.primary,
+    FlixieColors.secondary,
+    FlixieColors.tertiary,
+    Color(0xFF5B8DEF),
+    Color(0xFFEC6BD6),
+  ];
+  return fallback[normalized.hashCode.abs() % fallback.length];
 }
 
 class _GenreChip extends StatelessWidget {

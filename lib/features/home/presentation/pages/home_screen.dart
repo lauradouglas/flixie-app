@@ -30,6 +30,7 @@ import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/features/home/presentation/widgets/featured_card.dart';
 import 'package:flixie_app/features/home/presentation/widgets/greeting_header.dart';
 import 'package:flixie_app/features/home/presentation/widgets/section_header.dart';
+import 'package:flixie_app/features/home/presentation/widgets/continue_watching_carousel.dart';
 import 'package:flixie_app/features/home/presentation/widgets/trending_friends_section.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
@@ -456,21 +457,9 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         const HomeSectionHeader(title: 'Continue Watching'),
         const SizedBox(height: 12),
-        SizedBox(
-          height: 108,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _continueWatchingShows.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              final show = _continueWatchingShows[index];
-              return _ContinueWatchingCard(
-                show: show,
-                onTap: () => context.push('/shows/${show.showId}'),
-              );
-            },
-          ),
+        ContinueWatchingCarousel(
+          shows: _continueWatchingShows,
+          onTap: (show) => context.push('/shows/${show.showId}'),
         ),
         const SizedBox(height: 20),
       ],
@@ -1574,6 +1563,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+// Kept temporarily for hot-reload compatibility with older element trees.
+// ignore: unused_element
 class _ContinueWatchingCard extends StatelessWidget {
   const _ContinueWatchingCard({
     required this.show,

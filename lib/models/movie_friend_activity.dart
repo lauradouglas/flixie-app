@@ -1,12 +1,17 @@
+import 'package:flixie_app/models/profile_avatar.dart';
+
 class MovieFriendActivity {
   final String userId;
   final String username;
   final String? firstName;
   final Map<String, dynamic>? iconColor;
+  final ProfileAvatar? avatar;
+  final List<String> profileBadges;
   final bool onWatchlist;
   final bool watched;
   final bool favorited;
   final int? rating;
+  final bool reviewed;
   final bool? reviewRecommended;
   final bool? recommended;
   final int activityScore;
@@ -19,10 +24,13 @@ class MovieFriendActivity {
     required this.username,
     this.firstName,
     this.iconColor,
+    this.avatar,
+    this.profileBadges = const [],
     required this.onWatchlist,
     required this.watched,
     required this.favorited,
     this.rating,
+    this.reviewed = false,
     this.reviewRecommended,
     this.recommended,
     this.activityScore = 0,
@@ -38,10 +46,18 @@ class MovieFriendActivity {
       username: user['username'] as String,
       firstName: user['firstName'] as String?,
       iconColor: user['iconColor'] as Map<String, dynamic>?,
+      avatar: user['avatar'] is Map<String, dynamic>
+          ? ProfileAvatar.fromJson(user['avatar'] as Map<String, dynamic>)
+          : null,
+      profileBadges: (user['profileBadges'] as List<dynamic>? ?? const [])
+          .map((item) => item is Map<String, dynamic> ? item['badge'] : item)
+          .whereType<String>()
+          .toList(growable: false),
       onWatchlist: json['onWatchlist'] as bool? ?? false,
       watched: json['watched'] as bool? ?? false,
       favorited: json['favorited'] as bool? ?? false,
       rating: _parseInt(json['rating']),
+      reviewed: json['reviewed'] == true,
       reviewRecommended:
           (json['review'] as Map<String, dynamic>?)?['recommended'] as bool?,
       recommended: json['recommended'] as bool? ??

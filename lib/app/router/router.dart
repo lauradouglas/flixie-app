@@ -21,6 +21,7 @@ import 'package:flixie_app/features/settings/presentation/pages/settings_screen.
 import 'package:flixie_app/features/settings/presentation/pages/about_credits_screen.dart';
 import 'package:flixie_app/features/settings/presentation/pages/invite_friend_screen.dart';
 import 'package:flixie_app/features/movies/presentation/pages/stats_screen.dart';
+import 'package:flixie_app/features/movies/presentation/pages/user_wrapped_screen.dart';
 import 'package:flixie_app/features/movies/presentation/pages/watch_history_screen.dart';
 import 'package:flixie_app/features/social/presentation/pages/watch_requests_screen.dart';
 import 'package:flixie_app/features/movies/presentation/pages/movie_list_detail_screen.dart';
@@ -244,7 +245,22 @@ GoRouter buildRouter(AuthProvider authProvider) {
           ),
           GoRoute(
             path: '/wrapped',
-            redirect: (context, state) => '/stats',
+            pageBuilder: (context, state) => _pushPage(
+              state,
+              const UserWrappedScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/wrapped/:userId',
+            pageBuilder: (context, state) => _pushPage(
+              state,
+              UserWrappedScreen(
+                userId: state.pathParameters['userId'],
+                initialYear: int.tryParse(
+                  state.uri.queryParameters['year'] ?? '',
+                ),
+              ),
+            ),
           ),
           GoRoute(
             path: '/watch-requests',

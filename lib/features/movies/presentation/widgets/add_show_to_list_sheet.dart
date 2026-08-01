@@ -6,6 +6,7 @@ import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/list_picker_sheet.dart';
 
 class AddShowToListSheet extends StatefulWidget {
   const AddShowToListSheet({
@@ -81,11 +82,36 @@ class _AddShowToListSheetState extends State<AddShowToListSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final query = _searchController.text.trim().toLowerCase();
-    final filtered = _lists
-        .where((list) => list.name.toLowerCase().contains(query))
-        .toList(growable: false);
+    if (_loading) {
+      return const SizedBox(
+        height: 320,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    return ListPickerSheet(
+      items: _lists
+          .map((list) => ListPickerItem(
+                id: list.id,
+                name: list.name,
+                visibility: list.visibility,
+                posterUrls: list.previewPosterUrls,
+                countLabel: _listCountLabel(list),
+              ))
+          .toList(growable: false),
+      selectedIds: _selectedListIds,
+      mediaLabel: 'show',
+      saving: _saving,
+      onToggle: (id) => setState(() {
+        _selectedListIds.contains(id)
+            ? _selectedListIds.remove(id)
+            : _selectedListIds.add(id);
+      }),
+      onCreate: _openCreateListSheet,
+      onDone: _applyChanges,
+      onCancel: () => Navigator.pop(context),
+    );
 
+/*
     return SafeArea(
       child: SizedBox(
         height: MediaQuery.of(context).size.height * 0.88,
@@ -252,6 +278,7 @@ class _AddShowToListSheetState extends State<AddShowToListSheet> {
         ),
       ),
     );
+*/
   }
 
   Future<void> _applyChanges() async {
@@ -470,6 +497,7 @@ String _listCountLabel(ShowList list) {
   return '$total items';
 }
 
+// ignore: unused_element
 class _SelectedShowSummary extends StatelessWidget {
   const _SelectedShowSummary({
     required this.title,
@@ -546,6 +574,7 @@ class _SelectedShowSummary extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _ShowListPosterStack extends StatelessWidget {
   const _ShowListPosterStack({required this.list});
 

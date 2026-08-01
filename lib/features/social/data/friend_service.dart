@@ -3,7 +3,6 @@ import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/models/profile_avatar.dart';
 import 'package:flixie_app/models/friend_media_interaction.dart';
-import 'package:flixie_app/core/utils/activity_feed_ranking.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 import 'package:flixie_app/features/social/data/request_service.dart';
 
@@ -49,7 +48,7 @@ class FriendService {
 
   static Future<List<ActivityListItem>> getFriendsActivityLists(
     String userId, {
-    int days = 14,
+    int days = 30,
     int limit = 100,
   }) async {
     final data = await ApiClient.get(
@@ -77,7 +76,15 @@ class FriendService {
         // enrichment is temporarily unavailable.
       }
     }
-    return rankActivitiesForFeed(activities);
+    activities.sort((left, right) {
+      final leftDate = DateTime.tryParse(left.timestamp);
+      final rightDate = DateTime.tryParse(right.timestamp);
+      if (leftDate == null && rightDate == null) return 0;
+      if (leftDate == null) return 1;
+      if (rightDate == null) return -1;
+      return rightDate.compareTo(leftDate);
+    });
+    return activities;
   }
 
   static Future<List<FriendMediaInteraction>> getFriendsMovieInteractions(

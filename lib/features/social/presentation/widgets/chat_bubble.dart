@@ -10,6 +10,7 @@ class ChatBubble extends StatelessWidget {
     required this.message,
     required this.senderUsername,
     required this.isMe,
+    required this.sentAt,
     this.avatar,
     this.initials,
     this.profileBadges = const [],
@@ -20,6 +21,7 @@ class ChatBubble extends StatelessWidget {
   final String message;
   final String senderUsername;
   final bool isMe;
+  final DateTime sentAt;
   final ProfileAvatar? avatar;
   final String? initials;
   final List<String> profileBadges;
@@ -31,7 +33,7 @@ class ChatBubble extends StatelessWidget {
     return GestureDetector(
       onLongPress: onLongPress,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+        padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 16),
         child: Column(
           crossAxisAlignment:
               isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -46,23 +48,18 @@ class ChatBubble extends StatelessWidget {
                         fontSize: 10,
                         fontStyle: FontStyle.italic)),
               ),
-            Padding(
-              padding: EdgeInsets.only(
-                left: isMe ? 0 : 4,
-                right: isMe ? 4 : 0,
-                bottom: 3,
-              ),
-              child: Text(
-                isMe ? 'You' : senderUsername,
-                style: TextStyle(
-                  color: isMe
-                      ? FlixieColors.primary.withValues(alpha: 0.8)
-                      : FlixieColors.medium,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
+            if (!isMe)
+              Padding(
+                padding: const EdgeInsets.only(left: 46, bottom: 4),
+                child: Text(
+                  senderUsername,
+                  style: const TextStyle(
+                    color: FlixieColors.medium,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-            ),
             Row(
               mainAxisAlignment:
                   isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
@@ -77,34 +74,42 @@ class ChatBubble extends StatelessWidget {
                             ? senderUsername[0].toUpperCase()
                             : '?',
                     fallbackColor: FlixieColors.primary,
-                    size: 30,
+                    size: 36,
                     profileBadges: profileBadges,
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                 ],
-                Container(
-                  constraints: BoxConstraints(
-                    maxWidth: MediaQuery.of(context).size.width * 0.66,
-                  ),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: isMe
-                        ? FlixieColors.primary.withValues(alpha: 0.85)
-                        : FlixieColors.tabBarBackgroundFocused,
-                    borderRadius: BorderRadius.only(
-                      topLeft: const Radius.circular(16),
-                      topRight: const Radius.circular(16),
-                      bottomLeft: Radius.circular(isMe ? 16 : 4),
-                      bottomRight: Radius.circular(isMe ? 4 : 16),
+                Flexible(
+                  child: Container(
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * 0.62,
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isMe ? FlixieColors.primary : FlixieColors.surface,
+                      borderRadius: BorderRadius.only(
+                        topLeft: const Radius.circular(16),
+                        topRight: const Radius.circular(16),
+                        bottomLeft: Radius.circular(isMe ? 16 : 4),
+                        bottomRight: Radius.circular(isMe ? 4 : 16),
+                      ),
+                    ),
+                    child: Text(
+                      message,
+                      style: TextStyle(
+                        color: isMe ? Colors.white : FlixieColors.textPrimary,
+                        fontSize: 15,
+                      ),
                     ),
                   ),
-                  child: Text(
-                    message,
-                    style: TextStyle(
-                      color: isMe ? Colors.black : FlixieColors.light,
-                      fontSize: 14,
-                    ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _timeLabel(sentAt),
+                  style: const TextStyle(
+                    color: FlixieColors.medium,
+                    fontSize: 11,
                   ),
                 ),
               ],
@@ -113,5 +118,12 @@ class ChatBubble extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _timeLabel(DateTime value) {
+    final local = value.toLocal();
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
   }
 }

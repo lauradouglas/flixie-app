@@ -7,6 +7,7 @@ import 'package:flixie_app/features/movies/presentation/controllers/movie_lists_
 import 'package:flixie_app/features/movies/data/movie_features_repository.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/list_picker_sheet.dart';
 
 class AddToListSheet extends StatelessWidget {
   const AddToListSheet({
@@ -109,11 +110,41 @@ class _AddToListSheetBodyState extends State<_AddToListSheetBody> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<MovieListsProvider>();
-    final query = _searchController.text.trim().toLowerCase();
-    final filtered = provider.lists
-        .where((list) => list.name.toLowerCase().contains(query))
-        .toList(growable: false);
+    if (provider.isLoading || _loadingMembership) {
+      return const SizedBox(
+        height: 320,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    return ListPickerSheet(
+      items: provider.lists
+          .map((list) => ListPickerItem(
+                id: list.id,
+                name: list.name,
+                visibility: list.visibility,
+                posterUrls: list.previewPosterUrls,
+                countLabel: _listCountLabel(list),
+                scope: list.scope,
+                groupName: list.groupName,
+                collaborators: list.participants.isNotEmpty
+                    ? list.participants
+                    : list.collaborators,
+              ))
+          .toList(growable: false),
+      selectedIds: _selectedListIds,
+      mediaLabel: 'movie',
+      saving: _saving,
+      onToggle: (id) => setState(() {
+        _selectedListIds.contains(id)
+            ? _selectedListIds.remove(id)
+            : _selectedListIds.add(id);
+      }),
+      onCreate: _openCreateListSheet,
+      onDone: () => _applyChanges(provider),
+      onCancel: () => Navigator.pop(context),
+    );
 
+/*
     return SafeArea(
       child: SizedBox(
         height: MediaQuery.of(context).size.height * 0.88,
@@ -282,6 +313,7 @@ class _AddToListSheetBodyState extends State<_AddToListSheetBody> {
         ),
       ),
     );
+*/
   }
 
   Future<void> _applyChanges(MovieListsProvider provider) async {
@@ -600,6 +632,7 @@ class _VisibilityOptionTile extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _SelectedMovieSummary extends StatelessWidget {
   const _SelectedMovieSummary({
     required this.title,
@@ -679,6 +712,7 @@ class _SelectedMovieSummary extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _ListPosterStack extends StatelessWidget {
   const _ListPosterStack({required this.list});
   final MovieList list;

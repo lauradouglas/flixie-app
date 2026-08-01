@@ -13,6 +13,7 @@ import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/models/group.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 
 class MovieListsScreen extends StatelessWidget {
   const MovieListsScreen({super.key});
@@ -35,19 +36,48 @@ class MovieListsScreen extends StatelessWidget {
   }
 }
 
-class _MovieListsView extends StatelessWidget {
+class _MovieListsView extends StatefulWidget {
   const _MovieListsView();
+
+  @override
+  State<_MovieListsView> createState() => _MovieListsViewState();
+}
+
+enum _ListFilter { all, private, shared }
+
+enum _ListSort { updated, name }
+
+class _MovieListsViewState extends State<_MovieListsView> {
+  _ListFilter _filter = _ListFilter.all;
+  _ListSort _sort = _ListSort.updated;
+  bool _showSearch = false;
+  String _query = '';
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<MovieListsProvider>();
+    final visibleLists = provider.lists.where((list) {
+      final matchesFilter = switch (_filter) {
+        _ListFilter.all => true,
+        _ListFilter.private => list.visibility == ListVisibility.private &&
+            list.scope == ListScope.personal,
+        _ListFilter.shared => list.visibility != ListVisibility.private ||
+            list.scope != ListScope.personal,
+      };
+      final query = _query.trim().toLowerCase();
+      return matchesFilter &&
+          (query.isEmpty || list.name.toLowerCase().contains(query));
+    }).toList();
+    if (_sort == _ListSort.name) {
+      visibleLists
+          .sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    } else {
+      visibleLists.sort((a, b) => (b.updatedAt ?? b.createdAt ?? '')
+          .compareTo(a.updatedAt ?? a.createdAt ?? ''));
+    }
+
     return FlixiePageScaffold(
-      appBar: const FlixieTitleAppBar(title: Text('Your Lists')),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openListEditor(context),
-        icon: const Icon(Icons.add),
-        label: const Text('Create List'),
-      ),
+      appBar: const FlixieTitleAppBar(title: Text('Your lists')),
       body: provider.isLoading
           ? const Center(child: CircularProgressIndicator())
           : provider.lists.isEmpty
@@ -55,135 +85,187 @@ class _MovieListsView extends StatelessWidget {
                   message:
                       provider.error ?? 'No lists yet. Create your first one.',
                 )
-              : ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: provider.lists.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemBuilder: (_, i) {
-                    final list = provider.lists[i];
-                    return InkWell(
-                      borderRadius: BorderRadius.circular(14),
-                      onTap: () => context.push(
-                        '/movie-lists/${list.id}?name=${Uri.encodeComponent(list.name)}&isOwner=${list.isOwner}&canEdit=${list.canEdit}',
-                      ),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: FlixieColors.tabBarBackgroundFocused,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: FlixieColors.tabBarBorder),
-                        ),
-                        child: Row(
-                          children: [
-                            _PosterPreviewStack(
-                              posterUrls: list.previewPosterUrls,
-                              coverImageUrl: list.coverImageUrl,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          list.name,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      Icon(
-                                        _privacyIcon(list.visibility),
-                                        size: 16,
-                                        color: FlixieColors.medium,
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _listCountLabel(list),
-                                    style: const TextStyle(
-                                      color: FlixieColors.medium,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  if (list.scope != ListScope.personal) ...[
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      list.scope == ListScope.group
-                                          ? 'Group list · ${list.groupName ?? 'Group'}'
-                                          : 'Shared with ${list.collaborators.length} friend${list.collaborators.length == 1 ? '' : 's'}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: FlixieColors.primary,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ],
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    _updatedLabel(
-                                        list.updatedAt ?? list.createdAt),
-                                    style: const TextStyle(
-                                      color: FlixieColors.medium,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
+              : Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              OutlinedButton.icon(
+                                onPressed: () => _openListEditor(context),
+                                icon: const Icon(Icons.add, size: 18),
+                                label: const Text('New list'),
                               ),
-                            ),
-                            if (list.isOwner)
+                              const Spacer(),
+                              IconButton(
+                                onPressed: () =>
+                                    setState(() => _showSearch = !_showSearch),
+                                icon: const Icon(Icons.search_rounded),
+                              ),
                               PopupMenuButton<String>(
-                                onSelected: (value) async {
-                                  if (value == 'edit') {
-                                    await _openListEditor(
-                                      context,
-                                      listId: list.id,
-                                      initialName: list.name,
-                                      initialDescription: list.description,
-                                      initialVisibility: list.visibility,
-                                      initialWhoCanAddMovies:
-                                          list.whoCanAddMovies,
-                                      initialScope: list.scope,
-                                      initialGroupId: list.groupId,
-                                      initialCollaborators: list.collaborators,
-                                    );
-                                    return;
-                                  }
-                                  final ok = await provider.deleteList(list.id);
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          ok
-                                              ? 'List deleted'
-                                              : (provider.error ??
-                                                  'Failed to delete list'),
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                },
+                                icon: const Icon(Icons.more_horiz_rounded),
                                 itemBuilder: (_) => const [
                                   PopupMenuItem(
-                                      value: 'edit', child: Text('Edit')),
-                                  PopupMenuItem(
-                                      value: 'delete', child: Text('Delete')),
+                                      value: 'manage',
+                                      child: Text('Manage lists')),
                                 ],
                               ),
+                            ],
+                          ),
+                          if (_showSearch) ...[
+                            const SizedBox(height: 8),
+                            TextField(
+                              autofocus: true,
+                              onChanged: (value) =>
+                                  setState(() => _query = value),
+                              decoration: const InputDecoration(
+                                hintText: 'Search lists',
+                                prefixIcon: Icon(Icons.search_rounded),
+                              ),
+                            ),
                           ],
-                        ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(child: _buildFilterControl()),
+                              const SizedBox(width: 10),
+                              PopupMenuButton<_ListSort>(
+                                initialValue: _sort,
+                                onSelected: (value) =>
+                                    setState(() => _sort = value),
+                                itemBuilder: (_) => const [
+                                  PopupMenuItem(
+                                    value: _ListSort.updated,
+                                    child: Text('Recently updated'),
+                                  ),
+                                  PopupMenuItem(
+                                    value: _ListSort.name,
+                                    child: Text('List name'),
+                                  ),
+                                ],
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                        color: FlixieColors.tabBarBorder),
+                                    borderRadius: BorderRadius.circular(22),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.sort_rounded,
+                                          color: FlixieColors.primary,
+                                          size: 17),
+                                      const SizedBox(width: 7),
+                                      Text(_sort == _ListSort.updated
+                                          ? 'Updated'
+                                          : 'Name'),
+                                      const Icon(
+                                          Icons.keyboard_arrow_down_rounded,
+                                          size: 18),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                    );
-                  },
+                    ),
+                    Expanded(
+                      child: visibleLists.isEmpty
+                          ? const _EmptyState(
+                              message: 'No lists match these filters.')
+                          : GridView.builder(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                crossAxisSpacing: 10,
+                                mainAxisSpacing: 10,
+                                childAspectRatio: 0.72,
+                              ),
+                              itemCount: visibleLists.length,
+                              itemBuilder: (_, index) => _ListGridCard(
+                                list: visibleLists[index],
+                                onOpen: () =>
+                                    _openList(context, visibleLists[index]),
+                                onMenu: (value) => _handleListMenu(context,
+                                    provider, visibleLists[index], value),
+                              ),
+                            ),
+                    ),
+                  ],
                 ),
     );
+  }
+
+  Widget _buildFilterControl() {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: FlixieColors.surface.withValues(alpha: 0.55),
+        border: Border.all(color: FlixieColors.tabBarBorder),
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Row(
+        children: _ListFilter.values.map((filter) {
+          final selected = _filter == filter;
+          return Expanded(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(18),
+              onTap: () => setState(() => _filter = filter),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: selected ? FlixieColors.primary : Colors.transparent,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Text(
+                    switch (filter) {
+                      _ListFilter.all => 'All',
+                      _ListFilter.private => 'Private',
+                      _ListFilter.shared => 'Shared',
+                    },
+                    style: const TextStyle(fontSize: 11.5)),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  void _openList(BuildContext context, MovieList list) => context.push(
+        '/movie-lists/${list.id}?name=${Uri.encodeComponent(list.name)}&isOwner=${list.isOwner}&canEdit=${list.canEdit}',
+      );
+
+  Future<void> _handleListMenu(BuildContext context,
+      MovieListsProvider provider, MovieList list, String value) async {
+    if (value == 'edit') {
+      await _openListEditor(context,
+          listId: list.id,
+          initialName: list.name,
+          initialDescription: list.description,
+          initialVisibility: list.visibility,
+          initialWhoCanAddMovies: list.whoCanAddMovies,
+          initialScope: list.scope,
+          initialGroupId: list.groupId,
+          initialCollaborators: list.collaborators);
+      return;
+    }
+    final ok = await provider.deleteList(list.id);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(ok
+              ? 'List deleted'
+              : (provider.error ?? 'Failed to delete list'))));
+    }
   }
 
   Future<void> _openListEditor(
@@ -654,6 +736,193 @@ class _MovieListsView extends StatelessWidget {
   }
 }
 
+class _ListGridCard extends StatelessWidget {
+  const _ListGridCard({
+    required this.list,
+    required this.onOpen,
+    required this.onMenu,
+  });
+
+  final MovieList list;
+  final VoidCallback onOpen;
+  final ValueChanged<String> onMenu;
+
+  @override
+  Widget build(BuildContext context) {
+    final shared = list.scope != ListScope.personal;
+    final group = list.scope == ListScope.group;
+    return Material(
+      color: FlixieColors.tabBarBackgroundFocused,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onOpen,
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: FlixieColors.tabBarBorder),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Center(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: _PosterPreviewStack(
+                      posterUrls: list.previewPosterUrls,
+                      coverImageUrl: list.coverImageUrl,
+                      large: true,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      list.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: FlixieColors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        height: 1.15,
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right_rounded,
+                      color: FlixieColors.light, size: 20),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${_compactListCountLabel(list)} · ${_visibilityName(list.visibility)}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: FlixieColors.medium, fontSize: 11.5),
+                    ),
+                  ),
+                  Icon(_privacyIcon(list.visibility),
+                      color: FlixieColors.medium, size: 15),
+                ],
+              ),
+              if (shared) ...[
+                const SizedBox(height: 7),
+                Row(
+                  children: [
+                    _CollaboratorStack(
+                      collaborators: list.participants.isNotEmpty
+                          ? list.participants
+                          : list.collaborators,
+                      group: group,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        group
+                            ? list.groupName ?? 'Group list'
+                            : 'Shared with ${list.collaborators.length}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: FlixieColors.primary,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _updatedLabel(list.updatedAt ?? list.createdAt),
+                      style: const TextStyle(
+                          color: FlixieColors.medium, fontSize: 10.5),
+                    ),
+                  ),
+                  if (list.isOwner)
+                    PopupMenuButton<String>(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      iconSize: 18,
+                      onSelected: onMenu,
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(value: 'edit', child: Text('Edit')),
+                        PopupMenuItem(value: 'delete', child: Text('Delete')),
+                      ],
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CollaboratorStack extends StatelessWidget {
+  const _CollaboratorStack({
+    required this.collaborators,
+    required this.group,
+  });
+  final List<MovieListCollaborator> collaborators;
+  final bool group;
+
+  @override
+  Widget build(BuildContext context) {
+    final people = collaborators.take(3).toList();
+    if (people.isEmpty) {
+      return Icon(group ? Icons.groups_rounded : Icons.people_outline_rounded,
+          color: FlixieColors.primary, size: 20);
+    }
+    return SizedBox(
+      width: 25 + (people.length - 1) * 16,
+      height: 27,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: people.asMap().entries.map((entry) {
+          final username = entry.value.username;
+          return Positioned(
+            left: entry.key * 16,
+            child: Container(
+              padding: const EdgeInsets.all(1),
+              decoration: const BoxDecoration(
+                color: FlixieColors.background,
+                shape: BoxShape.circle,
+              ),
+              foregroundDecoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: FlixieColors.primary, width: 1.3),
+              ),
+              child: ProfileAvatarView(
+                avatar: entry.value.avatar,
+                fallbackText:
+                    username.isEmpty ? '?' : username[0].toUpperCase(),
+                fallbackColor: FlixieColors.primary,
+                profileBadges: entry.value.profileBadges,
+                size: 22,
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
 class _EmptyState extends StatelessWidget {
   const _EmptyState({required this.message});
   final String message;
@@ -677,10 +946,12 @@ class _PosterPreviewStack extends StatelessWidget {
   const _PosterPreviewStack({
     required this.posterUrls,
     required this.coverImageUrl,
+    this.large = false,
   });
 
   final List<String> posterUrls;
   final String? coverImageUrl;
+  final bool large;
 
   @override
   Widget build(BuildContext context) {
@@ -689,8 +960,8 @@ class _PosterPreviewStack extends StatelessWidget {
         : (coverImageUrl != null ? [coverImageUrl!] : const <String>[]);
     if (urls.isEmpty) {
       return Container(
-        width: 88,
-        height: 118,
+        width: large ? 150 : 88,
+        height: large ? 170 : 118,
         decoration: BoxDecoration(
           color: FlixieColors.surfaceElevated,
           borderRadius: BorderRadius.circular(10),
@@ -700,11 +971,11 @@ class _PosterPreviewStack extends StatelessWidget {
       );
     }
     return SizedBox(
-      width: 94,
-      height: 122,
+      width: large ? 164 : 94,
+      height: large ? 174 : 122,
       child: Stack(
         children: List.generate(urls.length, (index) {
-          final offset = index * 6.0;
+          final offset = index * (large ? 22.0 : 6.0);
           return Positioned(
             left: offset,
             top: offset,
@@ -712,12 +983,12 @@ class _PosterPreviewStack extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
               child: Image.network(
                 urls[index],
-                width: 72,
-                height: 108,
+                width: large ? 112 : 72,
+                height: large ? 168 : 108,
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => Container(
-                  width: 72,
-                  height: 108,
+                  width: large ? 112 : 72,
+                  height: large ? 168 : 108,
                   color: FlixieColors.surfaceElevated,
                   alignment: Alignment.center,
                   child: const Icon(
@@ -746,6 +1017,18 @@ IconData _privacyIcon(String visibility) {
   }
 }
 
+String _visibilityName(String visibility) {
+  switch (visibility.toUpperCase()) {
+    case ListVisibility.public:
+      return 'Public';
+    case ListVisibility.friends:
+      return 'Shared';
+    default:
+      return 'Private';
+  }
+}
+
+// ignore: unused_element
 String _listCountLabel(MovieList list) {
   final movies = list.movieCount ?? 0;
   final shows = list.showCount ?? 0;
@@ -756,6 +1039,19 @@ String _listCountLabel(MovieList list) {
   if (movies > 0) return '$movies films';
   if (shows > 0) return '$shows shows';
   return '$total items';
+}
+
+String _compactListCountLabel(MovieList list) {
+  final movies = list.movieCount ?? 0;
+  final shows = list.showCount ?? 0;
+  final total = list.itemCount ?? movies + shows;
+  if (movies > 0 && shows > 0) {
+    return '$movies ${movies == 1 ? 'movie' : 'movies'} & '
+        '$shows ${shows == 1 ? 'show' : 'shows'}';
+  }
+  if (movies > 0) return '$movies ${movies == 1 ? 'movie' : 'movies'}';
+  if (shows > 0) return '$shows ${shows == 1 ? 'show' : 'shows'}';
+  return '$total ${total == 1 ? 'title' : 'titles'}';
 }
 
 String _updatedLabel(String? date) {

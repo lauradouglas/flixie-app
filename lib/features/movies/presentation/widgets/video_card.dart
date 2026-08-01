@@ -47,15 +47,15 @@ class VideoCard extends StatelessWidget {
     return GestureDetector(
       onTap: () => _launchVideo(context),
       child: SizedBox(
-        width: 300,
+        width: 270,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Stack(
               children: [
                 Container(
-                  height: 170,
-                  width: 300,
+                  height: 152,
+                  width: 270,
                   decoration: BoxDecoration(
                     color: FlixieColors.surface,
                     borderRadius: BorderRadius.circular(10),
@@ -75,9 +75,9 @@ class VideoCard extends StatelessWidget {
                     ),
                     child: const Center(
                       child: Icon(
-                        Icons.play_circle_filled,
+                        Icons.play_arrow_rounded,
                         color: Colors.white,
-                        size: 56,
+                        size: 42,
                       ),
                     ),
                   ),
@@ -89,8 +89,8 @@ class VideoCard extends StatelessWidget {
               video.name,
               style: const TextStyle(
                 color: FlixieColors.light,
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,

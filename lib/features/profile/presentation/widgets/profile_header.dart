@@ -67,128 +67,136 @@ class ProfileHeader extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final color = _avatarColor;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: FlixieColors.surface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: FlixieColors.tabBarBorder),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          GestureDetector(
+            onTap: () => _openAvatarSheet(context),
+            child: ProfileAvatarView(
+              avatar: avatar,
+              fallbackText:
+                  displayName.isEmpty ? '?' : displayName[0].toUpperCase(),
+              fallbackColor: color,
+              size: 108,
+              profileBadges: profileBadges,
+            ),
+          ),
+          const SizedBox(width: 18),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                GestureDetector(
-                  onTap: () => _openAvatarSheet(context),
-                  child: Stack(
-                    alignment: Alignment.bottomRight,
-                    children: [
-                      ProfileAvatarView(
-                        avatar: avatar,
-                        fallbackText: displayName.isEmpty
-                            ? '?'
-                            : displayName[0].toUpperCase(),
-                        fallbackColor: color,
-                        size: 88,
-                        profileBadges: profileBadges,
-                      ),
-                      Container(
-                        padding: const EdgeInsets.all(5),
-                        decoration: const BoxDecoration(
-                          color: FlixieColors.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.edit_rounded,
-                          size: 13,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
                         '@$username',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: textTheme.headlineSmall?.copyWith(
+                        style: const TextStyle(
                           color: FlixieColors.light,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                      if (profileBadges.isNotEmpty) ...[
-                        const SizedBox(height: 7),
-                        ProfileBadgePills(
+                    ),
+                    if (profileBadges.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: ProfileBadgePills(
                           badges: profileBadges,
                           compact: true,
                           featuredOnly: true,
                         ),
-                      ],
-                      if (displayName.isNotEmpty) ...[
-                        const SizedBox(height: 7),
-                        Text(
-                          displayName,
-                          style: textTheme.bodyLarge?.copyWith(
-                            color: FlixieColors.light,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                      if (memberSince != null) ...[
-                        const SizedBox(height: 7),
-                        Text(
-                          memberSince!,
-                          style: textTheme.bodySmall?.copyWith(
-                            color: FlixieColors.medium,
-                          ),
-                        ),
-                      ],
+                      ),
                     ],
+                  ],
+                ),
+                const SizedBox(height: 7),
+                Text(
+                  displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.headlineSmall?.copyWith(
+                    color: FlixieColors.white,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
-              ],
-            ),
-            if (bio case final bioText
-                when bioText != null && bioText.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Text(
-                bioText,
-                style: textTheme.bodyMedium?.copyWith(
-                  color: FlixieColors.light,
-                  height: 1.45,
-                ),
-              ),
-            ],
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () => _openEditSheet(context),
-                    icon: const Icon(Icons.edit_outlined, size: 17),
-                    label: const Text('Edit profile'),
-                  ),
-                ),
-                if (onPreview != null) ...[
-                  const SizedBox(width: 10),
-                  OutlinedButton.icon(
-                    onPressed: onPreview,
-                    icon: const Icon(Icons.visibility_outlined, size: 17),
-                    label: const Text('Preview'),
+                if (bio case final bioText
+                    when bioText != null && bioText.isNotEmpty) ...[
+                  const SizedBox(height: 7),
+                  Text(
+                    bioText,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: FlixieColors.light,
+                      fontSize: 13,
+                      height: 1.35,
+                    ),
                   ),
                 ],
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    _ProfileHeaderAction(
+                      icon: Icons.edit_rounded,
+                      label: 'Edit',
+                      onTap: () => _openEditSheet(context),
+                    ),
+                    if (onPreview != null) ...[
+                      const SizedBox(width: 22),
+                      _ProfileHeaderAction(
+                        icon: Icons.visibility_outlined,
+                        label: 'Preview',
+                        onTap: onPreview!,
+                      ),
+                    ],
+                  ],
+                ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileHeaderAction extends StatelessWidget {
+  const _ProfileHeaderAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(99),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: FlixieColors.surfaceElevated,
+              shape: BoxShape.circle,
+              border: Border.all(color: FlixieColors.tabBarBorder),
+            ),
+            child: Icon(icon, color: FlixieColors.light, size: 18),
+          ),
+          const SizedBox(width: 6),
+          Text(label,
+              style: const TextStyle(color: FlixieColors.medium, fontSize: 12)),
+        ],
       ),
     );
   }

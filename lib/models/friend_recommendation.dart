@@ -1,8 +1,11 @@
+import 'package:flixie_app/models/profile_avatar.dart';
+
 class FriendRecommendationItem {
   final String userId;
   final String username;
   final String? displayName;
   final String? avatarUrl;
+  final ProfileAvatar? avatar;
   final double? rating;
   final bool recommends;
   final bool watched;
@@ -13,6 +16,7 @@ class FriendRecommendationItem {
     required this.username,
     this.displayName,
     this.avatarUrl,
+    this.avatar,
     this.rating,
     required this.recommends,
     this.watched = true,
@@ -29,6 +33,9 @@ class FriendRecommendationItem {
       username: json['username'] as String,
       displayName: json['displayName'] as String?,
       avatarUrl: json['avatarUrl'] as String?,
+      avatar: json['avatar'] is Map<String, dynamic>
+          ? ProfileAvatar.fromJson(json['avatar'] as Map<String, dynamic>)
+          : null,
       rating: rating,
       recommends: json['recommends'] as bool? ?? false,
       watched: watched,

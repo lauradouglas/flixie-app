@@ -25,6 +25,7 @@ import 'package:flixie_app/features/social/presentation/widgets/pending_friend_c
 import 'package:flixie_app/features/social/presentation/widgets/social_section_header.dart';
 import 'package:flixie_app/features/social/presentation/widgets/segmented_toggle.dart';
 import 'package:flixie_app/features/social/presentation/widgets/visibility_chip.dart';
+import 'package:flixie_app/features/social/presentation/widgets/activity_filter_bar.dart';
 
 class SocialScreen extends StatefulWidget {
   const SocialScreen({super.key});
@@ -122,7 +123,7 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
   FriendsData? _friendsData;
   List<ActivityListItem> _activity = [];
   bool _showMoreActivity = false;
-  List<Group> _groupsPreview = [];
+  ActivityFeedFilter _activityFilter = ActivityFeedFilter.all;
   String? _error;
 
   @override
@@ -132,7 +133,6 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
     final auth = context.read<AuthProvider>();
     _friendsData = auth.cachedFriends;
     _activity = auth.cachedFriendsActivity ?? const [];
-    _groupsPreview = auth.cachedGroups ?? const [];
     _loading = _friendsData == null;
     _load();
   }
@@ -156,7 +156,6 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
         setState(() {
           _friendsData = friends;
           _activity = activity;
-          _groupsPreview = groups;
           _loading = false;
           _error = null;
         });
@@ -284,10 +283,8 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
         : friends
             .where((friend) => friend.username.toLowerCase().contains(query))
             .toList();
-    final authUser = context.read<AuthProvider>().dbUser;
-    final myWatchlistIds =
-        authUser?.movieWatchlist?.map((item) => item.movieId).toSet() ??
-            <int>{};
+    final filteredActivity =
+        _activity.where(_activityFilter.matches).toList(growable: false);
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -298,21 +295,56 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (friends.isNotEmpty) ...[
-              _FriendStoryStrip(
-                friends: friends,
-                onAddTap: _showAddFriendSheet,
+            Row(children: [
+              Expanded(
+                child: _FriendSearchField(controller: _searchController),
               ),
-              const SizedBox(height: 14),
-            ],
-            _SocialQuickStats(
-              friendCount: friends.length,
-              pendingCount: data?.pendingFriends.length ?? 0,
-              groupCount: _groupsPreview.length,
-              activityCount: _activity.length,
-            ),
+              const SizedBox(width: 10),
+              OutlinedButton.icon(
+                onPressed: _showAddFriendSheet,
+                icon: const Icon(Icons.add),
+                label: const Text('Add'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: FlixieColors.primary,
+                  side: const BorderSide(color: FlixieColors.primary),
+                  minimumSize: const Size(96, 52),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _RequestBell(
+                count: data?.pendingFriends.length ?? 0,
+                onTap: () => context.push('/notifications'),
+              ),
+            ]),
+            const SizedBox(height: 20),
+            Row(children: [
+              const Text('Friends',
+                  style: TextStyle(
+                      color: FlixieColors.white,
+                      fontSize: 19,
+                      fontWeight: FontWeight.w800)),
+              const Spacer(),
+              Text('${friends.length}',
+                  style: const TextStyle(
+                      color: FlixieColors.primary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800)),
+            ]),
+            const SizedBox(height: 12),
+            if (filteredFriends.isEmpty)
+              _NoFriendsCard(
+                isSearching: query.isNotEmpty,
+                onAddFriend: _showAddFriendSheet,
+              )
+            else
+              _FriendStoryStrip(
+                friends: filteredFriends,
+              ),
             const SizedBox(height: 14),
-            _FriendSearchField(controller: _searchController),
+            Divider(color: Colors.white.withValues(alpha: .08)),
             const SizedBox(height: 14),
             // Pending requests section
             if (data != null &&
@@ -335,27 +367,16 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
                   },
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
             ],
-
-            // Friends section
-            if (data != null) ...[
-              _EnhancedFriendsSection(
-                friends: filteredFriends,
-                totalCount: friends.length,
-                activity: _activity,
-                myWatchlistIds: myWatchlistIds,
-                searchQuery: query,
-                onAddFriend: _showAddFriendSheet,
-                onRequestWatch: _showRequestWatchHint,
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            // Activity section
             const SocialSectionHeader(title: 'FRIEND ACTIVITY'),
-            const SizedBox(height: 8),
-            if (_activity.isEmpty)
+            const SizedBox(height: 10),
+            ActivityFilterBar(
+              selected: _activityFilter,
+              onChanged: (value) => setState(() => _activityFilter = value),
+            ),
+            const SizedBox(height: 14),
+            if (filteredActivity.isEmpty)
               _ActivityEmptyState(
                 hasFriends: friends.isNotEmpty,
                 onAddFriend: _showAddFriendSheet,
@@ -365,11 +386,12 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
               ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: _activity.take(_showMoreActivity ? 8 : 3).length,
+                itemCount:
+                    filteredActivity.take(_showMoreActivity ? 10 : 5).length,
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (_, i) => ActivityTile(item: _activity[i]),
+                itemBuilder: (_, i) => ActivityTile(item: filteredActivity[i]),
               ),
-              if (_activity.length > 3) ...[
+              if (filteredActivity.length > 5) ...[
                 const SizedBox(height: 10),
                 Row(
                   children: [
@@ -394,10 +416,6 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
                 ),
               ],
             ],
-            if (_groupsPreview.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              _GroupsPreviewSection(groups: _groupsPreview.take(3).toList()),
-            ],
             const SizedBox(height: 24),
           ],
         ),
@@ -405,6 +423,7 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
     );
   }
 
+  // ignore: unused_element
   void _showRequestWatchHint(FriendshipUser friend) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -420,11 +439,49 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
 // Friends widgets
 // ---------------------------------------------------------------------------
 
+class _RequestBell extends StatelessWidget {
+  const _RequestBell({required this.count, required this.onTap});
+
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Stack(
+        clipBehavior: Clip.none,
+        children: [
+          IconButton.outlined(
+            onPressed: onTap,
+            icon: const Icon(Icons.notifications_none_rounded),
+            style: IconButton.styleFrom(
+              minimumSize: const Size(52, 52),
+              side: const BorderSide(color: FlixieColors.tabBarBorder),
+            ),
+          ),
+          if (count > 0)
+            Positioned(
+              right: -2,
+              top: -5,
+              child: Container(
+                constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 5),
+                decoration: const BoxDecoration(
+                    color: FlixieColors.primary, shape: BoxShape.circle),
+                child: Text('$count',
+                    style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800)),
+              ),
+            ),
+        ],
+      );
+}
+
 class _FriendStoryStrip extends StatelessWidget {
-  const _FriendStoryStrip({required this.friends, required this.onAddTap});
+  const _FriendStoryStrip({required this.friends});
 
   final List<FriendshipUser> friends;
-  final VoidCallback onAddTap;
 
   Color _avatarColor(Map<String, dynamic>? iconColor) {
     final raw = (iconColor?['hexCode'] ?? iconColor?['hex']) as String?;
@@ -436,32 +493,12 @@ class _FriendStoryStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 72,
+      height: 82,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: friends.length + 1,
+        itemCount: friends.length,
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (_, index) {
-          if (index == friends.length) {
-            return GestureDetector(
-              onTap: onAddTap,
-              child: const Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircleAvatar(
-                    radius: 21,
-                    backgroundColor: FlixieColors.tabBarBackgroundFocused,
-                    child: Icon(Icons.add, color: FlixieColors.light),
-                  ),
-                  SizedBox(height: 4),
-                  SizedBox(
-                    width: 48,
-                    height: 12,
-                  ),
-                ],
-              ),
-            );
-          }
           final friend = friends[index];
           final initial = friend.username.isNotEmpty
               ? friend.username[0].toUpperCase()
@@ -474,12 +511,12 @@ class _FriendStoryStrip extends StatelessWidget {
                   avatar: friend.avatar,
                   fallbackText: initial,
                   fallbackColor: _avatarColor(friend.iconColor),
-                  size: 42,
+                  size: 54,
                   profileBadges: friend.profileBadges,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 SizedBox(
-                  width: 48,
+                  width: 62,
                   child: Text(
                     friend.username,
                     maxLines: 1,
@@ -487,7 +524,7 @@ class _FriendStoryStrip extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: FlixieColors.medium,
-                      fontSize: 10,
+                      fontSize: 11,
                     ),
                   ),
                 ),
@@ -500,6 +537,7 @@ class _FriendStoryStrip extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _SocialQuickStats extends StatelessWidget {
   const _SocialQuickStats({
     required this.friendCount,
@@ -665,6 +703,7 @@ class _PendingSocialSummary extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _EnhancedFriendsSection extends StatelessWidget {
   const _EnhancedFriendsSection({
     required this.friends,
@@ -1055,6 +1094,7 @@ class _ActivityEmptyState extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _GroupsPreviewSection extends StatelessWidget {
   const _GroupsPreviewSection({required this.groups});
 
@@ -1305,15 +1345,6 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
     );
   }
 
-  int get _totalMembers =>
-      _memberCounts.values.fold<int>(0, (sum, count) => sum + count);
-
-  int get _activeGroups => _groups.where((group) {
-        final updated = DateTime.tryParse(group.updatedAt ?? '');
-        if (updated == null) return false;
-        return DateTime.now().difference(updated).inDays <= 14;
-      }).length;
-
   List<Group> _sortGroups(List<Group> groups) {
     return [...groups]..sort((a, b) {
         final aUpdated = DateTime.tryParse(a.updatedAt ?? '');
@@ -1357,11 +1388,6 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
 
     return Column(
       children: [
-        _GroupsTabBar(
-          selectedIndex: _innerTab,
-          pendingCount: pendingGroups.length,
-          onChanged: (i) => setState(() => _innerTab = i),
-        ),
         Expanded(
           child: RefreshIndicator(
             onRefresh: _load,
@@ -1387,20 +1413,47 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _GroupStatsRow(
-            groupCount: myGroups.length,
-            inviteCount: pendingGroups.length,
-            memberCount: _totalMembers,
-            activeCount: _activeGroups,
+          Row(
+            children: [
+              Expanded(child: _GroupSearchField(controller: _searchController)),
+              const SizedBox(width: 10),
+              OutlinedButton.icon(
+                onPressed: _showCreateGroupSheet,
+                icon: const Icon(Icons.add_rounded, size: 20),
+                label: const Text('Create'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: FlixieColors.primary,
+                  side: const BorderSide(color: FlixieColors.primary),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Badge(
+                isLabelVisible: pendingGroups.isNotEmpty,
+                label: Text('${pendingGroups.length}'),
+                backgroundColor: FlixieColors.primary,
+                child: IconButton.filledTonal(
+                  onPressed: () => setState(() => _innerTab = 1),
+                  icon: const Icon(Icons.notifications_none_rounded),
+                  color: FlixieColors.light,
+                  style: IconButton.styleFrom(
+                    backgroundColor: FlixieColors.surfaceElevated,
+                    minimumSize: const Size(50, 50),
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 14),
-          _GroupSearchField(controller: _searchController),
-          const SizedBox(height: 14),
+          const SizedBox(height: 18),
           if (recentGroups.isNotEmpty) ...[
             const SocialSectionHeader(title: 'RECENT GROUPS'),
             const SizedBox(height: 8),
             SizedBox(
-              height: 70,
+              height: 108,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: recentGroups.length,
@@ -1415,20 +1468,20 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
                     },
                     child: Column(
                       children: [
-                        GroupAvatar(group: g, radius: 20),
-                        const SizedBox(height: 4),
+                        GroupAvatar(group: g, radius: 34),
+                        const SizedBox(height: 7),
                         SizedBox(
-                          width: 56,
+                          width: 72,
                           child: Text(
                             g.abbreviation?.isNotEmpty == true
                                 ? g.abbreviation!
                                 : g.name,
-                            maxLines: 1,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             textAlign: TextAlign.center,
                             style: const TextStyle(
                               color: FlixieColors.medium,
-                              fontSize: 10,
+                              fontSize: 11,
                             ),
                           ),
                         ),
@@ -1441,31 +1494,36 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
             const SizedBox(height: 16),
           ],
           if (pendingGroups.isNotEmpty) ...[
-            SocialSectionHeader(
-              title: 'PENDING INVITATIONS',
-              rightLabel: '${pendingGroups.length} REQUESTS',
+            _GroupInviteBanner(
+              group: pendingGroups.first,
+              count: pendingGroups.length,
+              onView: () => setState(() => _innerTab = 1),
             ),
-            const SizedBox(height: 10),
-            ...pendingGroups.map((g) => GroupInvitationCard(
-                  group: g,
-                  invitedByUsername: _inviteNotifications[g.id]?.senderName,
-                  onAccept: () => _respondToInvite(g, 'ACCEPTED'),
-                  onDecline: () => _respondToInvite(g, 'DECLINED'),
-                )),
             const SizedBox(height: 20),
           ],
           Row(
             children: [
               const Expanded(
-                child: SocialSectionHeader(title: 'MY COMMUNITIES'),
+                child: SocialSectionHeader(title: 'YOUR GROUPS'),
               ),
-              FilledButton.tonalIcon(
-                onPressed: _showCreateGroupSheet,
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text('Create'),
-                style: FilledButton.styleFrom(
-                  foregroundColor: FlixieColors.light,
-                  backgroundColor: FlixieColors.primary.withValues(alpha: 0.2),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: FlixieColors.primary.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const Row(
+                  children: [
+                    Text('Most active',
+                        style: TextStyle(
+                            color: FlixieColors.primary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12)),
+                    SizedBox(width: 5),
+                    Icon(Icons.keyboard_arrow_down_rounded,
+                        color: FlixieColors.primary, size: 18),
+                  ],
                 ),
               ),
             ],
@@ -1510,6 +1568,12 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          TextButton.icon(
+            onPressed: () => setState(() => _innerTab = 0),
+            icon: const Icon(Icons.arrow_back_rounded),
+            label: const Text('Your groups'),
+          ),
+          const SizedBox(height: 8),
           _PendingGroupInviteSummary(count: sortedPending.length),
           const SizedBox(height: 12),
           ...sortedPending.map((g) => GroupInvitationCard(
@@ -1533,71 +1597,56 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
   }
 }
 
-class _GroupStatsRow extends StatelessWidget {
-  const _GroupStatsRow({
-    required this.groupCount,
-    required this.inviteCount,
-    required this.memberCount,
-    required this.activeCount,
+class _GroupInviteBanner extends StatelessWidget {
+  const _GroupInviteBanner({
+    required this.group,
+    required this.count,
+    required this.onView,
   });
 
-  final int groupCount;
-  final int inviteCount;
-  final int memberCount;
-  final int activeCount;
+  final Group group;
+  final int count;
+  final VoidCallback onView;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        _stat(Icons.groups_2_outlined, '$groupCount', 'Groups',
-            FlixieColors.primary),
-        const SizedBox(width: 8),
-        _stat(Icons.mail_outline_rounded, '$inviteCount', 'Invites',
-            FlixieColors.warning),
-        const SizedBox(width: 8),
-        _stat(Icons.people_outline_rounded, '$memberCount', 'Members',
-            FlixieColors.secondary),
-        const SizedBox(width: 8),
-        _stat(Icons.bolt_rounded, '$activeCount', 'Active',
-            FlixieColors.tertiary),
-      ],
-    );
-  }
-
-  Widget _stat(IconData icon, String value, String label, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-        decoration: BoxDecoration(
-          color: FlixieColors.surfaceElevated,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: const TextStyle(
-                color: FlixieColors.light,
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            Text(
-              label,
-              maxLines: 1,
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+      decoration: BoxDecoration(
+        color: FlixieColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: FlixieColors.tabBarBorder),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.mail_outline_rounded,
+              color: FlixieColors.warning, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              count == 1
+                  ? "You've been invited to ${group.name}"
+                  : 'You have $count group invitations',
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                color: FlixieColors.medium,
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
+                color: FlixieColors.light,
+                fontSize: 13,
               ),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton(
+            onPressed: onView,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: FlixieColors.primary,
+              side: BorderSide(
+                  color: FlixieColors.primary.withValues(alpha: 0.65)),
+              visualDensity: VisualDensity.compact,
+            ),
+            child: const Text('View'),
+          ),
+        ],
       ),
     );
   }
@@ -1766,88 +1815,6 @@ class _PendingGroupInviteSummary extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
-// Groups inner tab bar
-// ---------------------------------------------------------------------------
-
-class _GroupsTabBar extends StatelessWidget {
-  const _GroupsTabBar({
-    required this.selectedIndex,
-    required this.pendingCount,
-    required this.onChanged,
-  });
-
-  final int selectedIndex;
-  final int pendingCount;
-  final ValueChanged<int> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-      child: Row(
-        children: [
-          _tab(0, 'Groups'),
-          const SizedBox(width: 8),
-          _tab(1, 'Invites'),
-        ],
-      ),
-    );
-  }
-
-  Widget _tab(int index, String label) {
-    final selected = index == selectedIndex;
-    final showBadge = index == 1 && pendingCount > 0;
-    return GestureDetector(
-      onTap: () => onChanged(index),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected
-              ? FlixieColors.primary
-              : FlixieColors.tabBarBackgroundFocused,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? FlixieColors.primary : FlixieColors.tabBarBorder,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                color: selected ? Colors.black : FlixieColors.medium,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-              ),
-            ),
-            if (showBadge) ...[
-              const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: FlixieColors.success,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  '$pendingCount',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ],
-        ),
       ),
     );
   }

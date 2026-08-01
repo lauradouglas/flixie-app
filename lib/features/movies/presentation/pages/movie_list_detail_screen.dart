@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'package:flixie_app/models/movie_short.dart';
 import 'package:flixie_app/models/movie_list.dart';
@@ -88,8 +89,11 @@ class _MovieListDetailView extends StatefulWidget {
 
 class _MovieListDetailViewState extends State<_MovieListDetailView> {
   _ListSort _sort = _ListSort.recentlyAdded;
+  bool _denseGrid = false;
   models.User? _owner;
   MovieListMembership? _membership;
+
+  bool get _canEdit => _membership?.canEdit ?? widget.canEdit;
 
   @override
   void initState() {
@@ -136,6 +140,12 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
     _loadMembership();
     return context.read<MovieListsProvider>().loadListMovies(widget.listId);
   }
+
+  Future<void> _shareList() => Share.share(
+        'Check out ${widget.listName} on Flixie\n'
+        'flixie:///movie-lists/${widget.listId}',
+        subject: widget.listName,
+      );
 
   Future<void> _showAddMovieSheet() async {
     final provider = context.read<MovieListsProvider>();
@@ -470,12 +480,11 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
         backgroundColor: FlixieColors.background,
         foregroundColor: FlixieColors.light,
         actions: [
-          if (widget.canEdit)
-            IconButton(
-              tooltip: 'Add movies',
-              onPressed: _showAddMovieSheet,
-              icon: const Icon(Icons.add_rounded),
-            ),
+          IconButton(
+            tooltip: 'Share list',
+            onPressed: _shareList,
+            icon: const Icon(Icons.ios_share_rounded),
+          ),
           PopupMenuButton<String>(
             tooltip: 'List actions',
             color: FlixieColors.tabBarBackgroundFocused,
@@ -534,7 +543,7 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                       listName: widget.listName,
                       owner: _owner,
                       membership: _membership,
-                      isOwner: widget.isOwner,
+                      isOwner: _canEdit,
                       movieCount: rawMovies.length,
                       posterUrls: _posterUrls(rawMovies),
                       onAddMovies: _showAddMovieSheet,
@@ -557,25 +566,27 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                           .where((entry) => _entryShowId(entry) > 0)
                           .length,
                       onSortChanged: (sort) => setState(() => _sort = sort),
+                      denseGrid: _denseGrid,
+                      onToggleGrid: () =>
+                          setState(() => _denseGrid = !_denseGrid),
                     ),
                   ),
                   if (movies.isEmpty)
                     SliverFillRemaining(
                       hasScrollBody: false,
                       child: _EmptyListState(
-                        isOwner: widget.canEdit,
+                        isOwner: _canEdit,
                         message: provider.error ?? 'No items in this list yet.',
                         onAddMovies: _showAddMovieSheet,
                       ),
                     )
                   else
                     SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+                      padding: const EdgeInsets.fromLTRB(16, 6, 16, 120),
                       sliver: SliverGrid(
-                        gridDelegate:
-                            const SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: 190,
-                          childAspectRatio: 0.48,
+                        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: _denseGrid ? 145 : 190,
+                          childAspectRatio: 0.43,
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 18,
                         ),
@@ -584,9 +595,7 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                             final entry = movies[index];
                             return _MovieListPosterCard(
                               entry: entry,
-                              canEdit: widget.canEdit,
-                              showContributor:
-                                  _membership?.scope != ListScope.personal,
+                              canEdit: _canEdit,
                               onOpen: () {
                                 final movieId = _entryMovieId(entry);
                                 if (movieId > 0) {
@@ -1069,12 +1078,12 @@ class _ListMembersStrip extends StatelessWidget {
     if (membership.members.length <= 1) return const SizedBox.shrink();
     final preview = membership.members.take(5).toList(growable: false);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: FlixieColors.surfaceElevated.withValues(alpha: 0.72),
             borderRadius: BorderRadius.circular(14),
@@ -1085,30 +1094,31 @@ class _ListMembersStrip extends StatelessWidget {
           child: Row(
             children: [
               SizedBox(
-                width: 44 + (preview.length - 1) * 25,
-                height: 44,
+                width: 34 + (preview.length - 1) * 20,
+                height: 34,
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
                     for (var index = 0; index < preview.length; index++)
                       Positioned(
-                        left: 3 + index * 25,
-                        top: 3,
+                        left: 2 + index * 20,
+                        top: 2,
                         child: Container(
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: FlixieColors.surfaceElevated,
-                              width: 2,
+                              color: FlixieColors.primary,
+                              width: 1.5,
                             ),
                           ),
+                          padding: const EdgeInsets.all(1),
                           child: ProfileAvatarView(
                             avatar: preview[index].avatar,
                             fallbackText: preview[index].username.isEmpty
                                 ? '?'
                                 : preview[index].username[0].toUpperCase(),
                             fallbackColor: FlixieColors.primary,
-                            size: 36,
+                            size: 28,
                             profileBadges: preview[index].profileBadges,
                           ),
                         ),
@@ -1123,16 +1133,21 @@ class _ListMembersStrip extends StatelessWidget {
                   children: [
                     Text(
                       membership.scope == 'GROUP'
-                          ? membership.groupName ?? 'Group list'
-                          : '${membership.members.length} people',
+                          ? '${membership.groupName ?? 'Group'} · ${membership.members.length} members'
+                          : '${membership.members.length} collaborators',
                       style: const TextStyle(
                         color: FlixieColors.light,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const Text(
-                      'Everyone can add titles',
-                      style: TextStyle(
+                    Text(
+                      membership.scope != ListScope.group &&
+                              membership.whoCanAddItems == 'owner'
+                          ? 'Only the owner can add'
+                          : membership.scope == ListScope.group
+                              ? 'Every group member can add'
+                              : 'Everyone can add',
+                      style: const TextStyle(
                         color: FlixieColors.medium,
                         fontSize: 11,
                       ),
@@ -1174,13 +1189,14 @@ class _ListHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isGroupList = membership?.scope == ListScope.group;
+    final identity = _listIdentity(listName);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           _PosterCollage(posterUrls: posterUrls),
-          const SizedBox(width: 20),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1245,7 +1261,7 @@ class _ListHeader extends StatelessWidget {
                                   child: Text(
                                     owner == null
                                         ? 'Loading creator…'
-                                        : 'Created by @${owner!.username}',
+                                        : 'Created by @${owner!.username} · ${_visibilityLabel(membership?.visibility)}',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
@@ -1289,7 +1305,7 @@ class _ListHeader extends StatelessWidget {
                               child: Text(
                                 owner == null
                                     ? 'Loading profile…'
-                                    : '@${owner!.username}',
+                                    : '@${owner!.username} · ${_visibilityLabel(membership?.visibility)}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
@@ -1312,20 +1328,45 @@ class _ListHeader extends StatelessWidget {
                       ),
                     ),
                   ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 8),
                 Text(
-                  listName,
-                  maxLines: 3,
+                  identity.$1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 27,
+                    fontSize: 23,
                     height: 1.05,
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.5,
                   ),
                 ),
-                const SizedBox(height: 10),
+                if (identity.$2 != null) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    identity.$2!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: FlixieColors.light,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+                if (membership?.description?.trim().isNotEmpty == true) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    membership!.description!.trim(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: FlixieColors.medium,
+                      fontSize: 11.5,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 7),
                 Row(
                   children: [
                     const Icon(
@@ -1345,7 +1386,7 @@ class _ListHeader extends StatelessWidget {
                   ],
                 ),
                 if (isOwner) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 9),
                   FilledButton.icon(
                     onPressed: onAddMovies,
                     icon: const Icon(Icons.add_rounded, size: 17),
@@ -1380,8 +1421,8 @@ class _PosterCollage extends StatelessWidget {
   Widget build(BuildContext context) {
     if (posterUrls.isEmpty) {
       return Container(
-        width: 108,
-        height: 162,
+        width: 92,
+        height: 138,
         decoration: BoxDecoration(
           color: FlixieColors.surfaceElevated,
           borderRadius: BorderRadius.circular(12),
@@ -1395,24 +1436,24 @@ class _PosterCollage extends StatelessWidget {
     }
 
     return SizedBox(
-      width: 116,
-      height: 166,
+      width: 108,
+      height: 142,
       child: Stack(
         children: List.generate(posterUrls.length.clamp(0, 4), (index) {
-          final offset = index * 4.0;
+          final offset = index * 7.0;
           return Positioned(
             left: offset,
-            top: offset,
+            top: index.isOdd ? 8 : 0,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: CachedNetworkImage(
                 imageUrl: posterUrls[index],
-                width: 104,
-                height: 156,
+                width: 86,
+                height: 134,
                 fit: BoxFit.cover,
                 errorWidget: (_, __, ___) => Container(
-                  width: 104,
-                  height: 156,
+                  width: 86,
+                  height: 134,
                   color: FlixieColors.surfaceElevated,
                   child: const Icon(
                     Icons.movie_outlined,
@@ -1434,12 +1475,16 @@ class _SortToolbar extends StatelessWidget {
     required this.movieCount,
     required this.showCount,
     required this.onSortChanged,
+    required this.denseGrid,
+    required this.onToggleGrid,
   });
 
   final _ListSort sort;
   final int movieCount;
   final int showCount;
   final ValueChanged<_ListSort> onSortChanged;
+  final bool denseGrid;
+  final VoidCallback onToggleGrid;
 
   @override
   Widget build(BuildContext context) {
@@ -1475,12 +1520,34 @@ class _SortToolbar extends StatelessWidget {
                 child: Text('Rating'),
               ),
             ],
-            child: Chip(
-              label: Text(_sortLabel(sort)),
-              avatar: const Icon(Icons.sort_rounded, size: 16),
-              backgroundColor: FlixieColors.tabBarBackgroundFocused,
-              side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              decoration: BoxDecoration(
+                color: FlixieColors.tabBarBackgroundFocused,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.sort_rounded,
+                      color: FlixieColors.primary, size: 17),
+                  const SizedBox(width: 7),
+                  Text(_sortLabel(sort)),
+                  const SizedBox(width: 2),
+                  const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
+                ],
+              ),
             ),
+          ),
+          const SizedBox(width: 8),
+          IconButton.outlined(
+            tooltip: denseGrid ? 'Larger cards' : 'Compact grid',
+            onPressed: onToggleGrid,
+            icon: Icon(denseGrid
+                ? Icons.view_module_outlined
+                : Icons.grid_view_rounded),
+            color: FlixieColors.primary,
           ),
         ],
       ),
@@ -1492,14 +1559,12 @@ class _MovieListPosterCard extends StatelessWidget {
   const _MovieListPosterCard({
     required this.entry,
     required this.canEdit,
-    required this.showContributor,
     required this.onOpen,
     required this.onRemove,
   });
 
   final MovieListMovie entry;
   final bool canEdit;
-  final bool showContributor;
   final VoidCallback onOpen;
   final VoidCallback onRemove;
 
@@ -1581,9 +1646,13 @@ class _MovieListPosterCard extends StatelessWidget {
                           ),
                           onSelected: (value) {
                             if (value == 'remove') onRemove();
+                            if (value == 'contributor' &&
+                                entry.addedBy != null) {
+                              context.push('/friends/${entry.addedBy!.id}');
+                            }
                           },
-                          itemBuilder: (_) => const [
-                            PopupMenuItem(
+                          itemBuilder: (_) => [
+                            const PopupMenuItem(
                               value: 'remove',
                               height: 40,
                               padding: EdgeInsets.symmetric(horizontal: 12),
@@ -1600,11 +1669,23 @@ class _MovieListPosterCard extends StatelessWidget {
                                 ],
                               ),
                             ),
+                            if (entry.addedBy != null)
+                              const PopupMenuItem(
+                                value: 'contributor',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.person_outline_rounded,
+                                        size: 18),
+                                    SizedBox(width: 9),
+                                    Text('View who added it'),
+                                  ],
+                                ),
+                              ),
                           ],
                         ),
                       ),
                     ),
-                  if (showContributor && entry.addedBy != null)
+                  if (entry.addedBy != null)
                     Positioned(
                       left: 7,
                       bottom: 7,
@@ -1640,15 +1721,18 @@ class _MovieListPosterCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    _entryTitle(entry),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: FlixieColors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                      height: 1.15,
+                  SizedBox(
+                    height: 30,
+                    child: Text(
+                      _entryTitle(entry),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: FlixieColors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        height: 1.15,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 5),
@@ -1681,6 +1765,34 @@ class _MovieListPosterCard extends StatelessWidget {
                       ],
                     ],
                   ),
+                  if (entry.addedBy != null) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        ProfileAvatarView(
+                          avatar: entry.addedBy!.avatar,
+                          fallbackText: entry.addedBy!.username.isEmpty
+                              ? '?'
+                              : entry.addedBy!.username[0].toUpperCase(),
+                          fallbackColor: FlixieColors.primary,
+                          size: 20,
+                          profileBadges: entry.addedBy!.profileBadges,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '${_addedDateLabel(entry.createdAt)} · @${entry.addedBy!.username}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: FlixieColors.medium,
+                              fontSize: 10.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1776,4 +1888,29 @@ String _sortLabel(_ListSort sort) {
     _ListSort.title => 'Title',
     _ListSort.rating => 'Rating',
   };
+}
+
+(String, String?) _listIdentity(String name) {
+  const marker = ' with @';
+  final index = name.indexOf(marker);
+  if (index <= 0) return (name, null);
+  return (name.substring(0, index), name.substring(index));
+}
+
+String _visibilityLabel(String? visibility) {
+  return switch (visibility?.toUpperCase()) {
+    'PUBLIC' => 'Public',
+    'FRIENDS' => 'Friends',
+    _ => 'Private',
+  };
+}
+
+String _addedDateLabel(String? value) {
+  final date = DateTime.tryParse(value ?? '');
+  if (date == null) return 'Added';
+  final days = DateTime.now().difference(date).inDays;
+  if (days <= 0) return 'Added today';
+  if (days == 1) return 'Added yesterday';
+  if (days < 7) return 'Added ${days}d ago';
+  return 'Added ${date.day}/${date.month}/${date.year}';
 }

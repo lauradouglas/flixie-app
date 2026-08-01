@@ -7,6 +7,7 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/safety/safety_actions.dart';
 import 'package:flixie_app/core/safety/safety_service.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 
 class ReviewCard extends StatefulWidget {
   const ReviewCard({
@@ -35,6 +36,7 @@ class _ReviewCardState extends State<ReviewCard> {
   late Map<String, int> _reactions;
   String? _myReaction;
   bool _blocked = false;
+  bool _spoilerRevealed = false;
 
   @override
   void initState() {
@@ -55,6 +57,16 @@ class _ReviewCardState extends State<ReviewCard> {
 
   String _getDisplayName() {
     return widget.review.user?.username ?? 'Anonymous';
+  }
+
+  Color _avatarColor() {
+    final hex = widget.review.user?.iconColor?['hexCode']
+        ?.toString()
+        .replaceFirst('#', '');
+    final value = hex == null
+        ? null
+        : int.tryParse(hex.length == 6 ? 'FF$hex' : hex, radix: 16);
+    return value == null ? FlixieColors.primary : Color(value);
   }
 
   String _formatDate(String dateStr) {
@@ -129,10 +141,10 @@ class _ReviewCardState extends State<ReviewCard> {
       child: Container(
         width: double.infinity,
         margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: FlixieColors.surface,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: FlixieColors.tabBarBorder),
         ),
         child: Column(
@@ -141,40 +153,39 @@ class _ReviewCardState extends State<ReviewCard> {
             // Header row
             Row(
               children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: FlixieColors.primary.withValues(alpha: 0.3),
-                  child: Text(
-                    _getInitials(),
-                    style: const TextStyle(
-                      color: FlixieColors.primary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
+                ProfileAvatarView(
+                  avatar: review.user?.avatar,
+                  fallbackText: _getInitials(),
+                  fallbackColor: _avatarColor(),
+                  profileBadges: review.user?.profileBadges ?? const [],
+                  size: 58,
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (review.title.isNotEmpty)
-                        Text(
-                          review.title,
-                          style: const TextStyle(
-                            color: FlixieColors.white,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
                       Text(
                         _getDisplayName(),
                         style: const TextStyle(
-                          color: FlixieColors.light,
-                          fontSize: 13,
-                          fontStyle: FontStyle.italic,
+                          color: FlixieColors.white,
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
+                      if (review.title.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          review.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: FlixieColors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 17,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -183,15 +194,15 @@ class _ReviewCardState extends State<ReviewCard> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.star,
-                            color: FlixieColors.warning, size: 14),
+                        const Icon(Icons.star_rounded,
+                            color: FlixieColors.warning, size: 20),
                         const SizedBox(width: 3),
                         Text(
                           '${review.rating}/10',
                           style: const TextStyle(
                             color: FlixieColors.white,
                             fontWeight: FontWeight.w600,
-                            fontSize: 13,
+                            fontSize: 18,
                           ),
                         ),
                       ],
@@ -200,7 +211,7 @@ class _ReviewCardState extends State<ReviewCard> {
                       _formatDate(review.createdAt),
                       style: const TextStyle(
                         color: FlixieColors.medium,
-                        fontSize: 12,
+                        fontSize: 12.5,
                       ),
                     ),
                   ],
@@ -249,50 +260,79 @@ class _ReviewCardState extends State<ReviewCard> {
                   ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 18),
 
             // Body — spoiler guard or truncated preview
-            if (hasSpoilers)
-              Container(
-                width: double.infinity,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  color: FlixieColors.warning.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: FlixieColors.warning.withValues(alpha: 0.45),
-                  ),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.warning_amber_rounded,
-                        color: FlixieColors.warning, size: 15),
-                    SizedBox(width: 6),
-                    Text(
-                      'Contains spoilers — tap to read',
-                      style: TextStyle(
-                        color: FlixieColors.warning,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
+            if (hasSpoilers && !_spoilerRevealed)
+              GestureDetector(
+                onTap: () => setState(() => _spoilerRevealed = true),
+                child: Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                  decoration: BoxDecoration(
+                    color: FlixieColors.warning.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: FlixieColors.warning.withValues(alpha: 0.45),
                     ),
-                  ],
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded,
+                          color: FlixieColors.warning, size: 19),
+                      SizedBox(width: 10),
+                      Text(
+                        'Contains spoilers — tap to reveal',
+                        style: TextStyle(
+                          color: FlixieColors.warning,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               )
             else
               Text(
                 review.body,
-                maxLines: 2,
+                maxLines: 4,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   color: FlixieColors.light,
-                  fontSize: 13,
+                  fontSize: 14,
                   height: 1.5,
                 ),
               ),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 16),
+
+            if (review.recommended)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                decoration: BoxDecoration(
+                  color: FlixieColors.success.withValues(alpha: 0.08),
+                  border: Border.all(color: FlixieColors.success, width: 1),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.thumb_up_alt_rounded,
+                        color: FlixieColors.success, size: 16),
+                    SizedBox(width: 7),
+                    Text('Recommends',
+                        style: TextStyle(
+                            color: FlixieColors.success,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ),
+
+            const SizedBox(height: 16),
 
             // Footer: reactions + "Read more"
             Row(
@@ -304,45 +344,10 @@ class _ReviewCardState extends State<ReviewCard> {
                   )
                 else
                   const Spacer(),
-                Text(
-                  hasSpoilers ? 'View review' : 'Read more',
-                  style: const TextStyle(
-                    color: FlixieColors.primary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
                 const Icon(Icons.chevron_right,
-                    color: FlixieColors.primary, size: 16),
+                    color: FlixieColors.primary, size: 22),
               ],
             ),
-            // Recommended badge
-            if (review.recommended) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: FlixieColors.success.withValues(alpha: 0.15),
-                  border: Border.all(color: FlixieColors.success, width: 1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.thumb_up, color: FlixieColors.success, size: 12),
-                    SizedBox(width: 4),
-                    Text(
-                      'Recommended',
-                      style: TextStyle(
-                        color: FlixieColors.success,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ],
         ),
       ),
@@ -386,6 +391,17 @@ class _ReviewDetailSheetState extends State<_ReviewDetailSheet> {
   late Map<String, int> _reactions;
   late String? _myReaction;
   String? _reactingType;
+  bool _spoilerRevealed = false;
+
+  Color _avatarColor() {
+    final hex = widget.review.user?.iconColor?['hexCode']
+        ?.toString()
+        .replaceFirst('#', '');
+    final value = hex == null
+        ? null
+        : int.tryParse(hex.length == 6 ? 'FF$hex' : hex, radix: 16);
+    return value == null ? FlixieColors.primary : Color(value);
+  }
 
   @override
   void initState() {
@@ -462,20 +478,20 @@ class _ReviewDetailSheetState extends State<_ReviewDetailSheet> {
   Widget build(BuildContext context) {
     final review = widget.review;
     return DraggableScrollableSheet(
-      initialChildSize: 0.7,
+      initialChildSize: 0.84,
       minChildSize: 0.4,
-      maxChildSize: 0.95,
+      maxChildSize: 0.97,
       builder: (context, scrollController) => Container(
         decoration: const BoxDecoration(
           color: FlixieColors.background,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
         ),
         child: Column(
           children: [
             // Handle
             Container(
               margin: const EdgeInsets.symmetric(vertical: 12),
-              width: 40,
+              width: 42,
               height: 4,
               decoration: BoxDecoration(
                 color: FlixieColors.medium,
@@ -484,44 +500,42 @@ class _ReviewDetailSheetState extends State<_ReviewDetailSheet> {
             ),
             // Header
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: const EdgeInsets.fromLTRB(22, 4, 18, 18),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor:
-                        FlixieColors.primary.withValues(alpha: 0.3),
-                    child: Text(
-                      widget.initials,
-                      style: const TextStyle(
-                        color: FlixieColors.primary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                      ),
-                    ),
+                  ProfileAvatarView(
+                    avatar: review.user?.avatar,
+                    fallbackText: widget.initials,
+                    fallbackColor: _avatarColor(),
+                    profileBadges: review.user?.profileBadges ?? const [],
+                    size: 60,
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (review.title.isNotEmpty)
-                          Text(
-                            review.title,
-                            style: const TextStyle(
-                              color: FlixieColors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 15,
-                            ),
-                          ),
                         Text(
                           widget.displayName,
                           style: const TextStyle(
-                            color: FlixieColors.light,
-                            fontSize: 13,
-                            fontStyle: FontStyle.italic,
+                            color: FlixieColors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
+                        if (review.title.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            review.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: FlixieColors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -530,15 +544,15 @@ class _ReviewDetailSheetState extends State<_ReviewDetailSheet> {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.star,
-                              color: FlixieColors.warning, size: 14),
+                          const Icon(Icons.star_rounded,
+                              color: FlixieColors.warning, size: 21),
                           const SizedBox(width: 3),
                           Text(
                             '${review.rating}/10',
                             style: const TextStyle(
                               color: FlixieColors.white,
                               fontWeight: FontWeight.w600,
-                              fontSize: 13,
+                              fontSize: 18,
                             ),
                           ),
                         ],
@@ -547,7 +561,7 @@ class _ReviewDetailSheetState extends State<_ReviewDetailSheet> {
                         widget.formattedDate,
                         style: const TextStyle(
                           color: FlixieColors.medium,
-                          fontSize: 12,
+                          fontSize: 13,
                         ),
                       ),
                     ],
@@ -555,59 +569,134 @@ class _ReviewDetailSheetState extends State<_ReviewDetailSheet> {
                 ],
               ),
             ),
-            const Divider(color: FlixieColors.tabBarBorder, height: 1),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 22),
+              child: Divider(
+                color: Colors.white.withValues(alpha: 0.09),
+                height: 1,
+              ),
+            ),
             // Scrollable body
             Expanded(
               child: SingleChildScrollView(
                 controller: scrollController,
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(22, 20, 22, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (review.containsSpoilers)
+                    if (review.containsSpoilers && !_spoilerRevealed)
                       Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 18),
+                        padding: const EdgeInsets.all(18),
                         decoration: BoxDecoration(
                           color: FlixieColors.warning.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                               color:
                                   FlixieColors.warning.withValues(alpha: 0.35)),
                         ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
+                        child: Column(
                           children: [
-                            Icon(Icons.warning_amber_rounded,
-                                color: FlixieColors.warning, size: 15),
-                            SizedBox(width: 6),
-                            Text(
-                              'Contains spoilers',
+                            const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.warning_amber_rounded,
+                                    color: FlixieColors.warning, size: 22),
+                                SizedBox(width: 10),
+                                Flexible(
+                                  child: Text(
+                                    'This review contains spoilers',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: FlixieColors.warning,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            const Text(
+                              'Reveal it only when you’re ready.',
                               style: TextStyle(
                                 color: FlixieColors.warning,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
+                                fontSize: 13,
                               ),
+                            ),
+                            const SizedBox(height: 16),
+                            OutlinedButton(
+                              onPressed: () =>
+                                  setState(() => _spoilerRevealed = true),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: FlixieColors.warning,
+                                side: const BorderSide(
+                                    color: FlixieColors.warning),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 11),
+                              ),
+                              child: const Text('Reveal review'),
                             ),
                           ],
                         ),
                       ),
-                    Text(
-                      review.body,
-                      style: const TextStyle(
-                        color: FlixieColors.light,
-                        fontSize: 14,
-                        height: 1.6,
+                    if (!review.containsSpoilers || _spoilerRevealed)
+                      Text(
+                        review.body,
+                        style: const TextStyle(
+                          color: FlixieColors.light,
+                          fontSize: 14,
+                          height: 1.6,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 20),
+                    if (review.recommended) ...[
+                      const SizedBox(height: 20),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: FlixieColors.success.withValues(alpha: 0.08),
+                          border: Border.all(color: FlixieColors.success),
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.thumb_up_alt_rounded,
+                                color: FlixieColors.success, size: 17),
+                            SizedBox(width: 8),
+                            Text('Recommends',
+                                style: TextStyle(
+                                    color: FlixieColors.success,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700)),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 24),
                     // Reaction strip
                     _ReactionStrip(
                       reactions: _reactions,
                       myReaction: _myReaction,
                       reactingType: _reactingType,
                       onReact: _react,
+                    ),
+                    const SizedBox(height: 22),
+                    Divider(color: Colors.white.withValues(alpha: 0.09)),
+                    Center(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text(
+                          'Close',
+                          style: TextStyle(
+                            color: FlixieColors.primary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -646,36 +735,38 @@ class _ReactionStrip extends StatelessWidget {
           'Reactions',
           style: TextStyle(
             color: FlixieColors.medium,
-            fontSize: 12,
+            fontSize: 14,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.5,
           ),
         ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        const SizedBox(height: 14),
+        Row(
           children: _kReactions.map((entry) {
             final (emoji, type) = entry;
             final count = reactions[type] ?? 0;
             final isActive = myReaction == type;
             final isLoading = reactingType == type;
 
-            return _ReactionChip(
-              emoji: emoji,
-              count: count,
-              isActive: isActive,
-              isLoading: isLoading,
-              onTap: isLoading ? null : () => onReact(type),
+            return Expanded(
+              child: _ReactionChip(
+                emoji: emoji,
+                count: count,
+                isActive: isActive,
+                isLoading: isLoading,
+                onTap: isLoading ? null : () => onReact(type),
+              ),
             );
           }).toList(),
         ),
-        const SizedBox(height: 6),
-        const Text(
-          'Tap to react • tap again to remove',
-          style: TextStyle(
-            color: FlixieColors.medium,
-            fontSize: 11,
+        const SizedBox(height: 16),
+        const Center(
+          child: Text(
+            'Tap to react • tap again to remove',
+            style: TextStyle(
+              color: FlixieColors.medium,
+              fontSize: 12,
+            ),
           ),
         ),
       ],
@@ -744,46 +835,44 @@ class _ReactionChipState extends State<_ReactionChip>
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: widget.onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: border, width: 1.2),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            widget.isLoading
+      child: Column(
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              color: bg,
+              shape: BoxShape.circle,
+              border: Border.all(color: border, width: 1.2),
+            ),
+            alignment: Alignment.center,
+            child: widget.isLoading
                 ? const SizedBox(
-                    width: 16,
-                    height: 16,
+                    width: 18,
+                    height: 18,
                     child: CircularProgressIndicator(
-                      strokeWidth: 1.5,
+                      strokeWidth: 1.7,
                       valueColor: AlwaysStoppedAnimation<Color>(activeColor),
                     ),
                   )
                 : ScaleTransition(
                     scale: _scale,
                     child: Text(widget.emoji,
-                        style: const TextStyle(fontSize: 16)),
+                        style: const TextStyle(fontSize: 24)),
                   ),
-            if (widget.count > 0) ...[
-              const SizedBox(width: 5),
-              AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: 200),
-                style: TextStyle(
-                  color: widget.isActive ? activeColor : FlixieColors.light,
-                  fontSize: 13,
-                  fontWeight:
-                      widget.isActive ? FontWeight.w700 : FontWeight.normal,
-                ),
-                child: Text('${widget.count}'),
-              ),
-            ],
-          ],
-        ),
+          ),
+          const SizedBox(height: 8),
+          AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 200),
+            style: TextStyle(
+              color: widget.isActive ? activeColor : FlixieColors.medium,
+              fontSize: 13,
+              fontWeight: widget.isActive ? FontWeight.w700 : FontWeight.w500,
+            ),
+            child: Text('${widget.count}'),
+          ),
+        ],
       ),
     );
   }

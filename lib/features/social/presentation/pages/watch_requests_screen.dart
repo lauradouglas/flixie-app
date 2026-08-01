@@ -18,6 +18,7 @@ import 'package:flixie_app/features/watchlist/presentation/controllers/watchlist
 import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_sheet.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/watch_follow_up_sheet.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/write_review_sheet.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/social/presentation/widgets/group_watch_requests_overview.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 
@@ -94,6 +95,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
   List<Group> _groups = [];
   bool _loadingGroups = true;
   _RequestAudience _audience = _RequestAudience.friends;
+  bool _showSearch = false;
 
   @override
   void initState() {
@@ -209,7 +211,11 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
   }
 
   bool _matchesStatusFilter(WatchRequest request) {
-    switch (_statusFilter) {
+    return _matchesFilter(request, _statusFilter);
+  }
+
+  bool _matchesFilter(WatchRequest request, _StatusFilter filter) {
+    switch (filter) {
       case _StatusFilter.active:
         return _isActiveRequest(request);
       case _StatusFilter.needsResponse:
@@ -703,6 +709,54 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     });
   }
 
+  Future<void> _cancelPlan(WatchRequest request) async {
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (userId == null || userId.isEmpty) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cancel this watch plan?'),
+        content:
+            const Text('Everyone taking part will see that it was cancelled.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep plan'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: TextButton.styleFrom(foregroundColor: FlixieColors.danger),
+            child: const Text('Cancel plan'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _withRequestAction(request, _RequestAction.declining, () async {
+      try {
+        final updated = await RequestService.cancelWatchRequest(
+          watchRequestId: request.id,
+          userId: userId,
+        );
+        _replaceRequest(updated);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Watch plan cancelled')),
+          );
+        }
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not cancel the watch plan'),
+              backgroundColor: FlixieColors.danger,
+            ),
+          );
+        }
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final isFocused = widget.initialRequestId?.isNotEmpty == true;
@@ -718,7 +772,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         : Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
                 child: _AudienceSwitcher(
                   selected: _audience,
                   onChanged: (value) => setState(() => _audience = value),
@@ -739,7 +793,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(isFocused ? 'Watch Request' : 'Watch Requests',
+            Text(isFocused ? 'Watch plan' : 'Watch requests',
                 style: const TextStyle(
                     color: Colors.white,
                     fontSize: 22,
@@ -747,7 +801,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
             if (!isFocused && !_loading && _error == null)
               Text(
                   _audience == _RequestAudience.friends
-                      ? '${_filtered.length} shown'
+                      ? '${_all.length} total'
                       : 'Across ${_groups.length} groups',
                   style: const TextStyle(
                       color: FlixieColors.medium, fontSize: 12)),
@@ -770,35 +824,58 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
                       : const Icon(Icons.delete_outline),
                 ),
               ]
-            : null,
-        bottom: isFocused || _audience == _RequestAudience.groups
-            ? null
-            : PreferredSize(
-                preferredSize: const Size.fromHeight(104),
-                child: Column(
-                  children: [
+            : isFocused
+                ? null
+                : [
+                    IconButton(
+                      tooltip: 'Search requests',
+                      onPressed: () =>
+                          setState(() => _showSearch = !_showSearch),
+                      icon: const Icon(Icons.search_rounded),
+                    ),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                      child: TextField(
-                        controller: _searchController,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: InputDecoration(
-                          hintText: 'Search by movie or username...',
-                          hintStyle:
-                              const TextStyle(color: FlixieColors.medium),
-                          prefixIcon: const Icon(Icons.search,
-                              color: FlixieColors.medium),
-                          filled: true,
-                          fillColor: FlixieColors.tabBarBackgroundFocused,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide.none,
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.only(right: 10),
+                      child: FilledButton.icon(
+                        onPressed: () => context.push('/search'),
+                        icon: const Icon(Icons.add_rounded, size: 19),
+                        label: const Text('New'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: FlixieColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 15),
                         ),
                       ),
                     ),
+                  ],
+        bottom: isFocused || _audience == _RequestAudience.groups
+            ? null
+            : PreferredSize(
+                preferredSize: Size.fromHeight(_showSearch ? 104 : 52),
+                child: Column(
+                  children: [
+                    if (_showSearch)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                        child: TextField(
+                          controller: _searchController,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            hintText: 'Search by movie or username...',
+                            hintStyle:
+                                const TextStyle(color: FlixieColors.medium),
+                            prefixIcon: const Icon(Icons.search,
+                                color: FlixieColors.medium),
+                            filled: true,
+                            fillColor: FlixieColors.tabBarBackgroundFocused,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                          ),
+                        ),
+                      ),
                     // Status filter chips
                     Container(
                       width: double.infinity,
@@ -808,7 +885,12 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
                       child: SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
-                          children: _StatusFilter.values.map((f) {
+                          children: const [
+                            _StatusFilter.needsResponse,
+                            _StatusFilter.scheduled,
+                            _StatusFilter.planning,
+                            _StatusFilter.completed,
+                          ].map((f) {
                             final selected = _statusFilter == f;
                             return Padding(
                               padding: const EdgeInsets.only(right: 8),
@@ -816,14 +898,15 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
                                 label: Text(_filterLabel(f)),
                                 selected: selected,
                                 onSelected: (_) {
-                                  setState(() => _statusFilter = f);
+                                  setState(() => _statusFilter =
+                                      selected ? _StatusFilter.active : f);
                                   _applyFilter();
                                 },
-                                selectedColor: _statusFilterColor(f),
+                                selectedColor: FlixieColors.primary,
                                 backgroundColor: FlixieColors.tabBarBorder,
                                 labelStyle: TextStyle(
                                   color: selected
-                                      ? Colors.black
+                                      ? Colors.white
                                       : FlixieColors.light,
                                   fontWeight: selected
                                       ? FontWeight.w600
@@ -952,6 +1035,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
       onRespondToProposal: (proposal, decision) =>
           _respondToProposal(request, proposal, decision),
       onConfirmWatched: () => _confirmWatched(request),
+      onCancelPlan: () => _cancelPlan(request),
     );
   }
 
@@ -960,13 +1044,13 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
       case _StatusFilter.active:
         return 'Active';
       case _StatusFilter.needsResponse:
-        return 'Needs response';
+        return 'Needs reply ${_countFor(_StatusFilter.needsResponse)}';
       case _StatusFilter.planning:
         return 'Planning';
       case _StatusFilter.scheduled:
-        return 'Scheduled';
+        return 'Upcoming ${_countFor(_StatusFilter.scheduled)}';
       case _StatusFilter.completed:
-        return 'Completed';
+        return 'Past';
       case _StatusFilter.declined:
         return 'Declined';
       case _StatusFilter.cancelled:
@@ -976,23 +1060,8 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     }
   }
 
-  Color _statusFilterColor(_StatusFilter f) {
-    switch (f) {
-      case _StatusFilter.needsResponse:
-        return FlixieColors.warning;
-      case _StatusFilter.planning:
-        return FlixieColors.success;
-      case _StatusFilter.scheduled:
-        return FlixieColors.secondary;
-      case _StatusFilter.completed:
-        return FlixieColors.primary;
-      case _StatusFilter.declined:
-      case _StatusFilter.cancelled:
-      case _StatusFilter.expired:
-        return FlixieColors.danger;
-      case _StatusFilter.active:
-        return FlixieColors.primary;
-    }
+  int _countFor(_StatusFilter filter) {
+    return _all.where((request) => _matchesFilter(request, filter)).length;
   }
 
   String _responseSuccessMessage(String response) {
@@ -1070,14 +1139,14 @@ class _AudienceSwitcher extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _item(_RequestAudience.friends, 'Friends'),
-          _item(_RequestAudience.groups, 'Groups'),
+          _item(_RequestAudience.friends, 'Friends', Icons.group_outlined),
+          _item(_RequestAudience.groups, 'Groups', Icons.groups_2_outlined),
         ],
       ),
     );
   }
 
-  Widget _item(_RequestAudience value, String label) {
+  Widget _item(_RequestAudience value, String label, IconData icon) {
     final isSelected = selected == value;
     return Expanded(
       child: InkWell(
@@ -1091,13 +1160,22 @@ class _AudienceSwitcher extends StatelessWidget {
             color: isSelected ? FlixieColors.primary : Colors.transparent,
             borderRadius: BorderRadius.circular(11),
           ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: isSelected ? Colors.black : FlixieColors.medium,
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-            ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon,
+                  size: 18,
+                  color: isSelected ? Colors.white : FlixieColors.medium),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : FlixieColors.medium,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1137,14 +1215,6 @@ class _RequestListSectionHeader extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  color: FlixieColors.medium,
-                  fontSize: 12,
-                ),
-              ),
             ],
           ),
         ),
@@ -1182,6 +1252,7 @@ class _WatchRequestCard extends StatelessWidget {
     required this.onEditLocation,
     required this.onRespondToProposal,
     required this.onConfirmWatched,
+    required this.onCancelPlan,
     this.onMovieTap,
     this.busyAction,
   });
@@ -1201,6 +1272,7 @@ class _WatchRequestCard extends StatelessWidget {
   final void Function(WatchScheduleProposal proposal, String decision)
       onRespondToProposal;
   final VoidCallback onConfirmWatched;
+  final VoidCallback onCancelPlan;
   final _RequestAction? busyAction;
 
   Color get _statusColor {
@@ -1282,7 +1354,7 @@ class _WatchRequestCard extends StatelessWidget {
         onTap: onOpen,
         borderRadius: BorderRadius.circular(12),
         child: SizedBox(
-          height: compact ? 150 : null,
+          height: 190,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1293,8 +1365,8 @@ class _WatchRequestCard extends StatelessWidget {
                   borderRadius:
                       const BorderRadius.horizontal(left: Radius.circular(12)),
                   child: SizedBox(
-                    width: 100,
-                    height: compact ? 150 : 190,
+                    width: 126,
+                    height: 190,
                     child: posterUrl != null
                         ? CachedNetworkImage(
                             imageUrl: posterUrl,
@@ -1314,38 +1386,50 @@ class _WatchRequestCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Movie title
+                      Row(
+                        children: [
+                          _smallUserAvatar(other),
+                          const SizedBox(width: 7),
+                          Expanded(
+                            child: Text.rich(
+                              TextSpan(
+                                style: const TextStyle(
+                                    color: FlixieColors.medium, fontSize: 12),
+                                children: [
+                                  TextSpan(
+                                    text: request.groupName?.isNotEmpty == true
+                                        ? request.groupName
+                                        : other?.username ?? 'Friend',
+                                    style: const TextStyle(
+                                      color: FlixieColors.light,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                      text:
+                                          isSent ? ' invited' : ' invited you'),
+                                ],
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const Icon(Icons.more_horiz_rounded,
+                              color: FlixieColors.medium, size: 20),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
                       GestureDetector(
                         onTap: onMovieTap,
                         child: Text(
                           movie?.title ?? 'Unknown Movie',
-                          style: TextStyle(
-                            color: onMovieTap != null
-                                ? FlixieColors.primary
-                                : FlixieColors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                            decorationColor: FlixieColors.primary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      // Direction label + username
-                      RichText(
-                        text: TextSpan(
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                              color: FlixieColors.medium, fontSize: 13),
-                          children: [
-                            TextSpan(text: isSent ? 'To: ' : 'From: '),
-                            TextSpan(
-                              text: other?.username ?? '—',
-                              style: const TextStyle(
-                                  color: FlixieColors.light,
-                                  fontWeight: FontWeight.w600),
-                            ),
-                            if (request.groupName?.trim().isNotEmpty == true)
-                              TextSpan(text: ' · ${request.groupName}'),
-                          ],
+                            color: FlixieColors.primary,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                          ),
                         ),
                       ),
                       if (compact) ...[
@@ -1363,33 +1447,16 @@ class _WatchRequestCard extends StatelessWidget {
                             text: _effectiveLocation!,
                           ),
                         ],
+                        if (request.message?.trim().isNotEmpty == true) ...[
+                          const SizedBox(height: 7),
+                          Text(request.message!.trim(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  color: FlixieColors.medium, fontSize: 12)),
+                        ],
                         const Spacer(),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: OutlinedButton.icon(
-                            onPressed: onOpen,
-                            icon:
-                                const Icon(Icons.visibility_outlined, size: 15),
-                            label: const Text('View request'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: FlixieColors.primary,
-                              side: BorderSide(
-                                color: FlixieColors.primary
-                                    .withValues(alpha: 0.45),
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
-                              ),
-                              minimumSize: const Size(0, 30),
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              textStyle: const TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
+                        _buildCompactActions(),
                       ],
                       // Detail-only content
                       if (!compact &&
@@ -1532,149 +1599,200 @@ class _WatchRequestCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              GestureDetector(
-                onTap: onMovieTap,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: SizedBox(
-                    width: 108,
-                    height: 162,
-                    child: posterUrl != null
-                        ? CachedNetworkImage(
-                            imageUrl: posterUrl,
-                            fit: BoxFit.cover,
-                            errorWidget: (_, __, ___) =>
-                                const _PosterPlaceholder(),
-                          )
-                        : const _PosterPlaceholder(),
+          _PlanSurface(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                GestureDetector(
+                  onTap: onMovieTap,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(
+                      width: 116,
+                      height: 174,
+                      child: posterUrl != null
+                          ? CachedNetworkImage(
+                              imageUrl: posterUrl,
+                              fit: BoxFit.cover,
+                              errorWidget: (_, __, ___) =>
+                                  const _PosterPlaceholder(),
+                            )
+                          : const _PosterPlaceholder(),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 18),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 8),
+                const SizedBox(width: 16),
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        movie?.title ?? 'Watch request',
-                        style: const TextStyle(
-                          color: FlixieColors.primary,
-                          fontSize: 23,
-                          fontWeight: FontWeight.w800,
-                          height: 1.15,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        '${isSent ? 'To' : 'From'}: ${other?.username ?? 'Unknown user'}',
-                        style: const TextStyle(
-                          color: FlixieColors.light,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      if (request.groupName?.trim().isNotEmpty == true) ...[
-                        const SizedBox(height: 7),
-                        Row(
-                          children: [
-                            const Icon(Icons.groups_2_outlined,
-                                size: 16, color: FlixieColors.medium),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                request.groupName!,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: FlixieColors.medium,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
+                      Text(movie?.title ?? 'Watch plan',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: FlixieColors.primary,
+                              fontSize: 24,
+                              height: 1.05,
+                              fontWeight: FontWeight.w900)),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          _smallUserAvatar(other),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              request.groupName?.trim().isNotEmpty == true
+                                  ? 'With ${request.groupName}'
+                                  : 'With ${other?.username ?? 'a friend'}',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  color: FlixieColors.light, fontSize: 14),
                             ),
-                          ],
-                        ),
-                      ],
-                      const SizedBox(height: 14),
-                      _DetailStatusBadge(
-                        icon: _statusIcon,
-                        label: _statusLabel,
-                        color: _statusColor,
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 13),
+                      _DetailStatusBadge(
+                          icon: _statusIcon,
+                          label: _statusLabel,
+                          color: _statusColor),
                       if (formattedDate.isNotEmpty) ...[
                         const SizedBox(height: 9),
-                        Text(
-                          'Requested $formattedDate',
-                          style: const TextStyle(
-                            color: FlixieColors.medium,
-                            fontSize: 12,
-                          ),
-                        ),
+                        Text('Requested $formattedDate',
+                            style: const TextStyle(
+                                color: FlixieColors.medium, fontSize: 11)),
                       ],
                     ],
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: 26),
-          const Divider(color: FlixieColors.tabBarBorder),
-          if (_effectiveWatchTime != null || _effectiveLocation != null) ...[
-            const SizedBox(height: 18),
-            const _DetailSectionTitle(title: 'Plans'),
-            const SizedBox(height: 12),
-            if (_effectiveWatchTime != null)
-              _WatchDetailRow(
-                icon: request.scheduledFor != null
-                    ? Icons.event_available_outlined
-                    : Icons.schedule_outlined,
-                label: request.scheduledFor != null ? 'Scheduled' : 'Proposed',
-                value: _dateLabel(_effectiveWatchTime),
-              ),
-            if (_effectiveWatchTime != null && _effectiveLocation != null)
-              const SizedBox(height: 12),
-            if (_effectiveLocation != null)
-              _WatchDetailRow(
-                icon: Icons.location_on_outlined,
-                label: 'Location',
-                value: _effectiveLocation!,
-              ),
-            const SizedBox(height: 20),
-            const Divider(color: FlixieColors.tabBarBorder),
-          ],
-          if (request.message?.trim().isNotEmpty == true) ...[
-            const SizedBox(height: 18),
-            const _DetailSectionTitle(title: 'Message'),
-            const SizedBox(height: 10),
-            Text(
-              request.message!.trim(),
-              style: const TextStyle(
-                color: FlixieColors.light,
-                fontSize: 14,
-                height: 1.45,
+          const SizedBox(height: 12),
+          if (_effectiveWatchTime != null) ...[
+            _PlanSurface(
+              child: Column(
+                children: [
+                  _WatchDetailRow(
+                    icon: Icons.event_available_outlined,
+                    label:
+                        request.scheduledFor != null ? 'Scheduled' : 'Proposed',
+                    value: _dateLabel(_effectiveWatchTime),
+                  ),
+                  const SizedBox(height: 12),
+                  _WatchDetailRow(
+                    icon: Icons.location_on_outlined,
+                    label: 'Location',
+                    value: _effectiveLocation ?? 'Not set',
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _PrimaryActionButton(
+                          label: 'Add to calendar',
+                          onPressed: () =>
+                              WatchCalendarService.addScheduledWatch(
+                            title: movie?.title ?? 'Watch together',
+                            scheduledFor: _effectiveWatchTime!,
+                            note: request.message,
+                            location: _effectiveLocation,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: _SecondaryActionButton(
+                          label: 'Edit plan',
+                          onPressed: onSuggestDifferentTime,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 20),
-            const Divider(color: FlixieColors.tabBarBorder),
+            const SizedBox(height: 12),
           ],
-          const SizedBox(height: 18),
-          const _DetailSectionTitle(title: 'What’s next'),
-          const SizedBox(height: 10),
-          _LifecycleSummary(
-            request: request,
-            scheduledLabel: _scheduleSummaryLabel(),
-            myUserId: myUserId,
+          _PlanSurface(child: _buildParticipants(other)),
+          if (request.message?.trim().isNotEmpty == true) ...[
+            const SizedBox(height: 12),
+            _PlanSurface(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Message',
+                      style:
+                          TextStyle(color: FlixieColors.medium, fontSize: 13)),
+                  const SizedBox(height: 7),
+                  Text(request.message!.trim(),
+                      style: const TextStyle(
+                          color: FlixieColors.textPrimary,
+                          fontSize: 14,
+                          height: 1.4)),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          _PlanSurface(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("After you've watched",
+                    style: TextStyle(
+                        color: FlixieColors.textPrimary,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900)),
+                const SizedBox(height: 4),
+                const Text('Log every watch separately and rate this viewing.',
+                    style: TextStyle(color: FlixieColors.medium, fontSize: 12)),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: request.canCompleteFor(myUserId)
+                        ? onConfirmWatched
+                        : null,
+                    icon: const Icon(Icons.check_circle_outline_rounded),
+                    label: const Text('Log watch'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: FlixieColors.success,
+                      foregroundColor: Colors.black,
+                    ),
+                  ),
+                ),
+                const Divider(height: 28, color: FlixieColors.tabBarBorder),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton.icon(
+                        onPressed: onSuggestDifferentTime,
+                        icon: const Icon(Icons.edit_calendar_outlined),
+                        label: const Text('Reschedule'),
+                      ),
+                    ),
+                    Expanded(
+                      child: TextButton.icon(
+                        onPressed: request.canCancelFor(myUserId)
+                            ? onCancelPlan
+                            : null,
+                        icon: const Icon(Icons.block_outlined),
+                        label: const Text('Cancel plan'),
+                        style: TextButton.styleFrom(
+                            foregroundColor: FlixieColors.danger),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          if (_proposalNoteText != null) ...[
-            const SizedBox(height: 10),
-            _ProposalNote(text: _proposalNoteText!),
+          if (request.isPending || _effectiveWatchTime == null) ...[
+            const SizedBox(height: 12),
+            _PlanSurface(child: _buildActions()),
           ],
-          const SizedBox(height: 18),
-          _buildActions(),
           if (request.groupId?.isNotEmpty == true) ...[
             const SizedBox(height: 8),
             _IconTextAction(
@@ -1687,6 +1805,196 @@ class _WatchRequestCard extends StatelessWidget {
           const SizedBox(height: 28),
         ],
       ),
+    );
+  }
+
+  Widget _smallUserAvatar(WatchRequestUser? user) => ProfileAvatarView(
+        avatar: user?.avatar,
+        fallbackText: user?.username.isNotEmpty == true
+            ? user!.username[0].toUpperCase()
+            : '?',
+        fallbackColor: FlixieColors.primary,
+        size: 32,
+      );
+
+  Widget _buildCompactActions() {
+    if (busyAction != null) {
+      return const SizedBox(
+        height: 34,
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+    final incoming = request.isPending &&
+        request.requesterId != myUserId &&
+        (request.recipientId == myUserId ||
+            request.participantFor(myUserId) != null);
+    if (incoming) {
+      return Row(
+        children: [
+          Expanded(
+            child: FilledButton.icon(
+              onPressed: onAccept,
+              icon: const Icon(Icons.check_rounded, size: 17),
+              label: const Text('Accept'),
+              style: FilledButton.styleFrom(
+                backgroundColor: FlixieColors.primary,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(0, 38),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: _effectiveWatchTime == null
+                  ? onSuggestSchedule
+                  : onSuggestDifferentTime,
+              icon: Icon(
+                _effectiveWatchTime == null
+                    ? Icons.edit_calendar_outlined
+                    : Icons.schedule_outlined,
+                size: 16,
+              ),
+              label: Text(
+                  _effectiveWatchTime == null ? 'Pick a time' : 'Suggest time'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: FlixieColors.primary,
+                side: const BorderSide(color: FlixieColors.primary),
+                minimumSize: const Size(0, 38),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                textStyle: const TextStyle(fontSize: 11),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    return Align(
+      alignment: Alignment.centerRight,
+      child: OutlinedButton.icon(
+        onPressed: onOpen,
+        icon: const Icon(Icons.visibility_outlined, size: 16),
+        label: Text(request.normalizedScheduleStatus == 'AGREED'
+            ? 'View plan'
+            : 'View request'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: FlixieColors.primary,
+          side: const BorderSide(color: FlixieColors.primary),
+          minimumSize: const Size(0, 36),
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildParticipants(WatchRequestUser? other) {
+    final users = request.participants
+        .map((participant) => participant.user)
+        .whereType<WatchRequestUser>()
+        .toList(growable: false);
+    final visible = users.isNotEmpty
+        ? users
+        : [request.requester, request.recipient, other]
+            .whereType<WatchRequestUser>()
+            .toSet()
+            .toList(growable: false);
+    bool hasAccepted(WatchRequestUser user) {
+      final participant = request.participantFor(user.id);
+      if (participant?.response.toUpperCase() == 'ACCEPTED') return true;
+      if (user.id == request.requesterId) return true;
+      // Older scheduled requests can omit their individual response rows even
+      // though agreeing the schedule required the recipients to accept.
+      return request.normalizedScheduleStatus == 'AGREED' ||
+          request.isScheduled;
+    }
+
+    final accepted = visible.where(hasAccepted).length;
+    final waiting = visible.length - accepted;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Participants',
+            style: TextStyle(color: FlixieColors.medium, fontSize: 13)),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: visible
+              .map((user) => _participantAvatar(
+                    user,
+                    accepted: hasAccepted(user),
+                  ))
+              .toList(growable: false),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          accepted == visible.length && visible.isNotEmpty
+              ? 'All $accepted accepted'
+              : accepted > 0
+                  ? '$accepted accepted · $waiting waiting'
+                  : 'Waiting for responses',
+          style: TextStyle(
+              color: accepted > 0 ? FlixieColors.success : FlixieColors.medium,
+              fontSize: 12,
+              fontWeight: FontWeight.w700),
+        ),
+      ],
+    );
+  }
+
+  Widget _participantAvatar(
+    WatchRequestUser user, {
+    required bool accepted,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            ProfileAvatarView(
+              avatar: user.avatar,
+              fallbackText: user.username.isNotEmpty
+                  ? user.username[0].toUpperCase()
+                  : '?',
+              fallbackColor: FlixieColors.primary,
+              size: 46,
+            ),
+            if (accepted)
+              const Positioned(
+                top: -3,
+                right: -3,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: FlixieColors.success,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.all(3),
+                    child: Icon(Icons.check_rounded,
+                        color: Colors.black, size: 12),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 5),
+        SizedBox(
+          width: 62,
+          child: Text(
+            user.username,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: accepted ? FlixieColors.success : FlixieColors.medium,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1951,6 +2259,26 @@ class _WatchRequestCard extends StatelessWidget {
   }
 }
 
+class _PlanSurface extends StatelessWidget {
+  const _PlanSurface({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: FlixieColors.surface.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: FlixieColors.tabBarBorder),
+      ),
+      child: child,
+    );
+  }
+}
+
 class _WatchDetailRow extends StatelessWidget {
   const _WatchDetailRow({
     required this.icon,
@@ -1988,25 +2316,6 @@ class _WatchDetailRow extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _DetailSectionTitle extends StatelessWidget {
-  const _DetailSectionTitle({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      title.toUpperCase(),
-      style: const TextStyle(
-        color: FlixieColors.medium,
-        fontSize: 11,
-        fontWeight: FontWeight.w800,
-        letterSpacing: 1.1,
-      ),
     );
   }
 }

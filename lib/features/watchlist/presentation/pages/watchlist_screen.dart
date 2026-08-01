@@ -21,6 +21,9 @@ import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'package:flixie_app/features/watchlist/presentation/controllers/watchlist_actions_controller.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_sheet.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
+import 'package:flixie_app/features/movies/data/movie_service.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
+import 'package:flixie_app/models/friend_recommendation.dart';
 
 class WatchlistScreen extends StatefulWidget {
   const WatchlistScreen({super.key});
@@ -50,6 +53,8 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
   Set<int> _userWatchProviderIds = {};
   bool _loadingWatchProviderAvailability = false;
   int _watchProviderAvailabilityRequest = 0;
+  final Map<int, List<FriendRecommendationItem>> _recommendationsByMovieId = {};
+  int _recommendationsRequest = 0;
 
   AuthProvider? _authProvider;
 
@@ -113,10 +118,41 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       });
 
       _loadWatchProviderAvailability(watchlist);
+      _loadFriendRecommendations(watchlist);
     } catch (e) {
       debugPrint('Error loading watchlist: $e');
       setState(() => _loading = false);
     }
+  }
+
+  Future<void> _loadFriendRecommendations(
+      List<WatchlistMovie> watchlist) async {
+    final request = ++_recommendationsRequest;
+    if (watchlist.isEmpty) {
+      if (mounted) setState(_recommendationsByMovieId.clear);
+      return;
+    }
+
+    final service = MovieService();
+    final entries = await Future.wait(watchlist.map((item) async {
+      try {
+        final response = await service.getFriendRecommendation(item.movieId);
+        return MapEntry(
+          item.movieId,
+          response.friends
+              .where((friend) => friend.recommends)
+              .toList(growable: false),
+        );
+      } catch (_) {
+        return MapEntry(item.movieId, const <FriendRecommendationItem>[]);
+      }
+    }));
+    if (!mounted || request != _recommendationsRequest) return;
+    setState(() {
+      _recommendationsByMovieId
+        ..clear()
+        ..addEntries(entries);
+    });
   }
 
   Future<void> _loadWatchProviderAvailability(
@@ -747,6 +783,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (_) => AddToListSheet(movieId: item.movieId),
     );
   }
@@ -1178,6 +1215,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       userWatchProviderIds: _userWatchProviderIds,
       canWatchNow: canWatchNow,
       isLoadingProviders: isLoadingProviders,
+      recommendations: _recommendationsByMovieId[item.movieId] ?? const [],
       onTap: () => context.push('/movies/${item.movieId}'),
       onMarkAsWatched: () => _markAsWatched(item),
       onAddToFavourites: () => _addToFavorites(item),
@@ -1591,6 +1629,7 @@ class WatchlistMovieRow extends StatelessWidget {
   final Set<int> userWatchProviderIds;
   final bool canWatchNow;
   final bool isLoadingProviders;
+  final List<FriendRecommendationItem> recommendations;
   final VoidCallback onTap;
   final VoidCallback onMarkAsWatched;
   final VoidCallback? onAddToFavourites;
@@ -1606,6 +1645,7 @@ class WatchlistMovieRow extends StatelessWidget {
     this.userWatchProviderIds = const <int>{},
     this.canWatchNow = false,
     this.isLoadingProviders = false,
+    this.recommendations = const [],
     required this.onTap,
     required this.onMarkAsWatched,
     this.onAddToFavourites,
@@ -1881,6 +1921,10 @@ class WatchlistMovieRow extends StatelessWidget {
                         canWatchNow: canWatchNow,
                         isLoading: isLoadingProviders,
                       ),
+                      if (recommendations.isNotEmpty) ...[
+                        const SizedBox(height: 9),
+                        _RecommendationAvatars(friends: recommendations),
+                      ],
                       // Added date row
                       if (addedDate.isNotEmpty) ...[
                         const SizedBox(height: 8),
@@ -1909,6 +1953,119 @@ class WatchlistMovieRow extends StatelessWidget {
       ),
     );
   }
+}
+
+class _RecommendationAvatars extends StatelessWidget {
+  const _RecommendationAvatars({required this.friends});
+
+  final List<FriendRecommendationItem> friends;
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = friends.take(3).toList(growable: false);
+    final overflow = friends.length - visible.length;
+    const avatarSize = 27.0;
+    const overlap = 8.0;
+    final stackWidth = visible.length * (avatarSize - overlap) +
+        overlap +
+        (overflow > 0 ? avatarSize - overlap : 0);
+
+    return Row(
+      children: [
+        SizedBox(
+          width: stackWidth,
+          height: avatarSize,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              for (var i = 0; i < visible.length; i++)
+                Positioned(
+                  left: i * (avatarSize - overlap),
+                  child: Container(
+                    width: avatarSize,
+                    height: avatarSize,
+                    padding: const EdgeInsets.all(1.5),
+                    decoration: const BoxDecoration(
+                      color: FlixieColors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: ClipOval(child: _friendAvatar(visible[i])),
+                  ),
+                ),
+              if (overflow > 0)
+                Positioned(
+                  left: visible.length * (avatarSize - overlap),
+                  child: Container(
+                    width: avatarSize,
+                    height: avatarSize,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: FlixieColors.surfaceElevated,
+                      shape: BoxShape.circle,
+                      border:
+                          Border.all(color: FlixieColors.primary, width: 1.5),
+                    ),
+                    child: Text('+$overflow',
+                        style: const TextStyle(
+                            color: FlixieColors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800)),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 7),
+        Flexible(
+          child: Text(
+            '${friends.length} ${friends.length == 1 ? 'friend recommends' : 'friends recommend'}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: FlixieColors.success,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _friendAvatar(FriendRecommendationItem friend) {
+    if (friend.avatar != null) {
+      return ProfileAvatarView(
+        avatar: friend.avatar,
+        fallbackText: friend.username.isEmpty
+            ? '?'
+            : friend.username.characters.first.toUpperCase(),
+        fallbackColor: FlixieColors.primary,
+        size: 24,
+      );
+    }
+    if (friend.avatarUrl?.isNotEmpty == true) {
+      return CachedNetworkImage(
+        imageUrl: friend.avatarUrl!,
+        fit: BoxFit.cover,
+        errorWidget: (_, __, ___) => _initial(friend),
+      );
+    }
+    return _initial(friend);
+  }
+
+  Widget _initial(FriendRecommendationItem friend) => Container(
+        color: FlixieColors.surface,
+        alignment: Alignment.center,
+        child: Text(
+          friend.username.isEmpty
+              ? '?'
+              : friend.username.characters.first.toUpperCase(),
+          style: const TextStyle(
+              color: FlixieColors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.w800),
+        ),
+      );
 }
 
 class _WatchProvidersInline extends StatelessWidget {

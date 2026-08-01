@@ -14,6 +14,7 @@ import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.d
 import 'package:flixie_app/features/social/presentation/widgets/group_hero_banner.dart';
 import 'package:flixie_app/features/social/presentation/widgets/pending_request_preview_tile.dart';
 import 'package:flixie_app/models/movie_list.dart';
+import 'package:flixie_app/features/social/presentation/widgets/activity_filter_bar.dart';
 
 class GroupActivityTab extends StatefulWidget {
   const GroupActivityTab({
@@ -47,6 +48,7 @@ class GroupActivityTabState extends State<GroupActivityTab> {
   bool _loading = false;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  ActivityFeedFilter _activityFilter = ActivityFeedFilter.all;
 
   @override
   void initState() {
@@ -87,8 +89,9 @@ class GroupActivityTabState extends State<GroupActivityTab> {
 
   List<ActivityListItem> get _filteredActivity {
     final q = _searchQuery.trim().toLowerCase();
-    if (q.isEmpty) return _activity;
     return _activity.where((item) {
+      if (!_activityFilter.matches(item)) return false;
+      if (q.isEmpty) return true;
       return (item.mediaTitle ?? '').toLowerCase().contains(q) ||
           item.username.toLowerCase().contains(q);
     }).toList();
@@ -351,7 +354,7 @@ class GroupActivityTabState extends State<GroupActivityTab> {
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    'RECENT ACTIVITY',
+                    'GROUP ACTIVITY',
                     style: textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
@@ -383,6 +386,14 @@ class GroupActivityTabState extends State<GroupActivityTab> {
               ),
             ),
             const SizedBox(height: 10),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: ActivityFilterBar(
+                selected: _activityFilter,
+                onChanged: (filter) => setState(() => _activityFilter = filter),
+              ),
+            ),
+            const SizedBox(height: 12),
             if (_filteredActivity.isEmpty)
               Padding(
                 padding:
@@ -390,17 +401,19 @@ class GroupActivityTabState extends State<GroupActivityTab> {
                 child: Text(
                   _searchQuery.isNotEmpty
                       ? 'No activity matches your search.'
-                      : 'No recent activity.',
+                      : _activityFilter != ActivityFeedFilter.all
+                          ? 'No ${_activityFilter.label.toLowerCase()} activity yet.'
+                          : 'No recent activity.',
                   style:
                       textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
                 ),
               )
             else
-              ...(_filteredActivity.take(_searchQuery.isNotEmpty ? 50 : 5).map(
+              ...(_filteredActivity.take(20).map(
                     (item) => Padding(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 4),
-                      child: ActivityTile(item: item, compact: true),
+                      child: ActivityTile(item: item),
                     ),
                   )),
 

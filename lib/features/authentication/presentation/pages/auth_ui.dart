@@ -247,7 +247,7 @@ class AuthGradientBrand extends StatelessWidget {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          Color(0xFFB388FF),
+          FlixieColors.primary,
           FlixieColors.primary,
           Color(0xFF6F45FF),
         ],

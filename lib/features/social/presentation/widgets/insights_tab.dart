@@ -22,34 +22,9 @@ class GroupInsightsTab extends StatefulWidget {
 
 class _GroupInsightsTabState extends State<GroupInsightsTab> {
   bool _loading = true;
+  bool _allTime = false;
   String? _error;
   GroupInsightsResponse _insights = const GroupInsightsResponse();
-
-  List<GroupInsightMovie> get _allInsightMovies => [
-        ..._insights.mostWatchedThisMonth,
-        ..._insights.mostDiscussedMovies,
-        ..._insights.highestRatedMovies,
-      ];
-
-  List<MapEntry<String, int>> get _topGenres {
-    final counts = <String, int>{};
-    for (final movie in _allInsightMovies) {
-      for (final genre in movie.genres) {
-        counts[genre] = (counts[genre] ?? 0) + 1;
-      }
-    }
-    final entries = counts.entries.toList(growable: false)
-      ..sort((a, b) => b.value.compareTo(a.value));
-    return entries.take(6).toList(growable: false);
-  }
-
-  List<GroupInsightMovie> get _mostDivisiveMovies {
-    final movies = _allInsightMovies
-        .where((movie) => movie.ratingSpread > 0)
-        .toList(growable: false)
-      ..sort((a, b) => b.ratingSpread.compareTo(a.ratingSpread));
-    return movies.take(8).toList(growable: false);
-  }
 
   @override
   void initState() {
@@ -66,7 +41,10 @@ class _GroupInsightsTabState extends State<GroupInsightsTab> {
     }
 
     try {
-      final insights = await GroupService.getGroupInsights(widget.groupId);
+      final insights = await GroupService.getGroupInsights(
+        widget.groupId,
+        timeWindow: _allTime ? 'all' : 'month',
+      );
       if (!mounted) return;
       setState(() {
         _insights = insights;
@@ -162,113 +140,25 @@ class _GroupInsightsTabState extends State<GroupInsightsTab> {
           32 + MediaQuery.of(context).padding.bottom,
         ),
         children: [
+          _InsightsTimeToggle(
+            allTime: _allTime,
+            onChanged: (allTime) {
+              if (_allTime == allTime) return;
+              setState(() => _allTime = allTime);
+              _loadInsights();
+            },
+          ),
+          const SizedBox(height: 12),
           InsightsPulseStrip(insights: _insights),
           const SizedBox(height: 18),
-          InsightSignalsPanel(insights: _insights),
-          const SizedBox(height: 22),
-          if (_topGenres.isNotEmpty) ...[
-            GenreTasteCloud(genres: _topGenres),
-            const SizedBox(height: 22),
-          ],
           if (_insights.mostWatchedThisMonth.isNotEmpty) ...[
-            InsightSectionHeader(
-              title: 'Most Watched This Month',
-              icon: Icons.local_fire_department_outlined,
-              meta: _countLabel(
-                _insights.mostWatchedThisMonth.fold<int>(
-                  0,
-                  (total, movie) => total + movie.watchCount,
-                ),
-                'watch',
-              ),
+            const InsightSectionHeader(
+              title: 'Highlights',
+              icon: Icons.auto_awesome_rounded,
             ),
             const SizedBox(height: 10),
-            HorizontalPosterRail(
-              children: _insights.mostWatchedThisMonth
-                  .asMap()
-                  .entries
-                  .map(
-                    (entry) => InsightMovieCard(
-                      movie: entry.value,
-                      variant: InsightMovieCardVariant.mostWatched,
-                      rank: entry.key + 1,
-                    ),
-                  )
-                  .toList(growable: false),
-            ),
-            const SizedBox(height: 22),
-          ],
-          if (_mostDivisiveMovies.isNotEmpty) ...[
-            InsightSectionHeader(
-              title: 'Most Divisive',
-              icon: Icons.call_split_outlined,
-              meta:
-                  '${_mostDivisiveMovies.first.ratingSpread.toStringAsFixed(1)} spread',
-            ),
-            const SizedBox(height: 10),
-            HorizontalPosterRail(
-              children: _mostDivisiveMovies
-                  .asMap()
-                  .entries
-                  .map(
-                    (entry) => InsightMovieCard(
-                      movie: entry.value,
-                      variant: InsightMovieCardVariant.mostDivisive,
-                      rank: entry.key + 1,
-                    ),
-                  )
-                  .toList(growable: false),
-            ),
-            const SizedBox(height: 22),
-          ],
-          if (_insights.mostDiscussedMovies.isNotEmpty) ...[
-            InsightSectionHeader(
-              title: 'Most Discussed Movies',
-              icon: Icons.forum_outlined,
-              meta: _countLabel(
-                _insights.mostDiscussedMovies.fold<int>(
-                  0,
-                  (total, movie) => total + movie.discussionCount,
-                ),
-                'message',
-              ),
-            ),
-            const SizedBox(height: 10),
-            HorizontalPosterRail(
-              children: _insights.mostDiscussedMovies
-                  .asMap()
-                  .entries
-                  .map(
-                    (entry) => InsightMovieCard(
-                      movie: entry.value,
-                      variant: InsightMovieCardVariant.mostDiscussed,
-                      rank: entry.key + 1,
-                    ),
-                  )
-                  .toList(growable: false),
-            ),
-            const SizedBox(height: 22),
-          ],
-          if (_insights.highestRatedMovies.isNotEmpty) ...[
-            InsightSectionHeader(
-              title: 'Highest Rated Movies',
-              icon: Icons.star_rounded,
-              meta:
-                  'Top ${_insights.highestRatedMovies.first.averageRating.toStringAsFixed(1)}',
-            ),
-            const SizedBox(height: 10),
-            HorizontalPosterRail(
-              children: _insights.highestRatedMovies
-                  .asMap()
-                  .entries
-                  .map(
-                    (entry) => InsightMovieCard(
-                      movie: entry.value,
-                      variant: InsightMovieCardVariant.highestRated,
-                      rank: entry.key + 1,
-                    ),
-                  )
-                  .toList(growable: false),
+            InsightHighlightCard(
+              movie: _insights.mostWatchedThisMonth.first,
             ),
             const SizedBox(height: 22),
           ],
@@ -286,7 +176,7 @@ class _GroupInsightsTabState extends State<GroupInsightsTab> {
           ],
           if (_insights.mostActiveMembers.isNotEmpty) ...[
             const InsightSectionHeader(
-              title: 'Most Active Members',
+              title: 'Top contributors',
               icon: Icons.bolt_outlined,
             ),
             const SizedBox(height: 10),
@@ -296,6 +186,67 @@ class _GroupInsightsTabState extends State<GroupInsightsTab> {
                 )),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _InsightsTimeToggle extends StatelessWidget {
+  const _InsightsTimeToggle({
+    required this.allTime,
+    required this.onChanged,
+  });
+
+  final bool allTime;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: FlixieColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: FlixieColors.tabBarBorder),
+      ),
+      child: Row(
+        children: [
+          _option('This month', false),
+          _option('All time', true),
+        ],
+      ),
+    );
+  }
+
+  Widget _option(String label, bool value) {
+    final selected = allTime == value;
+    return Expanded(
+      child: InkWell(
+        onTap: () => onChanged(value),
+        borderRadius: BorderRadius.circular(11),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          decoration: BoxDecoration(
+            color: selected
+                ? FlixieColors.primary.withValues(alpha: 0.16)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(11),
+            border: selected
+                ? Border.all(
+                    color: FlixieColors.primary.withValues(alpha: 0.48))
+                : null,
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? FlixieColors.primary : FlixieColors.medium,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -373,6 +324,113 @@ class InsightSectionHeader extends StatelessWidget {
   }
 }
 
+class InsightHighlightCard extends StatelessWidget {
+  const InsightHighlightCard({super.key, required this.movie});
+
+  final GroupInsightMovie movie;
+
+  @override
+  Widget build(BuildContext context) {
+    final posterUrl =
+        _resolvePosterUrl(movie.posterPath, 'https://image.tmdb.org/t/p/w342');
+    return InkWell(
+      onTap: movie.movieId == null
+          ? null
+          : () => context.push('/movies/${movie.movieId}'),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        height: 188,
+        padding: const EdgeInsets.all(12),
+        decoration: _glassDecoration(),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                width: 118,
+                height: double.infinity,
+                child: posterUrl == null
+                    ? Container(
+                        color: FlixieColors.surfaceElevated,
+                        child: const Icon(Icons.movie_outlined,
+                            color: FlixieColors.medium),
+                      )
+                    : CachedNetworkImage(
+                        imageUrl: posterUrl,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) => Container(
+                          color: FlixieColors.surfaceElevated,
+                          child: const Icon(Icons.movie_outlined,
+                              color: FlixieColors.medium),
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    movie.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: FlixieColors.textPrimary,
+                      fontSize: 20,
+                      height: 1.05,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 9),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: FlixieColors.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(color: FlixieColors.primary),
+                    ),
+                    child: const Text('#1 in your group',
+                        style: TextStyle(
+                            color: FlixieColors.primary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800)),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 5,
+                    children: [
+                      Text('${movie.watchCount} watches',
+                          style: const TextStyle(
+                              color: FlixieColors.light, fontSize: 11)),
+                      Text('${movie.discussionCount} discussions',
+                          style: const TextStyle(
+                              color: FlixieColors.light, fontSize: 11)),
+                      if (movie.averageRating > 0)
+                        Text('${movie.averageRating.toStringAsFixed(1)}/10',
+                            style: const TextStyle(
+                                color: FlixieColors.warning,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800)),
+                    ],
+                  ),
+                  if (movie.watchers.isNotEmpty) ...[
+                    const SizedBox(height: 11),
+                    _WatcherAvatarStack(watchers: movie.watchers),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class InsightsPulseStrip extends StatelessWidget {
   const InsightsPulseStrip({
     super.key,
@@ -391,42 +449,54 @@ class InsightsPulseStrip extends StatelessWidget {
       0,
       (total, movie) => total + movie.discussionCount,
     );
-    final ratedMovies = insights.highestRatedMovies
-        .where((movie) => movie.ratingCount > 0 && movie.averageRating > 0)
-        .toList(growable: false);
-    final topRating = ratedMovies.isEmpty
-        ? '-'
-        : ratedMovies.first.averageRating.toStringAsFixed(1);
+    final ratingCount = insights.highestRatedMovies.fold<int>(
+      0,
+      (total, movie) => total + movie.ratingCount,
+    );
 
-    return Row(
-      children: [
-        Expanded(
-          child: _PulseTile(
-            label: 'Watches',
-            value: '$monthlyWatches',
-            icon: Icons.visibility_outlined,
-            color: FlixieColors.primary,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _PulseTile(
-            label: 'Top score',
-            value: topRating,
-            icon: Icons.star_rounded,
-            color: FlixieColors.warning,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _PulseTile(
-            label: 'Chat',
-            value: '$discussionCount',
-            icon: Icons.forum_outlined,
-            color: FlixieColors.tertiary,
-          ),
-        ),
-      ],
+    final tiles = [
+      _PulseTile(
+        label: 'Watches',
+        value: '$monthlyWatches',
+        icon: Icons.visibility_outlined,
+        color: FlixieColors.primary,
+      ),
+      _PulseTile(
+        label: 'Ratings',
+        value: '$ratingCount',
+        icon: Icons.star_rounded,
+        color: FlixieColors.warning,
+      ),
+      _PulseTile(
+        label: 'Reviews',
+        value: '${insights.recentReviews.length}',
+        icon: Icons.rate_review_outlined,
+        color: FlixieColors.tertiary,
+      ),
+      _PulseTile(
+        label: 'Messages',
+        value: '$discussionCount',
+        icon: Icons.forum_outlined,
+        color: const Color(0xFF70A7FF),
+      ),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      decoration: _glassDecoration(),
+      child: Row(
+        children: [
+          for (var index = 0; index < tiles.length; index++) ...[
+            Expanded(child: tiles[index]),
+            if (index != tiles.length - 1)
+              const SizedBox(
+                height: 58,
+                child:
+                    VerticalDivider(width: 1, color: FlixieColors.tabBarBorder),
+              ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -446,45 +516,31 @@ class _PulseTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      decoration: BoxDecoration(
-        color: FlixieColors.surfaceElevated.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 5),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Row(
-            children: [
-              Icon(icon, color: color, size: 16),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: FlixieColors.medium,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
+          Icon(icon, color: color, size: 18),
+          const SizedBox(height: 5),
           Text(
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: color,
-              fontSize: 20,
+              fontSize: 18,
               fontWeight: FontWeight.w900,
             ),
           ),
+          const SizedBox(height: 2),
+          Text(label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  color: FlixieColors.medium,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700)),
         ],
       ),
     );

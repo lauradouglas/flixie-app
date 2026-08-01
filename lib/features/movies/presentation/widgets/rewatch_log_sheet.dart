@@ -209,26 +209,29 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                   ),
                   if (_rating != null) ...[
                     const SizedBox(height: 12),
-                    SwitchListTile.adaptive(
-                      contentPadding: EdgeInsets.zero,
-                      value: _recommended ?? false,
-                      onChanged: (value) =>
-                          setState(() => _recommended = value),
-                      activeTrackColor: FlixieColors.success,
-                      title: Text(
-                        _recommended == true
-                            ? 'Recommended'
-                            : 'Not recommended',
-                        style: const TextStyle(
-                          color: FlixieColors.light,
-                          fontWeight: FontWeight.w700,
+                    Material(
+                      color: Colors.transparent,
+                      child: SwitchListTile.adaptive(
+                        contentPadding: EdgeInsets.zero,
+                        value: _recommended ?? false,
+                        onChanged: (value) =>
+                            setState(() => _recommended = value),
+                        activeTrackColor: FlixieColors.success,
+                        title: Text(
+                          _recommended == true
+                              ? 'Recommended'
+                              : 'Not recommended',
+                          style: const TextStyle(
+                            color: FlixieColors.light,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                      subtitle: const Text(
-                        'Scores of 7+ select recommended automatically, but you can change it.',
-                        style: TextStyle(
-                          color: FlixieColors.medium,
-                          fontSize: 12,
+                        subtitle: const Text(
+                          'Scores of 7+ select recommended automatically, but you can change it.',
+                          style: TextStyle(
+                            color: FlixieColors.medium,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
                     ),

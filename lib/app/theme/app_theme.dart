@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 /// Flixie color palette — cinematic dark theme.
 class FlixieColors {
   // Primary – vivid purple
-  static const Color primary = Color(0xFF9B6BFF);
-  static const Color primaryShade = Color(0xFF7C4DFF);
-  static const Color primaryTint = Color(0xFFB388FF);
+  static const Color primary = Color(0xFF7C4DFF);
+  static const Color primaryShade = Color(0xFF6534E8);
+  static const Color primaryTint = Color(0xFF7C4DFF);
 
   // Secondary – cyan accent
   static const Color secondary = Color(0xFF00D1C7);

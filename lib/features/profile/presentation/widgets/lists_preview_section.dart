@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flixie_app/models/movie_list.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/media_lists_section.dart';
 
 class ListsPreviewSection extends StatelessWidget {
   const ListsPreviewSection({
@@ -34,60 +35,70 @@ class ListsPreviewSection extends StatelessWidget {
                 .where((list) => list.visibility == ListVisibility.public)
                 .toList(growable: false)
             : loadedLists;
-        final content = Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: FlixieColors.light,
+        final previewLists = lists.take(4).map((list) {
+          final posters = list.previewPosterUrls.map(_posterUrl).toList();
+          return MediaDetailListItem(
+            id: list.id,
+            name: list.scope == ListScope.group && list.groupName != null
+                ? '${list.name} · ${list.groupName}'
+                : list.name,
+            visibility: list.visibility,
+            posterUrls: posters,
+            itemCount: list.itemCount ??
+                (list.movieCount ?? 0) + (list.showCount ?? 0),
+            ownerId: list.userId,
+          );
+        }).toList(growable: false);
+
+        final content = snapshot.connectionState == ConnectionState.waiting
+            ? MediaListsSection(
+                ownLists: const [],
+                friendLists: const [],
+                loading: true,
+                itemLabel: 'items',
+                title: title,
+                onEdit: () {},
+                onOpenList: (_) {},
+              )
+            : lists.isEmpty
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: FlixieColors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                ),
-                const Spacer(),
-                if (allowManage)
-                  TextButton(
-                    onPressed: () => context.push('/movie-lists'),
-                    child: const Text('Manage'),
-                  ),
-              ],
-            ),
-            if (snapshot.connectionState == ConnectionState.waiting)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 20),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (lists.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Text(
-                  emptyMessage,
-                  style: const TextStyle(color: FlixieColors.medium),
-                ),
-              )
-            else
-              Column(
-                children: lists.take(4).map((list) {
-                  return ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    dense: true,
-                    title: Text(list.name),
-                    subtitle: Text(_listCountLabel(list)),
-                    trailing: Icon(
-                      _privacyIcon(list.visibility),
-                      size: 16,
-                      color: FlixieColors.medium,
-                    ),
-                    onTap: () => context.push(
-                      '/movie-lists/${list.id}?name=${Uri.encodeComponent(list.name)}&owner=${Uri.encodeComponent(list.userId ?? userId)}',
-                    ),
+                      const SizedBox(height: 10),
+                      Text(emptyMessage,
+                          style: const TextStyle(color: FlixieColors.medium)),
+                    ],
+                  )
+                : MediaListsSection(
+                    ownLists: previewLists,
+                    friendLists: const [],
+                    loading: false,
+                    itemLabel: 'items',
+                    title: title,
+                    ownSummary:
+                        '${lists.length} ${lists.length == 1 ? 'list' : 'lists'}',
+                    editLabel: 'Manage',
+                    showOwnItemCount: true,
+                    showEdit: allowManage,
+                    onEdit: () => context.push('/movie-lists'),
+                    onSeeAll:
+                        allowManage ? () => context.push('/movie-lists') : null,
+                    onOpenList: (item) {
+                      final list =
+                          lists.firstWhere((list) => list.id == item.id);
+                      context.push(
+                        '/movie-lists/${list.id}?name=${Uri.encodeComponent(list.name)}&owner=${Uri.encodeComponent(list.userId ?? userId)}',
+                      );
+                    },
                   );
-                }).toList(growable: false),
-              ),
-          ],
-        );
 
         if (embedded) {
           return content;
@@ -108,25 +119,7 @@ class ListsPreviewSection extends StatelessWidget {
   }
 }
 
-IconData _privacyIcon(String visibility) {
-  switch (visibility.toUpperCase()) {
-    case ListVisibility.public:
-      return Icons.public;
-    case ListVisibility.friends:
-      return Icons.group;
-    default:
-      return Icons.lock_outline;
-  }
-}
-
-String _listCountLabel(MovieList list) {
-  final movies = list.movieCount ?? 0;
-  final shows = list.showCount ?? 0;
-  final total = list.itemCount ?? movies + shows;
-  if (movies > 0 && shows > 0) {
-    return '$total items · $movies films · $shows shows';
-  }
-  if (movies > 0) return '$movies films';
-  if (shows > 0) return '$shows shows';
-  return '$total items';
+String _posterUrl(String path) {
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  return 'https://image.tmdb.org/t/p/w342$path';
 }

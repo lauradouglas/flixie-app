@@ -109,41 +109,41 @@ class ActivityTile extends StatelessWidget {
     return rating.toStringAsFixed(1);
   }
 
-  String _headlineText(String subject, String title) {
+  String _headlineText(String title) {
     switch (item.type) {
       case ActivityListType.movieRating:
       case ActivityListType.showRating:
         final rating = item.mediaRating;
         if (rating != null) {
-          return '$subject rated $title ${_formatRating(rating)}/10';
+          return 'rated $title ${_formatRating(rating)}/10';
         }
-        return '$subject rated $title';
+        return 'rated $title';
       case ActivityListType.movieReview:
       case ActivityListType.showReview:
-        return '$subject reviewed $title';
+        return 'reviewed $title';
       case ActivityListType.movieWatched:
       case ActivityListType.showWatched:
         if (item.isRewatch) {
           final count = item.watchCount;
           if (count != null && count > 1) {
-            return '$subject rewatched $title ($count times)';
+            return 'watched $title again · $count times';
           }
-          return '$subject rewatched $title';
+          return 'watched $title again';
         }
-        return '$subject watched $title';
+        return 'watched $title';
       case ActivityListType.favoriteMovie:
       case ActivityListType.favoriteShow:
       case ActivityListType.favoritePerson:
-        return '$subject added $title to favourites';
+        return 'added $title to favourites';
       case ActivityListType.movieWatchlist:
       case ActivityListType.showWatchlist:
-        return '$subject added $title to watchlist';
+        return 'added $title to their watchlist';
       case ActivityListType.watchRequest:
       case ActivityListType.watchRequestAccepted:
       case ActivityListType.watchRequestSent:
-        return '$subject shared $title';
+        return 'shared $title';
       case ActivityListType.unknown:
-        return '$subject activity on $title';
+        return 'activity on $title';
     }
   }
 
@@ -161,7 +161,7 @@ class ActivityTile extends StatelessWidget {
       avatar: item.avatar,
       fallbackText: initial,
       fallbackColor: FlixieColors.primary,
-      size: compact ? 36 : 40,
+      size: compact ? 38 : 44,
       profileBadges: item.profileBadges,
     );
   }
@@ -194,11 +194,6 @@ class ActivityTile extends StatelessWidget {
       case ActivityListType.unknown:
         return null;
     }
-  }
-
-  String _activitySubject(String displayName, String? currentUserId) {
-    if (currentUserId == item.userId && item.userId.isNotEmpty) return 'You';
-    return displayName;
   }
 
   Widget _buildChip({
@@ -262,11 +257,6 @@ class ActivityTile extends StatelessWidget {
     );
   }
 
-  bool _shouldShowUsername(String displayName, String username) {
-    return username.isNotEmpty &&
-        username.toLowerCase() != displayName.toLowerCase();
-  }
-
   String? _mediaRoute() {
     final isPerson = item.type == ActivityListType.favoritePerson;
     if (isPerson && item.personId != null) return '/people/${item.personId}';
@@ -279,7 +269,6 @@ class ActivityTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final currentUserId = context.read<AuthProvider?>()?.dbUser?.id;
     final displayName = _displayName();
-    final activitySubject = _activitySubject(displayName, currentUserId);
     final username = item.username.trim();
     final title = item.mediaTitle ?? 'something';
     final dateStr = _formatDate(item.timestamp);
@@ -338,50 +327,48 @@ class ActivityTile extends StatelessWidget {
                       onTap: item.userId.isEmpty
                           ? null
                           : () => context.push('/friends/${item.userId}'),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Row(
                         children: [
-                          Text(
-                            displayName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: compact ? 14 : 16,
-                              fontWeight: FontWeight.w700,
+                          Flexible(
+                            child: Text(
+                              username.isNotEmpty ? username : displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: compact ? 14 : 16,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           ),
-                          if (_shouldShowUsername(displayName, username)) ...[
-                            const SizedBox(height: 1),
-                            Text(
-                              '@$username',
+                          const SizedBox(width: 7),
+                          const Text('·',
+                              style: TextStyle(color: FlixieColors.medium)),
+                          const SizedBox(width: 7),
+                          Flexible(
+                            child: Text(
+                              dateStr,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 color: FlixieColors.medium,
-                                fontSize: 11,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                          ],
+                          ),
                         ],
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    dateStr,
-                    style: const TextStyle(
-                      color: FlixieColors.medium,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  const Icon(Icons.more_horiz_rounded,
+                      color: FlixieColors.medium, size: 21),
                 ],
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Text(
-                _headlineText(activitySubject, title),
+                _headlineText(title),
                 style: TextStyle(
                   color: FlixieColors.light,
                   fontSize: compact ? 13 : 14,
@@ -450,11 +437,13 @@ class ActivityTile extends StatelessWidget {
                               spacing: 6,
                               runSpacing: 6,
                               children: [
-                                _buildChip(
-                                  icon: Icons.local_activity_outlined,
-                                  label: _statusLabel(),
-                                  color: _accentColor,
-                                ),
+                                if (item.type != ActivityListType.movieRating &&
+                                    item.type != ActivityListType.showRating)
+                                  _buildChip(
+                                    icon: Icons.local_activity_outlined,
+                                    label: _statusLabel(),
+                                    color: _accentColor,
+                                  ),
                                 if (item.mediaRating != null)
                                   _buildChip(
                                     icon: Icons.star_rounded,

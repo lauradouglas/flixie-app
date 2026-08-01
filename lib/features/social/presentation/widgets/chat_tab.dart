@@ -690,135 +690,142 @@ class GroupChatTabState extends State<GroupChatTab> {
     final conversationId = _conversationId!;
     final currentUserId = context.read<AuthProvider>().dbUser?.id;
 
-    return Column(
-      children: [
-        Expanded(
-          child: StreamBuilder<List<ChatMessage>>(
-            stream: ChatService.messagesStream(conversationId),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting &&
-                  !snapshot.hasData) {
-                return const Center(
-                    child:
-                        CircularProgressIndicator(color: FlixieColors.primary));
-              }
-              final messages = snapshot.data ?? [];
-              if (messages.isEmpty) {
-                return const Center(
-                  child: Text(
-                    'No messages yet. Say hello!',
-                    style: TextStyle(color: FlixieColors.medium),
-                    textAlign: TextAlign.center,
-                  ),
-                );
-              }
-              return ListView.builder(
-                reverse: true,
-                padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
-                itemCount: messages.length,
-                itemBuilder: (_, i) {
-                  final msg = messages[i];
-                  final isMe = msg.senderId == currentUserId;
-                  if (!isMe && SafetyService.isBlocked(msg.senderId)) {
-                    return const SizedBox.shrink();
-                  }
+    return ColoredBox(
+      color: const Color(0xFF0F081E),
+      child: Column(
+        children: [
+          Expanded(
+            child: StreamBuilder<List<ChatMessage>>(
+              stream: ChatService.messagesStream(conversationId),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting &&
+                    !snapshot.hasData) {
+                  return const Center(
+                      child: CircularProgressIndicator(
+                          color: FlixieColors.primary));
+                }
+                final messages = snapshot.data ?? [];
+                if (messages.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'No messages yet. Say hello!',
+                      style: TextStyle(color: FlixieColors.medium),
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                }
+                return ListView.builder(
+                  reverse: true,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
+                  itemCount: messages.length,
+                  itemBuilder: (_, i) {
+                    final msg = messages[i];
+                    final isMe = msg.senderId == currentUserId;
+                    if (!isMe && SafetyService.isBlocked(msg.senderId)) {
+                      return const SizedBox.shrink();
+                    }
 
-                  if (msg.type == 'watch_request') {
-                    // Resolve to a postgres UUID.
-                    // After the BE sets pgGroupRequestId on the message doc,
-                    // msg.watchRequestId IS the postgres UUID. Until then,
-                    // fall back to the _msgIdToReqId map built from the
-                    // Firestore watchRequests subcollection.
-                    final pgId = msg.watchRequestId ?? _msgIdToReqId[msg.id];
-                    if (!_requestsLoaded) {
-                      _ensureRequests();
+                    if (msg.type == 'watch_request') {
+                      // Resolve to a postgres UUID.
+                      // After the BE sets pgGroupRequestId on the message doc,
+                      // msg.watchRequestId IS the postgres UUID. Until then,
+                      // fall back to the _msgIdToReqId map built from the
+                      // Firestore watchRequests subcollection.
+                      final pgId = msg.watchRequestId ?? _msgIdToReqId[msg.id];
+                      if (!_requestsLoaded) {
+                        _ensureRequests();
+                      }
+                      final cachedReq =
+                          pgId != null ? _requestCache[pgId] : null;
+                      final respondKey = pgId ?? msg.id;
+                      final optimisticStatus = _respondMap[respondKey];
+                      String? myStatus = optimisticStatus;
+                      if (myStatus == null &&
+                          cachedReq != null &&
+                          currentUserId != null) {
+                        myStatus = cachedReq.memberStatuses
+                                .where((s) => s.memberId == currentUserId)
+                                .map((s) => s.status)
+                                .where((s) =>
+                                    s == 'ACCEPTED' ||
+                                    s == 'DECLINED' ||
+                                    s == 'MAYBE')
+                                .firstOrNull ??
+                            cachedReq.currentUserResponse?.apiValue;
+                      }
+                      return WatchRequestChatCard(
+                        msg: msg,
+                        cachedRequest: cachedReq,
+                        currentUserId: currentUserId,
+                        myStatus: myStatus,
+                        memberUsernames: _memberUsernames,
+                        isResponding: _respondingIds.contains(respondKey),
+                        onAccept: () => _respondInChat(
+                            respondKey, WatchResponseDecision.accepted),
+                        onDecline: () => _respondInChat(
+                            respondKey, WatchResponseDecision.declined),
+                        onMaybe: () => _respondInChat(
+                            respondKey, WatchResponseDecision.maybe),
+                        onTap: () => _showWatchRequestDetail(
+                            context, msg, messages, cachedReq, currentUserId),
+                        onLongPress: isMe
+                            ? null
+                            : () => SafetyActions.contentMenu(
+                                  context,
+                                  targetType: 'WATCH_REQUEST_MESSAGE',
+                                  targetId: msg.id,
+                                  reportedUserId: msg.senderId,
+                                  username: msg.senderUsername ??
+                                      _memberUsernames[msg.senderId] ??
+                                      'User',
+                                  contentPreview:
+                                      msg.watchRequestPayload?['message']
+                                              as String? ??
+                                          msg.text,
+                                ),
+                      );
                     }
-                    final cachedReq = pgId != null ? _requestCache[pgId] : null;
-                    final respondKey = pgId ?? msg.id;
-                    final optimisticStatus = _respondMap[respondKey];
-                    String? myStatus = optimisticStatus;
-                    if (myStatus == null &&
-                        cachedReq != null &&
-                        currentUserId != null) {
-                      myStatus = cachedReq.memberStatuses
-                              .where((s) => s.memberId == currentUserId)
-                              .map((s) => s.status)
-                              .where((s) =>
-                                  s == 'ACCEPTED' ||
-                                  s == 'DECLINED' ||
-                                  s == 'MAYBE')
-                              .firstOrNull ??
-                          cachedReq.currentUserResponse?.apiValue;
-                    }
-                    return WatchRequestChatCard(
-                      msg: msg,
-                      cachedRequest: cachedReq,
-                      currentUserId: currentUserId,
-                      myStatus: myStatus,
-                      memberUsernames: _memberUsernames,
-                      isResponding: _respondingIds.contains(respondKey),
-                      onAccept: () => _respondInChat(
-                          respondKey, WatchResponseDecision.accepted),
-                      onDecline: () => _respondInChat(
-                          respondKey, WatchResponseDecision.declined),
-                      onMaybe: () => _respondInChat(
-                          respondKey, WatchResponseDecision.maybe),
-                      onTap: () => _showWatchRequestDetail(
-                          context, msg, messages, cachedReq, currentUserId),
+
+                    // Regular text bubble
+                    final sid = msg.senderId;
+                    final username = msg.senderUsername ??
+                        _memberUsernames[sid] ??
+                        sid.substring(0, sid.length.clamp(0, 6));
+                    final member = _membersById[sid];
+                    return ChatBubble(
+                      message: msg.text,
+                      senderUsername: username,
+                      isMe: isMe,
+                      sentAt: msg.createdAt,
+                      avatar: member?.avatar,
+                      initials: member?.initials,
+                      profileBadges: member?.profileBadges ?? const [],
+                      replyTo:
+                          msg.replyToMessageId != null ? '↩ replied' : null,
                       onLongPress: isMe
                           ? null
                           : () => SafetyActions.contentMenu(
                                 context,
-                                targetType: 'WATCH_REQUEST_MESSAGE',
+                                targetType: 'GROUP_MESSAGE',
                                 targetId: msg.id,
-                                reportedUserId: msg.senderId,
-                                username: msg.senderUsername ??
-                                    _memberUsernames[msg.senderId] ??
-                                    'User',
-                                contentPreview:
-                                    msg.watchRequestPayload?['message']
-                                            as String? ??
-                                        msg.text,
+                                reportedUserId: sid,
+                                username: username,
+                                contentPreview: msg.text,
                               ),
                     );
-                  }
-
-                  // Regular text bubble
-                  final sid = msg.senderId;
-                  final username = msg.senderUsername ??
-                      _memberUsernames[sid] ??
-                      sid.substring(0, sid.length.clamp(0, 6));
-                  final member = _membersById[sid];
-                  return ChatBubble(
-                    message: msg.text,
-                    senderUsername: username,
-                    isMe: isMe,
-                    avatar: member?.avatar,
-                    initials: member?.initials,
-                    profileBadges: member?.profileBadges ?? const [],
-                    replyTo: msg.replyToMessageId != null ? '↩ replied' : null,
-                    onLongPress: isMe
-                        ? null
-                        : () => SafetyActions.contentMenu(
-                              context,
-                              targetType: 'GROUP_MESSAGE',
-                              targetId: msg.id,
-                              reportedUserId: sid,
-                              username: username,
-                              contentPreview: msg.text,
-                            ),
-                  );
-                },
-              );
-            },
+                  },
+                );
+              },
+            ),
           ),
-        ),
-        ChatInput(
-          controller: _messageController,
-          sending: _sending,
-          onSend: _sendMessage,
-        ),
-      ],
+          ChatInput(
+            controller: _messageController,
+            sending: _sending,
+            onSend: _sendMessage,
+          ),
+        ],
+      ),
     );
   }
 }

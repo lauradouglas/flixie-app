@@ -79,7 +79,7 @@ class FavoriteMoviesSection extends StatelessWidget {
           )
         else
           SizedBox(
-            height: 205,
+            height: 214,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: top3.length,

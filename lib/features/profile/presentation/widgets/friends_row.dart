@@ -100,8 +100,8 @@ class _FriendsRowState extends State<FriendsRow> {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 minimumSize: Size.zero,
               ),
-              icon: const Icon(Icons.add_circle_outline, size: 16),
-              label: const Text('Add +'),
+              icon: const Icon(Icons.person_add_alt_1_outlined, size: 17),
+              label: const Text('Add friend'),
             ),
             TextButton(
               onPressed: () => _showAllFriendsSheet(context),
@@ -110,7 +110,7 @@ class _FriendsRowState extends State<FriendsRow> {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 minimumSize: Size.zero,
               ),
-              child: const Text('View all'),
+              child: const Text('See all'),
             ),
           ],
         ),
@@ -127,7 +127,7 @@ class _FriendsRowState extends State<FriendsRow> {
           )
         else
           SizedBox(
-            height: 124,
+            height: 102,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: friends.length,
@@ -164,14 +164,8 @@ class _FriendPreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 92,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      decoration: BoxDecoration(
-        color: FlixieColors.surfaceElevated,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: FlixieColors.tabBarBorder),
-      ),
+    return SizedBox(
+      width: 76,
       child: Column(
         children: [
           ProfileAvatarView(
@@ -181,7 +175,7 @@ class _FriendPreviewCard extends StatelessWidget {
                     ? user.username[0].toUpperCase()
                     : '?'),
             fallbackColor: _avatarColor,
-            size: 50,
+            size: 66,
             profileBadges: user.profileBadges,
           ),
           const SizedBox(height: 8),
@@ -191,16 +185,8 @@ class _FriendPreviewCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: FlixieColors.light,
-              fontSize: 12,
+              fontSize: 12.5,
               fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 2),
-          const Text(
-            'Friend',
-            style: TextStyle(
-              color: FlixieColors.medium,
-              fontSize: 10,
             ),
           ),
         ],

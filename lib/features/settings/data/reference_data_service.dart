@@ -43,6 +43,10 @@ class ReferenceDataService {
     apiLogger.d(list);
     return list
         .map((item) => WatchProvider.fromJson(item as Map<String, dynamic>))
+        // TMDB's canonical entry is "Disney Plus". Exclude the legacy
+        // duplicate so users cannot select both versions of the same service.
+        .where((provider) =>
+            provider.providerName.trim().toLowerCase() != 'disney+')
         .toList();
   }
 }

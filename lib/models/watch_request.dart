@@ -74,11 +74,30 @@ class WatchRequestParticipant {
   });
 
   factory WatchRequestParticipant.fromJson(Map<String, dynamic> json) {
+    final nestedUser = json['user'];
+    final userJson = nestedUser is Map<String, dynamic>
+        ? nestedUser
+        : <String, dynamic>{
+            'id': json['responderId'] ??
+                json['userId'] ??
+                json['memberId'] ??
+                json['id'],
+            'username': json['username'],
+            'firstName': json['firstName'],
+            'lastName': json['lastName'],
+            'iconColor': json['iconColor'],
+            'avatar': json['avatar'],
+          };
+    final userId = userJson['id']?.toString() ?? '';
+    final status = json['status']?.toString();
+    final response = json['response']?.toString();
+    final participantResponse = _isParticipantStatus(status)
+        ? status!
+        : (_isParticipantStatus(response) ? response! : 'pending');
+
     return WatchRequestParticipant(
-      user: json['user'] != null
-          ? WatchRequestUser.fromJson(json['user'] as Map<String, dynamic>)
-          : null,
-      response: (json['response'] ?? json['status'])?.toString() ?? 'pending',
+      user: userId.isNotEmpty ? WatchRequestUser.fromJson(userJson) : null,
+      response: participantResponse,
       respondedAt: _dateTimeValue(json['respondedAt']),
       watchedAt: _dateTimeValue(json['watchedAt']),
       rating: _doubleValue(json['rating']),
@@ -430,4 +449,16 @@ bool? _boolValue(dynamic value) {
   if (value is bool) return value;
   if (value is String) return bool.tryParse(value);
   return null;
+}
+
+bool _isParticipantStatus(String? value) {
+  switch (value?.toUpperCase()) {
+    case 'PENDING':
+    case 'ACCEPTED':
+    case 'DECLINED':
+    case 'MAYBE':
+      return true;
+    default:
+      return false;
+  }
 }

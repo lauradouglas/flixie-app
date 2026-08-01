@@ -5,7 +5,6 @@ import 'package:flixie_app/models/group_member.dart';
 import 'package:flixie_app/models/trending_groups.dart';
 import 'package:flixie_app/models/group_watch_request.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
-import 'package:flixie_app/core/utils/activity_feed_ranking.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 
 export 'package:flixie_app/models/group_watch_request.dart'
@@ -344,7 +343,15 @@ class GroupService {
     final activities = (data as List<dynamic>)
         .map((e) => ActivityListItem.fromJson(e as Map<String, dynamic>))
         .toList();
-    return rankActivitiesForFeed(activities);
+    activities.sort((left, right) {
+      final leftDate = DateTime.tryParse(left.timestamp);
+      final rightDate = DateTime.tryParse(right.timestamp);
+      if (leftDate == null && rightDate == null) return 0;
+      if (leftDate == null) return 1;
+      if (rightDate == null) return -1;
+      return rightDate.compareTo(leftDate);
+    });
+    return activities;
   }
 
   static Future<GroupInsightsResponse> getGroupInsights(

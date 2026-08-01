@@ -10,7 +10,6 @@ import 'package:flixie_app/models/person.dart';
 import 'package:flixie_app/models/search_result.dart';
 import 'package:flixie_app/models/show.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
-import 'package:flixie_app/core/widgets/movie_search_result_tile.dart';
 import 'package:flixie_app/features/movies/data/search_service.dart';
 import 'package:flixie_app/features/home/data/trending_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -212,16 +211,26 @@ class _SearchScreenState extends State<SearchScreen> {
           hintStyle: const TextStyle(color: FlixieColors.medium),
           prefixIcon:
               const Icon(Icons.search_rounded, color: FlixieColors.medium),
-          suffixIcon: _query.isNotEmpty
-              ? IconButton(
+          suffixIcon: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_query.isNotEmpty)
+                IconButton(
                   icon: const Icon(Icons.close_rounded,
                       color: FlixieColors.medium),
                   onPressed: () {
                     _controller.clear();
                     _onSearchChanged('');
                   },
-                )
-              : const Icon(Icons.mic_none_rounded, color: FlixieColors.medium),
+                ),
+              IconButton(
+                tooltip: 'Search filters',
+                icon:
+                    const Icon(Icons.tune_rounded, color: FlixieColors.medium),
+                onPressed: () {},
+              ),
+            ],
+          ),
           filled: true,
           fillColor: FlixieColors.tabBarBackgroundFocused,
           border: OutlineInputBorder(
@@ -237,7 +246,7 @@ class _SearchScreenState extends State<SearchScreen> {
             borderSide: const BorderSide(color: FlixieColors.primary),
           ),
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
         ),
       ),
     );
@@ -256,10 +265,10 @@ class _SearchScreenState extends State<SearchScreen> {
     ];
 
     return SizedBox(
-      height: 42,
+      height: 54,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+        padding: const EdgeInsets.fromLTRB(16, 2, 16, 10),
         itemCount: modes.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
@@ -269,17 +278,19 @@ class _SearchScreenState extends State<SearchScreen> {
             selected: selected,
             showCheckmark: false,
             label: Text(mode.label),
-            avatar: Icon(
-              mode.icon,
-              size: 16,
-              color: selected ? Colors.black : FlixieColors.medium,
-            ),
+            avatar: mode == _SearchMode.all
+                ? null
+                : Icon(
+                    mode.icon,
+                    size: 17,
+                    color: selected ? Colors.black : FlixieColors.medium,
+                  ),
             selectedColor: FlixieColors.primary,
             backgroundColor: FlixieColors.tabBarBackgroundFocused,
             labelStyle: TextStyle(
               color: selected ? Colors.black : FlixieColors.light,
               fontWeight: FontWeight.w700,
-              fontSize: 12,
+              fontSize: 13,
             ),
             side: BorderSide(
               color: selected
@@ -476,30 +487,71 @@ class _SearchScreenState extends State<SearchScreen> {
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: results.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        final item = results[index];
-        if (item.isPerson && item.person != null) {
-          return _PersonResultTile(
-            person: item.person!,
-            onTap: () => context.push('/people/${item.person!.id}'),
-          );
-        } else if (item.isShow && item.show != null) {
-          return _ShowResultTile(
-            show: item.show!,
-            onTap: () => context.push('/shows/${item.show!.id}'),
-          );
-        } else if (item.movie != null) {
-          return MovieSearchResultTile(
-            movie: item.movie!,
-            onTap: () => context.push('/movies/${item.movie!.id}'),
-          );
-        }
-        return const SizedBox.shrink();
-      },
+    final people = results
+        .where((item) => item.isPerson && item.person != null)
+        .map((item) => item.person!)
+        .toList();
+    final media = results.where((item) => !item.isPerson).toList();
+    final total = _searchResults?.totalResults ?? results.length;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+      children: [
+        _SearchSummary(query: _query.trim(), total: total),
+        if (people.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          _ResultsSectionHeader(
+            icon: Icons.person_outline_rounded,
+            title: 'People',
+            onSeeAll: _searchMode == _SearchMode.all
+                ? () => _setSearchMode(_SearchMode.people)
+                : null,
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 116,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: people.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (context, index) => _PersonResultTile(
+                person: people[index],
+                query: _query.trim(),
+                onTap: () => context.push('/people/${people[index].id}'),
+              ),
+            ),
+          ),
+        ],
+        if (media.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          _ResultsSectionHeader(
+            icon: Icons.movie_filter_outlined,
+            title: _searchMode == _SearchMode.movies
+                ? 'Movies'
+                : _searchMode == _SearchMode.shows
+                    ? 'Shows'
+                    : 'Movies & shows',
+          ),
+          const SizedBox(height: 10),
+          ...media.map((item) {
+            if (item.isShow && item.show != null) {
+              return _SearchMediaTile.show(
+                show: item.show!,
+                query: _query.trim(),
+                onTap: () => context.push('/shows/${item.show!.id}'),
+              );
+            }
+            if (item.movie != null) {
+              return _SearchMediaTile.movie(
+                movie: item.movie!,
+                query: _query.trim(),
+                onTap: () => context.push('/movies/${item.movie!.id}'),
+              );
+            }
+            return const SizedBox.shrink();
+          }),
+        ],
+      ],
     );
   }
 }
@@ -783,123 +835,6 @@ class _EntityIconPlaceholder extends StatelessWidget {
   }
 }
 
-// ─── Search result: show tile ────────────────────────────────────────────────
-
-class _ShowResultTile extends StatelessWidget {
-  const _ShowResultTile({required this.show, this.onTap});
-
-  final TvShow show;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final year = _extractYear(show.firstAirDate);
-    final posterUrl = show.posterPath == null
-        ? null
-        : 'https://image.tmdb.org/t/p/w92${show.posterPath}';
-
-    return Card(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: SizedBox(
-                  width: 50,
-                  height: 75,
-                  child: posterUrl != null
-                      ? CachedNetworkImage(
-                          imageUrl: posterUrl,
-                          fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) => Container(
-                            color: FlixieColors.primary.withValues(alpha: 0.3),
-                            child: const Icon(Icons.live_tv_rounded,
-                                color: FlixieColors.primary),
-                          ),
-                        )
-                      : Container(
-                          color: FlixieColors.primary.withValues(alpha: 0.3),
-                          child: const Icon(Icons.live_tv_rounded,
-                              color: FlixieColors.primary),
-                        ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      show.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyLarge
-                          ?.copyWith(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 7,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        const _MediaTypePill(
-                          label: 'Show',
-                          color: FlixieColors.primary,
-                        ),
-                        if (year != null)
-                          Text(
-                            year,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(color: FlixieColors.medium),
-                          ),
-                        if (show.voteAverage != null &&
-                            show.voteAverage! > 0) ...[
-                          const Icon(Icons.star_rounded,
-                              size: 14, color: FlixieColors.warning),
-                          Text(
-                            show.voteAverage!.toStringAsFixed(1),
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(color: FlixieColors.warning),
-                          ),
-                        ],
-                      ],
-                    ),
-                    if ((show.overview ?? '').isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        show.overview!,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: FlixieColors.light),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Icon(Icons.chevron_right_rounded,
-                  color: FlixieColors.medium),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _MediaTypePill extends StatelessWidget {
   const _MediaTypePill({required this.label, required this.color});
 
@@ -929,74 +864,384 @@ class _MediaTypePill extends StatelessWidget {
 
 // ─── Search result: person tile ──────────────────────────────────────────────
 
-class _PersonResultTile extends StatelessWidget {
-  const _PersonResultTile({required this.person, this.onTap});
+class _SearchSummary extends StatelessWidget {
+  const _SearchSummary({required this.query, required this.total});
 
-  final Person person;
+  final String query;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(top: 2),
+          child:
+              Icon(Icons.search_rounded, color: FlixieColors.medium, size: 22),
+        ),
+        const SizedBox(width: 10),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text.rich(
+              TextSpan(
+                style: const TextStyle(color: FlixieColors.light, fontSize: 14),
+                children: [
+                  const TextSpan(text: 'Search for '),
+                  TextSpan(
+                    text: '‘$query’',
+                    style: const TextStyle(
+                      color: FlixieColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              '$total ${total == 1 ? 'result' : 'results'}',
+              style: const TextStyle(color: FlixieColors.medium, fontSize: 13),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ResultsSectionHeader extends StatelessWidget {
+  const _ResultsSectionHeader({
+    required this.icon,
+    required this.title,
+    this.onSeeAll,
+  });
+
+  final IconData icon;
+  final String title;
+  final VoidCallback? onSeeAll;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, color: FlixieColors.primary, size: 20),
+        const SizedBox(width: 9),
+        Text(
+          title,
+          style: const TextStyle(
+            color: FlixieColors.white,
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const Spacer(),
+        if (onSeeAll != null)
+          TextButton(
+            onPressed: onSeeAll,
+            child: const Text(
+              'See all',
+              style: TextStyle(
+                color: FlixieColors.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _SearchMediaTile extends StatelessWidget {
+  const _SearchMediaTile._({
+    required this.name,
+    required this.posterPath,
+    required this.year,
+    required this.overview,
+    required this.rating,
+    required this.isShow,
+    required this.query,
+    this.onTap,
+  });
+
+  factory _SearchMediaTile.movie({
+    required MovieShort movie,
+    required String query,
+    VoidCallback? onTap,
+  }) =>
+      _SearchMediaTile._(
+        name: movie.name,
+        posterPath: movie.poster,
+        year: _extractYear(movie.releaseDate),
+        overview: movie.overview,
+        rating: movie.voteAverage,
+        isShow: false,
+        query: query,
+        onTap: onTap,
+      );
+
+  factory _SearchMediaTile.show({
+    required TvShow show,
+    required String query,
+    VoidCallback? onTap,
+  }) =>
+      _SearchMediaTile._(
+        name: show.name,
+        posterPath: show.posterPath,
+        year: _extractYear(show.firstAirDate),
+        overview: show.overview,
+        rating: show.voteAverage,
+        isShow: true,
+        query: query,
+        onTap: onTap,
+      );
+
+  final String name;
+  final String? posterPath;
+  final String? year;
+  final String? overview;
+  final double? rating;
+  final bool isShow;
+  final String query;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return Material(
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 112),
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: Colors.white.withValues(alpha: .07)),
+            ),
+          ),
           child: Row(
             children: [
               ClipRRect(
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(8),
                 child: SizedBox(
-                  width: 50,
-                  height: 75,
-                  child: person.profileImgUrl != null
-                      ? CachedNetworkImage(
+                  width: 67,
+                  height: 100,
+                  child: posterPath == null
+                      ? _MediaPlaceholder(isShow: isShow)
+                      : CachedNetworkImage(
                           imageUrl:
-                              'https://image.tmdb.org/t/p/w185${person.profileImgUrl}',
+                              'https://image.tmdb.org/t/p/w185$posterPath',
                           fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) => Container(
-                            color:
-                                FlixieColors.secondary.withValues(alpha: 0.3),
-                            child: const Icon(Icons.person,
-                                color: FlixieColors.secondary),
-                          ),
-                        )
-                      : Container(
-                          color: FlixieColors.secondary.withValues(alpha: 0.3),
-                          child: const Icon(Icons.person,
-                              color: FlixieColors.secondary),
+                          errorWidget: (_, __, ___) =>
+                              _MediaPlaceholder(isShow: isShow),
                         ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      person.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyLarge
-                          ?.copyWith(fontWeight: FontWeight.w600),
+                    _HighlightedText(
+                      text: name,
+                      query: query,
+                      maxLines: 2,
+                      baseStyle: const TextStyle(
+                        color: FlixieColors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                    if (person.department != null) ...[
-                      const SizedBox(height: 4),
+                    const SizedBox(height: 7),
+                    Wrap(
+                      spacing: 11,
+                      runSpacing: 5,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        _MediaTypePill(
+                          label: isShow ? 'Show' : 'Movie',
+                          color: isShow
+                              ? FlixieColors.primary
+                              : FlixieColors.danger,
+                        ),
+                        if (year != null)
+                          Text(year!,
+                              style: const TextStyle(
+                                  color: FlixieColors.medium, fontSize: 13)),
+                        if (rating != null && rating! > 0)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.star_rounded,
+                                  color: FlixieColors.warning, size: 17),
+                              const SizedBox(width: 3),
+                              Text(rating!.toStringAsFixed(1),
+                                  style: const TextStyle(
+                                      color: FlixieColors.medium,
+                                      fontSize: 13)),
+                            ],
+                          ),
+                      ],
+                    ),
+                    if ((overview ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 6),
                       Text(
-                        person.department!,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: FlixieColors.medium),
+                        overview!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: FlixieColors.light,
+                          fontSize: 12.5,
+                          height: 1.28,
+                        ),
                       ),
                     ],
                   ],
                 ),
               ),
+              const SizedBox(width: 6),
+              const Icon(Icons.chevron_right_rounded,
+                  color: FlixieColors.medium),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MediaPlaceholder extends StatelessWidget {
+  const _MediaPlaceholder({required this.isShow});
+  final bool isShow;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        color: FlixieColors.surfaceElevated,
+        child: Icon(
+          isShow ? Icons.live_tv_rounded : Icons.movie_outlined,
+          color: FlixieColors.medium,
+        ),
+      );
+}
+
+class _HighlightedText extends StatelessWidget {
+  const _HighlightedText({
+    required this.text,
+    required this.query,
+    required this.baseStyle,
+    this.maxLines = 1,
+  });
+
+  final String text;
+  final String query;
+  final TextStyle baseStyle;
+  final int maxLines;
+
+  @override
+  Widget build(BuildContext context) {
+    final start = text.toLowerCase().indexOf(query.toLowerCase());
+    if (query.isEmpty || start < 0) {
+      return Text(text,
+          maxLines: maxLines,
+          overflow: TextOverflow.ellipsis,
+          style: baseStyle);
+    }
+    final end = start + query.length;
+    return Text.rich(
+      TextSpan(
+        style: baseStyle,
+        children: [
+          TextSpan(text: text.substring(0, start)),
+          TextSpan(
+              text: text.substring(start, end),
+              style: const TextStyle(color: FlixieColors.primary)),
+          TextSpan(text: text.substring(end)),
+        ],
+      ),
+      maxLines: maxLines,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+}
+
+class _PersonResultTile extends StatelessWidget {
+  const _PersonResultTile(
+      {required this.person, required this.query, this.onTap});
+
+  final Person person;
+  final String query;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 188,
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: SizedBox(
+                    width: 64,
+                    height: 96,
+                    child: person.profileImgUrl != null
+                        ? CachedNetworkImage(
+                            imageUrl:
+                                'https://image.tmdb.org/t/p/w185${person.profileImgUrl}',
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => Container(
+                              color:
+                                  FlixieColors.secondary.withValues(alpha: 0.3),
+                              child: const Icon(Icons.person,
+                                  color: FlixieColors.secondary),
+                            ),
+                          )
+                        : Container(
+                            color:
+                                FlixieColors.secondary.withValues(alpha: 0.3),
+                            child: const Icon(Icons.person,
+                                color: FlixieColors.secondary),
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _HighlightedText(
+                        text: person.name,
+                        query: query,
+                        maxLines: 2,
+                        baseStyle: const TextStyle(
+                          color: FlixieColors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if (person.department != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          person.department!,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: FlixieColors.medium),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

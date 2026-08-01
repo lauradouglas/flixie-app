@@ -3,16 +3,25 @@ import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 
 class GenreChip extends StatelessWidget {
-  const GenreChip({super.key, required this.label, this.color});
+  const GenreChip({
+    super.key,
+    required this.label,
+    this.color,
+    this.compact = false,
+  });
 
   final String label;
   final Color? color;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final chipColor = color ?? FlixieColors.primary;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 9 : 12,
+        vertical: compact ? 4 : 6,
+      ),
       decoration: BoxDecoration(
         color: chipColor.withValues(alpha: 0.15),
         border: Border.all(color: chipColor.withValues(alpha: 0.5)),
@@ -22,9 +31,9 @@ class GenreChip extends StatelessWidget {
         label,
         style: TextStyle(
           color: chipColor,
-          fontSize: 11,
+          fontSize: compact ? 9 : 11,
           fontWeight: FontWeight.w600,
-          letterSpacing: 0.5,
+          letterSpacing: compact ? 0.3 : 0.5,
         ),
       ),
     );

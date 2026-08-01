@@ -18,7 +18,6 @@ import 'package:flixie_app/features/profile/presentation/widgets/favorite_movies
 import 'package:flixie_app/features/profile/presentation/widgets/lists_preview_section.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/movie_taste_badge.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_stats_row.dart';
-import 'package:flixie_app/features/movies/presentation/widgets/friend_wrapped_section.dart';
 import 'package:flixie_app/core/safety/safety_actions.dart';
 
 enum _FriendshipStatus { none, pending, requested, friends }
@@ -35,6 +34,25 @@ class FriendProfileScreen extends StatefulWidget {
 
   @override
   State<FriendProfileScreen> createState() => _FriendProfileScreenState();
+}
+
+class _EmptyProfileTab extends StatelessWidget {
+  const _EmptyProfileTab({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 48),
+        child: Column(
+          children: [
+            Icon(icon, color: FlixieColors.medium, size: 40),
+            const SizedBox(height: 12),
+            Text(text, style: const TextStyle(color: FlixieColors.medium)),
+          ],
+        ),
+      );
 }
 
 class _FriendProfileScreenState extends State<FriendProfileScreen> {
@@ -54,6 +72,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
   int _sharedMovieCount = 0;
   int _sharedFavCount = 0;
   bool _compatibilityLoading = true;
+  int _selectedTab = 0;
 
   @override
   void initState() {
@@ -449,39 +468,373 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
   void _openWrappedSheet() {
     final user = _user;
     if (user == null) return;
-    final joinYear = user.createdAt != null
-        ? (DateTime.tryParse(user.createdAt!)?.year ?? DateTime.now().year)
-        : DateTime.now().year;
-
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      isDismissible: true,
-      enableDrag: true,
-      showDragHandle: true,
-      backgroundColor: FlixieColors.background,
-      useSafeArea: true,
-      builder: (sheetContext) {
-        return DraggableScrollableSheet(
-          expand: false,
-          minChildSize: 0.5,
-          initialChildSize: 0.92,
-          maxChildSize: 0.95,
-          builder: (context, scrollController) {
-            return FriendWrappedSection(
-              userId: user.id,
-              joinYear: joinYear,
-              username: user.username,
-              scrollController: scrollController,
-            );
-          },
-        );
-      },
-    );
+    context.push('/wrapped/${user.id}');
   }
 
   @override
   Widget build(BuildContext context) {
+    final user = _user;
+    if (_userLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (user == null) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: const Center(child: Text('This profile is unavailable.')),
+      );
+    }
+
+    final watched =
+        (user.watchedMovies?.length ?? 0) + (user.watchedShows?.length ?? 0);
+    final watchlist =
+        (user.movieWatchlist?.length ?? 0) + (user.showWatchlist?.length ?? 0);
+    final favourites =
+        (user.favoriteMovies?.length ?? 0) + (user.favoriteShows?.length ?? 0);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(user.username),
+        centerTitle: true,
+        actions: [
+          if (!widget.previewMode)
+            PopupMenuButton<String>(
+              tooltip: 'Profile actions',
+              onSelected: (action) async {
+                if (action == 'wrapped') {
+                  _openWrappedSheet();
+                } else if (action == 'report') {
+                  await SafetyActions.report(
+                    context,
+                    targetType: 'USER',
+                    targetId: widget.userId,
+                    reportedUserId: widget.userId,
+                  );
+                } else if (action == 'block') {
+                  final blocked = await SafetyActions.block(
+                    context,
+                    userId: widget.userId,
+                    username: user.username,
+                  );
+                  if (blocked && context.mounted) context.pop();
+                }
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(
+                  value: 'wrapped',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.auto_awesome_outlined),
+                    title: Text('View Wrapped'),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'report',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.flag_outlined),
+                    title: Text('Report user'),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'block',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.block, color: FlixieColors.danger),
+                    title: Text('Block user',
+                        style: TextStyle(color: FlixieColors.danger)),
+                  ),
+                ),
+              ],
+            )
+          else
+            const SizedBox(width: 48),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _loadAll,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+          children: [
+            _modernHeader(user),
+            if (!widget.previewMode) ...[
+              const SizedBox(height: 18),
+              _profileActions(),
+              if (_friendshipStatus == _FriendshipStatus.friends) ...[
+                const SizedBox(height: 10),
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.check, size: 17, color: FlixieColors.primary),
+                    SizedBox(width: 7),
+                    Text('Friends',
+                        style: TextStyle(color: FlixieColors.medium)),
+                  ],
+                ),
+              ],
+            ],
+            const SizedBox(height: 20),
+            _modernStats(watched, watchlist, favourites),
+            const SizedBox(height: 12),
+            _profileTabs(),
+            const SizedBox(height: 18),
+            if (_selectedTab == 0) ..._overviewContent(user),
+            if (_selectedTab == 1) ..._activityContent(user),
+            if (_selectedTab == 2) ..._reviewsContent(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _modernHeader(User user) {
+    final showFirstName = user.firstName?.trim().isNotEmpty == true;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        ProfileAvatarView(
+          avatar: user.avatar,
+          fallbackText: user.initials ?? user.username[0].toUpperCase(),
+          fallbackColor: _avatarColor,
+          size: 116,
+          profileBadges: user.profileBadges,
+        ),
+        const SizedBox(width: 22),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '@${user.username}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: FlixieColors.white,
+                  fontSize: 25,
+                  height: 1.05,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              if (showFirstName) ...[
+                const SizedBox(height: 5),
+                Text(user.firstName!,
+                    style: const TextStyle(
+                        color: FlixieColors.light, fontSize: 16)),
+              ],
+              if (user.profileBadges.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                ProfileBadgePills(
+                  badges: user.profileBadges,
+                  compact: true,
+                  featuredOnly: true,
+                ),
+              ],
+              const SizedBox(height: 9),
+              Row(children: [
+                const Icon(Icons.calendar_month_outlined,
+                    size: 14, color: FlixieColors.medium),
+                const SizedBox(width: 5),
+                Flexible(
+                  child: Text(_memberSinceLabel,
+                      style: const TextStyle(
+                          color: FlixieColors.medium, fontSize: 12)),
+                ),
+              ]),
+              if (user.bio?.trim().isNotEmpty == true) ...[
+                const SizedBox(height: 9),
+                Text(user.bio!.trim(),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: FlixieColors.light, height: 1.35)),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _profileActions() {
+    if (_friendshipStatus != _FriendshipStatus.friends) {
+      return SizedBox(width: double.infinity, child: _buildFriendshipButton());
+    }
+    return Row(children: [
+      Expanded(
+        child: OutlinedButton.icon(
+          onPressed: () => context.push('/social'),
+          icon: const Icon(Icons.chat_bubble_outline),
+          label: const Text('Message'),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(50),
+            side: const BorderSide(color: FlixieColors.primary),
+          ),
+        ),
+      ),
+      const SizedBox(width: 10),
+      Expanded(
+        child: FilledButton.icon(
+          onPressed: () => context.push('/watch-requests'),
+          icon: const Icon(Icons.person_add_alt_1),
+          label: const Text('Invite to watch'),
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+        ),
+      ),
+    ]);
+  }
+
+  Widget _modernStats(int watched, int watchlist, int favourites) {
+    final values = [
+      (watched, 'Watched'),
+      (watchlist, 'Watchlist'),
+      (favourites, 'Favourites'),
+    ];
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      decoration: BoxDecoration(
+        color: FlixieColors.surface.withValues(alpha: .72),
+        border: Border.all(color: FlixieColors.tabBarBorder),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(children: [
+        for (var i = 0; i < values.length; i++) ...[
+          Expanded(
+            child: Column(children: [
+              Text('${values[i].$1}',
+                  style: const TextStyle(
+                      color: FlixieColors.primary,
+                      fontSize: 25,
+                      fontWeight: FontWeight.w800)),
+              Text(values[i].$2,
+                  style: const TextStyle(color: FlixieColors.light)),
+            ]),
+          ),
+          if (i < values.length - 1)
+            Container(width: 1, height: 50, color: FlixieColors.tabBarBorder),
+        ],
+      ]),
+    );
+  }
+
+  Widget _profileTabs() {
+    const labels = ['Overview', 'Activity', 'Reviews'];
+    return Row(children: [
+      for (var i = 0; i < labels.length; i++)
+        Expanded(
+          child: InkWell(
+            onTap: () => setState(() => _selectedTab = i),
+            child: Column(children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(labels[i],
+                    style: TextStyle(
+                      color: _selectedTab == i
+                          ? FlixieColors.primary
+                          : FlixieColors.light,
+                      fontWeight: FontWeight.w700,
+                    )),
+              ),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                height: 3,
+                margin: const EdgeInsets.symmetric(horizontal: 18),
+                decoration: BoxDecoration(
+                  color: _selectedTab == i
+                      ? FlixieColors.primary
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+            ]),
+          ),
+        ),
+    ]);
+  }
+
+  List<Widget> _overviewContent(User user) => [
+        if (!_compatibilityLoading) ...[
+          TasteCompatibilityCard(
+            score: _compatibilityScore,
+            sharedMovies: _sharedMovieCount,
+            sharedFavs: _sharedFavCount,
+            friendName: user.username,
+          ),
+          const SizedBox(height: 20),
+        ],
+        ListsPreviewSection(
+          userId: widget.userId,
+          title: 'PUBLIC LISTS',
+          emptyMessage: 'No public lists yet.',
+          embedded: true,
+          publicOnly: true,
+        ),
+        if (user.favoriteMovies?.isNotEmpty == true) ...[
+          const SizedBox(height: 18),
+          FavoriteMoviesSection(favoriteMovies: user.favoriteMovies!),
+        ],
+        if (_reviews.isNotEmpty) ...[
+          const SizedBox(height: 18),
+          _recentReview(_reviews.first),
+        ],
+      ];
+
+  List<Widget> _activityContent(User user) => [
+        if (user.watchedMovies?.isNotEmpty == true)
+          FriendMiniStats(watchedMovies: user.watchedMovies!),
+        if (user.watchedMovies?.isEmpty != false)
+          const _EmptyProfileTab(
+            icon: Icons.timeline_outlined,
+            text: 'No public activity yet.',
+          ),
+      ];
+
+  List<Widget> _reviewsContent() {
+    if (_reviewsLoading) {
+      return const [Center(child: CircularProgressIndicator())];
+    }
+    if (_reviews.isEmpty) {
+      return const [
+        _EmptyProfileTab(icon: Icons.reviews_outlined, text: 'No reviews yet.'),
+      ];
+    }
+    return [
+      ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: _reviews.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        itemBuilder: (_, i) => ReviewCard(
+          review: _reviews[i],
+          onTap: () {
+            final id = _reviews[i].movieId;
+            if (id != null) context.push('/movies/$id');
+          },
+        ),
+      ),
+    ];
+  }
+
+  Widget _recentReview(Review review) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('RECENT ACTIVITY',
+              style:
+                  TextStyle(fontWeight: FontWeight.w800, letterSpacing: 1.4)),
+          const SizedBox(height: 10),
+          ReviewCard(
+            review: review,
+            onTap: () {
+              if (review.movieId != null) {
+                context.push('/movies/${review.movieId}');
+              }
+            },
+          ),
+        ],
+      );
+
+  // Kept temporarily while the public-profile redesign settles, so its mature
+  // loading/error variants remain available during follow-up visual QA.
+  // ignore: unused_element
+  Widget _legacyBuild(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final profileName = _user?.username ?? 'Profile';
     final visibleFirstName = !widget.previewMode &&

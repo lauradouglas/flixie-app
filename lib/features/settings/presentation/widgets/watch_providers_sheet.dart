@@ -52,7 +52,11 @@ class _WatchProvidersSheetState extends State<WatchProvidersSheet> {
       setState(() {
         _providers = allProviders;
         _filteredProviders = allProviders;
-        _selectedProviderIds = selectedProviders.map((p) => p.id).toSet();
+        final visibleProviderIds = allProviders.map((p) => p.id).toSet();
+        _selectedProviderIds = selectedProviders
+            .map((provider) => provider.id)
+            .where(visibleProviderIds.contains)
+            .toSet();
         _loading = false;
       });
     } catch (e) {
@@ -212,7 +216,7 @@ class _WatchProvidersSheetState extends State<WatchProvidersSheet> {
                       : ListView.separated(
                           itemCount: _filteredProviders.length,
                           separatorBuilder: (_, __) =>
-                              const SizedBox(height: 10),
+                              const SizedBox(height: 4),
                           itemBuilder: (context, index) {
                             final provider = _filteredProviders[index];
                             final selected =
@@ -224,7 +228,7 @@ class _WatchProvidersSheetState extends State<WatchProvidersSheet> {
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 14,
-                                  vertical: 12,
+                                  vertical: 6,
                                 ),
                                 decoration: BoxDecoration(
                                   color: selected

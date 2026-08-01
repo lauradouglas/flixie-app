@@ -37,69 +37,94 @@ class GroupCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap ?? () => context.push('/groups/${group.id}'),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: FlixieColors.tabBarBackgroundFocused,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: FlixieColors.tabBarBorder),
         ),
-        child: Row(
+        child: Column(
           children: [
-            GroupAvatar(group: group, radius: 26),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    group.name,
-                    style: const TextStyle(
-                      color: FlixieColors.light,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                    ),
-                  ),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                GroupAvatar(group: group, radius: 30),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              group.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: FlixieColors.textPrimary,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                          const Icon(Icons.more_horiz_rounded,
+                              color: FlixieColors.medium, size: 20),
+                        ],
+                      ),
                       if (count != null)
-                        _GroupInfoChip(
-                          label:
-                              '${_formatCount(count)} member${count == 1 ? '' : 's'}',
-                          color: FlixieColors.primary,
+                        Text(
+                          '${_formatCount(count)} member${count == 1 ? '' : 's'}',
+                          style: const TextStyle(
+                            color: FlixieColors.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      if (statusLabel != null && statusLabel!.isNotEmpty)
-                        _GroupInfoChip(
-                          label: statusLabel!,
-                          color: statusLabel == 'Invite pending'
-                              ? FlixieColors.warning
-                              : FlixieColors.success,
-                        ),
+                      if (members.isNotEmpty) ...[
+                        const SizedBox(height: 7),
+                        _MemberAvatars(members: members),
+                      ],
                     ],
                   ),
-                  if (members.isNotEmpty) ...[
-                    const SizedBox(height: 7),
-                    _MemberAvatars(members: members),
-                  ],
-                  if (group.description != null &&
-                      group.description!.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      group.description!,
-                      style: const TextStyle(
-                        color: FlixieColors.medium,
-                        fontSize: 12,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                ),
+                if (statusLabel != null && statusLabel!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 34),
+                    child: _GroupInfoChip(
+                      label: statusLabel!,
+                      color: statusLabel == 'Invite pending'
+                          ? FlixieColors.warning
+                          : statusLabel == 'Community'
+                              ? FlixieColors.medium
+                              : FlixieColors.success,
                     ),
-                  ],
-                ],
-              ),
+                  ),
+              ],
             ),
-            const Icon(Icons.chevron_right, color: FlixieColors.medium),
+            const SizedBox(height: 10),
+            const Divider(height: 1, color: FlixieColors.tabBarBorder),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    group.description?.trim().isNotEmpty == true
+                        ? group.description!.trim()
+                        : statusLabel ?? 'Open group',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: FlixieColors.medium,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded,
+                    color: FlixieColors.primary),
+              ],
+            ),
           ],
         ),
       ),
@@ -122,15 +147,22 @@ class _MemberAvatars extends StatelessWidget {
           for (var index = 0; index < shown.length; index++)
             Positioned(
               left: index * 20,
-              child: ProfileAvatarView(
-                avatar: shown[index].avatar,
-                fallbackText: shown[index].initials ??
-                    (shown[index].username?.isNotEmpty == true
-                        ? shown[index].username![0].toUpperCase()
-                        : '?'),
-                fallbackColor: FlixieColors.primary,
-                size: 28,
-                profileBadges: shown[index].profileBadges,
+              child: Container(
+                padding: const EdgeInsets.all(1),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: FlixieColors.primary, width: 1.2),
+                ),
+                child: ProfileAvatarView(
+                  avatar: shown[index].avatar,
+                  fallbackText: shown[index].initials ??
+                      (shown[index].username?.isNotEmpty == true
+                          ? shown[index].username![0].toUpperCase()
+                          : '?'),
+                  fallbackColor: FlixieColors.primary,
+                  size: 26,
+                  profileBadges: shown[index].profileBadges,
+                ),
               ),
             ),
         ],

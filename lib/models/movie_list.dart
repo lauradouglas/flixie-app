@@ -1,3 +1,5 @@
+import 'package:flixie_app/models/profile_avatar.dart';
+
 class MovieList {
   final String id;
   final String? userId;
@@ -8,6 +10,7 @@ class MovieList {
   final String? groupId;
   final String? groupName;
   final List<MovieListCollaborator> collaborators;
+  final List<MovieListCollaborator> participants;
   final bool canEdit;
   final bool isOwner;
   final String? coverImageUrl;
@@ -30,6 +33,7 @@ class MovieList {
     this.groupId,
     this.groupName,
     this.collaborators = const [],
+    this.participants = const [],
     this.canEdit = true,
     this.isOwner = true,
     this.coverImageUrl,
@@ -54,6 +58,10 @@ class MovieList {
       groupId: json['groupId']?.toString(),
       groupName: (json['group'] as Map<String, dynamic>?)?['name']?.toString(),
       collaborators: (json['collaborators'] as List<dynamic>? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(MovieListCollaborator.fromJson)
+          .toList(growable: false),
+      participants: (json['participants'] as List<dynamic>? ?? const [])
           .whereType<Map<String, dynamic>>()
           .map(MovieListCollaborator.fromJson)
           .toList(growable: false),
@@ -87,6 +95,7 @@ class MovieList {
       'groupId': groupId,
       'groupName': groupName,
       'collaborators': collaborators.map((entry) => entry.toJson()).toList(),
+      'participants': participants.map((entry) => entry.toJson()).toList(),
       'canEdit': canEdit,
       'isOwner': isOwner,
       'coverImageUrl': coverImageUrl,
@@ -192,18 +201,34 @@ class MovieListCollaborator {
   const MovieListCollaborator({
     required this.id,
     required this.username,
+    this.avatar,
+    this.profileBadges = const [],
   });
 
   final String id;
   final String username;
+  final ProfileAvatar? avatar;
+  final List<String> profileBadges;
 
   factory MovieListCollaborator.fromJson(Map<String, dynamic> json) =>
       MovieListCollaborator(
         id: json['id']?.toString() ?? '',
         username: json['username']?.toString() ?? '',
+        avatar: json['avatar'] is Map<String, dynamic>
+            ? ProfileAvatar.fromJson(json['avatar'] as Map<String, dynamic>)
+            : null,
+        profileBadges: (json['profileBadges'] as List<dynamic>? ?? const [])
+            .map((entry) => entry is Map ? entry['badge'] : entry)
+            .whereType<String>()
+            .toList(growable: false),
       );
 
-  Map<String, dynamic> toJson() => {'id': id, 'username': username};
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'username': username,
+        'avatar': avatar?.toJson(),
+        'profileBadges': profileBadges,
+      };
 }
 
 String _parseVisibility(String? value) {

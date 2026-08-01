@@ -6,6 +6,9 @@ class MovieListMembership {
     required this.name,
     required this.ownerId,
     required this.scope,
+    this.description,
+    this.visibility = 'PRIVATE',
+    this.whoCanAddItems = 'owner',
     this.groupId,
     this.groupName,
     this.isOwner = false,
@@ -19,6 +22,9 @@ class MovieListMembership {
   final String name;
   final String ownerId;
   final String scope;
+  final String? description;
+  final String visibility;
+  final String whoCanAddItems;
   final String? groupId;
   final String? groupName;
   final bool isOwner;
@@ -33,6 +39,9 @@ class MovieListMembership {
         name: json['name']?.toString() ?? '',
         ownerId: json['ownerId']?.toString() ?? '',
         scope: json['scope']?.toString() ?? 'PERSONAL',
+        description: json['description']?.toString(),
+        visibility: json['visibility']?.toString() ?? 'PRIVATE',
+        whoCanAddItems: json['whoCanAddItems']?.toString() ?? 'owner',
         groupId: json['groupId']?.toString(),
         groupName: json['groupName']?.toString(),
         isOwner: json['isOwner'] as bool? ?? false,

@@ -15,6 +15,7 @@ import 'package:flixie_app/features/movies/presentation/widgets/add_show_to_list
 import 'package:flixie_app/features/movies/presentation/widgets/genre_chip.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/hero_backdrop.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/watch_provider_card.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/media_lists_section.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 
 enum _ShowAction { watchlist, favorite }
@@ -296,7 +297,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     final changed = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.background,
+      backgroundColor: Colors.transparent,
       builder: (_) => AddShowToListSheet(
         showId: show.id,
         showTitle: show.name,
@@ -585,6 +586,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                   _buildFriendSummary(show),
                   const SizedBox(height: 24),
                   _FriendActivityList(show: show),
+                  const SizedBox(height: 24),
+                  _buildListsSection(context),
                   const SizedBox(height: 24),
                   _buildCastSection(context, show),
                   const SizedBox(height: 24),
@@ -1488,6 +1491,34 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       width: 1,
       height: 26,
       color: Colors.white.withValues(alpha: 0.1),
+    );
+  }
+
+  Widget _buildListsSection(BuildContext context) {
+    final lists = _myListsContainingShow
+        .map((list) => MediaDetailListItem(
+              id: list.id,
+              name: list.name,
+              visibility: list.visibility,
+              posterUrls: list.previewPosterUrls,
+              itemCount: list.itemCount ??
+                  (list.movieCount ?? 0) + (list.showCount ?? 0),
+              ownerId: list.userId,
+            ))
+        .toList(growable: false);
+
+    return MediaListsSection(
+      ownLists: lists,
+      friendLists: const [],
+      loading: _listsContainingShowLoading,
+      itemLabel: 'titles',
+      onEdit: _showAddToListSheet,
+      onSeeAll: () => context.push('/movie-lists'),
+      onOpenList: (item) => context.push(
+        '/movie-lists/${item.id}'
+        '?name=${Uri.encodeComponent(item.name)}'
+        '&owner=${Uri.encodeComponent(item.ownerId ?? '')}',
+      ),
     );
   }
 

@@ -28,6 +28,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
   bool _isFavorite = false;
   bool _isFavoriteLoading = false;
   _CreditFilter _creditFilter = _CreditFilter.all;
+  _PersonalCreditFilter _personalCreditFilter = _PersonalCreditFilter.all;
   _CreditSort _creditSort = _CreditSort.popular;
   final TextEditingController _filmographySearchController =
       TextEditingController();
@@ -261,7 +262,13 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
           credit.roleLabel.toLowerCase().contains(query);
       final matchesYear =
           _filmographyYear == null || credit.year == _filmographyYear;
-      return matchesRole && matchesQuery && matchesYear;
+      final matchesPersonal = switch (_personalCreditFilter) {
+        _PersonalCreditFilter.all => true,
+        _PersonalCreditFilter.watched => _movieInWatched(credit.id),
+        _PersonalCreditFilter.watchlist => _movieInWatchlist(credit.id),
+        _PersonalCreditFilter.favourites => _movieInFavorites(credit.id),
+      };
+      return matchesRole && matchesQuery && matchesYear && matchesPersonal;
     }).toList();
 
     filtered.sort((a, b) {
@@ -1228,6 +1235,42 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
           ),
         ),
         const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: _PersonalCreditFilter.values.map((filter) {
+              final selected = _personalCreditFilter == filter;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  avatar: Icon(
+                    filter.icon,
+                    size: 16,
+                    color: selected ? filter.color : FlixieColors.medium,
+                  ),
+                  label: Text(filter.label),
+                  selected: selected,
+                  showCheckmark: false,
+                  onSelected: (_) =>
+                      setState(() => _personalCreditFilter = filter),
+                  selectedColor: filter.color.withValues(alpha: .16),
+                  backgroundColor: FlixieColors.surface,
+                  labelStyle: TextStyle(
+                    color: selected ? filter.color : FlixieColors.medium,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                  side: BorderSide(
+                    color: selected
+                        ? filter.color.withValues(alpha: .65)
+                        : FlixieColors.tabBarBorder,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        const SizedBox(height: 8),
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -1538,6 +1581,31 @@ class _StatusLegendItem extends StatelessWidget {
 }
 
 enum _CreditSort { popular, newest, oldest, rating }
+
+enum _PersonalCreditFilter { all, watched, watchlist, favourites }
+
+extension _PersonalCreditFilterView on _PersonalCreditFilter {
+  String get label => switch (this) {
+        _PersonalCreditFilter.all => 'All titles',
+        _PersonalCreditFilter.watched => 'Watched',
+        _PersonalCreditFilter.watchlist => 'Watchlist',
+        _PersonalCreditFilter.favourites => 'Favourites',
+      };
+
+  IconData get icon => switch (this) {
+        _PersonalCreditFilter.all => Icons.movie_filter_outlined,
+        _PersonalCreditFilter.watched => Icons.check_circle_outline_rounded,
+        _PersonalCreditFilter.watchlist => Icons.bookmark_outline_rounded,
+        _PersonalCreditFilter.favourites => Icons.favorite_outline_rounded,
+      };
+
+  Color get color => switch (this) {
+        _PersonalCreditFilter.all => FlixieColors.primary,
+        _PersonalCreditFilter.watched => FlixieColors.success,
+        _PersonalCreditFilter.watchlist => FlixieColors.warning,
+        _PersonalCreditFilter.favourites => FlixieColors.danger,
+      };
+}
 
 extension _CreditFilterView on _CreditFilter {
   String get label => switch (this) {
