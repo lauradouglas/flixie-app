@@ -6,6 +6,9 @@ import 'package:flixie_app/core/storage/movie_cache_service.dart';
 class TrendingService {
   static final _cache = MovieCacheService();
 
+  /// Per-timeWindow cache for trending shows (same day-level TTL as movies).
+  static final Map<String, _CachedTrendingShows> _showsCache = {};
+
   static Future<List<MovieShort>> getTrendingMovies(
       {String timeWindow = 'week'}) async {
     // Check cache first
@@ -28,10 +31,34 @@ class TrendingService {
 
   static Future<List<TvShow>> getTrendingShows(
       {String timeWindow = 'week'}) async {
+    final cached = _showsCache[timeWindow];
+    if (cached != null && cached.isValidToday) {
+      return cached.shows;
+    }
+
     final data = await ApiClient.get('/trending/shows',
         queryParams: {'timeWindow': timeWindow});
-    return (data as List<dynamic>)
+    final shows = (data as List<dynamic>)
         .map((e) => TvShow.fromJson(e as Map<String, dynamic>))
         .toList();
+
+    _showsCache[timeWindow] =
+        _CachedTrendingShows(shows: shows, timestamp: DateTime.now());
+
+    return shows;
+  }
+}
+
+class _CachedTrendingShows {
+  final List<TvShow> shows;
+  final DateTime timestamp;
+
+  _CachedTrendingShows({required this.shows, required this.timestamp});
+
+  bool get isValidToday {
+    final now = DateTime.now();
+    return now.year == timestamp.year &&
+        now.month == timestamp.month &&
+        now.day == timestamp.day;
   }
 }
