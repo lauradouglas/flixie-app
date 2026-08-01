@@ -10,13 +10,23 @@ class HomeSectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FlixieSectionHeader(
-      title: title,
-      uppercase: false,
-      padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-      trailingLabel: onSeeAll != null ? 'See all' : null,
-      trailingColor: FlixieColors.primary,
-      onTrailingTap: onSeeAll,
+    return SizedBox(
+      width: double.infinity,
+      child: FlixieSectionHeader(
+        title: title,
+        uppercase: false,
+        maxTitleLines: 1,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        titleStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 18,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.5,
+        ),
+        trailingLabel: onSeeAll != null ? 'See all' : null,
+        trailingColor: FlixieColors.primary,
+        onTrailingTap: onSeeAll,
+      ),
     );
   }
 }

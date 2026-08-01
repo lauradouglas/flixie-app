@@ -14,6 +14,7 @@ class FlixieSectionHeader extends StatelessWidget {
     this.trailingColor,
     this.onTrailingTap,
     this.accentHeight = 22,
+    this.maxTitleLines = 2,
   });
 
   final String title;
@@ -25,11 +26,23 @@ class FlixieSectionHeader extends StatelessWidget {
   final Color? trailingColor;
   final VoidCallback? onTrailingTap;
   final double accentHeight;
+  final int maxTitleLines;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final trailingText = trailingLabel;
+    final titleWidget = Text(
+      uppercase ? title.toUpperCase() : title,
+      maxLines: maxTitleLines,
+      overflow: TextOverflow.ellipsis,
+      style: titleStyle ??
+          textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            letterSpacing: 1.5,
+          ),
+    );
 
     return Padding(
       padding: padding,
@@ -44,19 +57,10 @@ class FlixieSectionHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          Flexible(
-            child: Text(
-              uppercase ? title.toUpperCase() : title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: titleStyle ??
-                  textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 1.5,
-                  ),
-            ),
-          ),
+          if (trailingText != null)
+            Expanded(child: titleWidget)
+          else
+            Flexible(child: titleWidget),
           if (badge != null) ...[
             const SizedBox(width: 8),
             Container(
@@ -76,7 +80,7 @@ class FlixieSectionHeader extends StatelessWidget {
             ),
           ],
           if (trailingText != null) ...[
-            const Spacer(),
+            const SizedBox(width: 12),
             GestureDetector(
               onTap: onTrailingTap,
               child: Text(

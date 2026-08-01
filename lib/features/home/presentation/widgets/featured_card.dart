@@ -27,7 +27,7 @@ class FeaturedCard extends StatelessWidget {
     final screenWidth = MediaQuery.sizeOf(context).width;
     // Keep cards compact enough on phones so the next card peeks in,
     // making horizontal swipe affordance obvious.
-    final cardWidth = (screenWidth * 0.42).clamp(156.0, 176.0);
+    final cardWidth = (screenWidth * 0.36).clamp(136.0, 156.0);
 
     return SizedBox(
       width: cardWidth,

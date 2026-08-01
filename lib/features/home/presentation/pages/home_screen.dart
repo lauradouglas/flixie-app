@@ -10,17 +10,13 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flixie_app/models/movie_short.dart';
 import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/models/friend_media_interaction.dart';
-import 'package:flixie_app/models/trending_groups.dart';
 import 'package:flixie_app/models/watch_request.dart';
 import 'package:flixie_app/models/watchlist_movie.dart';
 import 'package:flixie_app/models/continue_watching_show.dart';
 import 'package:flixie_app/models/user.dart' as models;
-import 'package:flixie_app/features/social/presentation/controllers/friend_actions_controller.dart';
 import 'package:flixie_app/features/watchlist/presentation/controllers/watchlist_actions_controller.dart';
-import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/features/social/data/friend_service.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
-import 'package:flixie_app/features/movies/data/movie_service.dart';
 import 'package:flixie_app/features/movies/data/show_service.dart';
 import 'package:flixie_app/features/home/data/recommendation_service.dart';
 import 'package:flixie_app/features/social/data/request_service.dart';
@@ -34,7 +30,7 @@ import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/features/home/presentation/widgets/featured_card.dart';
 import 'package:flixie_app/features/home/presentation/widgets/greeting_header.dart';
 import 'package:flixie_app/features/home/presentation/widgets/section_header.dart';
-import 'package:flixie_app/features/home/presentation/widgets/trending_groups_section.dart';
+import 'package:flixie_app/features/home/presentation/widgets/trending_friends_section.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 
@@ -49,27 +45,21 @@ class _HomeScreenState extends State<HomeScreen> {
   // Keep hero carousel concise so primary CTA and dots remain visible above fold.
   static const int _maxHeroCarouselItems = 6;
   static const double _defaultQuickRating = 5;
-  static const int _recentTheatreDays = 45;
 
   List<MovieShort> _featuredMovies = [];
-  List<MovieShort> _nowPlayingMovies = [];
   List<MovieShort> _forYouMovies = [];
   List<ContinueWatchingShow> _continueWatchingShows = [];
   List<ActivityListItem> _friendsActivity = [];
   final Map<int, List<FriendMediaInteraction>> _heroFriendInteractions = {};
   bool _showMoreFriendActivity = false;
-  TrendingGroupsResponse? _trendingGroups;
-  bool _isTrendingGroupsLoading = true;
-  String? _trendingGroupsError;
   final Set<int> _watchlistUpdatesInFlight = <int>{};
   Set<int> _watchlistMovieIds = {};
   int _watchRequestsNeedingResponse = 0;
+  WatchRequest? _upcomingWatchPlan;
   bool _isLoading = true;
   String? _error;
   String? _loadedForUserId;
   AuthProvider? _authProvider;
-  final FriendActionsController _friendActions =
-      FriendActionsController.instance;
   final WatchlistActionsController _watchlistActions =
       WatchlistActionsController.instance;
   final PageController _heroPageController =
@@ -120,15 +110,10 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _isLoading = true;
       _error = null;
-      _isTrendingGroupsLoading = true;
-      _trendingGroupsError = null;
     });
     final auth = context.read<AuthProvider>();
-    final movieService = context.read<MovieService>();
     final user = auth.dbUser;
-    final region =
-        (user?.country?['isoCode'] as String?)?.toUpperCase() ?? 'US';
-    logger.d('[HomeScreen] loading, user=[200b${user?.id}, region=$region');
+    logger.d('[HomeScreen] loading, user=${user?.id}');
 
     // Refresh the profile without holding up above-the-fold home content.
     unawaited(auth.refreshUserData());
@@ -137,21 +122,16 @@ class _HomeScreenState extends State<HomeScreen> {
     // Secondary sections manage their own loading/error states and should not
     // keep the whole page behind a skeleton.
     unawaited(_loadSecondaryContent(user));
-    unawaited(_loadTrendingGroups());
 
     try {
-      final results = await Future.wait([
-        TrendingService.getTrendingMovies(),
-        movieService.getNowPlayingMovies(region: region),
-      ]);
+      final trendingMovies = await TrendingService.getTrendingMovies();
       if (context.mounted) {
         setState(() {
-          _featuredMovies = results[0];
-          _nowPlayingMovies = results[1].take(8).toList();
+          _featuredMovies = trendingMovies;
           _isLoading = false;
         });
         if (user != null) {
-          unawaited(_loadHeroFriendInteractions(results[0], user.id));
+          unawaited(_loadHeroFriendInteractions(trendingMovies, user.id));
         }
       }
     } catch (e) {
@@ -202,13 +182,13 @@ class _HomeScreenState extends State<HomeScreen> {
         _continueWatchingShows = [];
         _watchlistMovieIds = {};
         _watchRequestsNeedingResponse = 0;
+        _upcomingWatchPlan = null;
       });
       return;
     }
 
     final results = await Future.wait([
-      _friendActions
-          .getFriendsActivityLists(user.id)
+      FriendService.getFriendsActivityLists(user.id, days: 30, limit: 200)
           .catchError((_) => <ActivityListItem>[]),
       RecommendationService.getRecommendationsFromHighlyRated(userId: user.id)
           .catchError((_) => null),
@@ -237,6 +217,7 @@ class _HomeScreenState extends State<HomeScreen> {
           .toSet();
       _watchRequestsNeedingResponse =
           _countWatchRequestsNeedingResponse(watchRequests, user.id);
+      _upcomingWatchPlan = _nearestUpcomingWatchPlan(watchRequests);
       _continueWatchingShows = results[5] as List<ContinueWatchingShow>;
     });
   }
@@ -258,44 +239,21 @@ class _HomeScreenState extends State<HomeScreen> {
     }).length;
   }
 
-  Future<void> _loadTrendingGroups() async {
-    if (!mounted) return;
-    final user = context.read<AuthProvider>().dbUser;
-    if (user == null) {
-      if (mounted) {
-        setState(() {
-          _trendingGroups = null;
-          _trendingGroupsError = null;
-          _isTrendingGroupsLoading = false;
-        });
-      }
-      return;
-    }
-
-    if (mounted) {
-      setState(() {
-        _isTrendingGroupsLoading = true;
-        _trendingGroupsError = null;
-      });
-    }
-
-    try {
-      final response = await GroupService.getTrendingGroups();
-      if (mounted) {
-        setState(() {
-          _trendingGroups = response;
-          _isTrendingGroupsLoading = false;
-        });
-      }
-    } catch (e) {
-      logger.e('[HomeScreen] trending groups load error: $e');
-      if (mounted) {
-        setState(() {
-          _trendingGroupsError = 'Couldn’t load group trends';
-          _isTrendingGroupsLoading = false;
-        });
-      }
-    }
+  WatchRequest? _nearestUpcomingWatchPlan(List<WatchRequest> requests) {
+    final now = DateTime.now();
+    final upcoming = requests.where((request) {
+      final scheduledFor = request.scheduledFor;
+      final isAgreed =
+          request.normalizedScheduleStatus == 'AGREED' || request.isScheduled;
+      return request.isWatchRequest &&
+          isAgreed &&
+          !request.isTerminal &&
+          scheduledFor != null &&
+          scheduledFor.isAfter(now);
+    }).toList()
+      ..sort(
+          (left, right) => left.scheduledFor!.compareTo(right.scheduledFor!));
+    return upcoming.isEmpty ? null : upcoming.first;
   }
 
   Future<void> _toggleHeroWatchlist(
@@ -470,10 +428,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                         if (heroMovies.isNotEmpty) ...[
-                          HomeSectionHeader(
-                            title: 'Trending now',
-                            onSeeAll: () => context.push('/search'),
-                          ),
+                          const HomeSectionHeader(title: 'Trending now'),
                           const SizedBox(height: 4),
                           _buildHeroCarousel(context, heroMovies),
                           const SizedBox(height: 10),
@@ -481,22 +436,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           const SizedBox(height: 20),
                         ],
                         _buildBecauseYouRatedSection(context),
-                        _buildJustOutSection(context),
-                        _buildWatchlistSection(context),
                         _buildContinueWatchingSection(context),
+                        FriendsWatchingSection(activity: _friendsActivity),
+                        _buildUpcomingWatchPlanSection(context, user),
                         _buildFriendActivitySection(context),
-                        TrendingGroupsSection(
-                          isLoading: _isTrendingGroupsLoading,
-                          response: _trendingGroups,
-                          errorMessage: _trendingGroupsError,
-                          onRetry: _loadTrendingGroups,
-                          onSeeAll: () => context.go('/social'),
-                          onExploreGroups: () => context.go('/social'),
-                          onOpenGroup: (groupId) =>
-                              context.push('/groups/$groupId'),
-                          onOpenMovie: (movieId) =>
-                              context.push('/movies/$movieId'),
-                        ),
+                        _buildWatchlistSection(context),
                       ],
                     ),
                   ),
@@ -513,7 +457,7 @@ class _HomeScreenState extends State<HomeScreen> {
         const HomeSectionHeader(title: 'Continue Watching'),
         const SizedBox(height: 12),
         SizedBox(
-          height: 322,
+          height: 108,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -908,53 +852,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildJustOutSection(BuildContext context) {
-    final items = _nowPlayingMovies.take(10).toList();
-    if (items.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        HomeSectionHeader(
-          title: 'Just Out',
-          onSeeAll: () => context.push('/search'),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 260,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              final movie = items[index];
-              return FeaturedCard(
-                movie: movie,
-                showNewBadge: _isRecentlyAddedToTheatres(movie),
-                onTap: () => context.push('/movies/${movie.id}'),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 20),
-      ],
-    );
-  }
-
-  bool _isRecentlyAddedToTheatres(MovieShort movie) {
-    final raw = movie.releaseDate;
-    if (raw == null || raw.isEmpty) return false;
-    final parsed = DateTime.tryParse(raw);
-    if (parsed == null) return false;
-    final release = DateTime(parsed.year, parsed.month, parsed.day);
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final daysSinceRelease = today.difference(release).inDays;
-
-    return daysSinceRelease >= 0 && daysSinceRelease <= _recentTheatreDays;
-  }
-
   Widget _buildWatchlistSection(BuildContext context) {
     final user = context.read<AuthProvider>().dbUser;
     final watchlist = user?.movieWatchlist
@@ -1119,18 +1016,15 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        HomeSectionHeader(
-          title: 'Just for you',
-          onSeeAll: () => context.push('/search'),
-        ),
-        const SizedBox(height: 12),
+        const HomeSectionHeader(title: 'For you'),
+        const SizedBox(height: 6),
         SizedBox(
-          height: 260,
+          height: 230,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             itemCount: _forYouMovies.length.clamp(0, 10),
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
             itemBuilder: (context, index) => FeaturedCard(
               movie: _forYouMovies[index],
               onTap: () => context.push('/movies/${_forYouMovies[index].id}'),
@@ -1142,6 +1036,175 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildUpcomingWatchPlanSection(
+    BuildContext context,
+    models.User? user,
+  ) {
+    final plan = _upcomingWatchPlan;
+    if (plan == null || user == null || plan.scheduledFor == null) {
+      return const SizedBox.shrink();
+    }
+    final other = plan.otherUser(user.id);
+    final posterPath = plan.movie?.posterPath;
+    final participants = <WatchRequestUser>[
+      ...plan.participants
+          .map((participant) => participant.user)
+          .whereType<WatchRequestUser>()
+          .where((participant) => participant.id != user.id),
+      if (other != null) other,
+    ]
+        .fold(<String, WatchRequestUser>{}, (byId, participant) {
+          byId[participant.id] = participant;
+          return byId;
+        })
+        .values
+        .toList(growable: false);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => context.push('/watch-requests/${plan.id}'),
+          child: Ink(
+            height: 100,
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: FlixieColors.surfaceElevated.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: FlixieColors.primary.withValues(alpha: 0.28),
+              ),
+            ),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(9),
+                  child: SizedBox(
+                    width: 58,
+                    height: 88,
+                    child: posterPath != null && posterPath.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl:
+                                'https://image.tmdb.org/t/p/w342$posterPath',
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => _heroFallback(),
+                          )
+                        : _heroFallback(),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Your next watch',
+                        style: TextStyle(
+                          color: FlixieColors.primary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatWatchPlanDate(plan.scheduledFor!),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        plan.movie?.title ?? plan.groupName ?? 'Watch plan',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: FlixieColors.medium,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (participants.isNotEmpty) ...[
+                  const SizedBox(width: 6),
+                  _WatchPlanAvatarStack(participants: participants),
+                ],
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: FlixieColors.success.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.check_circle_rounded,
+                        color: FlixieColors.success,
+                        size: 15,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        'Confirmed',
+                        style: TextStyle(
+                          color: FlixieColors.success,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: FlixieColors.light,
+                  size: 22,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatWatchPlanDate(DateTime raw) {
+    final date = raw.toLocal();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final target = DateTime(date.year, date.month, date.day);
+    final dayOffset = target.difference(today).inDays;
+    const weekdays = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+    final dayLabel = dayOffset == 0
+        ? 'Today'
+        : dayOffset == 1
+            ? 'Tomorrow'
+            : weekdays[date.weekday - 1];
+    final displayHour = date.hour % 12 == 0 ? 12 : date.hour % 12;
+    final minute = date.minute.toString().padLeft(2, '0');
+    final period = date.hour < 12 ? 'AM' : 'PM';
+    return '$dayLabel · $displayHour:$minute $period';
+  }
+
   Widget _buildFriendActivitySection(BuildContext context) {
     if (_friendsActivity.isEmpty) return const SizedBox.shrink();
     final previewCount = _showMoreFriendActivity ? 8 : 3;
@@ -1150,7 +1213,7 @@ class _HomeScreenState extends State<HomeScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         HomeSectionHeader(
-          title: 'Friend Activity',
+          title: 'Popular with friends',
           onSeeAll: () => context.push('/friends-activity'),
         ),
         const SizedBox(height: 12),
@@ -1520,99 +1583,119 @@ class _ContinueWatchingCard extends StatelessWidget {
   final ContinueWatchingShow show;
   final VoidCallback onTap;
 
-  static const double _cardWidth = 168;
-  static const double _posterHeight = _cardWidth * 1.5;
-
   @override
   Widget build(BuildContext context) {
+    final cardWidth =
+        (MediaQuery.sizeOf(context).width * 0.46).clamp(170.0, 340.0);
     final episode = show.lastWatchedEpisode;
     final episodeLabel = episode == null
         ? '${show.watchedEpisodes} episodes watched'
-        : 'S${episode.seasonNumber} E${episode.episodeNumber} watched';
+        : 'S${episode.seasonNumber} E${episode.episodeNumber}';
     final progress = (show.completionPercent / 100).clamp(0.0, 1.0);
-    final posterUrl = show.posterPath == null
-        ? null
-        : 'https://image.tmdb.org/t/p/w342${show.posterPath}';
+    final imagePath = show.backdropPath ?? show.posterPath;
+    final posterUrl =
+        imagePath == null ? null : 'https://image.tmdb.org/t/p/w780$imagePath';
 
     return SizedBox(
-      width: _cardWidth,
+      width: cardWidth,
+      height: 102,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    SizedBox(
-                      width: _cardWidth,
-                      height: _posterHeight,
-                      child: posterUrl == null
-                          ? _posterFallback()
-                          : CachedNetworkImage(
-                              imageUrl: posterUrl,
-                              fit: BoxFit.cover,
-                              placeholder: (_, __) => _posterFallback(),
-                              errorWidget: (_, __, ___) => _posterFallback(),
-                            ),
-                    ),
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.72),
-                        shape: BoxShape.circle,
+          borderRadius: BorderRadius.circular(14),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                posterUrl == null
+                    ? _posterFallback()
+                    : CachedNetworkImage(
+                        imageUrl: posterUrl,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => _posterFallback(),
+                        errorWidget: (_, __, ___) => _posterFallback(),
                       ),
-                      child: const Icon(
-                        Icons.play_arrow_rounded,
-                        color: Colors.white,
-                        size: 28,
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      stops: [0.35, 1],
+                      colors: [Colors.transparent, Colors.black87],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.68),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.24),
                       ),
                     ),
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        minHeight: 5,
-                        backgroundColor: Colors.black54,
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                          FlixieColors.primary,
+                    child: const Icon(
+                      Icons.play_arrow_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  bottom: 12,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        show.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
+                      const SizedBox(height: 2),
+                      Text(
+                        episodeLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: FlixieColors.light,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  left: 10,
+                  right: 10,
+                  bottom: 4,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(99),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 3,
+                      backgroundColor: Colors.black54,
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        FlixieColors.primary,
+                      ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                show.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                episodeLabel,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: FlixieColors.medium,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1708,6 +1791,75 @@ class _FriendInteractionAvatarStack extends StatelessWidget {
                   '+$overflow',
                   style: const TextStyle(
                     color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WatchPlanAvatarStack extends StatelessWidget {
+  const _WatchPlanAvatarStack({required this.participants});
+
+  final List<WatchRequestUser> participants;
+
+  @override
+  Widget build(BuildContext context) {
+    const size = 28.0;
+    const spacing = 19.0;
+    final visible = participants.take(2).toList(growable: false);
+    final overflow = participants.length - visible.length;
+    final count = visible.length + (overflow > 0 ? 1 : 0);
+    return SizedBox(
+      width: size + ((count - 1).clamp(0, 2) * spacing),
+      height: size,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          for (var index = 0; index < visible.length; index++)
+            Positioned(
+              left: index * spacing,
+              child: Container(
+                width: size,
+                height: size,
+                padding: const EdgeInsets.all(1.5),
+                decoration: const BoxDecoration(
+                  color: FlixieColors.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: ProfileAvatarView(
+                  avatar: visible[index].avatar,
+                  fallbackText: visible[index].username.isEmpty
+                      ? '?'
+                      : visible[index].username[0].toUpperCase(),
+                  fallbackColor: FlixieColors.surface,
+                  size: 25,
+                ),
+              ),
+            ),
+          if (overflow > 0)
+            Positioned(
+              left: visible.length * spacing,
+              child: Container(
+                width: size,
+                height: size,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: FlixieColors.primary.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: FlixieColors.primary.withValues(alpha: 0.38),
+                  ),
+                ),
+                child: Text(
+                  '+$overflow',
+                  style: const TextStyle(
+                    color: FlixieColors.primary,
                     fontSize: 9,
                     fontWeight: FontWeight.w900,
                   ),
