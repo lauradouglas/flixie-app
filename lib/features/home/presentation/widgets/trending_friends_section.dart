@@ -40,7 +40,7 @@ class FriendsWatchingSection extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         SizedBox(
-          height: 178,
+          height: 180,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -57,7 +57,7 @@ class FriendsWatchingSection extends StatelessWidget {
               return GestureDetector(
                 onTap: () => context.push('/movies/${item.movieId}'),
                 child: SizedBox(
-                  width: 108,
+                  width: 110,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -67,8 +67,8 @@ class FriendsWatchingSection extends StatelessWidget {
                           ClipRRect(
                             borderRadius: BorderRadius.circular(11),
                             child: SizedBox(
-                              width: 108,
-                              height: 144,
+                              width: 110,
+                              height: 148,
                               child: posterUrl == null
                                   ? _friendPosterFallback()
                                   : CachedNetworkImage(

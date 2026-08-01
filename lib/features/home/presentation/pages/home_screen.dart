@@ -1019,7 +1019,7 @@ class _HomeScreenState extends State<HomeScreen> {
         const HomeSectionHeader(title: 'For you'),
         const SizedBox(height: 6),
         SizedBox(
-          height: 230,
+          height: 180,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
