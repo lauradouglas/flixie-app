@@ -10,6 +10,7 @@ import 'package:flixie_app/features/social/data/request_service.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
 import 'package:flixie_app/core/calendar/watch_calendar_service.dart';
 import 'package:flixie_app/models/movie_watch_entry.dart';
@@ -761,7 +762,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
   Widget build(BuildContext context) {
     final isFocused = widget.initialRequestId?.isNotEmpty == true;
     final directBody = _loading
-        ? const Center(child: CircularProgressIndicator())
+        ? const WatchRequestsSkeleton()
         : _error != null
             ? _buildError()
             : _filtered.isEmpty

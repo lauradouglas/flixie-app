@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/models/group.dart';
@@ -84,7 +85,7 @@ class _GroupWatchRequestsOverviewState
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_loading) return const WatchRequestsSkeleton();
     final active = _items.where((item) => item.request.isActive).toList();
     final completed = _items
         .where((item) => item.request.status == WatchRequestStatus.completed)

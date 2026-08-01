@@ -23,6 +23,7 @@ import 'package:flixie_app/features/movies/data/movie_service.dart';
 import 'package:flixie_app/features/watchlist/presentation/controllers/watchlist_actions_controller.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/models/friend_summary.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/cast_card.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/external_links_section.dart';
@@ -743,7 +744,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     if (_isLoading) {
       return const Scaffold(
         backgroundColor: FlixieColors.background,
-        body: Center(child: CircularProgressIndicator()),
+        body: SafeArea(child: MediaDetailScreenSkeleton()),
       );
     }
 

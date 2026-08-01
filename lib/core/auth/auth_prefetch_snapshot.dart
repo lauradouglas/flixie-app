@@ -3,6 +3,7 @@ import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/models/group.dart';
 import 'package:flixie_app/models/movie_rating.dart';
 import 'package:flixie_app/models/movie_short.dart';
+import 'package:flixie_app/models/movie_list.dart';
 import 'package:flixie_app/models/notification.dart';
 import 'package:flixie_app/models/review.dart';
 import 'package:flixie_app/models/watch_provider.dart';
@@ -17,6 +18,7 @@ class AuthPrefetchSnapshot {
     this.reviews,
     this.trending,
     this.nowPlaying,
+    this.movieLists,
     this.unreadNotificationCount,
     this.notifications,
     this.watchProvidersByMovieId,
@@ -31,6 +33,7 @@ class AuthPrefetchSnapshot {
   final List<Review>? reviews;
   final List<MovieShort>? trending;
   final List<MovieShort>? nowPlaying;
+  final List<MovieList>? movieLists;
   final int? unreadNotificationCount;
   final List<FlixieNotification>? notifications;
   final Map<int, List<WatchProvider>>? watchProvidersByMovieId;

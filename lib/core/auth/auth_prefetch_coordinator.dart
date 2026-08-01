@@ -5,6 +5,7 @@ import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/models/group.dart';
 import 'package:flixie_app/models/movie_rating.dart';
 import 'package:flixie_app/models/movie_short.dart';
+import 'package:flixie_app/models/movie_list.dart';
 import 'package:flixie_app/models/notification.dart';
 import 'package:flixie_app/models/review.dart';
 import 'package:flixie_app/models/watch_provider.dart';
@@ -47,6 +48,7 @@ class AuthPrefetchCoordinator {
     List<Review>? reviews;
     List<MovieShort>? trending;
     List<MovieShort>? nowPlaying;
+    List<MovieList>? movieLists;
     int? unreadNotificationCount;
     List<FlixieNotification>? notifications;
     Map<int, List<WatchProvider>>? watchProvidersByMovieId;
@@ -75,6 +77,8 @@ class AuthPrefetchCoordinator {
       _movieService
           .getNowPlayingMovies(region: region)
           .then((v) => nowPlaying = v, onError: (_) {}),
+      UserService.getMovieLists(userId)
+          .then((v) => movieLists = v, onError: (_) {}),
       NotificationService.getNotifications(userId).then((value) {
         final visible = visibleNotificationsForUser(value, userId);
         notifications = visible;
@@ -97,6 +101,7 @@ class AuthPrefetchCoordinator {
       reviews: reviews,
       trending: trending,
       nowPlaying: nowPlaying,
+      movieLists: movieLists,
       unreadNotificationCount: unreadNotificationCount,
       notifications: notifications,
       watchProvidersByMovieId: watchProvidersByMovieId,

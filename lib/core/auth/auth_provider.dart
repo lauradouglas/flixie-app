@@ -10,6 +10,7 @@ import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/models/group.dart';
 import 'package:flixie_app/models/movie_rating.dart';
 import 'package:flixie_app/models/movie_short.dart';
+import 'package:flixie_app/models/movie_list.dart';
 import 'package:flixie_app/models/notification.dart';
 import 'package:flixie_app/models/review.dart';
 import 'package:flixie_app/models/user.dart' as models;
@@ -91,6 +92,7 @@ class AuthProvider extends ChangeNotifier {
   List<Review>? _cachedReviews;
   List<MovieShort>? _cachedTrending;
   List<MovieShort>? _cachedNowPlaying;
+  List<MovieList>? _cachedMovieLists;
   List<FlixieNotification>? _cachedNotifications;
   bool _isPrefetching = false;
   final Map<int, List<WatchProvider>> _cachedWatchProvidersByMovieId = {};
@@ -127,6 +129,7 @@ class AuthProvider extends ChangeNotifier {
   List<Review>? get cachedReviews => _cachedReviews;
   List<MovieShort>? get cachedTrending => _cachedTrending;
   List<MovieShort>? get cachedNowPlaying => _cachedNowPlaying;
+  List<MovieList>? get cachedMovieLists => _cachedMovieLists;
   List<FlixieNotification>? get cachedNotifications => _cachedNotifications;
   bool get isPrefetching => _isPrefetching;
   Map<int, List<WatchProvider>> get cachedWatchProvidersByMovieId =>
@@ -179,6 +182,16 @@ class AuthProvider extends ChangeNotifier {
 
   void updateCachedGroups(List<Group> groups) {
     _cachedGroups = groups;
+    notifyListeners();
+  }
+
+  void updateCachedMovieLists(List<MovieList> lists) {
+    _cachedMovieLists = List.unmodifiable(lists);
+    notifyListeners();
+  }
+
+  void invalidateCachedMovieLists() {
+    _cachedMovieLists = null;
     notifyListeners();
   }
 
@@ -302,6 +315,7 @@ class AuthProvider extends ChangeNotifier {
       _cachedReviews = null;
       _cachedTrending = null;
       _cachedNowPlaying = null;
+      _cachedMovieLists = null;
       _cachedNotifications = null;
       _cachedWatchProvidersByMovieId.clear();
       _cachedUserWatchProviderIds = null;
@@ -398,6 +412,7 @@ class AuthProvider extends ChangeNotifier {
     _cachedReviews = snapshot.reviews ?? _cachedReviews;
     _cachedTrending = snapshot.trending ?? _cachedTrending;
     _cachedNowPlaying = snapshot.nowPlaying ?? _cachedNowPlaying;
+    _cachedMovieLists = snapshot.movieLists ?? _cachedMovieLists;
     _cachedNotifications = snapshot.notifications ?? _cachedNotifications;
     _unreadNotificationCount =
         snapshot.unreadNotificationCount ?? _unreadNotificationCount;

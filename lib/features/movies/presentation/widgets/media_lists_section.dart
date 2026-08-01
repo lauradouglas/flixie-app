@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/models/profile_avatar.dart';
+import 'package:flixie_app/core/utils/skeleton.dart';
+import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 
 class MediaDetailListItem {
   const MediaDetailListItem({
@@ -60,9 +62,21 @@ class MediaListsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 24),
-        child: Center(child: CircularProgressIndicator()),
+      return const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            SkeletonBox(width: 86, height: 20),
+            Spacer(),
+            SkeletonBox(width: 58, height: 28, borderRadius: 14),
+          ]),
+          SizedBox(height: 8),
+          SkeletonBox(width: 128, height: 13),
+          SizedBox(height: 12),
+          SkeletonBox(height: 86, borderRadius: 14),
+          SizedBox(height: 10),
+          SkeletonBox(height: 86, borderRadius: 14),
+        ],
       );
     }
 
@@ -75,21 +89,19 @@ class MediaListsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(title,
-                  style: const TextStyle(
-                      color: FlixieColors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800)),
-            ),
-            if (onSeeAll != null)
-              TextButton(
-                onPressed: onSeeAll,
-                child: const Text('See all'),
-              ),
-          ],
+        FlixieSectionHeader(
+          title: title,
+          uppercase: false,
+          accentHeight: 22,
+          titleStyle: const TextStyle(
+            color: FlixieColors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            letterSpacing: .5,
+          ),
+          trailingLabel: onSeeAll == null ? null : 'See all',
+          trailingColor: FlixieColors.primary,
+          onTrailingTap: onSeeAll,
         ),
         Row(
           children: [

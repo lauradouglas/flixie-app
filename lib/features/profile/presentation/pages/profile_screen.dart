@@ -9,7 +9,6 @@ import 'package:flixie_app/models/movie_rating.dart';
 import 'package:flixie_app/models/continue_watching_show.dart';
 import 'package:flixie_app/models/watch_provider.dart';
 import 'package:flixie_app/models/review.dart';
-import 'package:flixie_app/models/movie_list.dart';
 import 'package:flixie_app/models/group.dart';
 import 'package:flixie_app/models/watch_request.dart';
 import 'package:flixie_app/models/movie_wrapped.dart';
@@ -22,6 +21,7 @@ import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/friends_row.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/movie_taste_badge.dart';
@@ -31,7 +31,7 @@ import 'package:flixie_app/features/profile/presentation/widgets/ratings_section
 import 'package:flixie_app/features/movies/data/show_service.dart';
 import 'package:flixie_app/features/movies/data/person_service.dart';
 import 'package:flixie_app/features/home/presentation/widgets/continue_watching_carousel.dart';
-import 'package:flixie_app/features/home/presentation/widgets/section_header.dart';
+import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 import 'package:flixie_app/features/settings/presentation/widgets/watch_providers_sheet.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/features/social/data/request_service.dart';
@@ -65,6 +65,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int _reviewCount = 0;
   List<Group> _groups = [];
   List<WatchRequest> _watchRequests = [];
+  bool _profileExtrasLoading = true;
   MovieWrapped? _wrapped;
   Map<int, Person> _directorPeople = {};
   Map<int, List<PersonCreditItem>> _directorCredits = {};
@@ -121,12 +122,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e, stackTrace) {
       logger.e('[ProfileScreen] Error in _loadAll: $e');
       logger.e('[ProfileScreen] Stack trace: $stackTrace');
+      if (mounted) {
+        setState(() {
+          _activityLoading = false;
+          _ratingsLoading = false;
+          _profileExtrasLoading = false;
+        });
+      }
     }
   }
 
   Future<void> _loadProfileExtras() async {
     final userId = context.read<AuthProvider>().dbUser?.id;
-    if (userId == null) return;
+    if (userId == null) {
+      if (mounted) setState(() => _profileExtrasLoading = false);
+      return;
+    }
     final results = await Future.wait<Object>([
       ShowService.getContinueWatching(userId)
           .catchError((_) => <ContinueWatchingShow>[]),
@@ -136,9 +147,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ProfileLookupController.instance
           .getUserMovieReviews(userId)
           .catchError((_) => <Review>[]),
-      ProfileLookupController.instance
-          .getMovieLists(userId)
-          .catchError((_) => <MovieList>[]),
       GroupService.getUserGroups(userId).catchError((_) => <Group>[]),
       RequestService.getWatchRequests(userId)
           .catchError((_) => <WatchRequest>[]),
@@ -155,7 +163,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 monthlyWatchCounts: const [],
               )),
     ]);
-    final wrapped = results[6] as MovieWrapped;
+    final wrapped = results[5] as MovieWrapped;
     final directorResults = await Future.wait(
       wrapped.topDirectors
           .where((director) => director.personId != null)
@@ -183,8 +191,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _watchProviders = results[1] as List<WatchProvider>;
       _reviews = results[2] as List<Review>;
       _reviewCount = _reviews.length;
-      _groups = results[4] as List<Group>;
-      _watchRequests = results[5] as List<WatchRequest>;
+      _groups = results[3] as List<Group>;
+      _watchRequests = results[4] as List<WatchRequest>;
+      _profileExtrasLoading = false;
       _wrapped = wrapped;
       _directorPeople = {
         for (final result in directorResults
@@ -382,71 +391,75 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        color: FlixieColors.primary,
-        onRefresh: () async {
-          await context.read<AuthProvider>().refreshUserData();
-          await _loadAll();
-        },
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Column(
-            children: [
-              // Avatar, name, bio & edit (full-width, no side padding)
-              ProfileHeader(
-                displayName: displayName,
-                username: username,
-                bio: bio,
-                iconColor: dbUser?.iconColor,
-                avatar: dbUser?.avatar,
-                profileBadges: dbUser?.profileBadges ?? const [],
-                memberSince: _memberSinceLabel(dbUser?.createdAt),
-                onPreview: userId == null
-                    ? null
-                    : () => context.push('/friends/$userId?preview=true'),
-              ),
-
-              Padding(
-                padding: const EdgeInsets.all(16),
+      body: _activityLoading && _ratingsLoading && _profileExtrasLoading
+          ? const ProfileScreenSkeleton()
+          : RefreshIndicator(
+              color: FlixieColors.primary,
+              onRefresh: () async {
+                await context.read<AuthProvider>().refreshUserData();
+                await _loadAll();
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _ProfileDashboard(
-                      watched: watchedCount,
-                      watchlist: watchlistCount,
-                      favorites: favoritesCount,
-                      averageRating: averageRating,
-                      onWatchHistory: () => context.push('/watch-history'),
-                      onWatchlist: () => context.push('/watchlist'),
-                      onFavourites: () =>
-                          setState(() => _selectedTab = _ProfileTab.library),
-                      onRecap: () => context.push('/stats'),
+                    // Avatar, name, bio & edit (full-width, no side padding)
+                    ProfileHeader(
+                      displayName: displayName,
+                      username: username,
+                      bio: bio,
+                      iconColor: dbUser?.iconColor,
+                      avatar: dbUser?.avatar,
+                      profileBadges: dbUser?.profileBadges ?? const [],
+                      memberSince: _memberSinceLabel(dbUser?.createdAt),
+                      onPreview: userId == null
+                          ? null
+                          : () => context.push('/friends/$userId?preview=true'),
                     ),
-                    const SizedBox(height: 18),
-                    _ProfileTabSelector(
-                      selected: _selectedTab,
-                      onSelected: (tab) => setState(() => _selectedTab = tab),
+
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _ProfileDashboard(
+                            watched: watchedCount,
+                            watchlist: watchlistCount,
+                            favorites: favoritesCount,
+                            averageRating: averageRating,
+                            onWatchHistory: () =>
+                                context.push('/watch-history'),
+                            onWatchlist: () => context.push('/watchlist'),
+                            onFavourites: () => setState(
+                                () => _selectedTab = _ProfileTab.library),
+                            onRecap: () => context.push('/stats'),
+                          ),
+                          const SizedBox(height: 18),
+                          _ProfileTabSelector(
+                            selected: _selectedTab,
+                            onSelected: (tab) =>
+                                setState(() => _selectedTab = tab),
+                          ),
+                          const SizedBox(height: 16),
+                          _buildSelectedTabContent(
+                            context: context,
+                            textTheme: textTheme,
+                            userId: userId,
+                            favoriteMovies: favoriteMovies,
+                            favoritePeople: favoritePeople,
+                            favoriteShows: dbUser?.favoriteShows ?? const [],
+                            favoriteGenres: dbUser?.favoriteGenres ?? const [],
+                            user: dbUser,
+                            visibleActivity: visibleActivity,
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 16),
-                    _buildSelectedTabContent(
-                      context: context,
-                      textTheme: textTheme,
-                      userId: userId,
-                      favoriteMovies: favoriteMovies,
-                      favoritePeople: favoritePeople,
-                      favoriteShows: dbUser?.favoriteShows ?? const [],
-                      favoriteGenres: dbUser?.favoriteGenres ?? const [],
-                      user: dbUser,
-                      visibleActivity: visibleActivity,
-                    ),
-                    const SizedBox(height: 16),
                   ],
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 
@@ -486,6 +499,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required List<dynamic> favoritePeople,
     required List<dynamic> favoriteShows,
   }) {
+    if (_profileExtrasLoading) {
+      return const _ProfileLibraryLoadingState();
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -496,7 +512,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
           ListsPreviewSection(
             userId: userId,
-            title: 'Your Lists',
+            title: 'Your lists',
             emptyMessage: "You haven't created any lists yet.",
             allowManage: true,
             embedded: true,
@@ -919,12 +935,16 @@ class _FavouritePosterRail extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: FlixieColors.light,
-                  fontWeight: FontWeight.w800,
-                ),
+          FlixieSectionHeader(
+            title: title,
+            uppercase: false,
+            accentHeight: 22,
+            titleStyle: const TextStyle(
+              color: FlixieColors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              letterSpacing: .5,
+            ),
           ),
           const SizedBox(height: 10),
           Expanded(
@@ -2138,7 +2158,17 @@ class _ProfileContinueWatching extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const HomeSectionHeader(title: 'Continue watching'),
+        const FlixieSectionHeader(
+          title: 'Continue watching',
+          uppercase: false,
+          accentHeight: 22,
+          titleStyle: TextStyle(
+            color: FlixieColors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            letterSpacing: .5,
+          ),
+        ),
         const SizedBox(height: 10),
         ContinueWatchingCarousel(
           shows: shows.take(10).toList(),
@@ -2148,6 +2178,48 @@ class _ProfileContinueWatching extends StatelessWidget {
       ],
     );
   }
+}
+
+class _ProfileLibraryLoadingState extends StatelessWidget {
+  const _ProfileLibraryLoadingState();
+
+  @override
+  Widget build(BuildContext context) => const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          FlixieSectionHeader(
+            title: 'Continue watching',
+            uppercase: false,
+            accentHeight: 22,
+            titleStyle: TextStyle(
+              color: FlixieColors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          SizedBox(height: 10),
+          Row(children: [
+            Expanded(child: SkeletonBox(height: 108, borderRadius: 14)),
+            SizedBox(width: 8),
+            Expanded(child: SkeletonBox(height: 108, borderRadius: 14)),
+          ]),
+          SizedBox(height: 20),
+          FlixieSectionHeader(
+            title: 'Your lists',
+            uppercase: false,
+            accentHeight: 22,
+            titleStyle: TextStyle(
+              color: FlixieColors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          SizedBox(height: 12),
+          SkeletonBox(height: 86, borderRadius: 14),
+          SizedBox(height: 10),
+          SkeletonBox(height: 86, borderRadius: 14),
+        ],
+      );
 }
 
 class _WatchProvidersSummary extends StatelessWidget {

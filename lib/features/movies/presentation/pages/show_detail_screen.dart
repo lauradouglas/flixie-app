@@ -17,6 +17,7 @@ import 'package:flixie_app/features/movies/presentation/widgets/hero_backdrop.da
 import 'package:flixie_app/features/movies/presentation/widgets/watch_provider_card.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/media_lists_section.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
+import 'package:flixie_app/core/utils/skeleton.dart';
 
 enum _ShowAction { watchlist, favorite }
 
@@ -544,9 +545,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     return Scaffold(
       backgroundColor: _background,
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: _primary),
-            )
+          ? const SafeArea(child: MediaDetailScreenSkeleton())
           : _error != null
               ? _ErrorState(message: _error!, onRetry: _load)
               : _buildBody(context),

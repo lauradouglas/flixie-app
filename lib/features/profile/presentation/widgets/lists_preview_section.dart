@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import 'package:flixie_app/models/movie_list.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/media_lists_section.dart';
+import 'package:flixie_app/core/auth/auth_provider.dart';
 
 class ListsPreviewSection extends StatelessWidget {
   const ListsPreviewSection({
@@ -26,8 +28,10 @@ class ListsPreviewSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cachedLists = context.watch<AuthProvider>().cachedMovieLists;
     return FutureBuilder<List<MovieList>>(
-      future: UserService.getMovieLists(userId),
+      future: cachedLists == null ? UserService.getMovieLists(userId) : null,
+      initialData: cachedLists,
       builder: (context, snapshot) {
         final loadedLists = snapshot.data ?? const <MovieList>[];
         final lists = publicOnly
@@ -50,7 +54,8 @@ class ListsPreviewSection extends StatelessWidget {
           );
         }).toList(growable: false);
 
-        final content = snapshot.connectionState == ConnectionState.waiting
+        final content = snapshot.connectionState == ConnectionState.waiting &&
+                snapshot.data == null
             ? MediaListsSection(
                 ownLists: const [],
                 friendLists: const [],

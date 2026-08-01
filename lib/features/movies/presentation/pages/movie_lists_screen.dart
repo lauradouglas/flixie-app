@@ -13,6 +13,7 @@ import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/models/group.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 
 class MovieListsScreen extends StatelessWidget {
@@ -79,7 +80,7 @@ class _MovieListsViewState extends State<_MovieListsView> {
     return FlixiePageScaffold(
       appBar: const FlixieTitleAppBar(title: Text('Your lists')),
       body: provider.isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const MovieListsScreenSkeleton()
           : provider.lists.isEmpty
               ? _EmptyState(
                   message:
