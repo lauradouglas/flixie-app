@@ -88,6 +88,18 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
   }
 
   @override
+  void didUpdateWidget(covariant GroupDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final nextTab = widget.initialTab;
+    if (nextTab != null &&
+        nextTab != _tabController.index &&
+        nextTab >= 0 &&
+        nextTab < _tabController.length) {
+      _tabController.animateTo(nextTab);
+    }
+  }
+
+  @override
   void dispose() {
     _tabController.dispose();
     super.dispose();

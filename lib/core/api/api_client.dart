@@ -54,6 +54,8 @@ class ApiClient {
   static final Map<String, Future<dynamic>> _inFlightGets = {};
 
   static String? _token;
+  static Future<String> Function()? _authTokenRefresher;
+  static Future<String>? _tokenRefreshInFlight;
 
   static void setToken(String? token) {
     _token = token;
@@ -65,6 +67,10 @@ class ApiClient {
       // are not reused by a subsequent user session.
       _inFlightGets.clear();
     }
+  }
+
+  static void setAuthTokenRefresher(Future<String> Function()? refresher) {
+    _authTokenRefresher = refresher;
   }
 
   static String? getToken() => _token;
@@ -139,11 +145,55 @@ class ApiClient {
       return existing;
     }
 
-    final future = _fetchWithRetry(uri, authenticated: authenticated);
+    final future = _withAuthRetry(
+      authenticated: authenticated,
+      requestLabel: 'GET $uri',
+      request: () => _fetchWithRetry(uri, authenticated: authenticated),
+    );
     _inFlightGets[key] = future;
     future.then<void>((_) => _inFlightGets.remove(key),
         onError: (_) => _inFlightGets.remove(key));
     return future;
+  }
+
+  static Future<T> _withAuthRetry<T>({
+    required bool authenticated,
+    required String requestLabel,
+    required Future<T> Function() request,
+  }) async {
+    try {
+      return await request();
+    } on ApiException catch (error) {
+      if (!authenticated ||
+          error.statusCode != 401 ||
+          _authTokenRefresher == null) {
+        rethrow;
+      }
+      apiLogger.w(
+        '$requestLabel returned 401 — refreshing auth token and retrying once',
+      );
+      await _refreshAuthToken();
+      return request();
+    }
+  }
+
+  static Future<void> _refreshAuthToken() async {
+    final refresher = _authTokenRefresher;
+    if (refresher == null) return;
+    final inFlight = _tokenRefreshInFlight;
+    if (inFlight != null) {
+      await inFlight;
+      return;
+    }
+    final refreshFuture = refresher();
+    _tokenRefreshInFlight = refreshFuture;
+    try {
+      await refreshFuture;
+    } finally {
+      if (identical(_tokenRefreshInFlight, refreshFuture)) {
+        _tokenRefreshInFlight = null;
+      }
+    }
   }
 
   static Future<dynamic> _fetchWithRetry(
@@ -200,46 +250,70 @@ class ApiClient {
     apiLogger.d(
         'Headers: ${_headers().map((k, v) => MapEntry(k, k == "Authorization" ? "[REDACTED]" : v))}');
     if (logBody != null) apiLogger.d('Body: $logBody');
-    final response = await http
-        .post(
-          _buildUri(path),
-          headers: _headers(),
-          body: body != null ? jsonEncode(body) : null,
-        )
-        .timeout(_timeout);
-    return _parseResponse(response);
+    return _withAuthRetry(
+      authenticated: true,
+      requestLabel: 'POST $path',
+      request: () async {
+        final response = await http
+            .post(
+              _buildUri(path),
+              headers: _headers(),
+              body: body != null ? jsonEncode(body) : null,
+            )
+            .timeout(_timeout);
+        return _parseResponse(response);
+      },
+    );
   }
 
   static Future<dynamic> put(String path, {dynamic body}) async {
-    final response = await http
-        .put(
-          _buildUri(path),
-          headers: _headers(),
-          body: body != null ? jsonEncode(body) : null,
-        )
-        .timeout(_timeout);
-    return _parseResponse(response);
+    return _withAuthRetry(
+      authenticated: true,
+      requestLabel: 'PUT $path',
+      request: () async {
+        final response = await http
+            .put(
+              _buildUri(path),
+              headers: _headers(),
+              body: body != null ? jsonEncode(body) : null,
+            )
+            .timeout(_timeout);
+        return _parseResponse(response);
+      },
+    );
   }
 
   static Future<dynamic> patch(String path, {dynamic body}) async {
-    final response = await http
-        .patch(
-          _buildUri(path),
-          headers: _headers(),
-          body: body != null ? jsonEncode(body) : null,
-        )
-        .timeout(_timeout);
-    return _parseResponse(response);
+    return _withAuthRetry(
+      authenticated: true,
+      requestLabel: 'PATCH $path',
+      request: () async {
+        final response = await http
+            .patch(
+              _buildUri(path),
+              headers: _headers(),
+              body: body != null ? jsonEncode(body) : null,
+            )
+            .timeout(_timeout);
+        return _parseResponse(response);
+      },
+    );
   }
 
   static Future<dynamic> delete(String path, {dynamic body}) async {
-    final request = http.Request('DELETE', _buildUri(path));
-    request.headers.addAll(_headers());
-    if (body != null) {
-      request.body = jsonEncode(body);
-    }
-    final streamedResponse = await request.send().timeout(_timeout);
-    final response = await http.Response.fromStream(streamedResponse);
-    return _parseResponse(response);
+    return _withAuthRetry(
+      authenticated: true,
+      requestLabel: 'DELETE $path',
+      request: () async {
+        final request = http.Request('DELETE', _buildUri(path));
+        request.headers.addAll(_headers());
+        if (body != null) {
+          request.body = jsonEncode(body);
+        }
+        final streamedResponse = await request.send().timeout(_timeout);
+        final response = await http.Response.fromStream(streamedResponse);
+        return _parseResponse(response);
+      },
+    );
   }
 }

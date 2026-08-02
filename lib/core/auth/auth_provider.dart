@@ -60,6 +60,7 @@ class AuthProvider extends ChangeNotifier {
     _profileLoader = profileLoader ?? UserService.getUserByExternalId;
     _prefetchAfterAuth = prefetchAfterAuth;
     _avatarSelector = avatarSelector ?? AvatarService.selectAvatar;
+    ApiClient.setAuthTokenRefresher(_authService.refreshIdToken);
     _authStateSubscription = _authService.authStateChanges.listen((user) {
       unawaited(_onAuthStateChanged(user));
     });
@@ -220,6 +221,9 @@ class AuthProvider extends ChangeNotifier {
   int? _pendingAvatarId;
   bool _isHandlingAuthState = false;
   Future<void>? _authStateChangeFuture;
+  DateTime? _lastResumeRefreshAt;
+  Future<void>? _resumeRefreshFuture;
+  static const Duration _resumeRefreshThrottle = Duration(minutes: 2);
 
   Future<void> _onAuthStateChanged(firebase_auth.User? user) async {
     // During sign-up the flow is managed directly in signUp(); skip here.
@@ -495,6 +499,42 @@ class AuthProvider extends ChangeNotifier {
     } catch (e) {
       logger.w('[AuthProvider] refreshUserData error: $e');
     }
+  }
+
+  /// Runs a lightweight auth + data refresh after long background periods.
+  Future<void> handleAppResumed() async {
+    if (_status != AuthStatus.authenticated || _firebaseUser == null) return;
+    final inFlight = _resumeRefreshFuture;
+    if (inFlight != null) {
+      await inFlight;
+      return;
+    }
+    final now = DateTime.now();
+    final lastRefresh = _lastResumeRefreshAt;
+    if (lastRefresh != null &&
+        now.difference(lastRefresh) < _resumeRefreshThrottle) {
+      return;
+    }
+    final refreshFuture = _refreshAfterResume();
+    _resumeRefreshFuture = refreshFuture;
+    try {
+      await refreshFuture;
+    } finally {
+      if (identical(_resumeRefreshFuture, refreshFuture)) {
+        _resumeRefreshFuture = null;
+      }
+    }
+  }
+
+  Future<void> _refreshAfterResume() async {
+    _lastResumeRefreshAt = DateTime.now();
+    try {
+      await _authService.refreshIdToken();
+    } catch (e) {
+      logger.w('[AuthProvider] token refresh on resume failed: $e');
+    }
+    await refreshUserData();
+    await refreshNotificationCount();
   }
 
   /// Replaces the cached db user with [user] and notifies listeners.
@@ -1008,6 +1048,7 @@ class AuthProvider extends ChangeNotifier {
   @override
   void dispose() {
     _notificationPoller.stop();
+    ApiClient.setAuthTokenRefresher(null);
     _authStateSubscription?.cancel();
     _authStatusNotifier.dispose();
     super.dispose();

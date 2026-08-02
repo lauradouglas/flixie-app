@@ -3,7 +3,22 @@ String notificationDeepLinkPath(Map<String, dynamic> data) {
   final type = (data['type']?.toString() ?? '').toUpperCase();
   final groupId = data['groupId']?.toString();
   final friendId = data['friendId']?.toString();
+  final routeGroupId = _groupIdFromRoute(route);
+  final routeTab = Uri.tryParse(route ?? '')?.queryParameters['tab'];
   final requestId = _watchRequestId(data, route, type);
+
+  if (type == 'GROUP_MESSAGE' ||
+      type == 'MESSAGE' ||
+      type == 'TEXT' ||
+      type == 'IMAGE') {
+    if (routeGroupId != null && routeTab == 'chat') {
+      return '/groups/$routeGroupId?tab=chat';
+    }
+    final targetGroupId = groupId ?? routeGroupId;
+    if (targetGroupId != null && targetGroupId.isNotEmpty) {
+      return '/groups/$targetGroupId?tab=chat';
+    }
+  }
 
   // Older lifecycle pushes used an API-style `/conversations/...` route that
   // has never been an app route. Prefer the request's dedicated full-page
@@ -16,15 +31,6 @@ String notificationDeepLinkPath(Map<String, dynamic> data) {
   }
 
   if (route != null && route.startsWith('/')) return route;
-
-  if ((type == 'GROUP_MESSAGE' ||
-          type == 'MESSAGE' ||
-          type == 'TEXT' ||
-          type == 'IMAGE') &&
-      groupId != null &&
-      groupId.isNotEmpty) {
-    return '/groups/$groupId?tab=chat';
-  }
 
   if ((type == 'MOVIE_WATCH_REQUEST' ||
           type == 'SHOW_WATCH_REQUEST' ||
@@ -76,4 +82,13 @@ String? _watchRequestId(
 
   if (route == null || !route.startsWith('/conversations/')) return null;
   return Uri.tryParse(route)?.queryParameters['watchRequestId'];
+}
+
+String? _groupIdFromRoute(String? route) {
+  if (route == null || route.isEmpty || !route.startsWith('/')) return null;
+  final uri = Uri.tryParse(route);
+  if (uri == null || uri.pathSegments.length < 2) return null;
+  if (uri.pathSegments[0] != 'groups') return null;
+  final id = uri.pathSegments[1];
+  return id.isEmpty ? null : id;
 }

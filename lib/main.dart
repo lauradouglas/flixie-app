@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -146,17 +148,31 @@ class FlixieApp extends StatefulWidget {
   State<FlixieApp> createState() => _FlixieAppState();
 }
 
-class _FlixieAppState extends State<FlixieApp> {
+class _FlixieAppState extends State<FlixieApp> with WidgetsBindingObserver {
   late final GoRouter _router;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Create router once - it will refresh via authStatusListenable, not by rebuilding this widget
     final authProvider = context.read<AuthProvider>();
     _router = buildRouter(authProvider);
     // Give the navigator key to AuthProvider so push notifications can navigate.
     authProvider.setNavigatorKey(rootNavigatorKey);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(context.read<AuthProvider>().handleAppResumed());
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   @override
