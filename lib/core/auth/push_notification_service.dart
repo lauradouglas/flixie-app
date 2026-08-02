@@ -62,6 +62,9 @@ class PushNotificationService {
   static StreamSubscription<String>? _tokenRefreshSubscription;
   static StreamSubscription<RemoteMessage>? _onMessageSubscription;
   static StreamSubscription<RemoteMessage>? _onMessageOpenedSubscription;
+  static Timer? _pendingNavigationTimer;
+  static String? _lastNavigatedPath;
+  static DateTime? _lastNavigatedAt;
 
   /// The userId of the currently logged-in user. Used to suppress
   /// notifications intended for a different user (e.g. the sender).
@@ -79,6 +82,9 @@ class PushNotificationService {
   /// via a notification tap. The widget tree needs time to fully mount before
   /// GoRouter can process a navigation call.
   static const _launchNavigationDelay = Duration(milliseconds: 500);
+  static const _navigationRetryDelay = Duration(milliseconds: 250);
+  static const _duplicateNavigationWindow = Duration(seconds: 2);
+  static const int _maxNavigationAttempts = 12;
 
   /// Initialises FCM for [userId].
   ///
@@ -239,10 +245,8 @@ class PushNotificationService {
       ),
       onDidReceiveNotificationResponse: (response) {
         final path = response.payload;
-        final context = navigatorKey.currentContext;
-        if (context == null) return;
         if (path != null && path.isNotEmpty) {
-          GoRouter.of(context).go(path);
+          _navigateToPath(path, navigatorKey);
         } else {
           _navigateToNotifications(navigatorKey);
         }
@@ -381,9 +385,7 @@ class PushNotificationService {
   ) {
     final path = notificationDeepLinkPath(message.data);
     logger.d('[FCM] Deep-link → $path');
-    final context = navigatorKey.currentContext;
-    if (context == null) return;
-    GoRouter.of(context).go(path);
+    _navigateToPath(path, navigatorKey);
   }
 
   static String _redactToken(String? token) {
@@ -393,8 +395,40 @@ class PushNotificationService {
   }
 
   static void _navigateToNotifications(GlobalKey<NavigatorState> navigatorKey) {
+    _navigateToPath('/notifications', navigatorKey);
+  }
+
+  static void _navigateToPath(
+    String path,
+    GlobalKey<NavigatorState> navigatorKey, {
+    int attempt = 0,
+  }) {
+    final now = DateTime.now();
+    if (attempt == 0 &&
+        _lastNavigatedPath == path &&
+        _lastNavigatedAt != null &&
+        now.difference(_lastNavigatedAt!) < _duplicateNavigationWindow) {
+      logger.d('[FCM] Ignoring duplicate deep-link tap: $path');
+      return;
+    }
+
     final context = navigatorKey.currentContext;
-    if (context == null) return;
-    GoRouter.of(context).go('/notifications');
+    if (context == null) {
+      if (attempt >= _maxNavigationAttempts) {
+        logger.w('[FCM] Failed to navigate to $path (context unavailable)');
+        return;
+      }
+      _pendingNavigationTimer?.cancel();
+      _pendingNavigationTimer = Timer(_navigationRetryDelay, () {
+        _navigateToPath(path, navigatorKey, attempt: attempt + 1);
+      });
+      return;
+    }
+
+    _pendingNavigationTimer?.cancel();
+    _pendingNavigationTimer = null;
+    _lastNavigatedPath = path;
+    _lastNavigatedAt = now;
+    GoRouter.of(context).go(path);
   }
 }
