@@ -40,6 +40,24 @@ void main() {
     expect(User.fromJson(json(avatarToJson())).avatar?.id, 1);
   });
 
+  test('user parsing tolerates null required string fields', () {
+    final parsed = User.fromJson({
+      'id': null,
+      'username': null,
+      'email': null,
+      'iconColorId': null,
+      'completedSetup': null,
+      'darkMode': null,
+    });
+
+    expect(parsed.id, '');
+    expect(parsed.username, 'user');
+    expect(parsed.email, '');
+    expect(parsed.iconColorId, 0);
+    expect(parsed.completedSetup, isFalse);
+    expect(parsed.darkMode, isFalse);
+  });
+
   test('download URLs are cached by storage path', () async {
     var calls = 0;
     final resolver = AvatarUrlResolver(loader: (path) async {

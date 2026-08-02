@@ -1305,19 +1305,7 @@ class _WatchRequestCard extends StatelessWidget {
   }
 
   String get _statusLabel {
-    if (request.normalizedWatchedStatus == 'WATCHED') return 'Watched';
-    if (request.normalizedWatchedStatus == 'NOT_WATCHED') {
-      return 'Not watched';
-    }
-    if (request.normalizedWatchedStatus == 'PARTIAL') {
-      return 'Confirming';
-    }
-    if (request.normalizedScheduleStatus == 'AGREED') return 'Scheduled';
-    if (request.normalizedScheduleStatus == 'PROPOSED') return 'Proposed';
-    if (request.isAccepted) return 'Accepted';
-    if (request.isDeclined) return 'Declined';
-    if (request.normalizedStatus == 'maybe') return 'Maybe';
-    return 'Pending';
+    return request.displayStatusLabel;
   }
 
   @override
@@ -1904,6 +1892,7 @@ class _WatchRequestCard extends StatelessWidget {
 
     final accepted = visible.where(hasAccepted).length;
     final waiting = visible.length - accepted;
+    final schedulingInProgress = request.isAwaitingScheduleApproval;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1917,15 +1906,21 @@ class _WatchRequestCard extends StatelessWidget {
               .map((user) => _participantAvatar(
                     user,
                     accepted: hasAccepted(user),
+              schedulingInProgress:
+                schedulingInProgress && hasAccepted(user),
                   ))
               .toList(growable: false),
         ),
         const SizedBox(height: 10),
         Text(
           accepted == visible.length && visible.isNotEmpty
-              ? 'All $accepted accepted'
+            ? schedulingInProgress
+              ? 'All $accepted accepted · scheduling in progress'
+              : 'All $accepted accepted'
               : accepted > 0
-                  ? '$accepted accepted · $waiting waiting'
+              ? schedulingInProgress
+                ? '$accepted accepted · $waiting waiting · scheduling in progress'
+                : '$accepted accepted · $waiting waiting'
                   : 'Waiting for responses',
           style: TextStyle(
               color: accepted > 0 ? FlixieColors.success : FlixieColors.medium,
@@ -1939,6 +1934,7 @@ class _WatchRequestCard extends StatelessWidget {
   Widget _participantAvatar(
     WatchRequestUser user, {
     required bool accepted,
+    required bool schedulingInProgress,
   }) {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -1955,18 +1951,25 @@ class _WatchRequestCard extends StatelessWidget {
               size: 46,
             ),
             if (accepted)
-              const Positioned(
+              Positioned(
                 top: -3,
                 right: -3,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: FlixieColors.success,
+                    color: schedulingInProgress
+                        ? FlixieColors.primary
+                        : FlixieColors.success,
                     shape: BoxShape.circle,
                   ),
                   child: Padding(
-                    padding: EdgeInsets.all(3),
-                    child: Icon(Icons.check_rounded,
-                        color: Colors.black, size: 12),
+                    padding: const EdgeInsets.all(3),
+                    child: Icon(
+                      schedulingInProgress
+                          ? Icons.hourglass_top_rounded
+                          : Icons.check_rounded,
+                      color: Colors.black,
+                      size: 12,
+                    ),
                   ),
                 ),
               ),
@@ -1981,7 +1984,11 @@ class _WatchRequestCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: accepted ? FlixieColors.success : FlixieColors.medium,
+              color: accepted
+                  ? (schedulingInProgress
+                      ? FlixieColors.primary
+                      : FlixieColors.success)
+                  : FlixieColors.medium,
               fontSize: 10,
               fontWeight: FontWeight.w700,
             ),
@@ -2338,12 +2345,16 @@ class _DetailStatusBadge extends StatelessWidget {
         children: [
           Icon(icon, size: 14, color: color),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
@@ -2449,6 +2460,9 @@ class _LifecycleSummary extends StatelessWidget {
       }
       if (request.normalizedScheduleStatus == 'CANCELLED') {
         return 'Schedule cancelled';
+      }
+      if (request.isAwaitingScheduleApproval) {
+        return 'Accepted · scheduling in progress';
       }
       return 'You’re both up for it. Add a time or location when you’re ready.';
     }

@@ -1,7 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:palette_generator/palette_generator.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -39,7 +41,10 @@ import 'package:flixie_app/features/movies/presentation/widgets/video_card.dart'
 import 'package:flixie_app/features/movies/presentation/widgets/media_lists_section.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/watch_request_sheet.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/write_review_sheet.dart';
+import 'package:flixie_app/features/social/data/chat_service.dart';
+import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
+import 'package:flixie_app/models/group.dart';
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -66,6 +71,85 @@ enum FriendActivityTab { all, watched, watchlist, ratings, reviews, lists }
 enum WatchProviderTab { stream, rent, buy }
 
 enum MovieDetailTab { overview, reviews, activity, details }
+
+class _MovieDetailHeroTokens {
+  const _MovieDetailHeroTokens._();
+
+  static const double pageHorizontalPadding = 16;
+  static const double heroToWatchSectionGap = 22;
+  static const double heroControlsTopInset = 2;
+  static const double heroSurfaceTopPadding = 8;
+  static const double heroSurfaceBottomPadding = 10;
+  static const double heroTopScrimHeight = 112;
+
+  static const double navButtonSize = 44;
+  static const double navIconSize = 21;
+  static const double navIconSizeMinimal = 20;
+  static const double navButtonLightBgAlpha = 0.30;
+  static const double navButtonDarkBgAlpha = 0.42;
+  static const double navButtonDarkMinimalBgAlpha = 0.18;
+  static const double navButtonBorderAlpha = 0.24;
+  static const double navButtonMinimalBorderAlpha = 0.18;
+  static const double navButtonShadowAlpha = 0.28;
+  static const double navButtonMinimalShadowAlpha = 0.12;
+  static const double navButtonBlurSigma = 12;
+  static const double navButtonMinimalBlurSigma = 6;
+  static const double navButtonBorderWidth = 0.85;
+  static const double navButtonMinimalBorderWidth = 0.7;
+
+  static const double posterCompactWidthFactor = 0.40;
+  static const double posterRegularWidthFactor = 0.36;
+  static const double posterMinWidth = 120;
+  static const double posterMaxWidth = 168;
+  static const double posterCornerRadius = 16;
+  static const double posterAspectRatio = 2 / 3;
+
+  static const double heroColumnGap = 12;
+  static const double heroContentRightInset = 14;
+
+  static const double textBlockGapCompact = 8;
+  static const double textBlockGapRegular = 10;
+  static const double genreTopGapCompact = 10;
+  static const double genreTopGapRegular = 12;
+
+  static const double titleCompact = 22;
+  static const double titleRegular = 30;
+  static const double titleWide = 36;
+  static const double titleLineHeight = 1.03;
+  static const double titleLetterSpacing = 0.05;
+
+  static const double metadataCompact = 13;
+  static const double metadataRegular = 15;
+  static const double metadataAlpha = 0.92;
+  static const double metadataLineHeight = 1.1;
+
+  static const double directorLabelCompact = 12;
+  static const double directorLabelRegular = 13;
+  static const double directorNameCompact = 13;
+  static const double directorNameRegular = 15;
+
+  static const double taglineCompact = 14;
+  static const double taglineRegular = 16;
+  static const double taglineLineHeight = 1.18;
+
+  static const double flixScoreHorizontalPadding = 11;
+  static const double flixScoreVerticalPadding = 7;
+  static const double flixScoreBackgroundAlpha = 0.48;
+  static const double flixScoreBorderAlpha = 0.65;
+  static const double flixScoreIconSize = 17;
+  static const double flixScoreValueSize = 14;
+  static const double flixScoreLabelSize = 12;
+
+  static const double linksSpacingCompact = 12;
+  static const double linksSpacingRegular = 24;
+  static const double linksRunSpacing = 6;
+  static const double textActionRadius = 8;
+  static const double textActionVerticalPadding = 3;
+  static const double textActionIconCompact = 18;
+  static const double textActionIconRegular = 22;
+  static const double textActionLabelCompact = 10.5;
+  static const double textActionLabelRegular = 13;
+}
 
 class _MovieDetailScreenState extends State<MovieDetailScreen> {
   static const double _sectionSpacing = 24;
@@ -103,6 +187,15 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   bool _watchHistoryLoading = false;
   FriendActivityTab _friendsActivityTab = FriendActivityTab.all;
   bool _showFullSynopsis = false;
+  String? _heroControlPosterPath;
+  Color _heroControlBackgroundColor = Colors.black
+      .withValues(alpha: _MovieDetailHeroTokens.navButtonDarkBgAlpha);
+  Color _heroControlIconColor = FlixieColors.white;
+  Color _heroControlBorderColor = Colors.white
+      .withValues(alpha: _MovieDetailHeroTokens.navButtonBorderAlpha);
+  Color _heroControlShadowColor = Colors.black
+      .withValues(alpha: _MovieDetailHeroTokens.navButtonShadowAlpha);
+  bool _heroControlMinimal = false;
   static const List<Color> _kGenreChipColors = [
     FlixieColors.primary,
     FlixieColors.secondary,
@@ -150,7 +243,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           return await future;
         } catch (e) {
           apiLogger.e('Movie detail load failed at $step for movie $id: $e');
-          rethrow;
+          throw Exception('Movie detail step failed [$step]: $e');
         }
       }
 
@@ -240,6 +333,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
           _isLoading = false;
         });
+        _syncHeroControlContrast(results[0] as Movie);
         if (userId != null) {
           _loadWatchHistory(userId, id);
           _loadListsContainingMovie(userId, id);
@@ -856,18 +950,20 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-            _buildSliverAppBar(context, movie),
+            SliverToBoxAdapter(
+              child: _buildMovieIntro(context, movie),
+            ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: _MovieDetailHeroTokens.pageHorizontalPadding),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 2),
-                    _buildMovieIntro(context, movie),
-                    const SizedBox(height: 10),
+                    const SizedBox(
+                        height: _MovieDetailHeroTokens.heroToWatchSectionGap),
                     _buildActionButtons(),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 18),
                     _buildWhereToWatchSection(context),
                     const SizedBox(height: 12),
                     _buildFriendSummarySection(context),
@@ -894,100 +990,139 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     );
   }
 
-  // ---- Compact top actions -------------------------------------------------
+  // ---- Hero top actions ----------------------------------------------------
 
-  Widget _buildSliverAppBar(BuildContext context, Movie movie) {
-    return SliverAppBar(
-      toolbarHeight: 60,
-      pinned: true,
-      backgroundColor: FlixieColors.background,
-      automaticallyImplyLeading: false,
-      titleSpacing: 16,
-      title: Row(
-        children: [
-          _heroIconButton(
-            icon: Icons.arrow_back_ios_new_rounded,
-            onTap: () => context.pop(),
-          ),
-          const Spacer(),
-          PopupMenuButton<String>(
-            tooltip: 'More actions',
-            padding: EdgeInsets.zero,
-            color: FlixieColors.tabBarBackgroundFocused,
-            icon: const Icon(
-              Icons.more_horiz_rounded,
-              color: FlixieColors.light,
-              size: 21,
-            ),
-            onSelected: (value) {
-              if (value == 'rewatch') {
-                if (_isWatched) {
-                  _showLogWatchSheet();
-                }
-              } else if (value == 'list') {
-                _showAddToListSheet();
-              } else if (value == 'request') {
-                _showWatchRequestSheet();
-              }
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem(
-                value: 'rewatch',
-                child: Row(
-                  children: [
-                    Icon(Icons.replay_rounded,
-                        color: FlixieColors.primary, size: 20),
-                    SizedBox(width: 8),
-                    Text('Log rewatch',
-                        style: TextStyle(color: FlixieColors.light)),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'list',
-                child: Row(
-                  children: [
-                    Icon(Icons.playlist_add_rounded,
-                        color: FlixieColors.secondary, size: 20),
-                    SizedBox(width: 8),
-                    Text('Add to list',
-                        style: TextStyle(color: FlixieColors.light)),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'request',
-                child: Row(
-                  children: [
-                    Icon(Icons.group_add_outlined,
-                        color: FlixieColors.primary, size: 20),
-                    SizedBox(width: 8),
-                    Text('Request to watch',
-                        style: TextStyle(color: FlixieColors.light)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+  void _setHeroControlScheme({
+    required bool darkPoster,
+  }) {
+    if (darkPoster) {
+      _heroControlMinimal = true;
+      _heroControlBackgroundColor = Colors.black.withValues(
+          alpha: _MovieDetailHeroTokens.navButtonDarkMinimalBgAlpha);
+      _heroControlIconColor = FlixieColors.white;
+      _heroControlBorderColor = Colors.white.withValues(
+          alpha: _MovieDetailHeroTokens.navButtonMinimalBorderAlpha);
+      _heroControlShadowColor = Colors.black.withValues(
+          alpha: _MovieDetailHeroTokens.navButtonMinimalShadowAlpha);
+      return;
+    }
+
+    _heroControlMinimal = false;
+    _heroControlBackgroundColor = Colors.white
+        .withValues(alpha: _MovieDetailHeroTokens.navButtonLightBgAlpha);
+    _heroControlIconColor = Colors.black.withValues(alpha: 0.88);
+    _heroControlBorderColor = Colors.black.withValues(alpha: 0.18);
+    _heroControlShadowColor = Colors.black.withValues(alpha: 0.18);
+  }
+
+  Future<void> _syncHeroControlContrast(Movie movie) async {
+    final posterPath = movie.posterPath;
+    if (_heroControlPosterPath == posterPath) return;
+    _heroControlPosterPath = posterPath;
+
+    if (posterPath == null || posterPath.isEmpty) {
+      if (mounted) {
+        setState(() => _setHeroControlScheme(darkPoster: false));
+      }
+      return;
+    }
+
+    final posterUrl = 'https://image.tmdb.org/t/p/w342$posterPath';
+    try {
+      final palette = await PaletteGenerator.fromImageProvider(
+        CachedNetworkImageProvider(posterUrl),
+        size: const Size(120, 180),
+        maximumColorCount: 12,
+      );
+
+      if (!mounted || _heroControlPosterPath != posterPath) return;
+
+      final swatch = palette.dominantColor?.color ??
+          palette.vibrantColor?.color ??
+          palette.darkVibrantColor?.color ??
+          palette.mutedColor?.color;
+
+      if (swatch == null) {
+        setState(() => _setHeroControlScheme(darkPoster: false));
+        return;
+      }
+
+      final isLightPoster =
+          ThemeData.estimateBrightnessForColor(swatch) == Brightness.light;
+      setState(() => _setHeroControlScheme(darkPoster: !isLightPoster));
+    } catch (_) {
+      if (!mounted || _heroControlPosterPath != posterPath) return;
+      setState(() => _setHeroControlScheme(darkPoster: false));
+    }
   }
 
   Widget _heroIconButton({
     required IconData icon,
     required VoidCallback onTap,
   }) {
-    return SizedBox(
-      width: 46,
-      height: 46,
-      child: IconButton(
-        onPressed: onTap,
-        style: IconButton.styleFrom(
-          backgroundColor: Colors.black.withValues(alpha: 0.45),
-          shape: const CircleBorder(),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: SizedBox(
+          width: _MovieDetailHeroTokens.navButtonSize,
+          height: _MovieDetailHeroTokens.navButtonSize,
+          child: _heroControlChrome(
+            child: Icon(
+              icon,
+              color: _heroControlIconColor,
+              size: _heroControlMinimal
+                  ? _MovieDetailHeroTokens.navIconSizeMinimal
+                  : _MovieDetailHeroTokens.navIconSize,
+            ),
+          ),
         ),
-        icon: Icon(icon, color: FlixieColors.light, size: 21),
+      ),
+    );
+  }
+
+  Widget _heroControlChrome({required Widget child}) {
+    final blurSigma = _heroControlMinimal
+        ? _MovieDetailHeroTokens.navButtonMinimalBlurSigma
+        : _MovieDetailHeroTokens.navButtonBlurSigma;
+    final borderWidth = _heroControlMinimal
+        ? _MovieDetailHeroTokens.navButtonMinimalBorderWidth
+        : _MovieDetailHeroTokens.navButtonBorderWidth;
+
+    return ClipOval(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(
+          sigmaX: blurSigma,
+          sigmaY: blurSigma,
+        ),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                _heroControlMinimal
+                    ? _heroControlBackgroundColor
+                    : _heroControlBackgroundColor.withValues(alpha: 0.78),
+                _heroControlBackgroundColor,
+              ],
+            ),
+            border: Border.all(
+              color: _heroControlBorderColor,
+              width: borderWidth,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: _heroControlShadowColor,
+                blurRadius: _heroControlMinimal ? 4 : 10,
+                offset: Offset(0, _heroControlMinimal ? 2 : 4),
+              ),
+            ],
+          ),
+          child: Center(child: child),
+        ),
       ),
     );
   }
@@ -996,116 +1131,192 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 500;
-        final posterWidth =
-            compact ? constraints.maxWidth * 0.42 : constraints.maxWidth * 0.46;
-        // The compact information column can be taller than a 2:3 poster when
-        // a tagline, director, genres and trailer are all present.
-        final heroHeight = posterWidth * 1.5 + (compact ? 22 : 0);
-        return SizedBox(
-          height: heroHeight,
-          child: Container(
-            decoration: BoxDecoration(
-              color: FlixieColors.surface.withValues(alpha: 0.72),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: FlixieColors.light.withValues(alpha: 0.2),
+        final safeTop = MediaQuery.paddingOf(context).top;
+        final heroContentTopPadding =
+            safeTop + _MovieDetailHeroTokens.heroSurfaceTopPadding;
+        final heroScrimHeight =
+            safeTop + _MovieDetailHeroTokens.heroTopScrimHeight;
+        final posterWidth = (constraints.maxWidth *
+                (compact
+                    ? _MovieDetailHeroTokens.posterCompactWidthFactor
+                    : _MovieDetailHeroTokens.posterRegularWidthFactor))
+            .clamp(_MovieDetailHeroTokens.posterMinWidth,
+                _MovieDetailHeroTokens.posterMaxWidth);
+
+        return Stack(
+          children: [
+            Padding(
+              padding: EdgeInsets.only(
+                top: heroContentTopPadding,
+                bottom: _MovieDetailHeroTokens.heroSurfaceBottomPadding,
               ),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(
-                  width: posterWidth,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(17),
-                    child: movie.posterPath == null
-                        ? Container(
-                            color: FlixieColors.tabBarBackgroundFocused,
-                            child: const Icon(Icons.movie_outlined,
-                                color: FlixieColors.medium, size: 42),
-                          )
-                        : CachedNetworkImage(
-                            imageUrl:
-                                'https://image.tmdb.org/t/p/w780${movie.posterPath}',
-                            fit: BoxFit.cover,
-                            alignment: Alignment.center,
-                            errorWidget: (_, __, ___) => const Center(
-                              child: Icon(Icons.movie_outlined,
-                                  color: FlixieColors.medium, size: 42),
-                            ),
-                          ),
-                  ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      compact ? 12 : 24,
-                      compact ? 10 : 18,
-                      compact ? 10 : 18,
-                      compact ? 10 : 18,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: _buildHeroFlixScoreBadge(context, movie),
-                        ),
-                        SizedBox(height: compact ? 9 : 16),
-                        _buildTitleBlock(context, movie, compact: compact),
-                        if ((movie.tagline ?? '').isNotEmpty) ...[
-                          SizedBox(height: compact ? 9 : 16),
-                          Text(
-                            movie.tagline!,
-                            maxLines: compact ? 2 : 3,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: FlixieColors.success,
-                              fontSize: compact ? 13 : 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                        if (_director != null) ...[
-                          SizedBox(height: compact ? 9 : 16),
-                          Wrap(
-                            children: [
-                              Text(
-                                'Directed by ',
-                                style: TextStyle(
-                                  color: FlixieColors.medium,
-                                  fontSize: compact ? 12 : 14,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: posterWidth.toDouble(),
+                    child: AspectRatio(
+                      aspectRatio: _MovieDetailHeroTokens.posterAspectRatio,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(
+                            _MovieDetailHeroTokens.posterCornerRadius),
+                        child: movie.posterPath == null
+                            ? Container(
+                                color: FlixieColors.tabBarBackgroundFocused,
+                                child: const Icon(Icons.movie_outlined,
+                                    color: FlixieColors.medium, size: 42),
+                              )
+                            : CachedNetworkImage(
+                                imageUrl:
+                                    'https://image.tmdb.org/t/p/w780${movie.posterPath}',
+                                fit: BoxFit.cover,
+                                alignment: Alignment.center,
+                                errorWidget: (_, __, ___) => const Center(
+                                  child: Icon(Icons.movie_outlined,
+                                      color: FlixieColors.medium, size: 42),
                                 ),
                               ),
-                              GestureDetector(
-                                onTap: () =>
-                                    context.push('/people/${_director!.id}'),
-                                child: Text(
-                                  _director!.name,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: _MovieDetailHeroTokens.heroColumnGap),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(
+                        right: _MovieDetailHeroTokens.heroContentRightInset,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildTitleBlock(context, movie, compact: compact),
+                          SizedBox(
+                            height: compact
+                                ? _MovieDetailHeroTokens.textBlockGapCompact
+                                : _MovieDetailHeroTokens.textBlockGapRegular,
+                          ),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: _buildHeroFlixScoreBadge(context, movie),
+                          ),
+                          SizedBox(
+                            height: compact
+                                ? _MovieDetailHeroTokens.textBlockGapCompact
+                                : _MovieDetailHeroTokens.textBlockGapRegular,
+                          ),
+                          _buildHeroMetadataRow(movie, compact: compact),
+                          if (_director != null) ...[
+                            SizedBox(
+                              height: compact
+                                  ? _MovieDetailHeroTokens.textBlockGapCompact
+                                  : _MovieDetailHeroTokens.textBlockGapRegular,
+                            ),
+                            Wrap(
+                              children: [
+                                Text(
+                                  'Directed by ',
                                   style: TextStyle(
-                                    color: FlixieColors.primary,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: compact ? 12 : 14,
+                                    color: FlixieColors.medium,
+                                    fontSize: compact
+                                        ? _MovieDetailHeroTokens
+                                            .directorLabelCompact
+                                        : _MovieDetailHeroTokens
+                                            .directorLabelRegular,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
+                                GestureDetector(
+                                  onTap: () =>
+                                      context.push('/people/${_director!.id}'),
+                                  child: Text(
+                                    _director!.name,
+                                    style: TextStyle(
+                                      color: FlixieColors.primary,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: compact
+                                          ? _MovieDetailHeroTokens
+                                              .directorNameCompact
+                                          : _MovieDetailHeroTokens
+                                              .directorNameRegular,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                          if ((movie.tagline ?? '').isNotEmpty) ...[
+                            SizedBox(
+                              height: compact
+                                  ? _MovieDetailHeroTokens.textBlockGapCompact
+                                  : _MovieDetailHeroTokens.textBlockGapRegular,
+                            ),
+                            Text(
+                              movie.tagline!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: FlixieColors.success,
+                                fontSize: compact
+                                    ? _MovieDetailHeroTokens.taglineCompact
+                                    : _MovieDetailHeroTokens.taglineRegular,
+                                fontWeight: FontWeight.w700,
+                                height:
+                                    _MovieDetailHeroTokens.taglineLineHeight,
                               ),
-                            ],
+                            ),
+                          ],
+                          SizedBox(
+                            height: compact
+                                ? _MovieDetailHeroTokens.genreTopGapCompact
+                                : _MovieDetailHeroTokens.genreTopGapRegular,
                           ),
+                          _buildGenrePills(
+                            movie,
+                            compact: compact,
+                            maxItems: compact ? 2 : 3,
+                          ),
+                          SizedBox(
+                            height: compact
+                                ? _MovieDetailHeroTokens.textBlockGapCompact
+                                : _MovieDetailHeroTokens.textBlockGapRegular,
+                          ),
+                          _buildHeroLinks(movie, compact: true),
                         ],
-                        SizedBox(height: compact ? 9 : 16),
-                        _buildGenrePills(movie, compact: compact),
-                        SizedBox(height: compact ? 9 : 16),
-                        _buildHeroLinks(movie, compact: compact),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: IgnorePointer(
+                child: Container(
+                  height: heroScrimHeight,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.3),
+                        Colors.black.withValues(alpha: 0.0),
                       ],
                     ),
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
+            Positioned(
+              top: safeTop + _MovieDetailHeroTokens.heroControlsTopInset,
+              left: _MovieDetailHeroTokens.pageHorizontalPadding,
+              child: _heroIconButton(
+                icon: Icons.arrow_back_ios_new_rounded,
+                onTap: () => context.pop(),
+              ),
+            ),
+          ],
         );
       },
     );
@@ -1115,39 +1326,51 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   Widget _buildTitleBlock(BuildContext context, Movie movie,
       {bool compact = false}) {
+    final width = MediaQuery.sizeOf(context).width;
+    final titleSize = compact
+        ? _MovieDetailHeroTokens.titleCompact
+        : (width < 700
+            ? _MovieDetailHeroTokens.titleRegular
+            : _MovieDetailHeroTokens.titleWide);
+
+    return Text(
+      movie.title,
+      maxLines: compact ? 3 : 4,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: FlixieColors.white,
+        fontSize: titleSize,
+        fontWeight: FontWeight.w900,
+        height: _MovieDetailHeroTokens.titleLineHeight,
+        letterSpacing: _MovieDetailHeroTokens.titleLetterSpacing,
+      ),
+    );
+  }
+
+  Widget _buildHeroMetadataRow(Movie movie, {required bool compact}) {
     final year = _extractYear(movie.releaseDate);
     final runtime = _formatRuntime(movie.runtime);
     final rating = _contentRating(movie);
     final meta =
         [year, runtime, rating].where((s) => s.isNotEmpty).join('  •  ');
-    final width = MediaQuery.sizeOf(context).width;
-    final titleSize = compact ? 25.0 : (width < 700 ? 32.0 : 38.0);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          movie.title,
-          style: TextStyle(
-            color: FlixieColors.white,
-            fontSize: titleSize,
-            fontWeight: FontWeight.w900,
-            height: 1.02,
-            letterSpacing: 0.1,
-          ),
-        ),
-        if (meta.isNotEmpty) ...[
-          SizedBox(height: compact ? 9 : 8),
-          Text(
-            meta,
-            style: TextStyle(
-              color: FlixieColors.light,
-              fontSize: compact ? 12 : 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ],
+    if (meta.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Text(
+      meta,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: FlixieColors.light
+            .withValues(alpha: _MovieDetailHeroTokens.metadataAlpha),
+        fontSize: compact
+            ? _MovieDetailHeroTokens.metadataCompact
+            : _MovieDetailHeroTokens.metadataRegular,
+        fontWeight: FontWeight.w700,
+        height: _MovieDetailHeroTokens.metadataLineHeight,
+      ),
     );
   }
 
@@ -1171,22 +1394,33 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         borderRadius: BorderRadius.circular(999),
         onTap: () => _showFlixScoreInfo(context),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+          padding: const EdgeInsets.symmetric(
+            horizontal: _MovieDetailHeroTokens.flixScoreHorizontalPadding,
+            vertical: _MovieDetailHeroTokens.flixScoreVerticalPadding,
+          ),
           decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.48),
+            color: Colors.black.withValues(
+                alpha: _MovieDetailHeroTokens.flixScoreBackgroundAlpha),
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: color.withValues(alpha: 0.65)),
+            border: Border.all(
+              color: color.withValues(
+                  alpha: _MovieDetailHeroTokens.flixScoreBorderAlpha),
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.star_rounded, color: color, size: 17),
+              Icon(
+                Icons.star_rounded,
+                color: color,
+                size: _MovieDetailHeroTokens.flixScoreIconSize,
+              ),
               const SizedBox(width: 6),
               Text(
                 hasScore ? score.toStringAsFixed(1) : '–',
                 style: const TextStyle(
                   color: FlixieColors.white,
-                  fontSize: 14,
+                  fontSize: _MovieDetailHeroTokens.flixScoreValueSize,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -1195,7 +1429,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 'FlixScore',
                 style: TextStyle(
                     color: FlixieColors.primary,
-                    fontSize: 12,
+                    fontSize: _MovieDetailHeroTokens.flixScoreLabelSize,
                     fontWeight: FontWeight.w700),
               ),
             ],
@@ -1214,14 +1448,16 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         videos.firstOrNull;
 
     return Wrap(
-      spacing: compact ? 12 : 24,
-      runSpacing: 6,
+      spacing: compact
+          ? _MovieDetailHeroTokens.linksSpacingCompact
+          : _MovieDetailHeroTokens.linksSpacingRegular,
+      runSpacing: _MovieDetailHeroTokens.linksRunSpacing,
       children: [
         _heroTextAction(
           icon: Icons.ios_share_rounded,
           label: 'Share',
           compact: compact,
-          onTap: () => _shareMovie(movie),
+          onTap: () => _showShareMovieSheet(movie),
         ),
         if (trailer != null)
           _heroTextAction(
@@ -1242,19 +1478,29 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius:
+          BorderRadius.circular(_MovieDetailHeroTokens.textActionRadius),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3),
+        padding: const EdgeInsets.symmetric(
+            vertical: _MovieDetailHeroTokens.textActionVerticalPadding),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: FlixieColors.light, size: compact ? 18 : 22),
+            Icon(
+              icon,
+              color: FlixieColors.light,
+              size: compact
+                  ? _MovieDetailHeroTokens.textActionIconCompact
+                  : _MovieDetailHeroTokens.textActionIconRegular,
+            ),
             const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
                 color: FlixieColors.light,
-                fontSize: compact ? 10.5 : 13,
+                fontSize: compact
+                    ? _MovieDetailHeroTokens.textActionLabelCompact
+                    : _MovieDetailHeroTokens.textActionLabelRegular,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -1264,14 +1510,357 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     );
   }
 
-  Future<void> _shareMovie(Movie movie) async {
-    final appLink = 'flixie:///movies/${movie.id}';
+  String _movieDeepLink(Movie movie) {
+    return Uri(
+      scheme: 'flixie',
+      host: 'movies',
+      pathSegments: [movie.id.toString()],
+      queryParameters: const {'source': 'share'},
+    ).toString();
+  }
+
+  Future<void> _showShareMovieSheet(Movie movie) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: FlixieColors.medium.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.ios_share_rounded,
+                  color: FlixieColors.light),
+              title: const Text(
+                'Share movie link',
+                style: TextStyle(color: FlixieColors.light),
+              ),
+              subtitle: const Text(
+                'Send a link that opens Flixie when installed',
+                style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                _shareMovieExternally(movie);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.content_copy_rounded,
+                  color: FlixieColors.light),
+              title: const Text(
+                'Copy movie link',
+                style: TextStyle(color: FlixieColors.light),
+              ),
+              subtitle: const Text(
+                'Paste it anywhere after copying',
+                style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                _copyMovieLink(movie);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.groups_2_outlined,
+                  color: FlixieColors.primary),
+              title: const Text(
+                'Share to group chat',
+                style: TextStyle(color: FlixieColors.light),
+              ),
+              subtitle: const Text(
+                'Post in one of your groups with a message',
+                style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showShareToGroupSheet(movie);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _shareMovieExternally(Movie movie) async {
+    final appLink = _movieDeepLink(movie);
     final webFallback = 'https://www.themoviedb.org/movie/${movie.id}';
     await Share.share(
-      'Check out ${movie.title} on Flixie\n$appLink\n\n'
-      "Don't have Flixie yet? $webFallback",
+      'Check out ${movie.title} on Flixie\n\n'
+      '$appLink\n\n'
+      "No app yet? View here: $webFallback",
       subject: '${movie.title} on Flixie',
     );
+  }
+
+  Future<void> _copyMovieLink(Movie movie) async {
+    final appLink = _movieDeepLink(movie);
+    await Clipboard.setData(ClipboardData(text: appLink));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Movie link copied')),
+    );
+  }
+
+  Future<List<Group>> _loadSharableGroups(String userId) async {
+    final auth = context.read<AuthProvider>();
+    final cached = auth.cachedGroups ?? const <Group>[];
+    if (cached.isNotEmpty) {
+      return cached.where((group) => group.id?.isNotEmpty == true).toList();
+    }
+
+    final fetched = await GroupService.getUserGroups(userId);
+    auth.updateCachedGroups(fetched);
+    return fetched.where((group) => group.id?.isNotEmpty == true).toList();
+  }
+
+  Future<void> _showShareToGroupSheet(Movie movie) async {
+    final auth = context.read<AuthProvider>();
+    final userId = auth.dbUser?.id;
+    if (userId == null) return;
+
+    List<Group> groups = const [];
+    try {
+      groups = await _loadSharableGroups(userId);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not load your groups')),
+        );
+      }
+      return;
+    }
+
+    if (!mounted) return;
+    if (groups.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Join or create a group to share there.')),
+      );
+      return;
+    }
+
+    String selectedGroupId = groups.first.id!;
+    final messageController =
+        TextEditingController(text: 'Has anyone ever seen this?');
+    bool sending = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            final selectedGroup = groups.firstWhere(
+              (group) => group.id == selectedGroupId,
+              orElse: () => groups.first,
+            );
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 12,
+                bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: FlixieColors.medium.withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Share to group chat',
+                    style: TextStyle(
+                      color: FlixieColors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    movie.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: FlixieColors.primary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: selectedGroupId,
+                    dropdownColor: FlixieColors.tabBarBackgroundFocused,
+                    decoration: const InputDecoration(
+                      labelText: 'Group',
+                    ),
+                    items: groups
+                        .map((group) => DropdownMenuItem<String>(
+                              value: group.id!,
+                              child: Text(
+                                group.name,
+                                style:
+                                    const TextStyle(color: FlixieColors.light),
+                              ),
+                            ))
+                        .toList(),
+                    onChanged: sending
+                        ? null
+                        : (value) {
+                            if (value == null) return;
+                            setSheetState(() => selectedGroupId = value);
+                          },
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: messageController,
+                    minLines: 2,
+                    maxLines: 3,
+                    enabled: !sending,
+                    style: const TextStyle(color: FlixieColors.light),
+                    decoration: const InputDecoration(
+                      labelText: 'Message',
+                      hintText: 'Has anyone ever seen this?',
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: sending
+                          ? null
+                          : () async {
+                              setSheetState(() => sending = true);
+                              final navigator = Navigator.of(sheetContext);
+                              final messenger = ScaffoldMessenger.of(context);
+                              final customMessage =
+                                  messageController.text.trim();
+
+                              try {
+                                await _shareMovieIntoGroupConversation(
+                                  movie: movie,
+                                  group: selectedGroup,
+                                  message: customMessage,
+                                );
+                                if (!mounted) return;
+                                navigator.pop();
+                                messenger.showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                        'Shared to ${selectedGroup.name} chat'),
+                                  ),
+                                );
+                              } catch (_) {
+                                if (!mounted) return;
+                                setSheetState(() => sending = false);
+                                messenger.showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                        'Could not share to that group yet'),
+                                  ),
+                                );
+                              }
+                            },
+                      icon: sending
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.send_rounded),
+                      label:
+                          Text(sending ? 'Sharing...' : 'Share in group chat'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _shareMovieIntoGroupConversation({
+    required Movie movie,
+    required Group group,
+    required String message,
+  }) async {
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    final groupId = group.id;
+    if (userId == null || groupId == null || groupId.isEmpty) {
+      throw StateError('Missing share context');
+    }
+
+    final members = await GroupService.getGroupMembers(groupId);
+    final memberIds = members
+        .where((member) => member.isAccepted)
+        .map((member) => member.memberId)
+        .toSet()
+      ..add(userId);
+
+    final conversation = await ChatService.getOrCreateGroupConversation(
+      creatorId: userId,
+      pgGroupId: groupId,
+      name: group.name,
+      memberIds: memberIds.toList(),
+    );
+
+    final prompt = message.isEmpty ? 'Has anyone ever seen this?' : message;
+    final chatText = _buildMovieSharePayload(
+      movie: movie,
+      message: prompt,
+    );
+
+    await ChatService.sendMessage(
+      conversationId: conversation.id,
+      senderId: userId,
+      text: chatText,
+    );
+  }
+
+  String _buildMovieSharePayload({
+    required Movie movie,
+    required String message,
+  }) {
+    final posterUrl = movie.posterPath == null
+        ? ''
+        : 'https://image.tmdb.org/t/p/w342${movie.posterPath}';
+    final title = Uri.encodeComponent(movie.title);
+    final deepLink = Uri.encodeComponent(_movieDeepLink(movie));
+    final poster = Uri.encodeComponent(posterUrl);
+    final prompt = Uri.encodeComponent(message.trim());
+
+    return '[FLIXIE_MOVIE_SHARE]\n'
+        'title=$title\n'
+        'link=$deepLink\n'
+        'poster=$poster\n'
+        'message=$prompt\n'
+        '[/FLIXIE_MOVIE_SHARE]';
   }
 
   Future<void> _openTrailer(String trailerUrl) async {
@@ -1288,21 +1877,18 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   // ---- Genre pills ---------------------------------------------------------
 
-  Widget _buildGenrePills(Movie movie, {bool compact = false}) {
+  Widget _buildGenrePills(Movie movie, {bool compact = false, int? maxItems}) {
     final genres = movie.genres;
     if (genres == null || genres.isEmpty) {
       return const SizedBox.shrink();
     }
 
+    final visibleCount = maxItems ?? (compact ? 2 : genres.length);
+
     return Wrap(
       spacing: 6,
       runSpacing: 6,
-      children: genres
-          .take(compact ? 2 : genres.length)
-          .toList()
-          .asMap()
-          .entries
-          .map((entry) {
+      children: genres.take(visibleCount).toList().asMap().entries.map((entry) {
         return GenreChip(
           label: entry.value.name.toUpperCase(),
           color: _kGenreChipColors[entry.key % _kGenreChipColors.length],

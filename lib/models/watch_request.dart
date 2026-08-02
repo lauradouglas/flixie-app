@@ -380,6 +380,21 @@ class WatchRequest {
   bool get isExpired => normalizedStatus == 'expired';
   bool get isDeclined => normalizedStatus == 'declined';
   bool get isTerminal => isCompleted || isCancelled || isExpired || isDeclined;
+  bool get isAwaitingScheduleApproval =>
+    isAccepted && normalizedScheduleStatus != 'AGREED';
+
+  String get displayStatusLabel {
+    if (normalizedWatchedStatus == 'WATCHED') return 'Watched';
+    if (normalizedWatchedStatus == 'NOT_WATCHED') return 'Not watched';
+    if (normalizedWatchedStatus == 'PARTIAL') return 'Confirming';
+    if (isAwaitingScheduleApproval) return 'Accepted · scheduling in progress';
+    if (normalizedScheduleStatus == 'AGREED') return 'Scheduled';
+    if (normalizedScheduleStatus == 'PROPOSED') return 'Proposed';
+    if (isAccepted) return 'Accepted';
+    if (isDeclined) return 'Declined';
+    if (normalizedStatus == 'maybe') return 'Maybe';
+    return 'Pending';
+  }
 
   bool canScheduleFor(String userId) =>
       canSchedule ?? ((isAccepted || isScheduled) && !isTerminal);

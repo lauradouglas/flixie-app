@@ -9,14 +9,12 @@ class MovieCredits {
 
   factory MovieCredits.fromJson(Map<String, dynamic> json) {
     return MovieCredits(
-      castMembers: (json['castMembers'] as List<dynamic>?)
-              ?.map((e) => MovieCastMember.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          [],
-      crewMembers: (json['crewMembers'] as List<dynamic>?)
-              ?.map((e) => CrewMember.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          [],
+      castMembers: _listFrom(json['castMembers'] ?? json['cast'])
+          .map(MovieCastMember.fromJson)
+          .toList(),
+      crewMembers: _listFrom(json['crewMembers'] ?? json['crew'])
+          .map(CrewMember.fromJson)
+          .toList(),
     );
   }
 
@@ -51,21 +49,18 @@ class MovieCastMember {
 
   factory MovieCastMember.fromJson(Map<String, dynamic> json) {
     return MovieCastMember(
-      id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
+      id: _intValue(json['id']) ?? 0,
       name: _stringOrFallback(json['name'], fallback: 'Unknown'),
-      character: _stringOrFallback(
-        json['character'],
-        fallback: 'Unknown Character',
+      character:
+          _stringOrFallback(json['character'], fallback: 'Unknown Character'),
+      profileImage:
+          _nullableString(json['profileImage'] ?? json['profile_path']),
+      knownForDepartment: _stringOrFallback(
+        json['knownForDepartment'] ?? json['known_for_department'],
+        fallback: 'Unknown',
       ),
-      profileImage: _nullableString(json['profileImage']),
-      knownForDepartment:
-          _stringOrFallback(json['knownForDepartment'], fallback: 'Unknown'),
-      gender: json['gender'] is int
-          ? json['gender']
-          : int.parse(json['gender'].toString()),
-      order: json['order'] is int
-          ? json['order']
-          : int.parse(json['order'].toString()),
+      gender: _intValue(json['gender']) ?? 0,
+      order: _intValue(json['order']) ?? 0,
     );
   }
 
@@ -105,14 +100,15 @@ class CrewMember {
 
   factory CrewMember.fromJson(Map<String, dynamic> json) {
     return CrewMember(
-      id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
+      id: _intValue(json['id']) ?? 0,
       name: _stringOrFallback(json['name'], fallback: 'Unknown'),
-      profileImage: _nullableString(json['profileImage']),
-      knownForDepartment:
-          _stringOrFallback(json['knownForDepartment'], fallback: 'Unknown'),
-      gender: json['gender'] is int
-          ? json['gender']
-          : int.parse(json['gender'].toString()),
+      profileImage:
+          _nullableString(json['profileImage'] ?? json['profile_path']),
+      knownForDepartment: _stringOrFallback(
+        json['knownForDepartment'] ?? json['known_for_department'],
+        fallback: 'Unknown',
+      ),
+      gender: _intValue(json['gender']) ?? 0,
       department: _stringOrFallback(json['department'], fallback: 'Unknown'),
       job: _stringOrFallback(json['job'], fallback: 'Unknown'),
     );
@@ -131,15 +127,30 @@ class CrewMember {
   }
 }
 
-String _stringOrFallback(dynamic value, {required String fallback}) {
-  final text = _nullableString(value);
-  return text ?? fallback;
+List<Map<String, dynamic>> _listFrom(dynamic value) {
+  if (value is! List) return const [];
+  return value.whereType<Map>().map((item) {
+    if (item is Map<String, dynamic>) return item;
+    return item.map((key, val) => MapEntry(key.toString(), val));
+  }).toList(growable: false);
 }
 
 String? _nullableString(dynamic value) {
   if (value == null) return null;
   final text = value.toString().trim();
   return text.isEmpty ? null : text;
+}
+
+String _stringOrFallback(dynamic value, {required String fallback}) {
+  return _nullableString(value) ?? fallback;
+}
+
+int? _intValue(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value);
+  return null;
 }
 
 String? resolveCreditProfileImage(String? value) {

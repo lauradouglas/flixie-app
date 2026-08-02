@@ -2,7 +2,7 @@ name: flixie_app
 description: Flixie - A Flutter frontend for the Flixie backend, available on Android and iOS.
 publish_to: 'none'
 
-version: 1.0.0+36
+version: 1.0.0+37
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -56,6 +56,7 @@ dependencies:
   firebase_analytics: ^11.6.0
   shared_preferences: ^2.3.3
   share_plus: ^10.1.4
+  palette_generator: ^0.3.3+7
 
 dev_dependencies:
   flutter_test:

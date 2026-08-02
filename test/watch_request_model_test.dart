@@ -98,6 +98,28 @@ void main() {
       expect(request.otherUser('u-1')?.username, 'sean');
     });
 
+    test('marks accepted requests without a schedule as awaiting approval', () {
+      final request = WatchRequest.fromJson({
+        'id': 'wr-awaiting-schedule',
+        'status': 'accepted',
+        'scheduleStatus': 'NONE',
+      });
+
+      expect(request.isAwaitingScheduleApproval, isTrue);
+      expect(request.displayStatusLabel, 'Accepted · scheduling in progress');
+    });
+
+    test('marks accepted proposed schedules as awaiting approval', () {
+      final request = WatchRequest.fromJson({
+        'id': 'wr-proposed-schedule',
+        'status': 'accepted',
+        'scheduleStatus': 'PROPOSED',
+      });
+
+      expect(request.isAwaitingScheduleApproval, isTrue);
+      expect(request.displayStatusLabel, 'Accepted · scheduling in progress');
+    });
+
     test('parses scheduled and completed fields safely', () {
       final scheduled = WatchRequest.fromJson({
         'id': 'wr-2',

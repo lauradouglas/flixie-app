@@ -28,6 +28,7 @@ import 'package:flixie_app/core/auth/push_notification_service.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/features/profile/data/avatar_service.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
+import 'package:flixie_app/core/utils/app_icon_badge_service.dart';
 import 'package:flixie_app/core/utils/notification_visibility.dart';
 
 /// Auth states that the UI can observe.
@@ -100,6 +101,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void>? _watchProviderCacheFuture;
 
   int _unreadNotificationCount = 0;
+  bool _hasResetAppBadgeThisSession = false;
 
   /// Navigator key set by the app root so push notifications can navigate.
   GlobalKey<NavigatorState>? _navigatorKey;
@@ -140,6 +142,11 @@ class AuthProvider extends ChangeNotifier {
           : Set.unmodifiable(_cachedUserWatchProviderIds!);
   int get unreadNotificationCount => _unreadNotificationCount;
 
+  void _syncUnreadNotificationCount(int count) {
+    _unreadNotificationCount = count < 0 ? 0 : count;
+    unawaited(AppIconBadgeService.setCount(_unreadNotificationCount));
+  }
+
   /// Update the reviews cache, e.g. after writing a new review.
   void updateCachedReviews(List<Review> reviews) {
     _cachedReviews = reviews;
@@ -152,7 +159,7 @@ class AuthProvider extends ChangeNotifier {
         ? List<FlixieNotification>.of(notifications)
         : visibleNotificationsForUser(notifications, userId);
     _cachedNotifications = List.unmodifiable(visible);
-    _unreadNotificationCount = visible.where((item) => !item.isRead).length;
+    _syncUnreadNotificationCount(visible.where((item) => !item.isRead).length);
     notifyListeners();
   }
 
@@ -246,6 +253,7 @@ class AuthProvider extends ChangeNotifier {
     final oldStatus = _status;
 
     if (user != null) {
+      _hasResetAppBadgeThisSession = false;
       // FIRST: Get Firebase ID token and set it in ApiClient.
       // Try a forced refresh first; on network failure fall back to the cached
       // token so the app stays authenticated on a flaky connection.
@@ -321,7 +329,8 @@ class AuthProvider extends ChangeNotifier {
       _cachedUserWatchProviderIds = null;
       _watchProviderCacheFuture = null;
       _notificationPoller.stop();
-      _unreadNotificationCount = 0;
+      _syncUnreadNotificationCount(0);
+      _hasResetAppBadgeThisSession = false;
     }
 
     logger.d('Final status: $_status');
@@ -352,6 +361,10 @@ class AuthProvider extends ChangeNotifier {
   /// Fetches profile/friend/home cache in parallel right after login.
   void _prefetch(String userId, {String region = 'US'}) {
     _isPrefetching = true;
+    if (!_hasResetAppBadgeThisSession) {
+      _hasResetAppBadgeThisSession = true;
+      unawaited(AppIconBadgeService.clear());
+    }
     // Token registration is independent of home/profile prefetching. Start it
     // immediately so a slow secondary API cannot delay push notifications.
     _initializePushNotifications(_dbUser?.externalId ?? userId);
@@ -414,8 +427,9 @@ class AuthProvider extends ChangeNotifier {
     _cachedNowPlaying = snapshot.nowPlaying ?? _cachedNowPlaying;
     _cachedMovieLists = snapshot.movieLists ?? _cachedMovieLists;
     _cachedNotifications = snapshot.notifications ?? _cachedNotifications;
-    _unreadNotificationCount =
-        snapshot.unreadNotificationCount ?? _unreadNotificationCount;
+    _syncUnreadNotificationCount(
+      snapshot.unreadNotificationCount ?? _unreadNotificationCount,
+    );
     if (snapshot.watchProvidersByMovieId != null) {
       _cachedWatchProvidersByMovieId.addAll(snapshot.watchProvidersByMovieId!);
     }
@@ -466,7 +480,7 @@ class AuthProvider extends ChangeNotifier {
   /// Directly updates the unread count from already-fetched notification data.
   /// Use this to keep the badge in sync without making an extra API call.
   void setUnreadNotificationCount(int count) {
-    _unreadNotificationCount = count;
+    _syncUnreadNotificationCount(count);
     notifyListeners();
   }
 
@@ -476,7 +490,7 @@ class AuthProvider extends ChangeNotifier {
     if (userId == null) return;
     final count = await _prefetchCoordinator.fetchUnreadCount(userId);
     if (count != null) {
-      _unreadNotificationCount = count;
+      _syncUnreadNotificationCount(count);
       notifyListeners();
     }
   }

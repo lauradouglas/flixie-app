@@ -71,24 +71,24 @@ class User {
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
-      id: json['id'] as String,
-      externalId: json['externalId'] as String?,
-      firstName: json['firstName'] as String?,
-      lastName: json['lastName'] as String?,
-      username: json['username'] as String,
-      email: json['email'] as String,
-      bio: json['bio'] as String?,
-      iconColorId: json['iconColorId'] as int,
-      countryId: json['countryId'] as int?,
-      languageId: json['languageId'] as int?,
-      completedSetup: json['completedSetup'] as bool,
-      darkMode: json['darkMode'] as bool,
-      createdAt: json['createdAt'] as String?,
-      updatedAt: json['updatedAt'] as String?,
-      initials: json['initials'] as String?,
-      country: json['country'] as Map<String, dynamic>?,
-      language: json['language'] as Map<String, dynamic>?,
-      iconColor: json['iconColor'] as Map<String, dynamic>?,
+      id: _stringOrFallback(json['id']),
+      externalId: _nullableString(json['externalId']),
+      firstName: _nullableString(json['firstName']),
+      lastName: _nullableString(json['lastName']),
+      username: _stringOrFallback(json['username'], fallback: 'user'),
+      email: _stringOrFallback(json['email']),
+      bio: _nullableString(json['bio']),
+      iconColorId: _intValue(json['iconColorId']) ?? 0,
+      countryId: _intValue(json['countryId']),
+      languageId: _intValue(json['languageId']),
+      completedSetup: _boolValue(json['completedSetup']) ?? false,
+      darkMode: _boolValue(json['darkMode']) ?? false,
+      createdAt: _nullableString(json['createdAt']),
+      updatedAt: _nullableString(json['updatedAt']),
+      initials: _nullableString(json['initials']),
+      country: _asStringMapOrNull(json['country']),
+      language: _asStringMapOrNull(json['language']),
+      iconColor: _asStringMapOrNull(json['iconColor']),
       avatar: json['avatar'] == null
           ? null
           : ProfileAvatar.fromJson(json['avatar'] as Map<String, dynamic>),
@@ -117,6 +117,45 @@ class User {
       favoritePeople: json['favoritePeople'] as List<dynamic>?,
       favoriteGenres: json['favoriteGenres'] as List<dynamic>?,
     );
+  }
+
+  static String? _nullableString(dynamic value) {
+    if (value == null) return null;
+    final text = value.toString().trim();
+    return text.isEmpty ? null : text;
+  }
+
+  static String _stringOrFallback(dynamic value, {String fallback = ''}) {
+    return _nullableString(value) ?? fallback;
+  }
+
+  static int? _intValue(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
+  static bool? _boolValue(dynamic value) {
+    if (value == null) return null;
+    if (value is bool) return value;
+    if (value is int) return value != 0;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      if (normalized == 'true' || normalized == '1') return true;
+      if (normalized == 'false' || normalized == '0') return false;
+    }
+    return null;
+  }
+
+  static Map<String, dynamic>? _asStringMapOrNull(dynamic value) {
+    if (value == null) return null;
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map((k, v) => MapEntry(k.toString(), v));
+    }
+    return null;
   }
 
   // Helper methods to check movie status

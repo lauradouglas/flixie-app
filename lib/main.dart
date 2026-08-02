@@ -18,6 +18,7 @@ import 'package:flixie_app/core/analytics/analytics_consent_prompt.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/core/analytics/shared_preferences_analytics_consent_store.dart';
 import 'package:flixie_app/core/storage/movie_cache_service.dart';
+import 'package:flixie_app/core/utils/app_icon_badge_service.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/features/movies/data/movie_service.dart';
 import 'package:flixie_app/features/social/data/watch_request_cache.dart';
@@ -146,17 +147,32 @@ class FlixieApp extends StatefulWidget {
   State<FlixieApp> createState() => _FlixieAppState();
 }
 
-class _FlixieAppState extends State<FlixieApp> {
+class _FlixieAppState extends State<FlixieApp> with WidgetsBindingObserver {
   late final GoRouter _router;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Create router once - it will refresh via authStatusListenable, not by rebuilding this widget
     final authProvider = context.read<AuthProvider>();
     _router = buildRouter(authProvider);
     // Give the navigator key to AuthProvider so push notifications can navigate.
     authProvider.setNavigatorKey(rootNavigatorKey);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final unread = context.read<AuthProvider>().unreadNotificationCount;
+      AppIconBadgeService.setCount(unread);
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   @override

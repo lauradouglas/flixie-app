@@ -40,12 +40,15 @@ class MovieFriendActivity {
   });
 
   factory MovieFriendActivity.fromJson(Map<String, dynamic> json) {
-    final user = json['user'] as Map<String, dynamic>;
+    final user = _asStringMap(json['user']);
     return MovieFriendActivity(
-      userId: user['id'] as String,
-      username: user['username'] as String,
-      firstName: user['firstName'] as String?,
-      iconColor: user['iconColor'] as Map<String, dynamic>?,
+      userId: _stringOrFallback(
+        user['id'] ?? json['userId'],
+        fallback: '',
+      ),
+      username: _stringOrFallback(user['username'], fallback: 'friend'),
+      firstName: _nullableString(user['firstName']),
+      iconColor: _asStringMapOrNull(user['iconColor']),
       avatar: user['avatar'] is Map<String, dynamic>
           ? ProfileAvatar.fromJson(user['avatar'] as Map<String, dynamic>)
           : null,
@@ -63,13 +66,39 @@ class MovieFriendActivity {
       recommended: json['recommended'] as bool? ??
           (json['review'] as Map<String, dynamic>?)?['recommended'] as bool?,
       activityScore: _parseInt(json['activityScore']) ?? 0,
-      createdAt: (json['createdAt'] ?? json['updatedAt']) as String?,
+      createdAt: _nullableString(json['createdAt'] ?? json['updatedAt']),
       watchCount: _parseInt(json['watchCount'] ?? json['totalWatchCount']),
       isRewatch: json['isRewatch'] == true ||
           json['rewatch'] == true ||
           ((_parseInt(json['watchCount'] ?? json['totalWatchCount']) ?? 0) > 1),
     );
   }
+}
+
+String? _nullableString(dynamic value) {
+  if (value == null) return null;
+  final text = value.toString().trim();
+  return text.isEmpty ? null : text;
+}
+
+String _stringOrFallback(dynamic value, {required String fallback}) {
+  return _nullableString(value) ?? fallback;
+}
+
+Map<String, dynamic> _asStringMap(dynamic value) {
+  if (value is Map<String, dynamic>) return value;
+  if (value is Map) {
+    return value.map(
+      (key, val) => MapEntry(key.toString(), val),
+    );
+  }
+  return <String, dynamic>{};
+}
+
+Map<String, dynamic>? _asStringMapOrNull(dynamic value) {
+  if (value == null) return null;
+  final mapped = _asStringMap(value);
+  return mapped.isEmpty ? null : mapped;
 }
 
 int? _parseInt(dynamic value) {

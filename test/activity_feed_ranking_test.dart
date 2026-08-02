@@ -152,4 +152,19 @@ void main() {
 
     expect(ids, <String>['u5', 'u4', 'u3', 'u2', 'u1']);
   });
+
+  test('MovieFriendActivity tolerates missing nested user fields', () {
+    final item = MovieFriendActivity.fromJson(<String, dynamic>{
+      'user': <String, dynamic>{
+        'id': null,
+        'username': null,
+      },
+      'userId': 42,
+      'createdAt': null,
+    });
+
+    expect(item.userId, '42');
+    expect(item.username, 'friend');
+    expect(item.createdAt, isNull);
+  });
 }

@@ -5,6 +5,8 @@ import UserNotifications
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate, MessagingDelegate {
+  private let badgeChannelName = "flixie/app_badge"
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -21,7 +23,19 @@ import UserNotifications
     // Surface native FCM token updates for diagnostics.
     Messaging.messaging().delegate = self
 
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    let didFinish = super.application(application, didFinishLaunchingWithOptions: launchOptions)
+
+    if let controller = window?.rootViewController as? FlutterViewController {
+      let channel = FlutterMethodChannel(
+        name: badgeChannelName,
+        binaryMessenger: controller.binaryMessenger
+      )
+      channel.setMethodCallHandler { [weak self] call, result in
+        self?.handleBadgeMethodCall(call, result: result)
+      }
+    }
+
+    return didFinish
   }
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
@@ -48,6 +62,25 @@ import UserNotifications
 
   func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
     print("[FCM][iOS] Native Messaging delegate token update: \(fcmToken ?? "<null>")")
+  }
+
+  private func handleBadgeMethodCall(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    switch call.method {
+    case "setCount":
+      let args = call.arguments as? [String: Any]
+      let count = args?["count"] as? Int ?? 0
+      DispatchQueue.main.async {
+        UIApplication.shared.applicationIconBadgeNumber = max(0, count)
+        result(nil)
+      }
+    case "clear":
+      DispatchQueue.main.async {
+        UIApplication.shared.applicationIconBadgeNumber = 0
+        result(nil)
+      }
+    default:
+      result(FlutterMethodNotImplemented)
+    }
   }
 
 }
