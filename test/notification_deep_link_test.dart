@@ -24,6 +24,17 @@ void main() {
     );
   });
 
+  test('group message route without chat tab is normalized to chat destination',
+      () {
+    expect(
+      notificationDeepLinkPath({
+        'type': 'GROUP_MESSAGE',
+        'route': '/groups/group-2',
+      }),
+      '/groups/group-2?tab=chat',
+    );
+  });
+
   test('watch request opens its full-page detail route', () {
     expect(
       notificationDeepLinkPath({
