@@ -128,7 +128,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
       final fresh = await NotificationService.getNotifications(userId);
       final visible = visibleNotificationsForUser(fresh, userId);
       if (mounted) {
-        setState(() => _notifications = visible);
+        setState(() {
+          _notifications = visible;
+          _error = null;
+        });
         auth.updateCachedNotifications(visible);
       }
     } catch (e) {
