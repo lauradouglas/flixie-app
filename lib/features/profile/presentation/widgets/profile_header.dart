@@ -84,78 +84,95 @@ class ProfileHeader extends StatelessWidget {
           ),
           const SizedBox(width: 18),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final badgesInline =
+                    profileBadges.isNotEmpty && constraints.maxWidth >= 240;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Flexible(
-                      child: Text(
-                        '@$username',
-                        maxLines: 1,
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            '@$username',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: FlixieColors.light,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        if (badgesInline) ...[
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: ProfileBadgePills(
+                                badges: profileBadges,
+                                compact: true,
+                                featuredOnly: true,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    if (profileBadges.isNotEmpty && !badgesInline) ...[
+                      const SizedBox(height: 8),
+                      ProfileBadgePills(
+                        badges: profileBadges,
+                        compact: true,
+                        featuredOnly: true,
+                      ),
+                    ],
+                    const SizedBox(height: 7),
+                    Text(
+                      displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.headlineSmall?.copyWith(
+                        color: FlixieColors.white,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    if (bio case final bioText
+                        when bioText != null && bioText.isNotEmpty) ...[
+                      const SizedBox(height: 7),
+                      Text(
+                        bioText,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: FlixieColors.light,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    if (profileBadges.isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: ProfileBadgePills(
-                          badges: profileBadges,
-                          compact: true,
-                          featuredOnly: true,
+                          fontSize: 13,
+                          height: 1.35,
                         ),
                       ),
                     ],
-                  ],
-                ),
-                const SizedBox(height: 7),
-                Text(
-                  displayName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.headlineSmall?.copyWith(
-                    color: FlixieColors.white,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                if (bio case final bioText
-                    when bioText != null && bioText.isNotEmpty) ...[
-                  const SizedBox(height: 7),
-                  Text(
-                    bioText,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: FlixieColors.light,
-                      fontSize: 13,
-                      height: 1.35,
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        _ProfileHeaderAction(
+                          icon: Icons.edit_rounded,
+                          label: 'Edit',
+                          onTap: () => _openEditSheet(context),
+                        ),
+                        if (onPreview != null) ...[
+                          const SizedBox(width: 22),
+                          _ProfileHeaderAction(
+                            icon: Icons.visibility_outlined,
+                            label: 'Preview',
+                            onTap: onPreview!,
+                          ),
+                        ],
+                      ],
                     ),
-                  ),
-                ],
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    _ProfileHeaderAction(
-                      icon: Icons.edit_rounded,
-                      label: 'Edit',
-                      onTap: () => _openEditSheet(context),
-                    ),
-                    if (onPreview != null) ...[
-                      const SizedBox(width: 22),
-                      _ProfileHeaderAction(
-                        icon: Icons.visibility_outlined,
-                        label: 'Preview',
-                        onTap: onPreview!,
-                      ),
-                    ],
                   ],
-                ),
-              ],
+                );
+              },
             ),
           ),
         ],

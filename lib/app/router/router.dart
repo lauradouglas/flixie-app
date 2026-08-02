@@ -29,6 +29,7 @@ import 'package:flixie_app/features/movies/presentation/pages/movie_lists_screen
 import 'package:flixie_app/features/social/presentation/pages/social_screen.dart';
 import 'package:flixie_app/features/social/presentation/pages/friends_activity_screen.dart';
 import 'package:flixie_app/features/social/presentation/pages/group_detail_screen.dart';
+import 'package:flixie_app/features/social/presentation/pages/direct_chat_screen.dart';
 import 'package:flixie_app/features/social/presentation/pages/group_members_screen.dart';
 import 'package:flixie_app/features/authentication/presentation/pages/login_screen.dart';
 import 'package:flixie_app/features/authentication/presentation/pages/signup_screen.dart';
@@ -198,6 +199,15 @@ GoRouter buildRouter(AuthProvider authProvider) {
               FriendProfileScreen(
                 userId: state.pathParameters['id'] ?? '',
                 previewMode: state.uri.queryParameters['preview'] == 'true',
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/chat/:id',
+            pageBuilder: (context, state) => _calmPage(
+              state,
+              DirectChatScreen(
+                otherUserId: state.pathParameters['id'] ?? '',
               ),
             ),
           ),

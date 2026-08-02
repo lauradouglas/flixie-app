@@ -3,7 +3,9 @@ String notificationDeepLinkPath(Map<String, dynamic> data) {
   final type = (data['type']?.toString() ?? '').toUpperCase();
   final groupId = data['groupId']?.toString();
   final friendId = data['friendId']?.toString();
+  final senderId = data['senderId']?.toString();
   final routeGroupId = _groupIdFromRoute(route);
+  final routeChatId = _chatIdFromRoute(route);
   final routeTab = Uri.tryParse(route ?? '')?.queryParameters['tab'];
   final requestId = _watchRequestId(data, route, type);
 
@@ -17,6 +19,16 @@ String notificationDeepLinkPath(Map<String, dynamic> data) {
     final targetGroupId = groupId ?? routeGroupId;
     if (targetGroupId != null && targetGroupId.isNotEmpty) {
       return '/groups/$targetGroupId?tab=chat';
+    }
+  }
+
+  if (type == 'DIRECT_MESSAGE') {
+    if (routeChatId != null && routeChatId.isNotEmpty) {
+      return '/chat/$routeChatId';
+    }
+    final targetChatId = friendId ?? senderId;
+    if (targetChatId != null && targetChatId.isNotEmpty) {
+      return '/chat/$targetChatId';
     }
   }
 
@@ -89,6 +101,15 @@ String? _groupIdFromRoute(String? route) {
   final uri = Uri.tryParse(route);
   if (uri == null || uri.pathSegments.length < 2) return null;
   if (uri.pathSegments[0] != 'groups') return null;
+  final id = uri.pathSegments[1];
+  return id.isEmpty ? null : id;
+}
+
+String? _chatIdFromRoute(String? route) {
+  if (route == null || route.isEmpty || !route.startsWith('/')) return null;
+  final uri = Uri.tryParse(route);
+  if (uri == null || uri.pathSegments.length < 2) return null;
+  if (uri.pathSegments[0] != 'chat') return null;
   final id = uri.pathSegments[1];
   return id.isEmpty ? null : id;
 }

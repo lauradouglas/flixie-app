@@ -27,6 +27,18 @@ class ChatService {
     return Conversation.fromMap(data as Map<String, dynamic>);
   }
 
+  /// Get or create a direct 1-to-1 conversation between two friends.
+  static Future<Conversation> getOrCreateDirectConversation({
+    required String userId,
+    required String otherUserId,
+  }) async {
+    final data = await ApiClient.post('/conversations/direct', body: {
+      'userId': userId,
+      'otherUserId': otherUserId,
+    });
+    return Conversation.fromMap(data as Map<String, dynamic>);
+  }
+
   /// Send a text message (backend writes to Firestore).
   static Future<void> sendMessage({
     required String conversationId,

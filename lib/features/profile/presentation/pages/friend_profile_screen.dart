@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import 'package:flixie_app/features/authentication/presentation/pages/auth_ui.dart';
+import 'package:flixie_app/features/movies/data/search_service.dart';
+import 'package:flixie_app/models/friendship.dart';
+import 'package:flixie_app/models/movie_short.dart';
 import 'package:flixie_app/models/review.dart';
 import 'package:flixie_app/models/user.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
@@ -18,6 +22,7 @@ import 'package:flixie_app/features/profile/presentation/widgets/favorite_movies
 import 'package:flixie_app/features/profile/presentation/widgets/lists_preview_section.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/movie_taste_badge.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_stats_row.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/watch_request_sheet.dart';
 import 'package:flixie_app/core/safety/safety_actions.dart';
 
 enum _FriendshipStatus { none, pending, requested, friends }
@@ -313,6 +318,79 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
         );
       }
     }
+  }
+
+  Future<List<MovieShort>> _searchMovies(String query) async {
+    final results = await SearchService.search(query, type: 'movie');
+    return results.results
+        .where((item) => !item.isPerson && item.movie != null)
+        .map((item) => item.movie!)
+        .toList(growable: false);
+  }
+
+  Future<void> _inviteToWatch() async {
+    final auth = context.read<AuthProvider>();
+    final myId = auth.dbUser?.id;
+    final user = _user;
+    if (myId == null || user == null) return;
+
+    final movie = await showModalBottomSheet<MovieShort>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: FlixieColors.surface,
+      builder: (sheetContext) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+        ),
+        child: MovieSearchSheet(searchMovies: _searchMovies),
+      ),
+    );
+    if (!mounted || movie == null) return;
+
+    final selectedFriend = Friendship(
+      id: 'friend:${user.id}',
+      friend: FriendshipUser(
+        id: user.id,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        initials: user.initials,
+        iconColor: user.iconColor,
+        avatar: user.avatar,
+        profileBadges: user.profileBadges,
+      ),
+      createdAt: '',
+      updatedAt: '',
+    );
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => MovieWatchRequestSheet(
+        movieId: movie.id,
+        movieTitle: movie.name,
+        requesterId: myId,
+        friends: [selectedFriend],
+        initialFriendId: user.id,
+        onSuccess: () {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Watch invite sent!')),
+            );
+          }
+        },
+        onError: () {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Failed to send invite')),
+            );
+          }
+        },
+      ),
+    );
   }
 
   Future<void> _acceptRequest() async {
@@ -661,7 +739,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     return Row(children: [
       Expanded(
         child: OutlinedButton.icon(
-          onPressed: () => context.push('/social'),
+          onPressed: () => context.push('/chat/${widget.userId}'),
           icon: const Icon(Icons.chat_bubble_outline),
           label: const Text('Message'),
           style: OutlinedButton.styleFrom(
@@ -673,7 +751,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       const SizedBox(width: 10),
       Expanded(
         child: FilledButton.icon(
-          onPressed: () => context.push('/watch-requests'),
+          onPressed: _inviteToWatch,
           icon: const Icon(Icons.person_add_alt_1),
           label: const Text('Invite to watch'),
           style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),

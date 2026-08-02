@@ -326,74 +326,120 @@ class MediaDetailScreenSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SingleChildScrollView(
         physics: const NeverScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 54, 16, 28),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Row(children: [
-            SkeletonBox(width: 44, height: 44, borderRadius: 22),
-            Spacer(),
-            SkeletonBox(width: 44, height: 44, borderRadius: 22),
-          ]),
-          const SizedBox(height: 18),
-          Container(
-            height: 330,
-            decoration: BoxDecoration(
-              color: FlixieColors.tabBarBackgroundFocused,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: FlixieColors.tabBarBorder),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                SkeletonBox(width: 44, height: 44, borderRadius: 22),
+                Spacer(),
+                SkeletonBox(width: 44, height: 44, borderRadius: 22),
+              ],
             ),
-            padding: const EdgeInsets.all(10),
-            child: const Row(children: [
-              Expanded(
-                flex: 9,
-                child: SkeletonBox(height: double.infinity, borderRadius: 14),
-              ),
-              SizedBox(width: 14),
-              Expanded(
-                flex: 11,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SkeletonBox(width: 132, height: 42, borderRadius: 21),
-                    SizedBox(height: 16),
-                    SkeletonBox(width: double.infinity, height: 28),
-                    SizedBox(height: 8),
-                    SkeletonBox(width: 170, height: 28),
-                    SizedBox(height: 14),
-                    SkeletonBox(width: 185, height: 14),
-                    SizedBox(height: 16),
-                    SkeletonBox(width: double.infinity, height: 15),
-                    SizedBox(height: 12),
-                    Row(children: [
-                      SkeletonBox(width: 76, height: 30, borderRadius: 15),
-                      SizedBox(width: 8),
-                      SkeletonBox(width: 86, height: 30, borderRadius: 15),
-                    ]),
-                    Spacer(),
-                    SkeletonBox(width: 170, height: 24),
-                  ],
+            const SizedBox(height: 14),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(
+                  width: 128,
+                  child: Column(
+                    children: [
+                      SkeletonBox(height: 192, borderRadius: 12),
+                      SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SkeletonBox(height: 6, borderRadius: 3),
+                          ),
+                          SizedBox(width: 6),
+                          Expanded(
+                            child: SkeletonBox(height: 6, borderRadius: 3),
+                          ),
+                          SizedBox(width: 6),
+                          Expanded(
+                            child: SkeletonBox(height: 6, borderRadius: 3),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SkeletonBox(
+                            width: 116, height: 26, borderRadius: 13),
+                        const SizedBox(height: 14),
+                        const SkeletonBox(width: double.infinity, height: 30),
+                        const SizedBox(height: 8),
+                        const SkeletonBox(width: 182, height: 30),
+                        const SizedBox(height: 14),
+                        const SkeletonBox(
+                            width: 160, height: 14, borderRadius: 5),
+                        const SizedBox(height: 10),
+                        const SkeletonBox(
+                            width: 212, height: 14, borderRadius: 5),
+                        const SizedBox(height: 10),
+                        const SkeletonBox(
+                            width: 188, height: 14, borderRadius: 5),
+                        const SizedBox(height: 16),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: const [
+                            SkeletonBox(
+                                width: 62, height: 28, borderRadius: 14),
+                            SkeletonBox(
+                                width: 72, height: 28, borderRadius: 14),
+                            SkeletonBox(
+                                width: 54, height: 28, borderRadius: 14),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        const SkeletonBox(
+                            width: 148, height: 18, borderRadius: 6),
+                        const SizedBox(height: 8),
+                        const SkeletonBox(
+                            width: 92, height: 14, borderRadius: 5),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: const Row(
+                children: [
+                  Expanded(child: SkeletonBox(height: 46, borderRadius: 23)),
+                  SizedBox(width: 1),
+                  SizedBox(height: 34, child: VerticalDivider(width: 1)),
+                  SizedBox(width: 1),
+                  SkeletonBox(width: 46, height: 46, borderRadius: 23),
+                  SizedBox(width: 10),
+                  SkeletonBox(width: 46, height: 46, borderRadius: 23),
+                ],
               ),
-            ]),
-          ),
-          const SizedBox(height: 12),
-          const SkeletonBox(height: 104, borderRadius: 16),
-          const SizedBox(height: 12),
-          const SkeletonBox(height: 94, borderRadius: 16),
-          const SizedBox(height: 22),
-          const SkeletonBox(width: 138, height: 22),
-          const SizedBox(height: 10),
-          const SkeletonBox(height: 46, borderRadius: 23),
-          const SizedBox(height: 10),
-          const Row(children: [
-            Expanded(child: SkeletonBox(height: 70, borderRadius: 14)),
-            SizedBox(width: 10),
-            Expanded(child: SkeletonBox(height: 70, borderRadius: 14)),
-          ]),
-          const SizedBox(height: 22),
-          const SkeletonBox(width: 90, height: 22),
-          const SizedBox(height: 10),
-          const SkeletonBox(height: 110, borderRadius: 16),
-        ]),
+            ),
+            const SizedBox(height: 18),
+            const SkeletonBox(width: 138, height: 22),
+            const SizedBox(height: 10),
+            const SkeletonBox(height: 104, borderRadius: 16),
+            const SizedBox(height: 12),
+            const SkeletonBox(height: 94, borderRadius: 16),
+            const SizedBox(height: 22),
+            const SkeletonBox(width: 90, height: 22),
+            const SizedBox(height: 10),
+            const SkeletonBox(height: 110, borderRadius: 16),
+          ],
+        ),
       );
 }
 

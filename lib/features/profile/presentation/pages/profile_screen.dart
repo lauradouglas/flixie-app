@@ -138,12 +138,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (mounted) setState(() => _profileExtrasLoading = false);
       return;
     }
-    final results = await Future.wait<Object>([
+    final libraryFuture = Future.wait<Object>([
       ShowService.getContinueWatching(userId)
           .catchError((_) => <ContinueWatchingShow>[]),
       ProfileLookupController.instance
           .getUserWatchProviders(userId)
           .catchError((_) => <WatchProvider>[]),
+    ]);
+    final statsFuture = Future.wait<Object>([
       ProfileLookupController.instance
           .getUserMovieReviews(userId)
           .catchError((_) => <Review>[]),
@@ -163,49 +165,65 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 monthlyWatchCounts: const [],
               )),
     ]);
-    final wrapped = results[5] as MovieWrapped;
-    final directorResults = await Future.wait(
-      wrapped.topDirectors
-          .where((director) => director.personId != null)
-          .take(4)
-          .map((director) async {
-        final id = director.personId!;
-        try {
-          final values = await Future.wait<Object>([
-            PersonService.getPersonById(id),
-            PersonService.getPersonCredits(id),
-          ]);
-          return (
-            id: id,
-            person: values[0] as Person,
-            credits: values[1] as PersonCredits
-          );
-        } catch (_) {
-          return null;
-        }
-      }),
-    );
-    if (!mounted) return;
-    setState(() {
-      _continueWatching = results[0] as List<ContinueWatchingShow>;
-      _watchProviders = results[1] as List<WatchProvider>;
-      _reviews = results[2] as List<Review>;
-      _reviewCount = _reviews.length;
-      _groups = results[3] as List<Group>;
-      _watchRequests = results[4] as List<WatchRequest>;
-      _profileExtrasLoading = false;
-      _wrapped = wrapped;
-      _directorPeople = {
-        for (final result in directorResults
-            .whereType<({int id, Person person, PersonCredits credits})>())
-          result.id: result.person,
-      };
-      _directorCredits = {
-        for (final result in directorResults
-            .whereType<({int id, Person person, PersonCredits credits})>())
-          result.id: result.credits.knownForCredits,
-      };
-    });
+
+    try {
+      final results = await libraryFuture;
+      if (!mounted) return;
+      setState(() {
+        _continueWatching = results[0] as List<ContinueWatchingShow>;
+        _watchProviders = results[1] as List<WatchProvider>;
+        _profileExtrasLoading = false;
+      });
+    } catch (e) {
+      logger.e('[ProfileScreen] library extras load error: $e');
+      if (mounted) setState(() => _profileExtrasLoading = false);
+    }
+
+    try {
+      final results = await statsFuture;
+      final wrapped = results[5] as MovieWrapped;
+      final directorResults = await Future.wait(
+        wrapped.topDirectors
+            .where((director) => director.personId != null)
+            .take(4)
+            .map((director) async {
+          final id = director.personId!;
+          try {
+            final values = await Future.wait<Object>([
+              PersonService.getPersonById(id),
+              PersonService.getPersonCredits(id),
+            ]);
+            return (
+              id: id,
+              person: values[0] as Person,
+              credits: values[1] as PersonCredits
+            );
+          } catch (_) {
+            return null;
+          }
+        }),
+      );
+      if (!mounted) return;
+      setState(() {
+        _reviews = results[2] as List<Review>;
+        _reviewCount = _reviews.length;
+        _groups = results[3] as List<Group>;
+        _watchRequests = results[4] as List<WatchRequest>;
+        _wrapped = wrapped;
+        _directorPeople = {
+          for (final result in directorResults
+              .whereType<({int id, Person person, PersonCredits credits})>())
+            result.id: result.person,
+        };
+        _directorCredits = {
+          for (final result in directorResults
+              .whereType<({int id, Person person, PersonCredits credits})>())
+            result.id: result.credits.knownForCredits,
+        };
+      });
+    } catch (e) {
+      logger.e('[ProfileScreen] stats extras load error: $e');
+    }
   }
 
   Future<void> _openWatchProviders() async {
@@ -505,6 +523,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (favoriteMovies.isNotEmpty ||
+            favoritePeople.isNotEmpty ||
+            favoriteShows.isNotEmpty) ...[
+          _FavouritesLibrary(
+            movies: favoriteMovies,
+            people: favoritePeople,
+            shows: favoriteShows,
+          ),
+          const SizedBox(height: 20),
+        ] else
+          _ProfileEmptyAction(
+            icon: Icons.favorite_outline_rounded,
+            title: 'No favourite movies yet',
+            body: 'Favourite a few movies so your profile feels like you.',
+            label: 'Find movies',
+            onPressed: () => context.push('/search'),
+          ),
         if (userId != null) ...[
           if (_continueWatching.isNotEmpty) ...[
             _ProfileContinueWatching(shows: _continueWatching),
@@ -519,23 +554,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 16),
         ],
-        if (favoriteMovies.isNotEmpty ||
-            favoriteShows.isNotEmpty ||
-            favoritePeople.isNotEmpty) ...[
-          _FavouritesLibrary(
-            movies: favoriteMovies,
-            shows: favoriteShows,
-            people: favoritePeople,
-          ),
-          const SizedBox(height: 20),
-        ] else
-          _ProfileEmptyAction(
-            icon: Icons.favorite_outline_rounded,
-            title: 'No favourite movies yet',
-            body: 'Favourite a few movies so your profile feels like you.',
-            label: 'Find movies',
-            onPressed: () => context.push('/search'),
-          ),
         if (_reviews.isNotEmpty) ...[
           _RecentReviewsSummary(reviews: _reviews),
           const SizedBox(height: 16),
@@ -844,8 +862,8 @@ class _FavouritesLibrary extends StatelessWidget {
   });
 
   final List<dynamic> movies;
-  final List<dynamic> shows;
   final List<dynamic> people;
+  final List<dynamic> shows;
 
   @override
   Widget build(BuildContext context) {
@@ -888,11 +906,7 @@ class _FavouritesLibrary extends StatelessWidget {
         if (movieItems.isNotEmpty)
           _FavouritePosterRail(title: 'Favourite movies', items: movieItems),
         if (movieItems.isNotEmpty &&
-            (showItems.isNotEmpty || peopleItems.isNotEmpty))
-          const SizedBox(height: 18),
-        if (showItems.isNotEmpty)
-          _FavouritePosterRail(title: 'Favourite shows', items: showItems),
-        if (showItems.isNotEmpty && peopleItems.isNotEmpty)
+            (peopleItems.isNotEmpty || showItems.isNotEmpty))
           const SizedBox(height: 18),
         if (peopleItems.isNotEmpty)
           _FavouritePosterRail(
@@ -900,6 +914,10 @@ class _FavouritesLibrary extends StatelessWidget {
             items: peopleItems,
             circular: true,
           ),
+        if (peopleItems.isNotEmpty && showItems.isNotEmpty)
+          const SizedBox(height: 18),
+        if (showItems.isNotEmpty)
+          _FavouritePosterRail(title: 'Favourite shows', items: showItems),
       ],
     );
   }
@@ -2186,6 +2204,69 @@ class _ProfileLibraryLoadingState extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           FlixieSectionHeader(
+            title: 'Favourite movies',
+            uppercase: false,
+            accentHeight: 22,
+            titleStyle: TextStyle(
+              color: FlixieColors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          SizedBox(height: 10),
+          Row(children: [
+            Expanded(child: _ProfileLibrarySkeletonCard()),
+            SizedBox(width: 8),
+            Expanded(child: _ProfileLibrarySkeletonCard()),
+            SizedBox(width: 8),
+            Expanded(child: _ProfileLibrarySkeletonCard()),
+            SizedBox(width: 8),
+            Expanded(child: _ProfileLibrarySkeletonCard()),
+          ]),
+          SizedBox(height: 18),
+          FlixieSectionHeader(
+            title: 'Favourite people',
+            uppercase: false,
+            accentHeight: 22,
+            titleStyle: TextStyle(
+              color: FlixieColors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          SizedBox(height: 10),
+          Row(children: [
+            Expanded(child: _ProfileLibrarySkeletonPerson()),
+            SizedBox(width: 8),
+            Expanded(child: _ProfileLibrarySkeletonPerson()),
+            SizedBox(width: 8),
+            Expanded(child: _ProfileLibrarySkeletonPerson()),
+            SizedBox(width: 8),
+            Expanded(child: _ProfileLibrarySkeletonPerson()),
+          ]),
+          SizedBox(height: 18),
+          FlixieSectionHeader(
+            title: 'Favourite shows',
+            uppercase: false,
+            accentHeight: 22,
+            titleStyle: TextStyle(
+              color: FlixieColors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          SizedBox(height: 10),
+          Row(children: [
+            Expanded(child: _ProfileLibrarySkeletonCard()),
+            SizedBox(width: 8),
+            Expanded(child: _ProfileLibrarySkeletonCard()),
+            SizedBox(width: 8),
+            Expanded(child: _ProfileLibrarySkeletonCard()),
+            SizedBox(width: 8),
+            Expanded(child: _ProfileLibrarySkeletonCard()),
+          ]),
+          SizedBox(height: 20),
+          FlixieSectionHeader(
             title: 'Continue watching',
             uppercase: false,
             accentHeight: 22,
@@ -2216,6 +2297,34 @@ class _ProfileLibraryLoadingState extends StatelessWidget {
           SkeletonBox(height: 86, borderRadius: 14),
           SizedBox(height: 10),
           SkeletonBox(height: 86, borderRadius: 14),
+        ],
+      );
+}
+
+class _ProfileLibrarySkeletonCard extends StatelessWidget {
+  const _ProfileLibrarySkeletonCard();
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          SkeletonBox(height: 154, borderRadius: 14),
+          SizedBox(height: 8),
+          SkeletonBox(height: 12, borderRadius: 4),
+        ],
+      );
+}
+
+class _ProfileLibrarySkeletonPerson extends StatelessWidget {
+  const _ProfileLibrarySkeletonPerson();
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: const [
+          Center(child: SkeletonBox(width: 78, height: 78, borderRadius: 39)),
+          SizedBox(height: 8),
+          SkeletonBox(width: double.infinity, height: 12, borderRadius: 4),
         ],
       );
 }

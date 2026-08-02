@@ -41,9 +41,11 @@ import 'package:flixie_app/features/movies/presentation/widgets/video_card.dart'
 import 'package:flixie_app/features/movies/presentation/widgets/media_lists_section.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/watch_request_sheet.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/write_review_sheet.dart';
+import 'package:flixie_app/features/social/data/friend_service.dart';
 import 'package:flixie_app/features/social/data/chat_service.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
+import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/models/group.dart';
 
 // ---------------------------------------------------------------------------
@@ -76,10 +78,10 @@ class _MovieDetailHeroTokens {
   const _MovieDetailHeroTokens._();
 
   static const double pageHorizontalPadding = 16;
-  static const double heroToWatchSectionGap = 22;
+  static const double heroToWatchSectionGap = 14;
   static const double heroControlsTopInset = 2;
-  static const double heroSurfaceTopPadding = 8;
-  static const double heroSurfaceBottomPadding = 10;
+  static const double heroSurfaceTopPadding = 0;
+  static const double heroSurfaceBottomPadding = 6;
   static const double heroTopScrimHeight = 112;
 
   static const double navButtonSize = 44;
@@ -97,11 +99,12 @@ class _MovieDetailHeroTokens {
   static const double navButtonBorderWidth = 0.85;
   static const double navButtonMinimalBorderWidth = 0.7;
 
-  static const double posterCompactWidthFactor = 0.40;
-  static const double posterRegularWidthFactor = 0.36;
+  static const double posterCompactWidthFactor = 0.42;
+  static const double posterRegularWidthFactor = 0.38;
   static const double posterMinWidth = 120;
   static const double posterMaxWidth = 168;
-  static const double posterCornerRadius = 16;
+  static const double posterCornerRadius = 0;
+  static const double posterRightRadius = 12;
   static const double posterAspectRatio = 2 / 3;
 
   static const double heroColumnGap = 12;
@@ -139,20 +142,16 @@ class _MovieDetailHeroTokens {
   static const double flixScoreIconSize = 17;
   static const double flixScoreValueSize = 14;
   static const double flixScoreLabelSize = 12;
-
-  static const double linksSpacingCompact = 12;
-  static const double linksSpacingRegular = 24;
-  static const double linksRunSpacing = 6;
   static const double textActionRadius = 8;
   static const double textActionVerticalPadding = 3;
   static const double textActionIconCompact = 18;
   static const double textActionIconRegular = 22;
   static const double textActionLabelCompact = 10.5;
   static const double textActionLabelRegular = 13;
+  static const double _sectionSpacing = 24;
 }
 
 class _MovieDetailScreenState extends State<MovieDetailScreen> {
-  static const double _sectionSpacing = 24;
   Movie? _movie;
   List<Review> _reviews = [];
   List<SimilarMovie> _similar = [];
@@ -831,10 +830,30 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   // ---- Helpers --------------------------------------------------------------
 
-  /// Extracts a 4-digit year from a date string like "2024-03-15".
-  String _extractYear(String? dateStr) {
-    if (dateStr == null || dateStr.length < 4) return '';
-    return dateStr.substring(0, 4);
+  /// Formats the hero release date as year-only, or full date when released this year.
+  String _formatHeroReleaseDate(String? iso) {
+    final dt = DateTime.tryParse(iso ?? '');
+    if (dt == null) return '';
+
+    if (dt.year == DateTime.now().year) {
+      const months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
+      return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
+    }
+
+    return '${dt.year}';
   }
 
   /// Formats runtime in minutes to "Xh Ym".
@@ -1158,8 +1177,16 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                     child: AspectRatio(
                       aspectRatio: _MovieDetailHeroTokens.posterAspectRatio,
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(
-                            _MovieDetailHeroTokens.posterCornerRadius),
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(
+                              _MovieDetailHeroTokens.posterCornerRadius),
+                          topRight: Radius.circular(
+                              _MovieDetailHeroTokens.posterRightRadius),
+                          bottomLeft: Radius.circular(
+                              _MovieDetailHeroTokens.posterCornerRadius),
+                          bottomRight: Radius.circular(
+                              _MovieDetailHeroTokens.posterRightRadius),
+                        ),
                         child: movie.posterPath == null
                             ? Container(
                                 color: FlixieColors.tabBarBackgroundFocused,
@@ -1188,7 +1215,13 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildTitleBlock(context, movie, compact: compact),
+                          Padding(
+                            padding: EdgeInsets.only(
+                              top: compact ? 4 : 6,
+                            ),
+                            child: _buildTitleBlock(context, movie,
+                                compact: compact),
+                          ),
                           SizedBox(
                             height: compact
                                 ? _MovieDetailHeroTokens.textBlockGapCompact
@@ -1348,7 +1381,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   }
 
   Widget _buildHeroMetadataRow(Movie movie, {required bool compact}) {
-    final year = _extractYear(movie.releaseDate);
+    final year = _formatHeroReleaseDate(movie.releaseDate);
     final runtime = _formatRuntime(movie.runtime);
     final rating = _contentRating(movie);
     final meta =
@@ -1447,25 +1480,34 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             .firstOrNull ??
         videos.firstOrNull;
 
-    return Wrap(
-      spacing: compact
-          ? _MovieDetailHeroTokens.linksSpacingCompact
-          : _MovieDetailHeroTokens.linksSpacingRegular,
-      runSpacing: _MovieDetailHeroTokens.linksRunSpacing,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         _heroTextAction(
           icon: Icons.ios_share_rounded,
           label: 'Share',
+          iconColor: const Color(0xFF5CC8FF),
           compact: compact,
           onTap: () => _showShareMovieSheet(movie),
         ),
-        if (trailer != null)
+        if (trailer != null) ...[
+          const SizedBox(width: 10),
+          Container(
+            width: 1,
+            height: compact
+                ? _MovieDetailHeroTokens.textActionIconCompact
+                : _MovieDetailHeroTokens.textActionIconRegular,
+            color: FlixieColors.light.withValues(alpha: 0.24),
+          ),
+          const SizedBox(width: 10),
           _heroTextAction(
             icon: Icons.play_circle_outline_rounded,
             label: 'Watch trailer',
+            iconColor: FlixieColors.danger,
             compact: compact,
             onTap: () => _openTrailer(trailer.youtubeUrl),
           ),
+        ],
       ],
     );
   }
@@ -1473,6 +1515,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   Widget _heroTextAction({
     required IconData icon,
     required String label,
+    Color iconColor = FlixieColors.light,
     required bool compact,
     required VoidCallback onTap,
   }) {
@@ -1483,28 +1526,37 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       child: Padding(
         padding: const EdgeInsets.symmetric(
             vertical: _MovieDetailHeroTokens.textActionVerticalPadding),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: FlixieColors.light,
-              size: compact
-                  ? _MovieDetailHeroTokens.textActionIconCompact
-                  : _MovieDetailHeroTokens.textActionIconRegular,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: FlixieColors.light,
-                fontSize: compact
-                    ? _MovieDetailHeroTokens.textActionLabelCompact
-                    : _MovieDetailHeroTokens.textActionLabelRegular,
-                fontWeight: FontWeight.w600,
+        child: SizedBox(
+          height: compact
+              ? _MovieDetailHeroTokens.textActionIconCompact
+              : _MovieDetailHeroTokens.textActionIconRegular,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                color: iconColor,
+                size: compact
+                    ? _MovieDetailHeroTokens.textActionIconCompact
+                    : _MovieDetailHeroTokens.textActionIconRegular,
               ),
-            ),
-          ],
+              const SizedBox(width: 6),
+              Center(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: FlixieColors.light,
+                    fontSize: compact
+                        ? _MovieDetailHeroTokens.textActionLabelCompact
+                        : _MovieDetailHeroTokens.textActionLabelRegular,
+                    fontWeight: FontWeight.w600,
+                    height: 1,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1519,6 +1571,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     ).toString();
   }
 
+  // ignore: unused_element
   Future<void> _showShareMovieSheet(Movie movie) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -1539,36 +1592,53 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               ),
             ),
             const SizedBox(height: 8),
+            // TODO(laura): Re-enable these options when the external share and copy link features are ready.
+            // ListTile(
+            //   leading: const Icon(Icons.ios_share_rounded,
+            //       color: FlixieColors.light),
+            //   title: const Text(
+            //     'Share movie link',
+            //     style: TextStyle(color: FlixieColors.light),
+            //   ),
+            //   subtitle: const Text(
+            //     'Send a link that opens Flixie when installed',
+            //     style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+            //   ),
+            //   onTap: () {
+            //     Navigator.pop(ctx);
+            //     _shareMovieExternally(movie);
+            //   },
+            // ),
+            // ListTile(
+            //   leading: const Icon(Icons.content_copy_rounded,
+            //       color: FlixieColors.light),
+            //   title: const Text(
+            //     'Copy movie link',
+            //     style: TextStyle(color: FlixieColors.light),
+            //   ),
+            //   subtitle: const Text(
+            //     'Paste it anywhere after copying',
+            //     style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+            //   ),
+            //   onTap: () {
+            //     Navigator.pop(ctx);
+            //     _copyMovieLink(movie);
+            //   },
+            // ),
             ListTile(
-              leading: const Icon(Icons.ios_share_rounded,
-                  color: FlixieColors.light),
+              leading:
+                  const Icon(Icons.person_rounded, color: FlixieColors.light),
               title: const Text(
-                'Share movie link',
+                'Share to friend',
                 style: TextStyle(color: FlixieColors.light),
               ),
               subtitle: const Text(
-                'Send a link that opens Flixie when installed',
+                'Send directly to one friend',
                 style: TextStyle(color: FlixieColors.medium, fontSize: 12),
               ),
               onTap: () {
                 Navigator.pop(ctx);
-                _shareMovieExternally(movie);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.content_copy_rounded,
-                  color: FlixieColors.light),
-              title: const Text(
-                'Copy movie link',
-                style: TextStyle(color: FlixieColors.light),
-              ),
-              subtitle: const Text(
-                'Paste it anywhere after copying',
-                style: TextStyle(color: FlixieColors.medium, fontSize: 12),
-              ),
-              onTap: () {
-                Navigator.pop(ctx);
-                _copyMovieLink(movie);
+                _showShareToFriendSheet(movie);
               },
             ),
             ListTile(
@@ -1624,6 +1694,267 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final fetched = await GroupService.getUserGroups(userId);
     auth.updateCachedGroups(fetched);
     return fetched.where((group) => group.id?.isNotEmpty == true).toList();
+  }
+
+  Future<List<Friendship>> _loadSharableFriends(String userId) async {
+    final auth = context.read<AuthProvider>();
+    final cached = auth.cachedFriends?.friendships ?? const <Friendship>[];
+    if (cached.isNotEmpty) {
+      return cached
+          .where((friendship) => friendship.friendUser?.id.isNotEmpty == true)
+          .toList();
+    }
+
+    final fetched = await FriendService.getFriends(userId);
+    auth.updateCachedFriends(fetched);
+    return fetched.friendships
+        .where((friendship) => friendship.friendUser?.id.isNotEmpty == true)
+        .toList();
+  }
+
+  Future<void> _showShareToFriendSheet(Movie movie) async {
+    final auth = context.read<AuthProvider>();
+    final userId = auth.dbUser?.id;
+    if (userId == null) return;
+
+    List<Friendship> friends = const [];
+    try {
+      friends = await _loadSharableFriends(userId);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not load your friends')),
+        );
+      }
+      return;
+    }
+
+    if (!mounted) return;
+    if (friends.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Add a friend to share there.')),
+      );
+      return;
+    }
+
+    String selectedFriendId = friends.first.friendUser!.id;
+    final messageController =
+        TextEditingController(text: 'You should watch this.');
+    bool sending = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            final selectedFriend = friends.firstWhere(
+              (friendship) => friendship.friendUser?.id == selectedFriendId,
+              orElse: () => friends.first,
+            );
+            final friendUser = selectedFriend.friendUser;
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 12,
+                bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: FlixieColors.medium.withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Share to friend',
+                    style: TextStyle(
+                      color: FlixieColors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    movie.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: FlixieColors.primary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Choose a friend',
+                    style: TextStyle(
+                      color: FlixieColors.medium,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 228),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: friends.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (_, index) {
+                        final friendship = friends[index];
+                        final friend = friendship.friendUser;
+                        if (friend == null) return const SizedBox.shrink();
+                        final isSelected = friend.id == selectedFriendId;
+                        final avatar = friend.avatar;
+                        final initials = friend.initials ??
+                            (friend.username.isNotEmpty
+                                ? friend.username[0].toUpperCase()
+                                : '?');
+
+                        return InkWell(
+                          onTap: sending
+                              ? null
+                              : () => setSheetState(
+                                  () => selectedFriendId = friend.id),
+                          borderRadius: BorderRadius.circular(14),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? FlixieColors.primary.withValues(alpha: 0.14)
+                                  : FlixieColors.tabBarBackgroundFocused,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: isSelected
+                                    ? FlixieColors.primary
+                                        .withValues(alpha: 0.45)
+                                    : FlixieColors.tabBarBorder,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                ProfileAvatarView(
+                                  avatar: avatar,
+                                  fallbackText: initials,
+                                  fallbackColor: FlixieColors.primary,
+                                  size: 34,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    friend.displayName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: FlixieColors.light,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                if (isSelected)
+                                  const Icon(
+                                    Icons.check_circle_rounded,
+                                    color: FlixieColors.primary,
+                                    size: 20,
+                                  )
+                                else
+                                  const Icon(
+                                    Icons.radio_button_unchecked_rounded,
+                                    color: FlixieColors.medium,
+                                    size: 20,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: messageController,
+                    minLines: 2,
+                    maxLines: 3,
+                    enabled: !sending,
+                    style: const TextStyle(color: FlixieColors.light),
+                    decoration: const InputDecoration(
+                      labelText: 'Message',
+                      hintText: 'You should watch this.',
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: sending
+                          ? null
+                          : () async {
+                              setSheetState(() => sending = true);
+                              final navigator = Navigator.of(sheetContext);
+                              final messenger = ScaffoldMessenger.of(context);
+                              final customMessage =
+                                  messageController.text.trim();
+
+                              try {
+                                await _shareMovieIntoDirectConversation(
+                                  movie: movie,
+                                  friend: selectedFriend,
+                                  message: customMessage,
+                                );
+                                if (!mounted) return;
+                                navigator.pop();
+                                messenger.showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                        'Shared to ${friendUser?.displayName ?? 'friend'}'),
+                                  ),
+                                );
+                              } catch (_) {
+                                if (!mounted) return;
+                                setSheetState(() => sending = false);
+                                messenger.showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                        'Could not share to that friend yet'),
+                                  ),
+                                );
+                              }
+                            },
+                      icon: sending
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.send_rounded),
+                      label:
+                          Text(sending ? 'Sharing...' : 'Share in direct chat'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _showShareToGroupSheet(Movie movie) async {
@@ -1712,28 +2043,125 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    value: selectedGroupId,
-                    dropdownColor: FlixieColors.tabBarBackgroundFocused,
-                    decoration: const InputDecoration(
-                      labelText: 'Group',
+                  const Text(
+                    'Choose a group',
+                    style: TextStyle(
+                      color: FlixieColors.medium,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.1,
                     ),
-                    items: groups
-                        .map((group) => DropdownMenuItem<String>(
-                              value: group.id!,
-                              child: Text(
-                                group.name,
-                                style:
-                                    const TextStyle(color: FlixieColors.light),
+                  ),
+                  const SizedBox(height: 10),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 228),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: groups.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (_, index) {
+                        final group = groups[index];
+                        final isSelected = group.id == selectedGroupId;
+                        return InkWell(
+                          onTap: sending || group.id == null
+                              ? null
+                              : () => setSheetState(
+                                  () => selectedGroupId = group.id!),
+                          borderRadius: BorderRadius.circular(14),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? FlixieColors.primary.withValues(alpha: 0.14)
+                                  : FlixieColors.tabBarBackgroundFocused,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: isSelected
+                                    ? FlixieColors.primary
+                                        .withValues(alpha: 0.45)
+                                    : FlixieColors.tabBarBorder,
                               ),
-                            ))
-                        .toList(),
-                    onChanged: sending
-                        ? null
-                        : (value) {
-                            if (value == null) return;
-                            setSheetState(() => selectedGroupId = value);
-                          },
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 34,
+                                  height: 34,
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? FlixieColors.primary
+                                            .withValues(alpha: 0.22)
+                                        : FlixieColors.surfaceElevated,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    (group.abbreviation?.isNotEmpty == true
+                                            ? group.abbreviation!
+                                            : group.name)
+                                        .trim()
+                                        .characters
+                                        .take(2)
+                                        .toString()
+                                        .toUpperCase(),
+                                    style: TextStyle(
+                                      color: isSelected
+                                          ? FlixieColors.primary
+                                          : FlixieColors.light,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        group.name,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: FlixieColors.light,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      if (group.abbreviation?.isNotEmpty ==
+                                          true) ...[
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          group.abbreviation!.toUpperCase(),
+                                          style: const TextStyle(
+                                            color: FlixieColors.medium,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                if (isSelected)
+                                  const Icon(
+                                    Icons.check_circle_rounded,
+                                    color: FlixieColors.primary,
+                                    size: 20,
+                                  )
+                                else
+                                  const Icon(
+                                    Icons.radio_button_unchecked_rounded,
+                                    color: FlixieColors.medium,
+                                    size: 20,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -1831,6 +2259,35 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     );
 
     final prompt = message.isEmpty ? 'Has anyone ever seen this?' : message;
+    final chatText = _buildMovieSharePayload(
+      movie: movie,
+      message: prompt,
+    );
+
+    await ChatService.sendMessage(
+      conversationId: conversation.id,
+      senderId: userId,
+      text: chatText,
+    );
+  }
+
+  Future<void> _shareMovieIntoDirectConversation({
+    required Movie movie,
+    required Friendship friend,
+    required String message,
+  }) async {
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    final friendUser = friend.friendUser;
+    if (userId == null || friendUser == null || friendUser.id.isEmpty) {
+      throw StateError('Missing share context');
+    }
+
+    final conversation = await ChatService.getOrCreateDirectConversation(
+      userId: userId,
+      otherUserId: friendUser.id,
+    );
+
+    final prompt = message.isEmpty ? 'You should watch this.' : message;
     final chatText = _buildMovieSharePayload(
       movie: movie,
       message: prompt,
@@ -2434,14 +2891,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         : _toggleWatched;
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: FlixieColors.surface.withValues(alpha: 0.85),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-          ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Row(
             children: [
               Container(
@@ -2467,6 +2920,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       hasWatchEntries
@@ -2479,93 +2933,85 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                         height: 1.1,
                       ),
                     ),
-                    if (hasWatchEntries && _lastWatchedLabel() != null) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        'Last watched ${_lastWatchedLabel()}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: FlixieColors.light,
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w500,
-                          height: 1.1,
-                        ),
+                    const SizedBox(height: 3),
+                    Text(
+                      hasWatchEntries && _lastWatchedLabel() != null
+                          ? 'Last watched ${_lastWatchedLabel()}'
+                          : 'Log your first watch to start your history',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: FlixieColors.light,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w500,
+                        height: 1.1,
                       ),
-                    ] else if (!hasWatchEntries) ...[
-                      const SizedBox(height: 3),
-                      const Text(
-                        'Log your first watch to start your history',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: FlixieColors.light,
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w500,
-                          height: 1.1,
-                        ),
-                      ),
-                    ],
+                    ),
                   ],
                 ),
               ),
-              Column(
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: _currentlyUpdating != null
-                        ? null
-                        : () => primaryAction(),
-                    icon: primaryIsLoading
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Icon(primaryIcon, size: 20),
-                    label: Text(primaryLabel),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: FlixieColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 11, vertical: 10),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(11),
-                      ),
-                      textStyle: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
+                onPressed:
+                    _currentlyUpdating != null ? null : () => primaryAction(),
+                icon: primaryIsLoading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(primaryIcon, size: 20),
+                label: Text(primaryLabel),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: FlixieColors.primary,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(11),
                   ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Rate and review each watch separately',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: FlixieColors.medium,
-                      fontSize: 8.5,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  textStyle: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
                   ),
-                ],
+                ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
-          decoration: BoxDecoration(
-            color: FlixieColors.surface.withValues(alpha: 0.58),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.13)),
+        const SizedBox(height: 10),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              'Rate and review each watch separately',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: FlixieColors.medium,
+                fontSize: 8.5,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
+        ),
+        const SizedBox(height: 12),
+        Divider(
+          height: 1,
+          thickness: 1,
+          color: Colors.white.withValues(alpha: 0.12),
+        ),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
           child: Row(
             children: [
               Expanded(
                 child: _statusActionItem(
-                  icon: Icons.star_outline_rounded,
+                  icon: _userRating != null
+                      ? Icons.star_rounded
+                      : Icons.star_outline_rounded,
                   label: 'Rate',
                   badge: _userRating != null ? '${_userRating!}/10' : null,
                   color: FlixieColors.tertiary,
@@ -2699,7 +3145,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 SizedBox(
                   height: 14,
                   child: Text(
-                    badge == null ? label : '$label $badge',
+                    badge ?? label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
@@ -3318,7 +3764,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         for (var index = 0; index < sections.length; index++) ...[
           sections[index],
           if (index != sections.length - 1)
-            const SizedBox(height: _sectionSpacing),
+            const SizedBox(height: _MovieDetailHeroTokens._sectionSpacing),
         ],
       ],
     );
@@ -4090,11 +4536,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         if (providers.length > 3)
           SizedBox(
             height: 30,
-            child: TextButton.icon(
+            child: TextButton(
               onPressed: () => _showAllProviderOptions(providers),
-              iconAlignment: IconAlignment.end,
-              icon: const Icon(Icons.chevron_right_rounded, size: 17),
-              label: Text('All ${providers.length} options'),
+              child: Text('All ${providers.length} options'),
               style: TextButton.styleFrom(
                 foregroundColor: FlixieColors.primary,
                 padding: EdgeInsets.zero,
@@ -4229,8 +4673,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               ],
             ),
           ),
-          const Icon(Icons.chevron_right_rounded,
-              color: FlixieColors.primary, size: 17),
         ],
       ),
     );

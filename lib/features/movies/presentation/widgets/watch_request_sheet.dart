@@ -27,6 +27,7 @@ class MovieWatchRequestSheet extends StatefulWidget {
     required this.friends,
     required this.onSuccess,
     required this.onError,
+    this.initialFriendId,
     this.fromMovieMatch = false,
   });
 
@@ -36,6 +37,7 @@ class MovieWatchRequestSheet extends StatefulWidget {
   final List<Friendship> friends;
   final VoidCallback onSuccess;
   final VoidCallback onError;
+  final String? initialFriendId;
   final bool fromMovieMatch;
 
   @override
@@ -67,6 +69,16 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
   void initState() {
     super.initState();
     _fetchGroups();
+    if (widget.initialFriendId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final initialId = widget.initialFriendId!;
+        if (widget.friends
+            .any((friendship) => friendship.friendUser?.id == initialId)) {
+          _selectFriend(initialId);
+        }
+      });
+    }
   }
 
   @override
