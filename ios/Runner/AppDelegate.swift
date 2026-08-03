@@ -6,6 +6,7 @@ import UserNotifications
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate, MessagingDelegate {
   private let badgeChannelName = "flixie/app_badge"
+  private var badgeChannel: FlutterMethodChannel?
 
   override func application(
     _ application: UIApplication,
@@ -25,14 +26,9 @@ import UserNotifications
 
     let didFinish = super.application(application, didFinishLaunchingWithOptions: launchOptions)
 
-    if let controller = window?.rootViewController as? FlutterViewController {
-      let channel = FlutterMethodChannel(
-        name: badgeChannelName,
-        binaryMessenger: controller.binaryMessenger
-      )
-      channel.setMethodCallHandler { [weak self] call, result in
-        self?.handleBadgeMethodCall(call, result: result)
-      }
+    if badgeChannel == nil,
+       let controller = window?.rootViewController as? FlutterViewController {
+      registerBadgeChannel(with: controller.binaryMessenger)
     }
 
     return didFinish
@@ -40,6 +36,18 @@ import UserNotifications
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    registerBadgeChannel(with: engineBridge.applicationRegistrar.messenger())
+  }
+
+  private func registerBadgeChannel(with messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(
+      name: badgeChannelName,
+      binaryMessenger: messenger
+    )
+    channel.setMethodCallHandler { [weak self] call, result in
+      self?.handleBadgeMethodCall(call, result: result)
+    }
+    badgeChannel = channel
   }
 
   // Forward APNs device tokens to Firebase Messaging so FCM can work on iOS.

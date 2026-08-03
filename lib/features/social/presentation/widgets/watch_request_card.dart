@@ -114,7 +114,7 @@ class WatchRequestCard extends StatelessWidget {
                         children: [
                           TextSpan(text: isSent ? 'To: ' : 'From: '),
                           TextSpan(
-                            text: other?.username ?? '—',
+                            text: other?.username ?? '-',
                             style: const TextStyle(
                                 color: FlixieColors.light,
                                 fontWeight: FontWeight.w600),

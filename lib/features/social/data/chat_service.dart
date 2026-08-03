@@ -8,7 +8,7 @@ class ChatService {
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   // ---------------------------------------------------------------------------
-  // REST — conversation management
+  // REST - conversation management
   // ---------------------------------------------------------------------------
 
   /// Get or create the Firestore conversation linked to a Prisma group.
@@ -62,7 +62,7 @@ class ChatService {
   }
 
   // ---------------------------------------------------------------------------
-  // Firestore — real-time streams
+  // Firestore - real-time streams
   // ---------------------------------------------------------------------------
 
   /// Real-time stream of messages (newest-first, capped at 50).

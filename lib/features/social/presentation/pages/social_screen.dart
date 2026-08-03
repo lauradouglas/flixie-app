@@ -15,6 +15,7 @@ import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/features/profile/data/notification_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
+import 'package:flixie_app/core/navigation/tab_refresh_controller.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
@@ -36,6 +37,23 @@ class SocialScreen extends StatefulWidget {
 
 class _SocialScreenState extends State<SocialScreen> {
   int _selectedTab = 0; // 0 = Friends, 1 = Groups
+  int _refreshRevision = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    TabRefreshController.social.addListener(_onSocialTabRefresh);
+  }
+
+  @override
+  void dispose() {
+    TabRefreshController.social.removeListener(_onSocialTabRefresh);
+    super.dispose();
+  }
+
+  void _onSocialTabRefresh() {
+    if (mounted) setState(() => _refreshRevision++);
+  }
 
   void _showAddFriendSheet() {
     showModalBottomSheet(
@@ -92,9 +110,9 @@ class _SocialScreenState extends State<SocialScreen> {
           Expanded(
             child: IndexedStack(
               index: _selectedTab,
-              children: const [
-                _FriendsSubView(),
-                _GroupsSubView(),
+              children: [
+                _FriendsSubView(key: ValueKey('friends-$_refreshRevision')),
+                _GroupsSubView(key: ValueKey('groups-$_refreshRevision')),
               ],
             ),
           ),
@@ -109,7 +127,7 @@ class _SocialScreenState extends State<SocialScreen> {
 // ---------------------------------------------------------------------------
 
 class _FriendsSubView extends StatefulWidget {
-  const _FriendsSubView();
+  const _FriendsSubView({super.key});
 
   @override
   State<_FriendsSubView> createState() => _FriendsSubViewState();
@@ -1131,7 +1149,7 @@ class _GroupsPreviewSection extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _GroupsSubView extends StatefulWidget {
-  const _GroupsSubView();
+  const _GroupsSubView({super.key});
 
   @override
   State<_GroupsSubView> createState() => _GroupsSubViewState();
@@ -1842,7 +1860,7 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
   final _descController = TextEditingController();
   bool _isPublic = true;
 
-  // Step 1 — add members (before creation)
+  // Step 1 - add members (before creation)
   int _step = 0;
   List<FriendshipUser> _friends = [];
   final List<String> _selectedFriendIds = [];

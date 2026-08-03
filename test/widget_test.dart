@@ -150,6 +150,25 @@ void main() {
       expect(authProvider.isAuthenticated, isFalse);
       expect(authProvider.firebaseUser, isNull);
     });
+
+    test('profile timeout is contained by the auth state listener', () async {
+      final timeoutAuth = _FakeAuthService();
+      final timeoutProvider = app_auth.AuthProvider(
+        timeoutAuth,
+        MovieService(),
+        prefetchAfterAuth: false,
+        profileLoader: (_) async => throw TimeoutException('profile timeout'),
+      );
+      addTearDown(() {
+        timeoutProvider.dispose();
+        timeoutAuth.close();
+      });
+
+      timeoutAuth.emitUser(_FakeUser());
+      await pumpEventQueue();
+
+      expect(timeoutProvider.status, app_auth.AuthStatus.unauthenticated);
+    });
   });
 
   group('AuthService.messageFromAuthException', () {

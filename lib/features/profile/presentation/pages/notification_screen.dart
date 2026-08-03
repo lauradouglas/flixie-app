@@ -117,7 +117,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     _pollTimer = null;
   }
 
-  /// Silent background refresh — does not show a loading spinner and does not
+  /// Silent background refresh - does not show a loading spinner and does not
   /// clear existing notifications while fetching, so the UI stays stable.
   Future<void> _poll() async {
     if (!mounted) return;

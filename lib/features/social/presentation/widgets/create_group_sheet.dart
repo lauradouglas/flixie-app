@@ -26,7 +26,7 @@ class _CreateGroupSheetState extends State<CreateGroupSheet> {
   final _descController = TextEditingController();
   bool _isPublic = true;
 
-  // Step 1 — add members (before creation)
+  // Step 1 - add members (before creation)
   int _step = 0;
   List<FriendshipUser> _friends = [];
   final List<String> _selectedFriendIds = [];

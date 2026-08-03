@@ -94,7 +94,7 @@ class GroupChatTabState extends State<GroupChatTab> {
   Future<void> _initConversation() async {
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (userId == null) {
-      // dbUser not ready yet — listener will retry once it loads
+      // dbUser not ready yet - listener will retry once it loads
       return;
     }
     if (!_initLoading) return; // already resolved
@@ -204,7 +204,7 @@ class GroupChatTabState extends State<GroupChatTab> {
       // to build the messageId → pgGroupRequestId mapping for legacy messages.
       // Once the BE writes pgGroupRequestId on the message doc itself, this
       // fetch is unnecessary and can be removed.
-      // Wrapped in its own try/catch — permission errors here must not abort
+      // Wrapped in its own try/catch - permission errors here must not abort
       // the API results already fetched above.
       final newMsgMap = <String, String>{};
       try {
@@ -439,7 +439,7 @@ class GroupChatTabState extends State<GroupChatTab> {
                                     fontStyle: FontStyle.italic)),
                           ),
                         ],
-                        // Responses — grouped by status
+                        // Responses - grouped by status
                         if (memberStatuses.isNotEmpty) ...[
                           const SizedBox(height: 16),
                           Row(

@@ -246,7 +246,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final userId = auth.dbUser?.id;
     if (userId == null) return;
 
-    // Use prefetched cache if ready — no spinner needed
+    // Use prefetched cache if ready - no spinner needed
     if (auth.cachedActivity != null) {
       if (mounted) {
         setState(() {

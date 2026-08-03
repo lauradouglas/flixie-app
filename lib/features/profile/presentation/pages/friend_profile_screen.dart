@@ -193,7 +193,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     if (myId == null) return;
 
     try {
-      // Always fetch fresh data — the cache may be stale after sending a request.
+      // Always fetch fresh data - the cache may be stale after sending a request.
       final data = await FriendService.getFriends(myId);
 
       if (!mounted) return;

@@ -45,7 +45,7 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
       return;
     }
 
-    // Use prefetched cache if ready — no spinner needed
+    // Use prefetched cache if ready - no spinner needed
     if (auth.cachedReviews != null) {
       setState(() {
         _allReviews = auth.cachedReviews!;

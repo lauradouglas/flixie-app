@@ -24,6 +24,7 @@ import 'package:flixie_app/features/social/data/request_service.dart';
 import 'package:flixie_app/features/home/data/trending_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
+import 'package:flixie_app/core/navigation/tab_refresh_controller.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
 import 'package:flixie_app/core/widgets/flixie_wordmark.dart';
@@ -95,6 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // Listen for dbUser becoming available after auth resolves
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _authProvider?.addListener(_onAuthChanged);
+      TabRefreshController.home.addListener(_onHomeTabRefresh);
       _loadAll();
     });
   }
@@ -102,6 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _authProvider?.removeListener(_onAuthChanged);
+    TabRefreshController.home.removeListener(_onHomeTabRefresh);
     _heroPageController.dispose();
     _forYouPageController.dispose();
     super.dispose();
@@ -114,11 +117,25 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _loadAll({bool refreshRecommendations = false}) async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+  void _onHomeTabRefresh() {
+    if (mounted) unawaited(_refreshAll());
+  }
+
+  Future<void> _refreshAll() => _loadAll(
+        refreshRecommendations: true,
+        showFullLoading: false,
+      );
+
+  Future<void> _loadAll({
+    bool refreshRecommendations = false,
+    bool showFullLoading = true,
+  }) async {
+    if (showFullLoading) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
     final auth = context.read<AuthProvider>();
     final user = auth.dbUser;
     logger.d('[HomeScreen] loading, user=${user?.id}');
@@ -129,13 +146,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Secondary sections manage their own loading/error states and should not
     // keep the whole page behind a skeleton.
-    unawaited(_loadSecondaryContent(
+    final secondaryLoad = _loadSecondaryContent(
       user,
       refreshRecommendations: refreshRecommendations,
-    ));
+    );
+    if (!refreshRecommendations) unawaited(secondaryLoad);
 
     try {
-      final trendingMovies = await TrendingService.getTrendingMovies();
+      final trendingMovies = await TrendingService.getTrendingMovies(
+        refresh: refreshRecommendations,
+      );
+      if (refreshRecommendations) await secondaryLoad;
       if (context.mounted) {
         setState(() {
           _featuredMovies = trendingMovies;
@@ -418,7 +439,7 @@ class _HomeScreenState extends State<HomeScreen> {
               : RefreshIndicator(
                   color: FlixieColors.primary,
                   backgroundColor: FlixieColors.background,
-                  onRefresh: () => _loadAll(refreshRecommendations: true),
+                  onRefresh: _refreshAll,
                   child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(0, 0, 0, 16),

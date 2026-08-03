@@ -846,7 +846,7 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
       final userId = widget.user.id;
       user_model.User updated = widget.user;
 
-      // Only send changed fields — API takes one field at a time
+      // Only send changed fields - API takes one field at a time
       if (username != widget.user.username) {
         updated = await _settingsController.updateUserField(
             userId, 'username', username);

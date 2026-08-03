@@ -53,7 +53,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
   List<ActivityListItem> _memberActivity = [];
   List<MovieList> _groupLists = [];
   String? _conversationId;
-  // Set by _RequestsTab when it refreshes — overrides the initial computed count.
+  // Set by _RequestsTab when it refreshes - overrides the initial computed count.
   int? _pendingCountOverride;
 
   int get _pendingRequestCount {

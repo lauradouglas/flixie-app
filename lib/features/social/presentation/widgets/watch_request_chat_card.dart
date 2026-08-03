@@ -88,7 +88,7 @@ class WatchRequestChatCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header — tappable
+              // Header - tappable
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: onTap,
@@ -116,7 +116,7 @@ class WatchRequestChatCard extends StatelessWidget {
                 ),
               ),
               const Divider(height: 1, color: FlixieColors.tabBarBorder),
-              // Poster + details — tappable
+              // Poster + details - tappable
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: onTap,
@@ -266,7 +266,7 @@ class WatchRequestChatCard extends StatelessWidget {
                   ),
                 ),
               ),
-              // Action row — only for members who aren't the requester
+              // Action row - only for members who aren't the requester
               if (!isMyRequest) ...[
                 const Divider(height: 1, color: FlixieColors.tabBarBorder),
                 Padding(
@@ -364,7 +364,7 @@ class WatchRequestChatCard extends StatelessWidget {
                                     ),
                 ),
               ],
-              // Footer — tappable to open detail
+              // Footer - tappable to open detail
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: onTap,

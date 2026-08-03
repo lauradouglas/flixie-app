@@ -65,7 +65,7 @@ class _FavoriteGenresSheetState extends State<FavoriteGenresSheet> {
       if (!mounted) return;
       await context.read<AuthProvider>().refreshUserData();
       if (!mounted) return;
-      // Capture messenger before pop — context is deactivated after pop()
+      // Capture messenger before pop - context is deactivated after pop()
       final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop();
       messenger.showSnackBar(

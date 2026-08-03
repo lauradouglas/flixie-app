@@ -62,9 +62,27 @@ class AuthProvider extends ChangeNotifier {
     _prefetchAfterAuth = prefetchAfterAuth;
     _avatarSelector = avatarSelector ?? AvatarService.selectAvatar;
     ApiClient.setAuthTokenRefresher(_authService.refreshIdToken);
-    _authStateSubscription = _authService.authStateChanges.listen((user) {
-      unawaited(_onAuthStateChanged(user));
-    });
+    _authStateSubscription = _authService.authStateChanges.listen(
+      (user) {
+        unawaited(
+          _onAuthStateChanged(user)
+              .catchError((Object error, StackTrace stack) {
+            logger.e(
+              'Auth state handler failed',
+              error: error,
+              stackTrace: stack,
+            );
+          }),
+        );
+      },
+      onError: (Object error, StackTrace stack) {
+        logger.e(
+          'Firebase auth state stream failed',
+          error: error,
+          stackTrace: stack,
+        );
+      },
+    );
   }
 
   final AuthService _authService;
@@ -242,6 +260,16 @@ class AuthProvider extends ChangeNotifier {
     _authStateChangeFuture = _handleAuthStateChanged(user);
     try {
       await _authStateChangeFuture;
+    } catch (error, stackTrace) {
+      logger.e(
+        'Unhandled auth state transition error',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (_status == AuthStatus.unknown) {
+        _status = AuthStatus.unauthenticated;
+        notifyListeners();
+      }
     } finally {
       _authStateChangeFuture = null;
       _isHandlingAuthState = false;

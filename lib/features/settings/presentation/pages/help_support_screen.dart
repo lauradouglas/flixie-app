@@ -42,7 +42,7 @@ class HelpSupportScreen extends StatelessWidget {
             question: 'Where does Flixie\'s data come from?',
             answer:
                 'All movie details, cast and crew information, release dates, and more '
-                'are sourced from The Movie Database (TMDB) — a reliable and comprehensive '
+                'are sourced from The Movie Database (TMDB) - a reliable and comprehensive '
                 'database dedicated to film and television. Any updates made on TMDB are '
                 'reflected in Flixie to ensure you always have the most current information. '
                 'Streaming availability data is powered by JustWatch, an international '
@@ -105,7 +105,7 @@ class HelpSupportScreen extends StatelessWidget {
                 'You\'ll need to enter your current password before setting a new one.',
           ),
           _FaqTile(
-            question: 'I forgot my password — what do I do?',
+            question: 'I forgot my password - what do I do?',
             answer:
                 'On the login screen, tap "Forgot Password" and enter your email. '
                 'We\'ll send you a reset link.',

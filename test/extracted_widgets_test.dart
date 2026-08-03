@@ -36,7 +36,8 @@ void main() {
       expect(find.text('BK'), findsOneWidget);
     });
 
-    testWidgets('renders ? for empty username with no initials', (tester) async {
+    testWidgets('renders ? for empty username with no initials',
+        (tester) async {
       const user = FriendshipUser(id: '3', username: '');
       await tester.pumpWidget(_wrap(const FriendAvatar(user: user)));
 
@@ -49,7 +50,7 @@ void main() {
         username: 'cleo',
         iconColor: {'hexCode': '#FF0000'},
       );
-      // Just verify widget renders without error — colour logic covered by unit test
+      // Just verify widget renders without error - colour logic covered by unit test
       await tester.pumpWidget(_wrap(const FriendAvatar(user: user)));
       expect(find.text('C'), findsOneWidget);
     });
@@ -121,7 +122,8 @@ void main() {
     });
 
     testWidgets('renders budget when present', (tester) async {
-      const movieWithBudget = Movie(id: 2, title: 'Big Budget', budget: 150000000);
+      const movieWithBudget =
+          Movie(id: 2, title: 'Big Budget', budget: 150000000);
       await tester.pumpWidget(
         _wrap(
           const FilmInfoCard(

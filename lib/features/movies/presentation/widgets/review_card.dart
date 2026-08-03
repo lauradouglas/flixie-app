@@ -262,7 +262,7 @@ class _ReviewCardState extends State<ReviewCard> {
             ),
             const SizedBox(height: 18),
 
-            // Body — spoiler guard or truncated preview
+            // Body - spoiler guard or truncated preview
             if (hasSpoilers && !_spoilerRevealed)
               GestureDetector(
                 onTap: () => setState(() => _spoilerRevealed = true),
@@ -283,7 +283,7 @@ class _ReviewCardState extends State<ReviewCard> {
                           color: FlixieColors.warning, size: 19),
                       SizedBox(width: 10),
                       Text(
-                        'Contains spoilers — tap to reveal',
+                        'Contains spoilers - tap to reveal',
                         style: TextStyle(
                           color: FlixieColors.warning,
                           fontSize: 13,
@@ -710,7 +710,7 @@ class _ReviewDetailSheetState extends State<_ReviewDetailSheet> {
 }
 
 // ---------------------------------------------------------------------------
-// Reaction strip — shown inside the full-review bottom sheet
+// Reaction strip - shown inside the full-review bottom sheet
 // ---------------------------------------------------------------------------
 
 class _ReactionStrip extends StatelessWidget {

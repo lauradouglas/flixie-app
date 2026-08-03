@@ -10,9 +10,10 @@ class TrendingService {
   static final Map<String, _CachedTrendingShows> _showsCache = {};
 
   static Future<List<MovieShort>> getTrendingMovies(
-      {String timeWindow = 'week'}) async {
+      {String timeWindow = 'week', bool refresh = false}) async {
     // Check cache first
-    final cachedTrending = _cache.getTrendingMovies(timeWindow);
+    final cachedTrending =
+        refresh ? null : _cache.getTrendingMovies(timeWindow);
     if (cachedTrending != null) {
       return cachedTrending;
     }

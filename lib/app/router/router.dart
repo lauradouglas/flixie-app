@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:flixie_app/core/auth/auth_provider.dart';
+import 'package:flixie_app/core/navigation/tab_refresh_controller.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/home/presentation/pages/home_screen.dart';
 import 'package:flixie_app/features/movies/presentation/pages/movie_detail_screen.dart';
@@ -395,7 +396,16 @@ class MainNavigationShell extends StatelessWidget {
         body: child,
         bottomNavigationBar: _FlixieNavBar(
           selectedIndex: selectedIndex,
-          onDestinationSelected: (index) => context.go(_routes[index]),
+          onDestinationSelected: (index) {
+            final isAtDestinationRoot =
+                GoRouterState.of(context).uri.path == _routes[index];
+            if (index == selectedIndex && isAtDestinationRoot) {
+              if (index == 0) TabRefreshController.requestHomeRefresh();
+              if (index == 3) TabRefreshController.requestSocialRefresh();
+              return;
+            }
+            context.go(_routes[index]);
+          },
         ),
       ),
     );

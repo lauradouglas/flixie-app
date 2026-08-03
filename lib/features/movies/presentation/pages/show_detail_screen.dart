@@ -1869,7 +1869,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
               _MiniMetric(
                 label: 'Average Rating',
                 value: summary?.averageRating == null
-                    ? '—'
+                    ? '-'
                     : summary!.averageRating!.toStringAsFixed(1),
               ),
               _MiniMetric(
@@ -1879,13 +1879,13 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
               _MiniMetric(
                 label: 'Highest',
                 value: summary?.highestRating == null
-                    ? '—'
+                    ? '-'
                     : '${summary!.highestName ?? 'Friend'} ${summary.highestRating!.toStringAsFixed(0)}/10',
               ),
               _MiniMetric(
                 label: 'Lowest',
                 value: summary?.lowestRating == null
-                    ? '—'
+                    ? '-'
                     : '${summary!.lowestName ?? 'Friend'} ${summary.lowestRating!.toStringAsFixed(0)}/10',
               ),
             ],
@@ -1953,7 +1953,7 @@ int? _year(String? date) {
 }
 
 String _dateLabel(String? date) {
-  if (date == null || date.isEmpty) return '—';
+  if (date == null || date.isEmpty) return '-';
   final parsed = DateTime.tryParse(date);
   if (parsed == null) return date;
   const months = [
@@ -2115,7 +2115,7 @@ class _InfoCell extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            (value == null || value!.isEmpty) ? '—' : value!,
+            (value == null || value!.isEmpty) ? '-' : value!,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
@@ -2484,7 +2484,7 @@ class _EpisodeCard extends StatelessWidget {
                       [
                         _dateLabel(episode.airDate),
                         if (episode.runtime != null) '${episode.runtime}m',
-                      ].where((item) => item != '—').join('  •  '),
+                      ].where((item) => item != '-').join('  •  '),
                       style: const TextStyle(
                         color: _ShowDetailScreenState._textSecondary,
                         fontSize: 12,
@@ -2671,7 +2671,7 @@ class _SimilarShowCard extends StatelessWidget {
                   color: Colors.white, fontWeight: FontWeight.w900),
             ),
             Text(
-              '${show.voteAverage?.toStringAsFixed(1) ?? '—'} • ${show.numberOfSeasons ?? show.seasons.length} Seasons',
+              '${show.voteAverage?.toStringAsFixed(1) ?? '-'} • ${show.numberOfSeasons ?? show.seasons.length} Seasons',
               style: const TextStyle(
                   color: _ShowDetailScreenState._textSecondary, fontSize: 12),
             ),

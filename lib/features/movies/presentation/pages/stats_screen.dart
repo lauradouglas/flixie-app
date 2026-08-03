@@ -116,13 +116,13 @@ class _StatsScreenState extends State<StatsScreen> {
           children: [
             StatsCard(
               label: 'Movies Watched',
-              value: _totalMovies > 0 ? '$_totalMovies' : '—',
+              value: _totalMovies > 0 ? '$_totalMovies' : '-',
               icon: Icons.movie_outlined,
             ),
             const SizedBox(width: 12),
             StatsCard(
               label: 'Total Runtime',
-              value: _totalMovies > 0 ? _runtimeLabel : '—',
+              value: _totalMovies > 0 ? _runtimeLabel : '-',
               icon: Icons.schedule_outlined,
             ),
           ],
@@ -132,13 +132,13 @@ class _StatsScreenState extends State<StatsScreen> {
           children: [
             StatsCard(
               label: 'Avg Rating',
-              value: _avgRating > 0 ? _avgRating.toStringAsFixed(1) : '—',
+              value: _avgRating > 0 ? _avgRating.toStringAsFixed(1) : '-',
               icon: Icons.star_outline,
             ),
             const SizedBox(width: 12),
             StatsCard(
               label: 'Most Active',
-              value: mostActive >= 0 ? _kMonthNames[mostActive] : '—',
+              value: mostActive >= 0 ? _kMonthNames[mostActive] : '-',
               subtitle:
                   mostActive >= 0 ? '${buckets[mostActive]} movies' : null,
               icon: Icons.calendar_month_outlined,
@@ -207,7 +207,7 @@ class _StatsScreenState extends State<StatsScreen> {
 
   String get _runtimeLabel {
     final mins = _totalMinutes;
-    if (mins == 0) return '—';
+    if (mins == 0) return '-';
     final d = mins ~/ (60 * 24);
     final h = (mins % (60 * 24)) ~/ 60;
     final m = mins % 60;

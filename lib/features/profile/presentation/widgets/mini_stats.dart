@@ -27,7 +27,7 @@ class FriendMiniStats extends StatelessWidget {
 
   String get _runtimeLabel {
     final mins = _movies.fold<int>(0, (s, m) => s + (m.runtime ?? 0));
-    if (mins == 0) return '—';
+    if (mins == 0) return '-';
     final d = mins ~/ (60 * 24);
     final h = (mins % (60 * 24)) ~/ 60;
     final m = mins % 60;
@@ -95,7 +95,7 @@ class FriendMiniStats extends StatelessWidget {
             Expanded(
               child: FriendProfileChip(
                 icon: Icons.movie_outlined,
-                label: movies.isNotEmpty ? '${movies.length}' : '—',
+                label: movies.isNotEmpty ? '${movies.length}' : '-',
                 sublabel: 'movies watched',
               ),
             ),
