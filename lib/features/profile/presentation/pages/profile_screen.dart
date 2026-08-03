@@ -78,6 +78,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final ProfileLookupController _profileLookup =
       ProfileLookupController.instance;
 
+  MovieWrapped _emptyWrapped() => MovieWrapped(
+        year: DateTime.now().year,
+        totalMoviesWatched: 0,
+        rewatchCount: 0,
+        totalHoursWatched: 0,
+        topGenres: const [],
+        topDirectors: const [],
+        topMovies: const [],
+        highestRatedMovies: const [],
+        monthlyWatchCounts: const [],
+      );
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -153,17 +165,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       RequestService.getWatchRequests(userId)
           .catchError((_) => <WatchRequest>[]),
       UserService.getMovieWrapped(userId, DateTime.now().year)
-          .catchError((_) => MovieWrapped(
-                year: DateTime.now().year,
-                totalMoviesWatched: 0,
-                rewatchCount: 0,
-                totalHoursWatched: 0,
-                topGenres: const [],
-                topDirectors: const [],
-                topMovies: const [],
-                highestRatedMovies: const [],
-                monthlyWatchCounts: const [],
-              )),
+          .catchError((_) => _emptyWrapped()),
     ]);
 
     try {
@@ -180,8 +182,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     try {
-      final results = await statsFuture;
-      final wrapped = results[5] as MovieWrapped;
+      final results = await statsFuture.timeout(const Duration(seconds: 15));
+      final wrapped = results[3] as MovieWrapped;
       final directorResults = await Future.wait(
         wrapped.topDirectors
             .where((director) => director.personId != null)
@@ -205,10 +207,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
       if (!mounted) return;
       setState(() {
-        _reviews = results[2] as List<Review>;
+        _reviews = results[0] as List<Review>;
         _reviewCount = _reviews.length;
-        _groups = results[3] as List<Group>;
-        _watchRequests = results[4] as List<WatchRequest>;
+        _groups = results[1] as List<Group>;
+        _watchRequests = results[2] as List<WatchRequest>;
         _wrapped = wrapped;
         _directorPeople = {
           for (final result in directorResults
@@ -223,6 +225,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       });
     } catch (e) {
       logger.e('[ProfileScreen] stats extras load error: $e');
+      if (mounted) setState(() => _wrapped = _emptyWrapped());
     }
   }
 
