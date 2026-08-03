@@ -1475,10 +1475,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   Widget _buildHeroLinks(Movie movie, {required bool compact}) {
     final videos = movie.videos ?? const [];
     final trailer = videos
-            .where((video) =>
-                video.videoTypeName.toLowerCase().contains('trailer'))
-            .firstOrNull ??
-        videos.firstOrNull;
+        .where((video) =>
+            video.videoTypeName.trim().toLowerCase() == 'trailer' &&
+            video.key.trim().isNotEmpty)
+        .firstOrNull;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -2980,15 +2980,15 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           ),
         ),
         const SizedBox(height: 10),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 4),
           child: Align(
             alignment: Alignment.centerRight,
             child: Text(
               'Rate and review each watch separately',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 color: FlixieColors.medium,
                 fontSize: 8.5,
                 fontWeight: FontWeight.w500,
@@ -3428,6 +3428,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final recommended =
         activities.where((item) => item.recommended == true).length;
     final watchlisted = activities.where((item) => item.onWatchlist).length;
+    final favourited = activities.where((item) => item.favorited).length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3494,6 +3495,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               _friendStat(rated, 'rated'),
               _friendStat(recommended, 'recommend'),
               _friendStat(watchlisted, 'watchlist'),
+              _friendStat(favourited, 'favourited'),
             ],
           ),
         ),
@@ -3899,6 +3901,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final recommendCount =
         activities.where((item) => item.recommended == true).length;
     final watchlistCount = activities.where((item) => item.onWatchlist).length;
+    final favouritedCount = activities.where((item) => item.favorited).length;
 
     return showModalBottomSheet<void>(
       context: context,
@@ -4039,6 +4042,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                           _friendStat(ratedCount, 'rated'),
                           _friendStat(recommendCount, 'recommend'),
                           _friendStat(watchlistCount, 'watchlist'),
+                          _friendStat(favouritedCount, 'favourited'),
                         ],
                       ),
                     ),
@@ -4538,13 +4542,13 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             height: 30,
             child: TextButton(
               onPressed: () => _showAllProviderOptions(providers),
-              child: Text('All ${providers.length} options'),
               style: TextButton.styleFrom(
                 foregroundColor: FlixieColors.primary,
                 padding: EdgeInsets.zero,
                 minimumSize: const Size(0, 30),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
+              child: Text('All ${providers.length} options'),
             ),
           ),
       ],

@@ -44,7 +44,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   // Keep hero carousel concise so primary CTA and dots remain visible above fold.
-  static const int _maxHeroCarouselItems = 6;
+  static const int _maxHeroCarouselItems = 12;
+  static const double _heroViewportFraction = 0.84;
   static const double _defaultQuickRating = 5;
 
   List<MovieShort> _featuredMovies = [];
@@ -64,7 +65,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final WatchlistActionsController _watchlistActions =
       WatchlistActionsController.instance;
   final PageController _heroPageController =
-      PageController(viewportFraction: 0.84);
+      PageController(viewportFraction: _heroViewportFraction);
   int _heroPage = 0;
 
   List<MovieShort> get _heroMovies {
@@ -336,7 +337,7 @@ class _HomeScreenState extends State<HomeScreen> {
     MovieShort movie,
   ) async {
     final rawUrl = movie.trailer?.key;
-    if (rawUrl == null || rawUrl.isEmpty) return;
+    if (rawUrl == null || rawUrl.trim().isEmpty) return;
     final watchUrl = rawUrl.replaceFirst(
       'youtube.com/embed/',
       'youtube.com/watch?v=',
@@ -478,37 +479,44 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.only(left: 14),
             child: PageView.builder(
               controller: _heroPageController,
-              padEnds: false,
+              padEnds: true,
+              clipBehavior: Clip.none,
               onPageChanged: (i) => setState(() => _heroPage = i),
               itemCount: count,
               itemBuilder: (context, index) {
                 final posterCard =
                     _buildInactiveHeroCard(context, movies[index]);
                 final detailCard = _buildHeroCard(context, movies[index]);
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: AnimatedBuilder(
-                    animation: _heroPageController,
-                    builder: (context, _) {
-                      final page = _heroPageController.hasClients
-                          ? (_heroPageController.page ?? _heroPage.toDouble())
-                          : _heroPage.toDouble();
-                      final detailOpacity =
-                          (1 - (page - index).abs()).clamp(0.0, 1.0);
-                      return Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          posterCard,
-                          IgnorePointer(
-                            ignoring: detailOpacity < 0.98,
-                            child: Opacity(
-                              opacity: detailOpacity,
-                              child: detailCard,
+                final leadingInset = MediaQuery.sizeOf(context).width *
+                    (1 - _heroViewportFraction) /
+                    2;
+                return Transform.translate(
+                  offset: Offset(index == 0 ? -leadingInset : 0, 0),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: AnimatedBuilder(
+                      animation: _heroPageController,
+                      builder: (context, _) {
+                        final page = _heroPageController.hasClients
+                            ? (_heroPageController.page ?? _heroPage.toDouble())
+                            : _heroPage.toDouble();
+                        final detailOpacity =
+                            (1 - (page - index).abs()).clamp(0.0, 1.0);
+                        return Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            posterCard,
+                            IgnorePointer(
+                              ignoring: detailOpacity < 0.98,
+                              child: Opacity(
+                                opacity: detailOpacity,
+                                child: detailCard,
+                              ),
                             ),
-                          ),
-                        ],
-                      );
-                    },
+                          ],
+                        );
+                      },
+                    ),
                   ),
                 );
               },
@@ -689,7 +697,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                         ],
-                        if ((movie.trailer?.key ?? '').isNotEmpty) ...[
+                        if ((movie.trailer?.key ?? '').trim().isNotEmpty) ...[
                           const SizedBox(width: 10),
                           Container(
                             width: 1,

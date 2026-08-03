@@ -673,7 +673,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
           avatar: user.avatar,
           fallbackText: user.initials ?? user.username[0].toUpperCase(),
           fallbackColor: _avatarColor,
-          size: 116,
+          size: 80,
           profileBadges: user.profileBadges,
         ),
         const SizedBox(width: 22),
