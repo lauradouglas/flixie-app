@@ -12,6 +12,8 @@ class Movie {
   final double? popularity;
   final double? voteAverage;
   final int? voteCount;
+  final double? tmdbVoteAverage;
+  final int? tmdbVoteCount;
   final int? runtime;
   final String? tagline;
   final String? status;
@@ -35,6 +37,8 @@ class Movie {
     this.popularity,
     this.voteAverage,
     this.voteCount,
+    this.tmdbVoteAverage,
+    this.tmdbVoteCount,
     this.runtime,
     this.tagline,
     this.status,
@@ -64,6 +68,8 @@ class Movie {
       popularity: _parseDouble(json['popularity']),
       voteAverage: _parseDouble(json['voteAverage']),
       voteCount: _parseInt(json['voteCount']),
+      tmdbVoteAverage: _parseDouble(json['tmdbVoteAverage']),
+      tmdbVoteCount: _parseInt(json['tmdbVoteCount']),
       runtime: _parseInt(json['runtime']),
       tagline: _nullableString(json['tagline']),
       status: _nullableString(json['status']),
@@ -133,6 +139,8 @@ class Movie {
     double? popularity,
     double? voteAverage,
     int? voteCount,
+    double? tmdbVoteAverage,
+    int? tmdbVoteCount,
     int? runtime,
     String? tagline,
     String? status,
@@ -156,6 +164,8 @@ class Movie {
       popularity: popularity ?? this.popularity,
       voteAverage: voteAverage ?? this.voteAverage,
       voteCount: voteCount ?? this.voteCount,
+      tmdbVoteAverage: tmdbVoteAverage ?? this.tmdbVoteAverage,
+      tmdbVoteCount: tmdbVoteCount ?? this.tmdbVoteCount,
       runtime: runtime ?? this.runtime,
       tagline: tagline ?? this.tagline,
       status: status ?? this.status,
@@ -182,6 +192,8 @@ class Movie {
       'popularity': popularity,
       'voteAverage': voteAverage,
       'voteCount': voteCount,
+      'tmdbVoteAverage': tmdbVoteAverage,
+      'tmdbVoteCount': tmdbVoteCount,
       'runtime': runtime,
       'tagline': tagline,
       'status': status,

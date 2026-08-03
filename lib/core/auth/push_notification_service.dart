@@ -166,14 +166,14 @@ class PushNotificationService {
       logger.d('[FCM] Foreground message: ${message.notification?.title}');
       logger.d('[FCM] Foreground payload: data=${message.data}');
       if (_currentUserId == null) {
-        logger.d('[FCM] Suppressing foreground message — no user logged in');
+        logger.d('[FCM] Suppressing foreground message - no user logged in');
         return;
       }
       // If the backend puts the recipient userId in data, skip if it
       // doesn't match (prevents sender seeing their own notification).
       final recipientId = message.data['recipientId'] as String?;
       if (recipientId != null && recipientId != _currentUserId) {
-        logger.d('[FCM] Suppressing foreground message — not for current user');
+        logger.d('[FCM] Suppressing foreground message - not for current user');
         return;
       }
 
@@ -222,7 +222,7 @@ class PushNotificationService {
     }
     try {
       await _messaging.deleteToken();
-      logger.i('[FCM] FCM token deleted from Firebase — device unsubscribed');
+      logger.i('[FCM] FCM token deleted from Firebase - device unsubscribed');
     } catch (e) {
       logger.w('[FCM] Failed to delete FCM token from Firebase: $e');
     }
@@ -375,10 +375,10 @@ class PushNotificationService {
   /// payload, and navigates there.
   ///
   /// Supported data keys (sent by the backend):
-  ///   type        — notification type string (matches FlixieNotification consts)
-  ///   groupId     — UUID of the group (for group/watch-request notifications)
-  ///   movieId     — TMDB movie id (for movie watch-request notifications)
-  ///   friendId    — userId of the sender (for friend-request notifications)
+  ///   type        - notification type string (matches FlixieNotification consts)
+  ///   groupId     - UUID of the group (for group/watch-request notifications)
+  ///   movieId     - TMDB movie id (for movie watch-request notifications)
+  ///   friendId    - userId of the sender (for friend-request notifications)
   static void _navigateFromMessage(
     RemoteMessage message,
     GlobalKey<NavigatorState> navigatorKey,

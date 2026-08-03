@@ -683,19 +683,26 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final userId = authProvider.dbUser?.id;
     if (movieId == null || userId == null) return false;
     var didSubmit = false;
+    var writeReview = false;
+    double? reviewRating;
+    bool? reviewRecommended;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => RewatchLogSheet(
         initial: entry,
+        showReviewOption: entry == null,
+        onReviewSelected: (selected) => writeReview = selected,
         onSubmit: ({
-          required String watchedAt,
+          required String? watchedAt,
           required double? rating,
           required bool? recommended,
           required String? notes,
         }) async {
           try {
+            reviewRating = rating;
+            reviewRecommended = recommended;
             if (entry == null) {
               await WatchlistActionsController.instance.logMovieWatch(
                 userId,
@@ -805,6 +812,13 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         },
       ),
     );
+    if (didSubmit && writeReview && mounted) {
+      await _showWriteReviewSheet(
+        context,
+        initialRating: reviewRating,
+        initialRecommended: reviewRecommended,
+      );
+    }
     return didSubmit;
   }
 
@@ -2357,7 +2371,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   // ---- User Rating ----------------------------------------------------------
 
-  Future<void> _setUserRating(int rating, bool recommended) async {
+  Future<void> _setUserRating(int rating, bool? recommended) async {
     final authProvider = context.read<AuthProvider>();
     final analytics = context.read<AnalyticsController>();
     final user = authProvider.dbUser;
@@ -2402,7 +2416,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   void _showRatingSheet() {
     var selectedRating = _userRating;
-    var recommended = _userRecommends ?? ((_userRating ?? 0) >= 7);
+    bool? recommended = _userRecommends;
     showModalBottomSheet<void>(
       context: context,
       clipBehavior: Clip.antiAlias,
@@ -2422,7 +2436,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                     style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 4),
                 const Text(
-                  'Choose a score, then decide whether you recommend it.',
+                  'Choose a score, then tell us whether you would recommend it.',
                   style: TextStyle(color: FlixieColors.medium, fontSize: 13),
                 ),
                 const SizedBox(height: 20),
@@ -2438,7 +2452,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                     return InkWell(
                       onTap: () => setSheetState(() {
                         selectedRating = rating;
-                        recommended = rating >= 7;
                       }),
                       borderRadius: BorderRadius.circular(8),
                       child: Container(
@@ -2463,30 +2476,47 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   }),
                 ),
                 const SizedBox(height: 16),
-                SwitchListTile.adaptive(
-                  contentPadding: EdgeInsets.zero,
-                  value: recommended,
-                  onChanged: selectedRating == null
-                      ? null
-                      : (value) => setSheetState(() => recommended = value),
-                  activeTrackColor: FlixieColors.success,
-                  title: const Text(
-                    'I recommend this movie',
-                    style: TextStyle(
-                      color: FlixieColors.light,
-                      fontWeight: FontWeight.w700,
+                const Text(
+                  'Would you recommend it? *',
+                  style: TextStyle(
+                    color: FlixieColors.light,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                const Text(
+                  'Choose Yes or No to save your rating.',
+                  style: TextStyle(
+                    color: FlixieColors.medium,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('Yes, recommend'),
+                      selected: recommended == true,
+                      onSelected: selectedRating == null
+                          ? null
+                          : (_) => setSheetState(() => recommended = true),
                     ),
-                  ),
-                  subtitle: const Text(
-                    'Scores of 7 or higher select this automatically. You can change it.',
-                    style: TextStyle(color: FlixieColors.medium, fontSize: 12),
-                  ),
+                    ChoiceChip(
+                      label: const Text("No, don't recommend"),
+                      selected: recommended == false,
+                      onSelected: selectedRating == null
+                          ? null
+                          : (_) => setSheetState(() => recommended = false),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: selectedRating == null
+                    onPressed: selectedRating == null || recommended == null
                         ? null
                         : () {
                             final rating = selectedRating!;
@@ -4791,7 +4821,11 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   // ---- Write review -------------------------------------------------------
 
-  Future<void> _showWriteReviewSheet(BuildContext context) async {
+  Future<void> _showWriteReviewSheet(
+    BuildContext context, {
+    double? initialRating,
+    bool? initialRecommended,
+  }) async {
     final user = context.read<AuthProvider>().dbUser;
     if (user == null) return;
     final movieId = int.tryParse(widget.movieId);
@@ -4805,6 +4839,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       builder: (ctx) => WriteReviewSheet(
         movieId: movieId,
         userId: user.id,
+        initialRating: initialRating,
+        initialRecommended: initialRecommended,
         onSubmitted: (review) {
           final auth = context.read<AuthProvider>();
           setState(() => _reviews = [review, ..._reviews]);

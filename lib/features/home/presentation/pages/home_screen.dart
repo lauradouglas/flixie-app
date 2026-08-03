@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:flixie_app/models/movie_short.dart';
+import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/models/friend_media_interaction.dart';
 import 'package:flixie_app/models/watch_request.dart';
@@ -27,11 +28,13 @@ import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
 import 'package:flixie_app/core/widgets/flixie_wordmark.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
-import 'package:flixie_app/features/home/presentation/widgets/featured_card.dart';
 import 'package:flixie_app/features/home/presentation/widgets/greeting_header.dart';
 import 'package:flixie_app/features/home/presentation/widgets/section_header.dart';
 import 'package:flixie_app/features/home/presentation/widgets/continue_watching_carousel.dart';
 import 'package:flixie_app/features/home/presentation/widgets/trending_friends_section.dart';
+import 'package:flixie_app/features/home/presentation/widgets/personalized_recommendation_card.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_sheet.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/write_review_sheet.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 
@@ -46,7 +49,6 @@ class _HomeScreenState extends State<HomeScreen> {
   // Keep hero carousel concise so primary CTA and dots remain visible above fold.
   static const int _maxHeroCarouselItems = 12;
   static const double _heroViewportFraction = 0.84;
-  static const double _defaultQuickRating = 5;
 
   List<MovieShort> _featuredMovies = [];
   List<MovieShort> _forYouMovies = [];
@@ -66,7 +68,10 @@ class _HomeScreenState extends State<HomeScreen> {
       WatchlistActionsController.instance;
   final PageController _heroPageController =
       PageController(viewportFraction: _heroViewportFraction);
+  final PageController _forYouPageController =
+      PageController(viewportFraction: 0.88);
   int _heroPage = 0;
+  int _forYouPage = 0;
 
   List<MovieShort> get _heroMovies {
     if (_forYouMovies.isEmpty) return _featuredMovies;
@@ -98,6 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _authProvider?.removeListener(_onAuthChanged);
     _heroPageController.dispose();
+    _forYouPageController.dispose();
     super.dispose();
   }
 
@@ -108,7 +114,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _loadAll() async {
+  Future<void> _loadAll({bool refreshRecommendations = false}) async {
     setState(() {
       _isLoading = true;
       _error = null;
@@ -123,7 +129,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Secondary sections manage their own loading/error states and should not
     // keep the whole page behind a skeleton.
-    unawaited(_loadSecondaryContent(user));
+    unawaited(_loadSecondaryContent(
+      user,
+      refreshRecommendations: refreshRecommendations,
+    ));
 
     try {
       final trendingMovies = await TrendingService.getTrendingMovies();
@@ -175,7 +184,10 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  Future<void> _loadSecondaryContent(models.User? user) async {
+  Future<void> _loadSecondaryContent(
+    models.User? user, {
+    bool refreshRecommendations = false,
+  }) async {
     if (user == null) {
       if (!mounted) return;
       setState(() {
@@ -192,10 +204,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final results = await Future.wait([
       FriendService.getFriendsActivityLists(user.id, days: 30, limit: 200)
           .catchError((_) => <ActivityListItem>[]),
-      RecommendationService.getRecommendationsFromHighlyRated(userId: user.id)
-          .catchError((_) => null),
-      RecommendationService.getUserRecommendations(user.id)
-          .catchError((_) => <MovieShort>[]),
+      RecommendationService.getUserRecommendations(
+        user.id,
+        refresh: refreshRecommendations,
+      ).catchError((_) => <MovieShort>[]),
       _watchlistActions
           .getUserWatchlist(user.id)
           .catchError((_) => <WatchlistMovie>[]),
@@ -206,21 +218,18 @@ class _HomeScreenState extends State<HomeScreen> {
     ]);
     if (!mounted || _loadedForUserId != user.id) return;
 
-    final highlyRated = results[1] as RecommendationFromHighlyRatedResponse?;
-    final fallbackForYou = results[2] as List<MovieShort>;
-    final watchRequests = results[4] as List<WatchRequest>;
+    final personalisedForYou = results[1] as List<MovieShort>;
+    final watchRequests = results[3] as List<WatchRequest>;
     setState(() {
       _friendsActivity = results[0] as List<ActivityListItem>;
-      _forYouMovies = (highlyRated?.recommendations ?? []).isNotEmpty
-          ? highlyRated!.recommendations.take(20).toList()
-          : fallbackForYou.take(20).toList();
-      _watchlistMovieIds = (results[3] as List<WatchlistMovie>)
+      _forYouMovies = personalisedForYou.take(20).toList();
+      _watchlistMovieIds = (results[2] as List<WatchlistMovie>)
           .map((item) => item.movieId)
           .toSet();
       _watchRequestsNeedingResponse =
           _countWatchRequestsNeedingResponse(watchRequests, user.id);
       _upcomingWatchPlan = _nearestUpcomingWatchPlan(watchRequests);
-      _continueWatchingShows = results[5] as List<ContinueWatchingShow>;
+      _continueWatchingShows = results[4] as List<ContinueWatchingShow>;
     });
   }
 
@@ -409,7 +418,7 @@ class _HomeScreenState extends State<HomeScreen> {
               : RefreshIndicator(
                   color: FlixieColors.primary,
                   backgroundColor: FlixieColors.background,
-                  onRefresh: _loadAll,
+                  onRefresh: () => _loadAll(refreshRecommendations: true),
                   child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(0, 0, 0, 16),
@@ -1010,24 +1019,102 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildBecauseYouRatedSection(BuildContext context) {
     if (_forYouMovies.isEmpty) return const SizedBox.shrink();
 
+    final movies = _forYouMovies.take(10).toList(growable: false);
+    final activeIndex = _forYouPage.clamp(0, movies.length - 1);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const HomeSectionHeader(title: 'For you'),
-        const SizedBox(height: 6),
-        SizedBox(
-          height: 180,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _forYouMovies.length.clamp(0, 10),
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
-            itemBuilder: (context, index) => FeaturedCard(
-              movie: _forYouMovies[index],
-              onTap: () => context.push('/movies/${_forYouMovies[index].id}'),
+        const HomeSectionHeader(title: 'Just for you'),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 0, 16, 10),
+          child: Text(
+            'Picked from your taste',
+            style: TextStyle(
+              color: FlixieColors.medium,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ),
+        SizedBox(
+          height: PersonalizedRecommendationCard.height,
+          child: Padding(
+            padding: const EdgeInsets.only(left: 16),
+            child: PageView.builder(
+              controller: _forYouPageController,
+              padEnds: false,
+              itemCount: movies.length,
+              onPageChanged: (index) => setState(() => _forYouPage = index),
+              itemBuilder: (context, index) {
+                final movie = movies[index];
+                final isBookmarked = _watchlistMovieIds.contains(movie.id);
+                final isPreviouslyWatched = movie.previouslyWatched ||
+                    (context
+                            .read<AuthProvider>()
+                            .dbUser
+                            ?.isMovieWatched(movie.id) ??
+                        false);
+                final reasons = isPreviouslyWatched &&
+                        !movie.recommendationReasons.any(
+                          (reason) => reason.toLowerCase().contains('rewatch'),
+                        )
+                    ? [
+                        'You\'ve watched this before - it may be worth a rewatch',
+                        ...movie.recommendationReasons,
+                      ]
+                    : movie.recommendationReasons;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: PersonalizedRecommendationCard(
+                    movie: movie,
+                    reasons: reasons,
+                    isBookmarked: isBookmarked,
+                    isBookmarkUpdating:
+                        _watchlistUpdatesInFlight.contains(movie.id),
+                    isPreviouslyWatched: isPreviouslyWatched,
+                    onTap: () => context.push('/movies/${movie.id}'),
+                    onBookmarkTap: () => _toggleWatchlistState(
+                      context,
+                      movieId: movie.id,
+                      movieTitle: movie.name,
+                      posterPath: movie.poster,
+                      currentlyInWatchlist: isBookmarked,
+                    ),
+                    onMarkWatched: () => _openQuickMarkWatchedSheet(
+                      context,
+                      movieId: movie.id,
+                      movieTitle: movie.name,
+                      isInWatchlist: isBookmarked,
+                      isRewatch: isPreviouslyWatched,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        if (movies.length > 1) ...[
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(
+              movies.length,
+              (index) => AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: index == activeIndex ? 22 : 6,
+                height: 6,
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                decoration: BoxDecoration(
+                  color: index == activeIndex
+                      ? FlixieColors.primary
+                      : FlixieColors.mediumShade.withValues(alpha: 0.65),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 20),
       ],
     );
@@ -1413,161 +1500,92 @@ class _HomeScreenState extends State<HomeScreen> {
     required int movieId,
     required String movieTitle,
     required bool isInWatchlist,
+    bool isRewatch = false,
   }) async {
     final auth = context.read<AuthProvider>();
     final analytics = context.read<AnalyticsController>();
     final userId = auth.dbUser?.id;
     if (userId == null) return;
-
-    double rating = _defaultQuickRating;
-    bool includeRating = true;
-    bool rewatch = false;
-    final notesController = TextEditingController();
-    final watchedAt = DateTime.now();
-    final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
-
-    Future<void> commitWatchedEntry() async {
-      try {
-        await _watchlistActions.addToWatched(userId, movieId);
-        if (isInWatchlist) {
-          await _watchlistActions.removeFromWatchlist(userId, movieId);
-          await analytics.watchlistItemRemoved(source: 'home');
-          await analytics.movieRemovedFromWatchlist();
-          final currentWatchlist = auth.dbUser?.movieWatchlist ?? [];
-          auth.updateUserList(
-            movieWatchlist: currentWatchlist
-                .where((entry) => entry.movieId != movieId)
-                .toList(),
-          );
-        }
-        if (mounted) {
-          navigator.maybePop();
-          final ratingLabel =
-              includeRating ? ' • ${rating.toStringAsFixed(0)}/10' : '';
-          final noteLabel =
-              notesController.text.trim().isNotEmpty ? ' • note saved' : '';
-          final rewatchLabel = rewatch ? ' • rewatch' : '';
-          messenger.showSnackBar(
-            SnackBar(
-              content: Text(
-                '$movieTitle marked watched$ratingLabel$noteLabel$rewatchLabel',
-              ),
-            ),
-          );
-        }
-      } catch (e) {
-        logger.w('[HomeScreen] mark watched failed: $e');
-        if (mounted) {
-          messenger.showSnackBar(
-            const SnackBar(
-                content: Text('Could not mark this movie as watched')),
-          );
-        }
-      }
-    }
+    var writeReview = false;
+    var watchSaved = false;
+    double? reviewRating;
+    bool? reviewRecommended;
 
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.tabBarBackgroundFocused,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) => Padding(
-          padding: EdgeInsets.fromLTRB(
-            16,
-            16,
-            16,
-            MediaQuery.of(context).viewInsets.bottom + 16,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Mark watched · $movieTitle',
-                style: const TextStyle(
-                  color: FlixieColors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 12),
-              SwitchListTile.adaptive(
-                contentPadding: EdgeInsets.zero,
-                value: includeRating,
-                title: const Text('Add rating'),
-                subtitle: Text(
-                  includeRating
-                      ? '${rating.toStringAsFixed(0)}/10'
-                      : 'Skip rating',
-                ),
-                onChanged: (value) =>
-                    setSheetState(() => includeRating = value),
-              ),
-              if (includeRating)
-                Slider(
-                  value: rating,
-                  min: 1,
-                  max: 10,
-                  divisions: 9,
-                  label: rating.toStringAsFixed(0),
-                  onChanged: (value) => setSheetState(() => rating = value),
-                ),
-              TextField(
-                controller: notesController,
-                maxLines: 2,
-                decoration: InputDecoration(
-                  hintText: 'Optional review',
-                  filled: true,
-                  fillColor: FlixieColors.background.withValues(alpha: 0.35),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.08),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              SwitchListTile.adaptive(
-                contentPadding: EdgeInsets.zero,
-                value: rewatch,
-                title: const Text('Rewatch'),
-                subtitle: Text(
-                    'Watched on ${watchedAt.day}/${watchedAt.month}/${watchedAt.year}'),
-                onChanged: (value) => setSheetState(() => rewatch = value),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        setSheetState(() => includeRating = false);
-                        commitWatchedEntry();
-                      },
-                      child: const Text('Mark without rating'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: commitWatchedEntry,
-                      child: const Text('Save'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
+      backgroundColor: Colors.transparent,
+      builder: (_) => RewatchLogSheet(
+        isRewatch: isRewatch,
+        showReviewOption: true,
+        onReviewSelected: (selected) => writeReview = selected,
+        onSubmit: ({
+          required watchedAt,
+          required rating,
+          required recommended,
+          required notes,
+        }) async {
+          reviewRating = rating;
+          reviewRecommended = recommended;
+          await _watchlistActions.logMovieWatch(
+            userId,
+            LogMovieWatchRequest(
+              movieId: movieId,
+              watchedAt: watchedAt,
+              rating: rating,
+              recommended: recommended,
+              notes: notes,
+            ),
+          );
+          if (isInWatchlist) {
+            await _watchlistActions.removeFromWatchlist(userId, movieId);
+            await analytics.watchlistItemRemoved(source: 'home');
+            await analytics.movieRemovedFromWatchlist();
+            final currentWatchlist = auth.dbUser?.movieWatchlist ?? [];
+            auth.updateUserList(
+              movieWatchlist: currentWatchlist
+                  .where((entry) => entry.movieId != movieId)
+                  .toList(),
+            );
+          }
+          watchSaved = true;
+          RecommendationService.invalidateCache(userId: userId);
+          auth.markActivityChanged();
+          if (mounted) {
+            setState(() {
+              _forYouMovies.removeWhere((movie) => movie.id == movieId);
+              _watchlistMovieIds.remove(movieId);
+              if (_forYouMovies.isEmpty) {
+                _forYouPage = 0;
+              } else {
+                _forYouPage = _forYouPage.clamp(0, _forYouMovies.length - 1);
+              }
+            });
+            messenger.showSnackBar(
+              SnackBar(content: Text('$movieTitle marked as watched')),
+            );
+          }
+        },
       ),
     );
 
-    notesController.dispose();
+    if (!mounted || !context.mounted || !watchSaved || !writeReview) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => WriteReviewSheet(
+        movieId: movieId,
+        userId: userId,
+        initialRating: reviewRating,
+        initialRecommended: reviewRecommended,
+        onSubmitted: (_) {
+          auth.invalidateCachedReviews();
+          auth.markActivityChanged();
+        },
+      ),
+    );
   }
 }
 

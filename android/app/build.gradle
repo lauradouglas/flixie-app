@@ -1,6 +1,6 @@
 plugins {
     id "com.android.application"
-    // org.jetbrains.kotlin.android removed — Flutter built-in Kotlin handles
+    // org.jetbrains.kotlin.android removed - Flutter built-in Kotlin handles
     // this via dev.flutter.flutter-gradle-plugin (migration guide: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-app-developers)
     id "dev.flutter.flutter-gradle-plugin"
     id "com.google.gms.google-services"
@@ -81,5 +81,5 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
-    // kotlin-stdlib removed — provided automatically by built-in Kotlin
+    // kotlin-stdlib removed - provided automatically by built-in Kotlin
 }

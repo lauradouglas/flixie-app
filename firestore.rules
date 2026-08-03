@@ -6,7 +6,7 @@ service cloud.firestore {
     // Conversations
     // NOTE: memberIds stores Postgres UUIDs, not Firebase Auth UIDs.
     // Membership is enforced by the backend (Admin SDK) at write time.
-    // Client reads are gated to any authenticated user — the backend ensures
+    // Client reads are gated to any authenticated user - the backend ensures
     // only members ever receive a conversationId.
     // -------------------------------------------------------------------------
     match /conversations/{conversationId} {

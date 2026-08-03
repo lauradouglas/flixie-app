@@ -8,6 +8,7 @@ class MovieCarouselTile extends StatelessWidget {
   const MovieCarouselTile({
     super.key,
     required this.title,
+    this.subtitle,
     this.posterPath,
     this.onTap,
     this.onLongPress,
@@ -21,6 +22,7 @@ class MovieCarouselTile extends StatelessWidget {
   static const double posterHeight = 148;
 
   final String title;
+  final String? subtitle;
   final String? posterPath;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
@@ -83,6 +85,36 @@ class MovieCarouselTile extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
+            if (subtitle != null && subtitle!.trim().isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(top: 1),
+                    child: Icon(
+                      Icons.auto_awesome_rounded,
+                      size: 11,
+                      color: FlixieColors.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      subtitle!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: FlixieColors.medium,
+                        fontSize: 9.5,
+                        height: 1.2,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),

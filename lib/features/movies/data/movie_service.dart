@@ -43,7 +43,7 @@ class MovieService {
         final stale = _cache.getStaleCachedMovie(id);
         if (stale != null) {
           apiLogger.w(
-              'DATABASE_ERROR for movie $id — serving stale cache to avoid blank screen.');
+              'DATABASE_ERROR for movie $id - serving stale cache to avoid blank screen.');
           return stale;
         }
       }
@@ -59,7 +59,7 @@ class MovieService {
   }
 
   Future<Map<String, dynamic>> addMovieRating(
-      int movieId, String userId, int rating, bool recommended) async {
+      int movieId, String userId, int rating, bool? recommended) async {
     final data = await ApiClient.post('/movies/$movieId/add/rating', body: {
       'userId': userId,
       'rating': rating,

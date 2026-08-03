@@ -439,7 +439,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         backgroundColor: Colors.transparent,
         builder: (_) => RewatchLogSheet(
           onSubmit: ({
-            required String watchedAt,
+            required String? watchedAt,
             required double? rating,
             required bool? recommended,
             required String? notes,
@@ -1906,21 +1906,21 @@ class _WatchRequestCard extends StatelessWidget {
               .map((user) => _participantAvatar(
                     user,
                     accepted: hasAccepted(user),
-              schedulingInProgress:
-                schedulingInProgress && hasAccepted(user),
+                    schedulingInProgress:
+                        schedulingInProgress && hasAccepted(user),
                   ))
               .toList(growable: false),
         ),
         const SizedBox(height: 10),
         Text(
           accepted == visible.length && visible.isNotEmpty
-            ? schedulingInProgress
-              ? 'All $accepted accepted · scheduling in progress'
-              : 'All $accepted accepted'
-              : accepted > 0
               ? schedulingInProgress
-                ? '$accepted accepted · $waiting waiting · scheduling in progress'
-                : '$accepted accepted · $waiting waiting'
+                  ? 'All $accepted accepted · scheduling in progress'
+                  : 'All $accepted accepted'
+              : accepted > 0
+                  ? schedulingInProgress
+                      ? '$accepted accepted · $waiting waiting · scheduling in progress'
+                      : '$accepted accepted · $waiting waiting'
                   : 'Waiting for responses',
           style: TextStyle(
               color: accepted > 0 ? FlixieColors.success : FlixieColors.medium,

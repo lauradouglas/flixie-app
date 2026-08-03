@@ -10,11 +10,15 @@ class WriteReviewSheet extends StatefulWidget {
     required this.movieId,
     required this.userId,
     required this.onSubmitted,
+    this.initialRating,
+    this.initialRecommended,
   });
 
   final int movieId;
   final String userId;
   final void Function(Review review) onSubmitted;
+  final double? initialRating;
+  final bool? initialRecommended;
 
   @override
   State<WriteReviewSheet> createState() => _WriteReviewSheetState();
@@ -27,10 +31,17 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
 
-  int _rating = 5;
-  bool _recommended = true;
+  late int _rating;
+  late bool _recommended;
   bool _containsSpoilers = false;
   bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _rating = (widget.initialRating?.round() ?? 5).clamp(1, 10);
+    _recommended = widget.initialRecommended ?? true;
+  }
 
   @override
   void dispose() {
@@ -153,21 +164,49 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Row(
+                    Wrap(
+                      spacing: 7,
+                      runSpacing: 7,
                       children: List.generate(10, (i) {
                         final value = i + 1;
-                        final isSelected = value <= _rating;
-                        return GestureDetector(
-                          onTap: () => setState(() => _rating = value),
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 4),
-                            child: Icon(
-                              isSelected ? Icons.star : Icons.star_border,
+                        final isSelected = value == _rating;
+                        return ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            minWidth: 48,
+                            minHeight: 42,
+                          ),
+                          child: ChoiceChip(
+                            label: Text('$value'),
+                            avatar: Icon(
+                              isSelected
+                                  ? Icons.star_rounded
+                                  : Icons.star_border_rounded,
+                              size: 17,
                               color: isSelected
-                                  ? Colors.amber
+                                  ? Colors.white
                                   : FlixieColors.medium,
-                              size: 28,
                             ),
+                            selected: isSelected,
+                            showCheckmark: false,
+                            onSelected: (_) => setState(() => _rating = value),
+                            selectedColor: FlixieColors.primary,
+                            backgroundColor: FlixieColors.surfaceElevated,
+                            side: BorderSide(
+                              color: isSelected
+                                  ? FlixieColors.primary
+                                  : FlixieColors.tabBarBorder,
+                            ),
+                            labelStyle: TextStyle(
+                              color: isSelected
+                                  ? Colors.white
+                                  : FlixieColors.light,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(9),
+                            ),
+                            visualDensity: VisualDensity.compact,
                           ),
                         );
                       }),

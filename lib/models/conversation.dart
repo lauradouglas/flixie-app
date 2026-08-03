@@ -45,7 +45,7 @@ class ChatMessage {
       payload = Map<String, dynamic>.from(data);
     }
 
-    // expiresAt may be a Firestore Timestamp — convert to ISO string
+    // expiresAt may be a Firestore Timestamp - convert to ISO string
     final rawExpires = payload?['expiresAt'];
     if (rawExpires is Timestamp && payload != null) {
       payload = Map<String, dynamic>.from(payload)

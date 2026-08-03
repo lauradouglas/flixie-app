@@ -86,7 +86,7 @@ class AuthProvider extends ChangeNotifier {
   int _activityVersion = 0;
   bool _pendingReferralQualification = false;
 
-  // Prefetched at login — screens use these to skip spinners
+  // Prefetched at login - screens use these to skip spinners
   List<ActivityListItem>? _cachedActivity;
   FriendsData? _cachedFriends;
   List<Group>? _cachedGroups;
@@ -270,7 +270,7 @@ class AuthProvider extends ChangeNotifier {
           logger.w('ID token is null');
         }
       } catch (e) {
-        logger.w('Failed to get fresh ID token: $e — trying cached token');
+        logger.w('Failed to get fresh ID token: $e - trying cached token');
         try {
           final cachedToken = await user.getIdToken(false);
           if (cachedToken != null) {
@@ -278,7 +278,7 @@ class AuthProvider extends ChangeNotifier {
             ApiClient.setToken(cachedToken);
           } else {
             logger.w(
-                'Cached ID token is also null — API calls will be unauthorized');
+                'Cached ID token is also null - API calls will be unauthorized');
           }
         } catch (e2) {
           logger.w('Failed to get cached ID token: $e2');

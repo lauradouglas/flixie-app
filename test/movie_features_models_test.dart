@@ -5,6 +5,7 @@ import 'package:flixie_app/models/movie_list_movie.dart';
 import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'package:flixie_app/models/movie_wrapped.dart';
 import 'package:flixie_app/features/home/data/recommendation_service.dart';
+import 'package:flixie_app/models/movie_short.dart';
 
 void main() {
   group('MovieList', () {
@@ -172,6 +173,31 @@ void main() {
       expect(model.sourceMovie!.rating, 9.0);
       expect(model.recommendations, hasLength(1));
       expect(model.recommendations.first.name, 'Arrival');
+    });
+  });
+
+  group('Personalised MovieShort', () {
+    test('parses recommendation score, reasons and sources', () {
+      final movie = MovieShort.fromJson({
+        'id': 321,
+        'name': 'Arrival',
+        'poster': '/abc.jpg',
+        'score': 0.82,
+        'reasons': [
+          'Matches your interest in first contact',
+          'Because you enjoy Science Fiction',
+        ],
+        'sourceTypes': ['taste_profile'],
+        'previouslyWatched': true,
+      });
+
+      expect(movie.recommendationScore, 0.82);
+      expect(movie.recommendationReasons, hasLength(2));
+      expect(movie.recommendationReasons.first,
+          'Matches your interest in first contact');
+      expect(movie.recommendationSourceTypes, ['taste_profile']);
+      expect(movie.previouslyWatched, isTrue);
+      expect(movie.toJson()['reasons'], movie.recommendationReasons);
     });
   });
 }

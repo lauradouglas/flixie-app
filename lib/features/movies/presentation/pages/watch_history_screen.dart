@@ -144,7 +144,7 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
       builder: (_) => RewatchLogSheet(
         initial: initial,
         onSubmit: ({
-          required String watchedAt,
+          required String? watchedAt,
           required double? rating,
           required bool? recommended,
           required String? notes,

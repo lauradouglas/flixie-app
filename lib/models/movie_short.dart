@@ -9,6 +9,10 @@ class MovieShort {
   final Trailer? trailer;
   final String? mediaType;
   final double? voteAverage;
+  final double? recommendationScore;
+  final List<String> recommendationReasons;
+  final List<String> recommendationSourceTypes;
+  final bool previouslyWatched;
 
   const MovieShort({
     required this.id,
@@ -21,6 +25,10 @@ class MovieShort {
     this.trailer,
     this.mediaType,
     this.voteAverage,
+    this.recommendationScore,
+    this.recommendationReasons = const [],
+    this.recommendationSourceTypes = const [],
+    this.previouslyWatched = false,
   });
 
   factory MovieShort.fromJson(Map<String, dynamic> json) {
@@ -46,6 +54,16 @@ class MovieShort {
       mediaType: stringValue(json['mediaType'] ?? json['media_type']),
       voteAverage:
           ((json['voteAverage'] ?? json['vote_average']) as num?)?.toDouble(),
+      recommendationScore: (json['score'] as num?)?.toDouble(),
+      recommendationReasons: (json['reasons'] as List<dynamic>? ?? const [])
+          .whereType<String>()
+          .where((reason) => reason.trim().isNotEmpty)
+          .toList(growable: false),
+      recommendationSourceTypes:
+          (json['sourceTypes'] as List<dynamic>? ?? const [])
+              .whereType<String>()
+              .toList(growable: false),
+      previouslyWatched: json['previouslyWatched'] == true,
     );
   }
 
@@ -61,6 +79,10 @@ class MovieShort {
       'trailer': trailer?.toJson(),
       'mediaType': mediaType,
       'voteAverage': voteAverage,
+      'score': recommendationScore,
+      'reasons': recommendationReasons,
+      'sourceTypes': recommendationSourceTypes,
+      'previouslyWatched': previouslyWatched,
     };
   }
 }

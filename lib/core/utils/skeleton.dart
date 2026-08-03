@@ -338,10 +338,10 @@ class MediaDetailScreenSkeleton extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
-            Row(
+            const Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(
+                SizedBox(
                   width: 128,
                   child: Column(
                     children: [
@@ -365,33 +365,29 @@ class MediaDetailScreenSkeleton extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 14),
+                SizedBox(width: 14),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 8),
+                    padding: EdgeInsets.only(top: 8),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SkeletonBox(
-                            width: 116, height: 26, borderRadius: 13),
-                        const SizedBox(height: 14),
-                        const SkeletonBox(width: double.infinity, height: 30),
-                        const SizedBox(height: 8),
-                        const SkeletonBox(width: 182, height: 30),
-                        const SizedBox(height: 14),
-                        const SkeletonBox(
-                            width: 160, height: 14, borderRadius: 5),
-                        const SizedBox(height: 10),
-                        const SkeletonBox(
-                            width: 212, height: 14, borderRadius: 5),
-                        const SizedBox(height: 10),
-                        const SkeletonBox(
-                            width: 188, height: 14, borderRadius: 5),
-                        const SizedBox(height: 16),
+                        SkeletonBox(width: 116, height: 26, borderRadius: 13),
+                        SizedBox(height: 14),
+                        SkeletonBox(width: double.infinity, height: 30),
+                        SizedBox(height: 8),
+                        SkeletonBox(width: 182, height: 30),
+                        SizedBox(height: 14),
+                        SkeletonBox(width: 160, height: 14, borderRadius: 5),
+                        SizedBox(height: 10),
+                        SkeletonBox(width: 212, height: 14, borderRadius: 5),
+                        SizedBox(height: 10),
+                        SkeletonBox(width: 188, height: 14, borderRadius: 5),
+                        SizedBox(height: 16),
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
-                          children: const [
+                          children: [
                             SkeletonBox(
                                 width: 62, height: 28, borderRadius: 14),
                             SkeletonBox(
@@ -400,12 +396,10 @@ class MediaDetailScreenSkeleton extends StatelessWidget {
                                 width: 54, height: 28, borderRadius: 14),
                           ],
                         ),
-                        const SizedBox(height: 16),
-                        const SkeletonBox(
-                            width: 148, height: 18, borderRadius: 6),
-                        const SizedBox(height: 8),
-                        const SkeletonBox(
-                            width: 92, height: 14, borderRadius: 5),
+                        SizedBox(height: 16),
+                        SkeletonBox(width: 148, height: 18, borderRadius: 6),
+                        SizedBox(height: 8),
+                        SkeletonBox(width: 92, height: 14, borderRadius: 5),
                       ],
                     ),
                   ),

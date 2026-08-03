@@ -97,7 +97,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     }
 
     try {
-      // The list is already typed — just filter out removed entries
+      // The list is already typed - just filter out removed entries
       final watchlist =
           (userWatchlist).where((item) => item.removed != true).toList();
 
@@ -410,7 +410,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => RewatchLogSheet(
         onSubmit: ({
-          required String watchedAt,
+          required String? watchedAt,
           required double? rating,
           required bool? recommended,
           required String? notes,

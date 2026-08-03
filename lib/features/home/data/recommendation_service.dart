@@ -59,15 +59,22 @@ class RecommendationService {
   /// Per-user cache for /recommendations/from-highly-rated.
   static final Map<String, _CachedHighlyRated> _highlyRatedCache = {};
 
-  static Future<List<MovieShort>> getUserRecommendations(String userId) async {
+  static Future<List<MovieShort>> getUserRecommendations(
+    String userId, {
+    bool refresh = false,
+  }) async {
     final cached = _userRecsCache[userId];
-    if (cached != null && !cached.isExpired) {
-      apiLogger.d('getUserRecommendations [$userId] — serving from cache');
+    if (!refresh && cached != null && !cached.isExpired) {
+      apiLogger.d('getUserRecommendations [$userId] - serving from cache');
       return cached.movies;
     }
 
-    apiLogger.d('GET /users/$userId/recommendations');
-    final data = await ApiClient.get('/users/$userId/recommendations');
+    apiLogger.d(
+        'GET /users/$userId/recommendations${refresh ? '?refresh=true' : ''}');
+    final data = await ApiClient.get(
+      '/users/$userId/recommendations',
+      queryParams: refresh ? const {'refresh': 'true'} : null,
+    );
     final movies = (data as List<dynamic>)
         .map((e) => MovieShort.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -82,7 +89,7 @@ class RecommendationService {
     final cached = _highlyRatedCache[cacheKey];
     if (cached != null && !cached.isExpired) {
       apiLogger.d(
-          'getRecommendationsFromHighlyRated [$cacheKey] — serving from cache');
+          'getRecommendationsFromHighlyRated [$cacheKey] - serving from cache');
       return cached.response;
     }
 

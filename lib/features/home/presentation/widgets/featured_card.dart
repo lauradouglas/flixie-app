@@ -13,6 +13,7 @@ class FeaturedCard extends StatelessWidget {
     this.isBookmarked = false,
     this.isBookmarkUpdating = false,
     this.showNewBadge = false,
+    this.recommendationReason,
   });
 
   final MovieShort movie;
@@ -21,11 +22,13 @@ class FeaturedCard extends StatelessWidget {
   final bool isBookmarked;
   final bool isBookmarkUpdating;
   final bool showNewBadge;
+  final String? recommendationReason;
 
   @override
   Widget build(BuildContext context) {
     return MovieCarouselTile(
       title: movie.name,
+      subtitle: recommendationReason,
       posterPath: movie.poster,
       onTap: onTap,
       topLeft: showNewBadge

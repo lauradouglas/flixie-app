@@ -19,21 +19,21 @@ class ApiException implements Exception {
 }
 
 class ApiClient {
-  // static const String baseUrl = String.fromEnvironment(
-  //   'API_BASE_URL',
-  //   defaultValue: 'http://localhost:3000',
-  // );
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://localhost:3000',
+  );
 
   // static const String baseUrl = String.fromEnvironment(
   //   'API_BASE_URL',
   //   defaultValue: 'http://192.168.1.203:3000',
   // );
 
-  static const String baseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue:
-        'https://flixie-api-fmcehvaecwdheccm.northeurope-01.azurewebsites.net',
-  );
+  // static const String baseUrl = String.fromEnvironment(
+  //   'API_BASE_URL',
+  //   defaultValue:
+  //       'https://flixie-api-fmcehvaecwdheccm.northeurope-01.azurewebsites.net',
+  // );
 
   static const Duration _timeout = Duration(seconds: 15);
 
@@ -170,7 +170,7 @@ class ApiClient {
         rethrow;
       }
       apiLogger.w(
-        '$requestLabel returned 401 — refreshing auth token and retrying once',
+        '$requestLabel returned 401 - refreshing auth token and retrying once',
       );
       await _refreshAuthToken();
       return request();
@@ -220,7 +220,7 @@ class ApiClient {
             e.code == 'DATABASE_ERROR' &&
             attempt < _maxRetries) {
           apiLogger.w(
-            'DATABASE_ERROR (attempt ${attempt + 1}/$_maxRetries) for $uri — '
+            'DATABASE_ERROR (attempt ${attempt + 1}/$_maxRetries) for $uri - '
             'retrying in ${_retryDelays[attempt].inMilliseconds}ms…',
           );
           await Future<void>.delayed(_retryDelays[attempt]);
@@ -229,7 +229,7 @@ class ApiClient {
         rethrow;
       }
     }
-    // Unreachable — the loop always returns or rethrows.
+    // Unreachable - the loop always returns or rethrows.
     throw StateError('Unreachable retry loop exit for $uri');
   }
 
