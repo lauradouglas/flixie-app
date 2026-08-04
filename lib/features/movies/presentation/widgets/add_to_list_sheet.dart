@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:flixie_app/models/movie_list.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/features/movies/presentation/controllers/movie_lists_controller.dart';
-import 'package:flixie_app/features/movies/data/movie_features_repository.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/list_picker_sheet.dart';
@@ -38,7 +37,6 @@ class AddToListSheet extends StatelessWidget {
     }
     return ChangeNotifierProvider(
       create: (_) => MovieListsProvider(
-        repository: const MovieFeaturesRepository(),
         userId: userId,
       )..loadLists(),
       child: _AddToListSheetBody(

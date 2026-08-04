@@ -1,25 +1,22 @@
-import 'package:flixie_app/features/social/data/social_repository_impl.dart';
-import 'package:flixie_app/features/social/data/friend_actions_usecase.dart';
+import 'package:flixie_app/features/social/data/friend_service.dart';
 import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/models/friendship.dart';
 
 class FriendActionsController {
-  FriendActionsController({FriendActionsUseCase? useCase})
-      : _useCase = useCase ?? FriendActionsUseCase(SocialRepositoryImpl());
+  const FriendActionsController();
 
-  static final FriendActionsController instance = FriendActionsController();
+  static const FriendActionsController instance = FriendActionsController();
 
-  final FriendActionsUseCase _useCase;
-
-  Future<FriendsData> getFriends(String userId) => _useCase.getFriends(userId);
+  Future<FriendsData> getFriends(String userId) =>
+      FriendService.getFriends(userId);
   Future<List<ActivityListItem>> getFriendsActivityLists(String userId) =>
-      _useCase.getFriendsActivityLists(userId);
+      FriendService.getFriendsActivityLists(userId);
   Future<void> acceptRequest(String requestId) =>
-      _useCase.acceptRequest(requestId);
+      FriendService.updateRequest(requestId, 'ACCEPTED');
   Future<void> declineRequest(String requestId) =>
-      _useCase.declineRequest(requestId);
+      FriendService.updateRequest(requestId, 'DECLINED');
   Future<void> sendFriendRequest(Map<String, dynamic> body) =>
-      _useCase.sendFriendRequest(body);
+      FriendService.sendFriendRequest(body);
   Future<void> removeFriend(String userId, String friendId) =>
-      _useCase.removeFriend(userId, friendId);
+      FriendService.removeFriend(userId, friendId);
 }

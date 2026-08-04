@@ -2,16 +2,14 @@ import 'package:flutter/foundation.dart';
 
 import 'package:flixie_app/models/movie_list.dart';
 import 'package:flixie_app/models/movie_list_movie.dart';
-import 'package:flixie_app/features/movies/data/movie_features_repository.dart';
+import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 
 class MovieListsProvider extends ChangeNotifier {
   MovieListsProvider({
-    required this.repository,
     required this.userId,
   });
 
-  final MovieFeaturesRepository repository;
   final String userId;
 
   List<MovieList> lists = [];
@@ -25,7 +23,7 @@ class MovieListsProvider extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      lists = await repository.getMovieLists(userId);
+      lists = await UserService.getMovieLists(userId);
     } catch (e) {
       error = _friendlyError(e);
     } finally {
@@ -45,16 +43,18 @@ class MovieListsProvider extends ChangeNotifier {
     List<String> collaboratorIds = const [],
   }) async {
     try {
-      final created = await repository.createMovieList(
+      final created = await UserService.createMovieList(
         userId,
-        name,
-        description: description,
-        visibility: visibility,
-        coverImageUrl: coverImageUrl,
-        whoCanAddMovies: whoCanAddMovies,
-        scope: scope,
-        groupId: groupId,
-        collaboratorIds: collaboratorIds,
+        CreateMovieListRequest(
+          name: name,
+          description: description,
+          visibility: visibility,
+          coverImageUrl: coverImageUrl,
+          whoCanAddMovies: whoCanAddMovies,
+          scope: scope,
+          groupId: groupId,
+          collaboratorIds: collaboratorIds,
+        ),
       );
       lists = [...lists, created]
         ..sort((a, b) => (a.createdAt ?? '').compareTo(b.createdAt ?? ''));
@@ -79,21 +79,23 @@ class MovieListsProvider extends ChangeNotifier {
     List<String>? collaboratorIds,
   }) async {
     try {
-      await repository.renameMovieList(
+      await UserService.renameMovieList(
         userId,
         listId,
-        name,
-        description: description,
-        visibility: visibility,
-        coverImageUrl: coverImageUrl,
-        whoCanAddMovies: whoCanAddMovies,
-        scope: scope,
-        groupId: groupId,
-        collaboratorIds: collaboratorIds,
+        UpdateMovieListRequest(
+          name: name,
+          description: description,
+          visibility: visibility,
+          coverImageUrl: coverImageUrl,
+          whoCanAddMovies: whoCanAddMovies,
+          scope: scope,
+          groupId: groupId,
+          collaboratorIds: collaboratorIds,
+        ),
       );
       // PATCH returns a deliberately small list record. Refresh the collection
       // so counts and poster previews are not temporarily replaced with zeroes.
-      lists = await repository.getMovieLists(userId);
+      lists = await UserService.getMovieLists(userId);
       notifyListeners();
       return true;
     } catch (e) {
@@ -105,7 +107,7 @@ class MovieListsProvider extends ChangeNotifier {
 
   Future<bool> deleteList(String listId) async {
     try {
-      await repository.deleteMovieList(userId, listId);
+      await UserService.deleteMovieList(userId, listId);
       lists = lists.where((l) => l.id != listId).toList();
       listMovies.remove(listId);
       notifyListeners();
@@ -122,7 +124,7 @@ class MovieListsProvider extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      listMovies[listId] = await repository.getMovieListMovies(userId, listId);
+      listMovies[listId] = await UserService.getMovieListMovies(userId, listId);
     } catch (e) {
       error = _friendlyError(e);
     } finally {
@@ -133,7 +135,7 @@ class MovieListsProvider extends ChangeNotifier {
 
   Future<bool> addMovieToList(String listId, int movieId) async {
     try {
-      final entry = await repository.addMovieToList(userId, listId, movieId);
+      final entry = await UserService.addMovieToList(userId, listId, movieId);
       final current = List<MovieListMovie>.from(listMovies[listId] ?? []);
       current.removeWhere((e) => _entryMatchesMovie(e, movieId));
       current.insert(0, entry);
@@ -149,7 +151,7 @@ class MovieListsProvider extends ChangeNotifier {
 
   Future<bool> removeMovieFromList(String listId, int movieId) async {
     try {
-      await repository.removeMovieFromList(userId, listId, movieId);
+      await UserService.removeMovieFromList(userId, listId, movieId);
       final current = List<MovieListMovie>.from(listMovies[listId] ?? []);
       current.removeWhere((e) => _entryMatchesMovie(e, movieId));
       listMovies[listId] = current;
@@ -164,7 +166,7 @@ class MovieListsProvider extends ChangeNotifier {
 
   Future<bool> removeShowFromList(String listId, int showId) async {
     try {
-      await repository.removeShowFromList(userId, listId, showId);
+      await UserService.removeShowFromList(userId, listId, showId);
       final current = List<MovieListMovie>.from(listMovies[listId] ?? []);
       current.removeWhere((e) => _entryMatchesShow(e, showId));
       listMovies[listId] = current;
@@ -179,7 +181,7 @@ class MovieListsProvider extends ChangeNotifier {
 
   Future<List<MovieList>> getListsContainingMovie(int movieId) async {
     try {
-      final containing = await repository.getMyListsContainingMovie(
+      final containing = await UserService.getMyListsContainingMovie(
         userId,
         movieId,
       );

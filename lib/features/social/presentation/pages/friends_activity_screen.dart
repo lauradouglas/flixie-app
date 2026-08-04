@@ -23,28 +23,40 @@ class _FriendsActivityScreenState extends State<FriendsActivityScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    final cached = context.read<AuthProvider>().cachedFriendsActivity;
+    if (cached != null) {
+      final cutoff = DateTime.now().subtract(const Duration(days: 14));
+      _items = cached.where((item) {
+        final timestamp = DateTime.tryParse(item.timestamp);
+        return timestamp == null || timestamp.isAfter(cutoff);
+      }).toList();
+      _loading = false;
+    }
+    _load(showSpinner: cached == null);
   }
 
-  Future<void> _load() async {
-    final userId = context.read<AuthProvider>().dbUser?.id;
+  Future<void> _load({bool showSpinner = false}) async {
+    final auth = context.read<AuthProvider>();
+    final userId = auth.dbUser?.id;
     if (userId == null) {
       if (mounted) setState(() => _loading = false);
       return;
     }
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (showSpinner) setState(() => _loading = true);
+    setState(() => _error = null);
     try {
       final items = await FriendService.getFriendsActivityLists(
         userId,
         days: 14,
         limit: 100,
       );
-      if (mounted) setState(() => _items = items);
+      if (mounted) {
+        setState(() => _items = items);
+      }
     } catch (_) {
-      if (mounted) setState(() => _error = 'Couldn\'t load friend activity.');
+      if (mounted && _items.isEmpty) {
+        setState(() => _error = 'Couldn\'t load friend activity.');
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -63,7 +75,7 @@ class _FriendsActivityScreenState extends State<FriendsActivityScreen> {
         ),
       ),
       body: RefreshIndicator(
-        onRefresh: _load,
+        onRefresh: () => _load(),
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null

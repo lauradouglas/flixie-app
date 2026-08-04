@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/features/movies/presentation/controllers/movie_wrapped_controller.dart';
-import 'package:flixie_app/features/movies/data/movie_features_repository.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/home/presentation/widgets/section_header.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/wrapped_widgets.dart';
@@ -46,7 +45,6 @@ class WrappedContent extends StatelessWidget {
     final currentYear = DateTime.now().year;
     return ChangeNotifierProvider(
       create: (_) => MovieWrappedProvider(
-        repository: const MovieFeaturesRepository(),
         userId: userId,
       )..loadYear(currentYear),
       child: _WrappedView(

@@ -17,6 +17,7 @@ import 'package:flixie_app/models/user.dart' as models;
 import 'package:flixie_app/models/watched_movie.dart';
 import 'package:flixie_app/models/watchlist_movie.dart';
 import 'package:flixie_app/models/watch_provider.dart';
+import 'package:flixie_app/models/watch_request.dart';
 import 'package:flixie_app/models/profile_avatar.dart';
 import 'package:flixie_app/core/auth/auth_notification_poller.dart';
 import 'package:flixie_app/core/auth/auth_prefetch_coordinator.dart';
@@ -114,6 +115,7 @@ class AuthProvider extends ChangeNotifier {
   List<MovieShort>? _cachedNowPlaying;
   List<MovieList>? _cachedMovieLists;
   List<FlixieNotification>? _cachedNotifications;
+  List<WatchRequest>? _cachedWatchRequests;
   bool _isPrefetching = false;
   final Map<int, List<WatchProvider>> _cachedWatchProvidersByMovieId = {};
   Set<int>? _cachedUserWatchProviderIds;
@@ -152,6 +154,7 @@ class AuthProvider extends ChangeNotifier {
   List<MovieShort>? get cachedNowPlaying => _cachedNowPlaying;
   List<MovieList>? get cachedMovieLists => _cachedMovieLists;
   List<FlixieNotification>? get cachedNotifications => _cachedNotifications;
+  List<WatchRequest>? get cachedWatchRequests => _cachedWatchRequests;
   bool get isPrefetching => _isPrefetching;
   Map<int, List<WatchProvider>> get cachedWatchProvidersByMovieId =>
       Map.unmodifiable(_cachedWatchProvidersByMovieId);
@@ -179,6 +182,11 @@ class AuthProvider extends ChangeNotifier {
         : visibleNotificationsForUser(notifications, userId);
     _cachedNotifications = List.unmodifiable(visible);
     _syncUnreadNotificationCount(visible.where((item) => !item.isRead).length);
+    notifyListeners();
+  }
+
+  void updateCachedWatchRequests(List<WatchRequest> requests) {
+    _cachedWatchRequests = List.unmodifiable(requests);
     notifyListeners();
   }
 
@@ -357,6 +365,7 @@ class AuthProvider extends ChangeNotifier {
       _cachedNowPlaying = null;
       _cachedMovieLists = null;
       _cachedNotifications = null;
+      _cachedWatchRequests = null;
       _cachedWatchProvidersByMovieId.clear();
       _cachedUserWatchProviderIds = null;
       _watchProviderCacheFuture = null;
@@ -459,6 +468,7 @@ class AuthProvider extends ChangeNotifier {
     _cachedNowPlaying = snapshot.nowPlaying ?? _cachedNowPlaying;
     _cachedMovieLists = snapshot.movieLists ?? _cachedMovieLists;
     _cachedNotifications = snapshot.notifications ?? _cachedNotifications;
+    _cachedWatchRequests = snapshot.watchRequests ?? _cachedWatchRequests;
     _syncUnreadNotificationCount(
       snapshot.unreadNotificationCount ?? _unreadNotificationCount,
     );

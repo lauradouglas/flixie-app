@@ -1,16 +1,14 @@
 import 'package:flutter/foundation.dart';
 
 import 'package:flixie_app/models/movie_wrapped.dart';
-import 'package:flixie_app/features/movies/data/movie_features_repository.dart';
+import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 
 class MovieWrappedProvider extends ChangeNotifier {
   MovieWrappedProvider({
-    required this.repository,
     required this.userId,
   });
 
-  final MovieFeaturesRepository repository;
   final String userId;
 
   MovieWrapped? wrapped;
@@ -22,7 +20,7 @@ class MovieWrappedProvider extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      wrapped = await repository.getMovieWrapped(userId, year);
+      wrapped = await UserService.getMovieWrapped(userId, year);
     } catch (e) {
       wrapped = null;
       error = _friendlyError(e);

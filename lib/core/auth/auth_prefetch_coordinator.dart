@@ -9,6 +9,7 @@ import 'package:flixie_app/models/movie_list.dart';
 import 'package:flixie_app/models/notification.dart';
 import 'package:flixie_app/models/review.dart';
 import 'package:flixie_app/models/watch_provider.dart';
+import 'package:flixie_app/models/watch_request.dart';
 import 'package:flixie_app/features/movies/data/movie_service.dart';
 import 'package:flixie_app/features/profile/data/notification_service.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
@@ -17,6 +18,7 @@ import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/utils/notification_visibility.dart';
 import 'package:flixie_app/features/social/presentation/controllers/friend_actions_controller.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
+import 'package:flixie_app/features/social/data/request_service.dart';
 import 'package:flixie_app/features/profile/presentation/controllers/profile_lookup_controller.dart';
 import 'package:flixie_app/core/auth/auth_prefetch_snapshot.dart';
 
@@ -53,6 +55,7 @@ class AuthPrefetchCoordinator {
     List<FlixieNotification>? notifications;
     Map<int, List<WatchProvider>>? watchProvidersByMovieId;
     Set<int>? userWatchProviderIds;
+    List<WatchRequest>? watchRequests;
 
     await Future.wait([
       _profileLookupController
@@ -66,6 +69,8 @@ class AuthPrefetchCoordinator {
           .then((v) => friendsActivity = v, onError: (_) {}),
       GroupService.getUserGroups(userId)
           .then((v) => groups = v, onError: (_) {}),
+      RequestService.getWatchRequests(userId)
+          .then((v) => watchRequests = v, onError: (_) {}),
       _profileLookupController
           .getUserMovieRatings(userId)
           .then((v) => ratings = v, onError: (_) {}),
@@ -106,6 +111,7 @@ class AuthPrefetchCoordinator {
       notifications: notifications,
       watchProvidersByMovieId: watchProvidersByMovieId,
       userWatchProviderIds: userWatchProviderIds,
+      watchRequests: watchRequests,
     );
   }
 

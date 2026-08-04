@@ -101,9 +101,16 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
   @override
   void initState() {
     super.initState();
-    _groups = context.read<AuthProvider>().cachedGroups ?? [];
+    final auth = context.read<AuthProvider>();
+    _groups = auth.cachedGroups ?? [];
     _loadingGroups = _groups.isEmpty;
-    _load();
+    final cachedRequests = auth.cachedWatchRequests;
+    if (cachedRequests != null) {
+      _all = List.of(cachedRequests);
+      _loading = false;
+      _applyFilter();
+    }
+    _load(showSpinner: cachedRequests == null);
     _loadGroups();
     _searchController.addListener(_applyFilter);
   }
@@ -133,16 +140,14 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool showSpinner = false}) async {
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (userId == null) {
       setState(() => _loading = false);
       return;
     }
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (showSpinner) setState(() => _loading = true);
+    setState(() => _error = null);
     try {
       final requests = await RequestService.getWatchRequests(userId);
       final hydrated = await Future.wait(
@@ -173,13 +178,14 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
           _all = hydrated;
           _loading = false;
         });
+        context.read<AuthProvider>().updateCachedWatchRequests(hydrated);
         _applyFilter();
       }
     } catch (e) {
       logger.e('[WatchRequestsScreen] load error: $e');
       if (mounted) {
         setState(() {
-          _error = 'Failed to load watch requests.';
+          if (_all.isEmpty) _error = 'Failed to load watch requests.';
           _loading = false;
         });
       }
@@ -284,6 +290,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     setState(() {
       _all = _all.map((r) => r.id == updated.id ? updated : r).toList();
     });
+    context.read<AuthProvider>().updateCachedWatchRequests(_all);
     _applyFilter();
   }
 
@@ -348,6 +355,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
           _all.removeWhere((item) => item.id == request.id);
           _filtered.removeWhere((item) => item.id == request.id);
         });
+        auth.updateCachedWatchRequests(_all);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Watch request deleted')),
         );
@@ -717,8 +725,9 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Cancel this watch plan?'),
-        content:
-            const Text('Everyone taking part will see that it was cancelled.'),
+        content: const Text(
+          'This removes the watch plan and its related notifications for everyone taking part.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
@@ -735,15 +744,36 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     if (confirmed != true || !mounted) return;
     await _withRequestAction(request, _RequestAction.declining, () async {
       try {
-        final updated = await RequestService.cancelWatchRequest(
+        await RequestService.deleteWatchRequest(
           watchRequestId: request.id,
           userId: userId,
         );
-        _replaceRequest(updated);
+        if (!mounted) return;
+        final auth = context.read<AuthProvider>();
+        final cachedNotifications = auth.cachedNotifications;
+        if (cachedNotifications != null) {
+          auth.updateCachedNotifications(
+            cachedNotifications
+                .where((item) => item.linkedRequestId != request.id)
+                .toList(),
+          );
+        }
+        setState(() {
+          _all.removeWhere((item) => item.id == request.id);
+          _filtered.removeWhere((item) => item.id == request.id);
+        });
+        auth.updateCachedWatchRequests(_all);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Watch plan cancelled')),
+            const SnackBar(content: Text('Watch plan cancelled for everyone')),
           );
+          if (widget.initialRequestId?.isNotEmpty == true) {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/watch-requests');
+            }
+          }
         }
       } catch (_) {
         if (mounted) {

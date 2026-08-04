@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
-import 'package:flixie_app/features/settings/presentation/widgets/settings_constants.dart';
+
+const double kSettingsCornerRadius = 14;
 
 const double _kTileHorizontalPadding = 16;
 const double _kTileIconSize = 34;

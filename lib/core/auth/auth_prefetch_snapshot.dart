@@ -7,6 +7,7 @@ import 'package:flixie_app/models/movie_list.dart';
 import 'package:flixie_app/models/notification.dart';
 import 'package:flixie_app/models/review.dart';
 import 'package:flixie_app/models/watch_provider.dart';
+import 'package:flixie_app/models/watch_request.dart';
 
 class AuthPrefetchSnapshot {
   const AuthPrefetchSnapshot({
@@ -23,6 +24,7 @@ class AuthPrefetchSnapshot {
     this.notifications,
     this.watchProvidersByMovieId,
     this.userWatchProviderIds,
+    this.watchRequests,
   });
 
   final List<ActivityListItem>? activity;
@@ -38,4 +40,5 @@ class AuthPrefetchSnapshot {
   final List<FlixieNotification>? notifications;
   final Map<int, List<WatchProvider>>? watchProvidersByMovieId;
   final Set<int>? userWatchProviderIds;
+  final List<WatchRequest>? watchRequests;
 }

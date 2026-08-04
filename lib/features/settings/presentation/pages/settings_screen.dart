@@ -12,7 +12,6 @@ import 'package:flixie_app/features/settings/data/reference_data_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
 import 'package:flixie_app/features/settings/presentation/widgets/change_password_sheet.dart';
-import 'package:flixie_app/features/settings/presentation/widgets/settings_constants.dart';
 import 'package:flixie_app/features/settings/presentation/widgets/favorite_genres_sheet.dart';
 import 'package:flixie_app/features/settings/presentation/widgets/icon_color_sheet.dart';
 import 'package:flixie_app/features/settings/presentation/widgets/settings_tile.dart';

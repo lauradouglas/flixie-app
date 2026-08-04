@@ -1,14 +1,10 @@
-import 'package:flixie_app/features/movies/data/review_repository_impl.dart';
-import 'package:flixie_app/features/movies/data/review_reactions_usecase.dart';
+import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/models/review.dart';
 
 class ReviewReactionsController {
-  ReviewReactionsController({ReviewReactionsUseCase? useCase})
-      : _useCase = useCase ?? ReviewReactionsUseCase(ReviewRepositoryImpl());
+  const ReviewReactionsController();
 
-  static final ReviewReactionsController instance = ReviewReactionsController();
-
-  final ReviewReactionsUseCase _useCase;
+  static const ReviewReactionsController instance = ReviewReactionsController();
 
   Future<({Map<String, int> reactions, String? myReaction})> reactToReview({
     required String mediaType,
@@ -17,7 +13,7 @@ class ReviewReactionsController {
     required String userId,
     required String? reactionType,
   }) {
-    return _useCase.reactToReview(
+    return UserService.reactToReview(
       mediaType: mediaType,
       mediaId: mediaId,
       reviewId: reviewId,
@@ -27,5 +23,5 @@ class ReviewReactionsController {
   }
 
   Future<Review> addMovieReview(Review review) =>
-      _useCase.addMovieReview(review);
+      UserService.addMovieReview(review);
 }

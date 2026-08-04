@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:palette_generator/palette_generator.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flixie_app/models/favorite_movie.dart';
 import 'package:flixie_app/models/friend_recommendation.dart';
@@ -1675,26 +1674,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  Future<void> _shareMovieExternally(Movie movie) async {
-    final appLink = _movieDeepLink(movie);
-    final webFallback = 'https://www.themoviedb.org/movie/${movie.id}';
-    await Share.share(
-      'Check out ${movie.title} on Flixie\n\n'
-      '$appLink\n\n'
-      "No app yet? View here: $webFallback",
-      subject: '${movie.title} on Flixie',
-    );
-  }
-
-  Future<void> _copyMovieLink(Movie movie) async {
-    final appLink = _movieDeepLink(movie);
-    await Clipboard.setData(ClipboardData(text: appLink));
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Movie link copied')),
     );
   }
 

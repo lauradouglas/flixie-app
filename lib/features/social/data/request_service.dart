@@ -140,17 +140,6 @@ class RequestService {
     return WatchRequest.fromJson(data as Map<String, dynamic>);
   }
 
-  static Future<WatchRequest> cancelWatchRequest({
-    required String watchRequestId,
-    required String userId,
-  }) async {
-    final data = await ApiClient.patch(
-      '/watch-requests/$watchRequestId/cancel',
-      body: {'userId': userId},
-    );
-    return WatchRequest.fromJson(data as Map<String, dynamic>);
-  }
-
   static Future<void> deleteWatchRequest({
     required String watchRequestId,
     required String userId,

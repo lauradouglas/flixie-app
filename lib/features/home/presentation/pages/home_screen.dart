@@ -245,6 +245,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final personalisedForYou = results[1] as List<MovieShort>;
     final watchRequests = results[3] as List<WatchRequest>;
+    context.read<AuthProvider>().updateCachedWatchRequests(watchRequests);
     setState(() {
       _friendsActivity = results[0] as List<ActivityListItem>;
       _forYouMovies = personalisedForYou.take(20).toList();
@@ -528,7 +529,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                         _buildBecauseYouRatedSection(context),
                         _buildContinueWatchingSection(context),
-                        FriendsWatchingSection(activity: _friendsActivity),
+                        if (_isLoadingRecommendations &&
+                            _friendsActivity.isEmpty)
+                          _buildPosterRailLoadingState('Friends watching')
+                        else
+                          FriendsWatchingSection(activity: _friendsActivity),
                         _buildUpcomingWatchPlanSection(context, user),
                         _buildFriendActivitySection(context),
                         _buildWatchlistSection(context),
@@ -540,6 +545,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildContinueWatchingSection(BuildContext context) {
+    if (_isLoadingRecommendations && _continueWatchingShows.isEmpty) {
+      return _buildPosterRailLoadingState('Continue Watching');
+    }
     if (_continueWatchingShows.isEmpty) return const SizedBox.shrink();
 
     return Column(
@@ -1254,6 +1262,16 @@ class _HomeScreenState extends State<HomeScreen> {
     models.User? user,
   ) {
     final plan = _upcomingWatchPlan;
+    if (_isLoadingRecommendations && plan == null && user != null) {
+      return const Padding(
+        padding: EdgeInsets.fromLTRB(16, 0, 16, 20),
+        child: SkeletonBox(
+          width: double.infinity,
+          height: 100,
+          borderRadius: 14,
+        ),
+      );
+    }
     if (plan == null || user == null || plan.scheduledFor == null) {
       return const SizedBox.shrink();
     }
@@ -1419,6 +1437,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildFriendActivitySection(BuildContext context) {
+    if (_isLoadingRecommendations && _friendsActivity.isEmpty) {
+      return _buildActivityLoadingState();
+    }
     if (_friendsActivity.isEmpty) return const SizedBox.shrink();
     final previewCount = _showMoreFriendActivity ? 8 : 3;
     final items = _friendsActivity.take(previewCount).toList();
@@ -1469,6 +1490,57 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 8),
         ],
         const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  Widget _buildPosterRailLoadingState(String title) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        HomeSectionHeader(title: title),
+        const SizedBox(height: 12),
+        const SizedBox(
+          height: 180,
+          child: Row(
+            children: [
+              SizedBox(width: 16),
+              SkeletonBox(width: 110, height: 148, borderRadius: 11),
+              SizedBox(width: 8),
+              SkeletonBox(width: 110, height: 148, borderRadius: 11),
+              SizedBox(width: 8),
+              SkeletonBox(width: 110, height: 148, borderRadius: 11),
+              SizedBox(width: 8),
+              Expanded(
+                child: SkeletonBox(height: 148, borderRadius: 11),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+      ],
+    );
+  }
+
+  Widget _buildActivityLoadingState() {
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        HomeSectionHeader(title: 'Popular with friends'),
+        SizedBox(height: 12),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            children: [
+              SkeletonBox(height: 72, borderRadius: 14),
+              SizedBox(height: 10),
+              SkeletonBox(height: 72, borderRadius: 14),
+              SizedBox(height: 10),
+              SkeletonBox(height: 72, borderRadius: 14),
+            ],
+          ),
+        ),
+        SizedBox(height: 20),
       ],
     );
   }

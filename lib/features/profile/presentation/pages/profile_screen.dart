@@ -145,10 +145,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadProfileExtras() async {
-    final userId = context.read<AuthProvider>().dbUser?.id;
+    final auth = context.read<AuthProvider>();
+    final userId = auth.dbUser?.id;
     if (userId == null) {
       if (mounted) setState(() => _profileExtrasLoading = false);
       return;
+    }
+    if (mounted) {
+      setState(() {
+        _reviews = auth.cachedReviews ?? _reviews;
+        _reviewCount = _reviews.length;
+        _groups = auth.cachedGroups ?? _groups;
+        _watchRequests = auth.cachedWatchRequests ?? _watchRequests;
+      });
     }
     final libraryFuture = Future.wait<Object>([
       ShowService.getContinueWatching(userId)
@@ -206,11 +215,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }),
       );
       if (!mounted) return;
+      final watchRequests = results[2] as List<WatchRequest>;
       setState(() {
         _reviews = results[0] as List<Review>;
         _reviewCount = _reviews.length;
         _groups = results[1] as List<Group>;
-        _watchRequests = results[2] as List<WatchRequest>;
+        _watchRequests = watchRequests;
         _wrapped = wrapped;
         _directorPeople = {
           for (final result in directorResults
@@ -223,6 +233,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             result.id: result.credits.knownForCredits,
         };
       });
+      context.read<AuthProvider>().updateCachedWatchRequests(watchRequests);
     } catch (e) {
       logger.e('[ProfileScreen] stats extras load error: $e');
       if (mounted) setState(() => _wrapped = _emptyWrapped());
@@ -412,7 +423,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-      body: _activityLoading && _ratingsLoading && _profileExtrasLoading
+      body: dbUser == null &&
+              _activityLoading &&
+              _ratingsLoading &&
+              _profileExtrasLoading
           ? const ProfileScreenSkeleton()
           : RefreshIndicator(
               color: FlixieColors.primary,
@@ -520,9 +534,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required List<dynamic> favoritePeople,
     required List<dynamic> favoriteShows,
   }) {
-    if (_profileExtrasLoading) {
-      return const _ProfileLibraryLoadingState();
-    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -543,6 +554,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             label: 'Find movies',
             onPressed: () => context.push('/search'),
           ),
+        if (_profileExtrasLoading) ...[
+          const SizedBox(height: 20),
+          const _ProfileExtrasLoadingIndicator(),
+        ],
         if (userId != null) ...[
           if (_continueWatching.isNotEmpty) ...[
             _ProfileContinueWatching(shows: _continueWatching),
@@ -2199,135 +2214,22 @@ class _ProfileContinueWatching extends StatelessWidget {
   }
 }
 
-class _ProfileLibraryLoadingState extends StatelessWidget {
-  const _ProfileLibraryLoadingState();
+class _ProfileExtrasLoadingIndicator extends StatelessWidget {
+  const _ProfileExtrasLoadingIndicator();
 
   @override
-  Widget build(BuildContext context) => const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget build(BuildContext context) => const Row(
         children: [
-          FlixieSectionHeader(
-            title: 'Favourite movies',
-            uppercase: false,
-            accentHeight: 22,
-            titleStyle: TextStyle(
-              color: FlixieColors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-            ),
+          SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
           ),
-          SizedBox(height: 10),
-          Row(children: [
-            Expanded(child: _ProfileLibrarySkeletonCard()),
-            SizedBox(width: 8),
-            Expanded(child: _ProfileLibrarySkeletonCard()),
-            SizedBox(width: 8),
-            Expanded(child: _ProfileLibrarySkeletonCard()),
-            SizedBox(width: 8),
-            Expanded(child: _ProfileLibrarySkeletonCard()),
-          ]),
-          SizedBox(height: 18),
-          FlixieSectionHeader(
-            title: 'Favourite people',
-            uppercase: false,
-            accentHeight: 22,
-            titleStyle: TextStyle(
-              color: FlixieColors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-            ),
+          SizedBox(width: 10),
+          Text(
+            'Updating the rest of your profile…',
+            style: TextStyle(color: FlixieColors.medium),
           ),
-          SizedBox(height: 10),
-          Row(children: [
-            Expanded(child: _ProfileLibrarySkeletonPerson()),
-            SizedBox(width: 8),
-            Expanded(child: _ProfileLibrarySkeletonPerson()),
-            SizedBox(width: 8),
-            Expanded(child: _ProfileLibrarySkeletonPerson()),
-            SizedBox(width: 8),
-            Expanded(child: _ProfileLibrarySkeletonPerson()),
-          ]),
-          SizedBox(height: 18),
-          FlixieSectionHeader(
-            title: 'Favourite shows',
-            uppercase: false,
-            accentHeight: 22,
-            titleStyle: TextStyle(
-              color: FlixieColors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          SizedBox(height: 10),
-          Row(children: [
-            Expanded(child: _ProfileLibrarySkeletonCard()),
-            SizedBox(width: 8),
-            Expanded(child: _ProfileLibrarySkeletonCard()),
-            SizedBox(width: 8),
-            Expanded(child: _ProfileLibrarySkeletonCard()),
-            SizedBox(width: 8),
-            Expanded(child: _ProfileLibrarySkeletonCard()),
-          ]),
-          SizedBox(height: 20),
-          FlixieSectionHeader(
-            title: 'Continue watching',
-            uppercase: false,
-            accentHeight: 22,
-            titleStyle: TextStyle(
-              color: FlixieColors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          SizedBox(height: 10),
-          Row(children: [
-            Expanded(child: SkeletonBox(height: 108, borderRadius: 14)),
-            SizedBox(width: 8),
-            Expanded(child: SkeletonBox(height: 108, borderRadius: 14)),
-          ]),
-          SizedBox(height: 20),
-          FlixieSectionHeader(
-            title: 'Your lists',
-            uppercase: false,
-            accentHeight: 22,
-            titleStyle: TextStyle(
-              color: FlixieColors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          SizedBox(height: 12),
-          SkeletonBox(height: 86, borderRadius: 14),
-          SizedBox(height: 10),
-          SkeletonBox(height: 86, borderRadius: 14),
-        ],
-      );
-}
-
-class _ProfileLibrarySkeletonCard extends StatelessWidget {
-  const _ProfileLibrarySkeletonCard();
-
-  @override
-  Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          SkeletonBox(height: 154, borderRadius: 14),
-          SizedBox(height: 8),
-          SkeletonBox(height: 12, borderRadius: 4),
-        ],
-      );
-}
-
-class _ProfileLibrarySkeletonPerson extends StatelessWidget {
-  const _ProfileLibrarySkeletonPerson();
-
-  @override
-  Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: const [
-          Center(child: SkeletonBox(width: 78, height: 78, borderRadius: 39)),
-          SizedBox(height: 8),
-          SkeletonBox(width: double.infinity, height: 12, borderRadius: 4),
         ],
       );
 }

@@ -17,7 +17,6 @@ import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/features/social/data/friend_service.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/movies/presentation/controllers/movie_lists_controller.dart';
-import 'package:flixie_app/features/movies/data/movie_features_repository.dart';
 import 'package:flixie_app/features/movies/data/search_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
@@ -52,7 +51,6 @@ class MovieListDetailScreen extends StatelessWidget {
     }
     return ChangeNotifierProvider(
       create: (_) => MovieListsProvider(
-        repository: const MovieFeaturesRepository(),
         userId: userId,
       )..loadListMovies(listId),
       child: _MovieListDetailView(
