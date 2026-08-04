@@ -62,133 +62,200 @@ class _SkeletonBoxState extends State<SkeletonBox>
 // Home screen skeleton
 // ---------------------------------------------------------------------------
 
-class HomeScreenSkeleton extends StatelessWidget {
+class HomeScreenSkeleton extends StatefulWidget {
   const HomeScreenSkeleton({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(0, 8, 0, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Greeting and the four quick actions.
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    SkeletonBox(width: 28, height: 28, borderRadius: 14),
-                    SizedBox(width: 9),
-                    SkeletonBox(width: 190, height: 17, borderRadius: 5),
-                  ],
-                ),
-                SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(child: SkeletonBox(height: 53, borderRadius: 12)),
-                    SizedBox(width: 8),
-                    Expanded(child: SkeletonBox(height: 53, borderRadius: 12)),
-                    SizedBox(width: 8),
-                    Expanded(child: SkeletonBox(height: 53, borderRadius: 12)),
-                    SizedBox(width: 8),
-                    Expanded(child: SkeletonBox(height: 53, borderRadius: 12)),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          const _SkeletonSectionHeader(width: 150),
-          const SizedBox(height: 8),
+  State<HomeScreenSkeleton> createState() => _HomeScreenSkeletonState();
+}
 
-          // Current 560px trending card: tall poster plus detail/actions.
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            child: SizedBox(
-                height: 560,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child:
-                          SkeletonBox(width: double.infinity, borderRadius: 18),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(14, 13, 14, 14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+class _HomeScreenSkeletonState extends State<HomeScreenSkeleton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 4200),
+  )..repeat();
+
+  static const _messages = [
+    'Finding tonight’s good stuff…',
+    'Checking what your friends loved…',
+    'Picking films that feel like you…',
+    'Putting your watch plans together…',
+  ];
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 34, 24, 28),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, child) {
+                    final turn = _controller.value * 6.283;
+                    final pulse =
+                        1 + 0.05 * (1 - (2 * _controller.value - 1).abs());
+                    return SizedBox(
+                      width: 190,
+                      height: 190,
+                      child: Stack(
+                        alignment: Alignment.center,
                         children: [
-                          SkeletonBox(width: 210, height: 23, borderRadius: 6),
-                          SizedBox(height: 7),
-                          SkeletonBox(width: 250, height: 13, borderRadius: 4),
-                          SizedBox(height: 8),
-                          SkeletonBox(width: double.infinity, height: 12),
-                          SizedBox(height: 6),
-                          SkeletonBox(width: 230, height: 12),
-                          SizedBox(height: 10),
-                          Row(
-                            children: [
-                              Expanded(
-                                child:
-                                    SkeletonBox(height: 40, borderRadius: 10),
+                          Transform.scale(
+                            scale: pulse,
+                            child: Container(
+                              width: 126,
+                              height: 126,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: RadialGradient(
+                                  colors: [
+                                    FlixieColors.primary
+                                        .withValues(alpha: 0.28),
+                                    FlixieColors.primary
+                                        .withValues(alpha: 0.04),
+                                  ],
+                                ),
+                                border: Border.all(
+                                  color: FlixieColors.primary
+                                      .withValues(alpha: 0.32),
+                                ),
                               ),
-                              SizedBox(width: 10),
-                              SkeletonBox(
-                                  width: 72, height: 40, borderRadius: 10),
-                            ],
+                              child: const Icon(
+                                Icons.local_movies_rounded,
+                                color: FlixieColors.primary,
+                                size: 58,
+                              ),
+                            ),
+                          ),
+                          Transform.rotate(
+                            angle: turn,
+                            child: const Align(
+                              alignment: Alignment.topCenter,
+                              child: _LoadingSpark(
+                                icon: Icons.auto_awesome_rounded,
+                                color: FlixieColors.tertiary,
+                              ),
+                            ),
+                          ),
+                          Transform.rotate(
+                            angle: turn + 2.1,
+                            child: const Align(
+                              alignment: Alignment.topCenter,
+                              child: _LoadingSpark(
+                                icon: Icons.favorite_rounded,
+                                color: Colors.pinkAccent,
+                              ),
+                            ),
+                          ),
+                          Transform.rotate(
+                            angle: turn + 4.2,
+                            child: const Align(
+                              alignment: Alignment.topCenter,
+                              child: _LoadingSpark(
+                                icon: Icons.people_alt_rounded,
+                                color: FlixieColors.success,
+                              ),
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
-                )),
-          ),
-          const SizedBox(height: 10),
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SkeletonBox(width: 20, height: 6, borderRadius: 3),
-              SizedBox(width: 6),
-              SkeletonBox(width: 6, height: 6, borderRadius: 3),
-              SizedBox(width: 6),
-              SkeletonBox(width: 6, height: 6, borderRadius: 3),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          // For-you poster carousel.
-          const _SkeletonSectionHeader(width: 92),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 230,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: 3,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (_, __) => const SizedBox(
-                width: 124,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SkeletonBox(width: 124, height: 186, borderRadius: 12),
-                    SizedBox(height: 8),
-                    SkeletonBox(width: 108, height: 13, borderRadius: 4),
-                    SizedBox(height: 6),
-                    SkeletonBox(width: 76, height: 11, borderRadius: 4),
-                  ],
+                    );
+                  },
                 ),
-              ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Getting the good stuff',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: FlixieColors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 9),
+                AnimatedBuilder(
+                  animation: _controller,
+                  builder: (_, __) {
+                    final index =
+                        (_controller.value * _messages.length).floor() %
+                            _messages.length;
+                    return AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      child: Text(
+                        _messages[index],
+                        key: ValueKey(index),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: FlixieColors.medium,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 28),
+                const _LoadingPreview(),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
+}
+
+class _LoadingSpark extends StatelessWidget {
+  const _LoadingSpark({required this.icon, required this.color});
+
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: FlixieColors.surfaceElevated,
+          shape: BoxShape.circle,
+          border: Border.all(color: color.withValues(alpha: 0.45)),
+        ),
+        child: Icon(icon, color: color, size: 18),
+      );
+}
+
+class _LoadingPreview extends StatelessWidget {
+  const _LoadingPreview();
+
+  @override
+  Widget build(BuildContext context) => const Column(
+        children: [
+          SkeletonBox(width: 170, height: 12, borderRadius: 5),
+          SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: SkeletonBox(height: 92, borderRadius: 14)),
+              SizedBox(width: 10),
+              Expanded(child: SkeletonBox(height: 92, borderRadius: 14)),
+              SizedBox(width: 10),
+              Expanded(child: SkeletonBox(height: 92, borderRadius: 14)),
+            ],
+          ),
+        ],
+      );
 }
 
 class _SkeletonSectionHeader extends StatelessWidget {

@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:flixie_app/core/auth/auth_provider.dart';
@@ -46,6 +47,7 @@ final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(
 Page<void> _calmPage(GoRouterState state, Widget child) {
   return NoTransitionPage<void>(
     key: state.pageKey,
+    name: _screenNameFor(state),
     child: child,
   );
 }
@@ -54,15 +56,66 @@ Page<void> _calmPage(GoRouterState state, Widget child) {
 /// CupertinoPageRoute supplies iOS's interactive left-edge back gesture.
 Page<void> _pushPage(GoRouterState state, Widget child) {
   if (defaultTargetPlatform == TargetPlatform.iOS) {
-    return CupertinoPage<void>(key: state.pageKey, child: child);
+    return CupertinoPage<void>(
+      key: state.pageKey,
+      name: _screenNameFor(state),
+      child: child,
+    );
   }
-  return MaterialPage<void>(key: state.pageKey, child: child);
+  return MaterialPage<void>(
+    key: state.pageKey,
+    name: _screenNameFor(state),
+    child: child,
+  );
 }
+
+String _screenNameFor(GoRouterState state) {
+  final path = state.fullPath ?? state.matchedLocation;
+  return switch (path) {
+    '/' => 'Home',
+    '/search' => 'Search',
+    '/watchlist' => 'Watchlist',
+    '/social' => 'Friends',
+    '/friends-activity' => 'Friend Activity',
+    '/groups/:id' => 'Group',
+    '/groups/:id/members' => 'Group Members',
+    '/profile' => 'Profile',
+    '/friends/:id' => 'Friend Profile',
+    '/movies/:id' => 'Movie Details',
+    '/shows/:id' => 'Show Details',
+    '/people/:id' => 'Person Details',
+    '/chat/:id' => 'Friend Chat',
+    '/notifications' => 'Notifications',
+    '/watch-history' => 'Watch History',
+    '/movie-lists' => 'Movie Lists',
+    '/movie-lists/:id' => 'Movie List Details',
+    '/my-reviews' => 'My Reviews',
+    '/stats' => 'Stats',
+    '/wrapped' || '/wrapped/:userId' => 'Wrapped',
+    '/watch-requests' => 'Watch Requests',
+    '/watch-requests/:requestId' => 'Watch Plan',
+    '/settings' => 'Settings',
+    '/help-support' => 'Help and Support',
+    '/about-credits' => 'About Flixie',
+    '/invite-friend' => 'Invite Friend',
+    '/onboarding' => 'Onboarding',
+    '/auth/login' => 'Login',
+    '/auth/signup' => 'Sign Up',
+    '/auth/forgot-password' => 'Forgot Password',
+    '/splash' => 'Splash',
+    _ => 'Flixie',
+  };
+}
+
+FirebaseAnalyticsObserver _analyticsObserver() => FirebaseAnalyticsObserver(
+      analytics: FirebaseAnalytics.instance,
+    );
 
 /// Builds the GoRouter, refreshing only when auth status changes (not user data).
 GoRouter buildRouter(AuthProvider authProvider) {
   return GoRouter(
     navigatorKey: rootNavigatorKey,
+    observers: [_analyticsObserver()],
     refreshListenable: authProvider.authStatusListenable,
     initialLocation: '/',
     redirect: (context, state) {
@@ -104,6 +157,7 @@ GoRouter buildRouter(AuthProvider authProvider) {
 
       // Main shell (authenticated)
       ShellRoute(
+        observers: [_analyticsObserver()],
         builder: (context, state, child) => MainNavigationShell(child: child),
         routes: [
           GoRoute(
