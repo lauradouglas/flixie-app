@@ -131,6 +131,23 @@ class RecommendationService {
       _highlyRatedCache.clear();
     }
   }
+
+  static Future<void> markMovieNotInterested(
+    String userId,
+    int movieId,
+  ) async {
+    await ApiClient.post('/users/$userId/movies/$movieId/not-interested',
+        body: const {});
+    invalidateCache(userId: userId);
+  }
+
+  static Future<void> removeMovieNotInterested(
+    String userId,
+    int movieId,
+  ) async {
+    await ApiClient.delete('/users/$userId/movies/$movieId/not-interested');
+    invalidateCache(userId: userId);
+  }
 }
 
 class _CachedUserRecs {

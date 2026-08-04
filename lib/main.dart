@@ -193,9 +193,7 @@ class _FlixieAppState extends State<FlixieApp> with WidgetsBindingObserver {
         behavior: HitTestBehavior.translucent,
         onTap: () {
           final focus = FocusManager.instance.primaryFocus;
-          if (focus != null && !focus.hasPrimaryFocus) {
-            focus.unfocus();
-          }
+          focus?.unfocus();
         },
         child: AnalyticsConsentPrompt(
           child: ColoredBox(

@@ -15,6 +15,7 @@ class PersonalizedRecommendationCard extends StatelessWidget {
     required this.onTap,
     required this.onBookmarkTap,
     required this.onMarkWatched,
+    required this.onNotInterested,
   });
 
   final MovieShort movie;
@@ -25,8 +26,10 @@ class PersonalizedRecommendationCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onBookmarkTap;
   final VoidCallback onMarkWatched;
+  final VoidCallback onNotInterested;
 
-  static const double height = 236;
+  // Accommodates the headline reason plus two supporting reasons at two lines.
+  static const double height = 270;
   static const double posterWidth = height * 2 / 3;
 
   @override
@@ -164,7 +167,7 @@ class PersonalizedRecommendationCard extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 reason,
-                                maxLines: 1,
+                                maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   color: FlixieColors.light,
@@ -204,6 +207,13 @@ class PersonalizedRecommendationCard extends StatelessWidget {
                               color: FlixieColors.warning,
                               onPressed:
                                   isBookmarkUpdating ? null : onBookmarkTap,
+                            ),
+                            const SizedBox(width: 5),
+                            _ActionButton(
+                              tooltip: 'Not interested',
+                              icon: Icons.visibility_off_rounded,
+                              color: FlixieColors.medium,
+                              onPressed: onNotInterested,
                             ),
                             const SizedBox(width: 5),
                             _ActionButton(

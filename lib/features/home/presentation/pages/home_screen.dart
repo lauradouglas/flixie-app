@@ -62,6 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _watchRequestsNeedingResponse = 0;
   WatchRequest? _upcomingWatchPlan;
   bool _isLoading = true;
+  bool _isLoadingRecommendations = false;
   String? _error;
   String? _loadedForUserId;
   AuthProvider? _authProvider;
@@ -218,9 +219,12 @@ class _HomeScreenState extends State<HomeScreen> {
         _watchlistMovieIds = {};
         _watchRequestsNeedingResponse = 0;
         _upcomingWatchPlan = null;
+        _isLoadingRecommendations = false;
       });
       return;
     }
+
+    if (mounted) setState(() => _isLoadingRecommendations = true);
 
     final results = await Future.wait([
       FriendService.getFriendsActivityLists(user.id, days: 30, limit: 200)
@@ -251,7 +255,62 @@ class _HomeScreenState extends State<HomeScreen> {
           _countWatchRequestsNeedingResponse(watchRequests, user.id);
       _upcomingWatchPlan = _nearestUpcomingWatchPlan(watchRequests);
       _continueWatchingShows = results[4] as List<ContinueWatchingShow>;
+      _isLoadingRecommendations = false;
     });
+  }
+
+  Future<void> _markMovieNotInterested(MovieShort movie) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final user = context.read<AuthProvider>().dbUser;
+    if (user == null) return;
+
+    final originalIndex =
+        _forYouMovies.indexWhere((item) => item.id == movie.id);
+    if (originalIndex < 0) return;
+    setState(() => _forYouMovies.removeAt(originalIndex));
+
+    try {
+      await RecommendationService.markMovieNotInterested(user.id, movie.id);
+      if (!mounted) return;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('We won\'t recommend ${movie.name} again.'),
+            action: SnackBarAction(
+              label: 'Undo',
+              onPressed: () async {
+                try {
+                  await RecommendationService.removeMovieNotInterested(
+                    user.id,
+                    movie.id,
+                  );
+                  if (mounted &&
+                      !_forYouMovies.any((item) => item.id == movie.id)) {
+                    setState(() => _forYouMovies.insert(
+                          originalIndex.clamp(0, _forYouMovies.length),
+                          movie,
+                        ));
+                  }
+                } catch (error) {
+                  logger.e('[HomeScreen] undo not-interested error: $error');
+                }
+              },
+            ),
+          ),
+        );
+    } catch (error) {
+      logger.e('[HomeScreen] not-interested error: $error');
+      if (mounted && !_forYouMovies.any((item) => item.id == movie.id)) {
+        setState(() => _forYouMovies.insert(
+              originalIndex.clamp(0, _forYouMovies.length),
+              movie,
+            ));
+      }
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Couldn\'t update recommendations.')),
+      );
+    }
   }
 
   int _countWatchRequestsNeedingResponse(
@@ -1038,6 +1097,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBecauseYouRatedSection(BuildContext context) {
+    if (_isLoadingRecommendations && _forYouMovies.isEmpty) {
+      return _buildRecommendationsLoadingState();
+    }
     if (_forYouMovies.isEmpty) return const SizedBox.shrink();
 
     final movies = _forYouMovies.take(10).toList(growable: false);
@@ -1109,6 +1171,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       isInWatchlist: isBookmarked,
                       isRewatch: isPreviouslyWatched,
                     ),
+                    onNotInterested: () => _markMovieNotInterested(movie),
                   ),
                 );
               },
@@ -1137,6 +1200,51 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
         const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  Widget _buildRecommendationsLoadingState() {
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        HomeSectionHeader(title: 'Just for you'),
+        Padding(
+          padding: EdgeInsets.fromLTRB(16, 0, 16, 10),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: FlixieColors.primary,
+                ),
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Building your recommendations…',
+                style: TextStyle(
+                  color: FlixieColors.medium,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: PersonalizedRecommendationCard.height,
+          child: Padding(
+            padding: EdgeInsets.only(left: 16, right: 10),
+            child: SkeletonBox(
+              width: double.infinity,
+              height: PersonalizedRecommendationCard.height,
+              borderRadius: 16,
+            ),
+          ),
+        ),
+        SizedBox(height: 20),
       ],
     );
   }
