@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:go_router/go_router.dart';
 
@@ -59,10 +60,17 @@ class PushNotificationService {
 
   static final _messaging = FirebaseMessaging.instance;
   static final _localNotifications = FlutterLocalNotificationsPlugin();
+  static const _nativeTapChannel = MethodChannel('flixie/push_taps');
   static StreamSubscription<String>? _tokenRefreshSubscription;
   static StreamSubscription<RemoteMessage>? _onMessageSubscription;
   static StreamSubscription<RemoteMessage>? _onMessageOpenedSubscription;
+  static Future<void>? _initializationFuture;
+  static String? _initializedUserId;
   static Timer? _pendingNavigationTimer;
+  static GoRouter? _router;
+  static String? _pendingNavigationPath;
+  static bool _navigationReady = false;
+  static bool _nativeTapBridgeInitialized = false;
   static String? _lastNavigatedPath;
   static DateTime? _lastNavigatedAt;
 
@@ -78,13 +86,65 @@ class PushNotificationService {
     importance: Importance.high,
   );
 
-  /// Delay before navigating when the app is launched from a terminated state
-  /// via a notification tap. The widget tree needs time to fully mount before
-  /// GoRouter can process a navigation call.
-  static const _launchNavigationDelay = Duration(milliseconds: 500);
   static const _navigationRetryDelay = Duration(milliseconds: 250);
   static const _duplicateNavigationWindow = Duration(seconds: 2);
   static const int _maxNavigationAttempts = 12;
+
+  /// Connects push navigation directly to the app router. Any notification
+  /// tapped during startup is retained and applied once routing is available.
+  static void attachRouter(GoRouter router) {
+    _router = router;
+  }
+
+  /// Captures an FCM notification launch before the widget tree and auth
+  /// redirects start. Navigation is deliberately deferred until [initialize]
+  /// confirms that the signed-in app shell is ready.
+  static Future<void> captureInitialNotification() async {
+    _initializeNativeTapBridge();
+    _ensureRemoteTapListener();
+    try {
+      final message = await _messaging.getInitialMessage();
+      if (message == null) return;
+      _pendingNavigationPath = notificationDeepLinkPath(message.data);
+      logger.i(
+        '[FCM] Captured cold-start notification → $_pendingNavigationPath',
+      );
+      _flushPendingNavigation();
+    } catch (error) {
+      logger.w('[FCM] Failed to capture cold-start notification: $error');
+    }
+  }
+
+  static void _initializeNativeTapBridge() {
+    if (_nativeTapBridgeInitialized || !Platform.isIOS) return;
+    _nativeTapBridgeInitialized = true;
+    _nativeTapChannel.setMethodCallHandler((call) async {
+      if (call.method == 'notificationTapped') {
+        _handleNativeTapPayload(call.arguments);
+      }
+    });
+    unawaited(_nativeTapChannel
+        .invokeMethod<Object?>('getInitialPushTap')
+        .then(_handleNativeTapPayload)
+        .catchError((Object error) {
+      logger.w('[FCM] Native initial notification lookup failed: $error');
+    }));
+  }
+
+  static void _handleNativeTapPayload(Object? arguments) {
+    if (arguments is! Map || arguments.isEmpty) return;
+    final data = <String, dynamic>{
+      for (final entry in arguments.entries)
+        entry.key.toString(): entry.value?.toString(),
+    };
+    final path = notificationDeepLinkPath(data);
+    logger.i('[FCM] Native iOS notification tap → $path data=$data');
+    if (!_navigationReady || _router == null) {
+      _pendingNavigationPath = path;
+      return;
+    }
+    _navigateWithRouter(path);
+  }
 
   /// Initialises FCM for [userId].
   ///
@@ -98,15 +158,32 @@ class PushNotificationService {
   static Future<void> initialize({
     required String userId,
     required GlobalKey<NavigatorState> navigatorKey,
+  }) {
+    if (_initializedUserId == userId && _initializationFuture != null) {
+      logger.d('[FCM] Push service already initialized for userId=$userId');
+      return _initializationFuture!;
+    }
+
+    _initializedUserId = userId;
+    final future = _initialize(userId: userId, navigatorKey: navigatorKey);
+    _initializationFuture = future;
+    return future;
+  }
+
+  static Future<void> _initialize({
+    required String userId,
+    required GlobalKey<NavigatorState> navigatorKey,
   }) async {
     _currentUserId = userId;
+    _navigationReady = true;
+    _flushPendingNavigation();
     logger.i(
         '[FCM] Initializing push service (platform=${Platform.operatingSystem}, userId=$userId)');
 
     // Ensure old listeners do not duplicate local notifications across re-logins.
     await _tokenRefreshSubscription?.cancel();
     await _onMessageSubscription?.cancel();
-    await _onMessageOpenedSubscription?.cancel();
+    _ensureRemoteTapListener();
 
     final settings = await _messaging.requestPermission(
       alert: true,
@@ -156,8 +233,9 @@ class PushNotificationService {
       _saveToken(userId, token);
     });
 
-    // Get the FCM token and register it with the backend.
-    await _registerToken(userId);
+    // Token registration can wait for APNs retries on iOS. Do not let that
+    // delay installing tap listeners or consuming the launch notification.
+    unawaited(_registerToken(userId));
 
     // Foreground messages: FCM does NOT show a system notification by default,
     // so we display one manually via flutter_local_notifications.
@@ -188,32 +266,24 @@ class PushNotificationService {
       unawaited(_showLocalNotification(message));
     });
 
-    // Notification tap while app is in the background (not terminated).
-    _onMessageOpenedSubscription =
-        FirebaseMessaging.onMessageOpenedApp.listen((message) {
-      logger.d(
-          '[FCM] Notification tapped (background): ${message.notification?.title}');
-      logger.d('[FCM] Notification tap payload: data=${message.data}');
-      _navigateFromMessage(message, navigatorKey);
-    });
-
-    // Notification tap from terminated state.
-    final initialMessage = await _messaging.getInitialMessage();
-    if (initialMessage != null) {
-      logger.d(
-          '[FCM] App launched via notification: ${initialMessage.notification?.title}');
-      logger.d('[FCM] Initial message payload: data=${initialMessage.data}');
-      // Give the widget tree time to fully mount before navigating.
-      Future<void>.delayed(_launchNavigationDelay, () {
-        _navigateFromMessage(initialMessage, navigatorKey);
-      });
-    }
+    // Terminated-state notification taps are captured once during main()
+    // before auth redirects begin. Do not call getInitialMessage here too:
+    // Firebase exposes it as a one-time launch value.
   }
 
   /// Removes the stored FCM token from the backend and deregisters the device
   /// from FCM so no further messages are delivered after sign-out.
   static Future<void> removeToken(String userId) async {
     _currentUserId = null;
+    _navigationReady = false;
+    _initializedUserId = null;
+    _initializationFuture = null;
+    await _tokenRefreshSubscription?.cancel();
+    await _onMessageSubscription?.cancel();
+    await _onMessageOpenedSubscription?.cancel();
+    _tokenRefreshSubscription = null;
+    _onMessageSubscription = null;
+    _onMessageOpenedSubscription = null;
     try {
       await UserService.removeFcmToken(userId);
       logger.i('[FCM] Token removed from backend');
@@ -253,6 +323,19 @@ class PushNotificationService {
       },
     );
 
+    // Firebase's getInitialMessage only covers notifications opened by FCM.
+    // Data-only messages are displayed through flutter_local_notifications,
+    // so recover that plugin's payload when its tap launched the app.
+    final launchDetails =
+        await _localNotifications.getNotificationAppLaunchDetails();
+    final launchPayload = launchDetails?.notificationResponse?.payload;
+    if (launchDetails?.didNotificationLaunchApp == true &&
+        launchPayload != null &&
+        launchPayload.isNotEmpty) {
+      logger.d('[FCM] App launched from local notification → $launchPayload');
+      _navigateToPath(launchPayload, navigatorKey);
+    }
+
     // Create (or update) the Android notification channel.
     await _localNotifications
         .resolvePlatformSpecificImplementation<
@@ -264,8 +347,8 @@ class PushNotificationService {
     try {
       String? apnsToken;
 
-      // On iOS: get the APNs token first (it must exist before we can get
-      // or delete an FCM token). Only then delete the old FCM token.
+      // On iOS the APNs token must exist before Firebase can reliably return
+      // the corresponding FCM token.
       if (Platform.isIOS) {
         for (var i = 0; i < 8; i++) {
           apnsToken = await _messaging.getAPNSToken();
@@ -281,16 +364,11 @@ class PushNotificationService {
         );
       }
 
-      // Delete the existing FCM token so Firebase issues a brand-new one,
-      // breaking any stale association with a previous user on this device.
-      // If APNs isn't ready on iOS, skip delete to avoid unnecessary failures
-      // and still try to fetch/log the current token for diagnostics.
-      if (!Platform.isIOS || apnsToken != null) {
-        await _messaging.deleteToken();
-        // Brief pause after delete to let Firebase settle, especially on iOS.
-        await Future<void>.delayed(const Duration(milliseconds: 500));
-      }
-
+      // Keep the stable token Firebase has assigned to this installation.
+      // Deleting it during normal startup can invalidate the token already
+      // stored by the backend, especially when authentication initializes
+      // more than once. The backend safely moves a token between users, and
+      // sign-out explicitly deletes it when that is actually required.
       final token = await _messaging.getToken();
       if (token != null) {
         logger.i('[FCM] FCM token: ${_redactToken(token)}');
@@ -371,21 +449,20 @@ class PushNotificationService {
     );
   }
 
-  /// Determines the destination route for a notification based on its data
-  /// payload, and navigates there.
-  ///
-  /// Supported data keys (sent by the backend):
-  ///   type        - notification type string (matches FlixieNotification consts)
-  ///   groupId     - UUID of the group (for group/watch-request notifications)
-  ///   movieId     - TMDB movie id (for movie watch-request notifications)
-  ///   friendId    - userId of the sender (for friend-request notifications)
-  static void _navigateFromMessage(
-    RemoteMessage message,
-    GlobalKey<NavigatorState> navigatorKey,
-  ) {
-    final path = notificationDeepLinkPath(message.data);
-    logger.d('[FCM] Deep-link → $path');
-    _navigateToPath(path, navigatorKey);
+  static void _ensureRemoteTapListener() {
+    if (_onMessageOpenedSubscription != null) return;
+    _onMessageOpenedSubscription =
+        FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      final path = notificationDeepLinkPath(message.data);
+      logger.i('[FCM] Notification tapped → $path data=${message.data}');
+      if (!_navigationReady || _router == null) {
+        _pendingNavigationPath = path;
+        logger
+            .d('[FCM] Holding notification tap until app navigation is ready');
+        return;
+      }
+      _navigateWithRouter(path);
+    });
   }
 
   static String _redactToken(String? token) {
@@ -412,6 +489,19 @@ class PushNotificationService {
       return;
     }
 
+    if (!_navigationReady) {
+      _pendingNavigationPath = path;
+      logger.d('[FCM] Holding deep-link until authentication is ready: $path');
+      return;
+    }
+
+    if (_router != null) {
+      _navigateWithRouter(path);
+      return;
+    }
+
+    _pendingNavigationPath = path;
+
     final context = navigatorKey.currentContext;
     if (context == null) {
       if (attempt >= _maxNavigationAttempts) {
@@ -430,5 +520,28 @@ class PushNotificationService {
     _lastNavigatedPath = path;
     _lastNavigatedAt = now;
     GoRouter.of(context).go(path);
+  }
+
+  static void _navigateWithRouter(String path) {
+    try {
+      _pendingNavigationTimer?.cancel();
+      _pendingNavigationTimer = null;
+      _lastNavigatedPath = path;
+      _lastNavigatedAt = DateTime.now();
+      logger.i('[FCM] Navigating with GoRouter → $path');
+      _router!.go(path);
+    } catch (error) {
+      logger.w('[FCM] Router not ready for $path: $error');
+      _pendingNavigationPath = path;
+    }
+  }
+
+  static void _flushPendingNavigation() {
+    final path = _pendingNavigationPath;
+    if (!_navigationReady || _router == null || path == null) return;
+    _pendingNavigationPath = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _navigateWithRouter(path);
+    });
   }
 }

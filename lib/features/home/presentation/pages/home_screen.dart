@@ -278,6 +278,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ..showSnackBar(
           SnackBar(
             content: Text('We won\'t recommend ${movie.name} again.'),
+            duration: const Duration(seconds: 4),
+            persist: false,
             action: SnackBarAction(
               label: 'Undo',
               onPressed: () async {
@@ -311,6 +313,44 @@ class _HomeScreenState extends State<HomeScreen> {
       messenger.showSnackBar(
         const SnackBar(content: Text('Couldn\'t update recommendations.')),
       );
+    }
+  }
+
+  Future<void> _refreshRecommendations() async {
+    if (_isLoadingRecommendations) return;
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (userId == null || userId.isEmpty) return;
+
+    setState(() => _isLoadingRecommendations = true);
+    try {
+      final recommendations =
+          await RecommendationService.getUserRecommendations(
+        userId,
+        refresh: true,
+      );
+      if (!mounted) return;
+      setState(() {
+        _forYouMovies = recommendations.take(20).toList();
+        _forYouPage = 0;
+      });
+      if (_forYouPageController.hasClients) {
+        await _forYouPageController.animateToPage(
+          0,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    } catch (error) {
+      logger.w('[HomeScreen] recommendation refresh failed: $error');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Couldn’t refresh your picks. Try again shortly.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoadingRecommendations = false);
     }
   }
 
@@ -1116,15 +1156,66 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const HomeSectionHeader(title: 'Just for you'),
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 0, 16, 10),
-          child: Text(
-            'Picked from your taste',
-            style: TextStyle(
-              color: FlixieColors.medium,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 12, 4),
+          child: Row(
+            children: [
+              Container(
+                width: 4,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: FlixieColors.primary,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Just for you',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Reload recommendations',
+                onPressed:
+                    _isLoadingRecommendations ? null : _refreshRecommendations,
+                style: IconButton.styleFrom(
+                  foregroundColor: FlixieColors.primary,
+                  backgroundColor: FlixieColors.primary.withValues(alpha: 0.14),
+                  disabledForegroundColor: FlixieColors.medium,
+                  disabledBackgroundColor:
+                      FlixieColors.surfaceElevated.withValues(alpha: 0.7),
+                ),
+                icon: _isLoadingRecommendations
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh_rounded),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            child: Text(
+              _isLoadingRecommendations
+                  ? 'Building your fresh picks…'
+                  : 'Picked from your taste',
+              key: ValueKey(_isLoadingRecommendations),
+              style: const TextStyle(
+                color: FlixieColors.medium,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ),
@@ -1132,61 +1223,84 @@ class _HomeScreenState extends State<HomeScreen> {
           height: PersonalizedRecommendationCard.height,
           child: Padding(
             padding: const EdgeInsets.only(left: 16),
-            child: PageView.builder(
-              controller: _forYouPageController,
-              padEnds: false,
-              itemCount: movies.length,
-              onPageChanged: (index) => setState(() => _forYouPage = index),
-              itemBuilder: (context, index) {
-                final movie = movies[index];
-                final isBookmarked = _watchlistMovieIds.contains(movie.id);
-                final isPreviouslyWatched = movie.previouslyWatched ||
-                    (context
-                            .read<AuthProvider>()
-                            .dbUser
-                            ?.isMovieWatched(movie.id) ??
-                        false);
-                final reasons = isPreviouslyWatched &&
-                        !movie.recommendationReasons.any(
-                          (reason) => reason.toLowerCase().contains('rewatch'),
-                        )
-                    ? [
-                        'You\'ve watched this before - it may be worth a rewatch',
-                        ...movie.recommendationReasons,
-                      ]
-                    : movie.recommendationReasons;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 10),
-                  child: PersonalizedRecommendationCard(
-                    movie: movie,
-                    reasons: reasons,
-                    isBookmarked: isBookmarked,
-                    isBookmarkUpdating:
-                        _watchlistUpdatesInFlight.contains(movie.id),
-                    isPreviouslyWatched: isPreviouslyWatched,
-                    onTap: () => context.push('/movies/${movie.id}'),
-                    onBookmarkTap: () => _toggleWatchlistState(
-                      context,
-                      movieId: movie.id,
-                      movieTitle: movie.name,
-                      posterPath: movie.poster,
-                      currentlyInWatchlist: isBookmarked,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 320),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              layoutBuilder: (currentChild, previousChildren) => Stack(
+                fit: StackFit.expand,
+                children: [
+                  ...previousChildren,
+                  if (currentChild != null) currentChild,
+                ],
+              ),
+              child: _isLoadingRecommendations
+                  ? const Padding(
+                      key: ValueKey('recommendations-generating'),
+                      padding: EdgeInsets.only(right: 10),
+                      child: _RecommendationGeneratingCard(),
+                    )
+                  : PageView.builder(
+                      key: const ValueKey('recommendation-cards'),
+                      controller: _forYouPageController,
+                      padEnds: false,
+                      itemCount: movies.length,
+                      onPageChanged: (index) =>
+                          setState(() => _forYouPage = index),
+                      itemBuilder: (context, index) {
+                        final movie = movies[index];
+                        final isBookmarked =
+                            _watchlistMovieIds.contains(movie.id);
+                        final isPreviouslyWatched = movie.previouslyWatched ||
+                            (context
+                                    .read<AuthProvider>()
+                                    .dbUser
+                                    ?.isMovieWatched(movie.id) ??
+                                false);
+                        final reasons = isPreviouslyWatched &&
+                                !movie.recommendationReasons.any(
+                                  (reason) =>
+                                      reason.toLowerCase().contains('rewatch'),
+                                )
+                            ? [
+                                'You\'ve watched this before - it may be worth a rewatch',
+                                ...movie.recommendationReasons,
+                              ]
+                            : movie.recommendationReasons;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 10),
+                          child: PersonalizedRecommendationCard(
+                            movie: movie,
+                            reasons: reasons,
+                            isBookmarked: isBookmarked,
+                            isBookmarkUpdating:
+                                _watchlistUpdatesInFlight.contains(movie.id),
+                            isPreviouslyWatched: isPreviouslyWatched,
+                            onTap: () => context.push('/movies/${movie.id}'),
+                            onBookmarkTap: () => _toggleWatchlistState(
+                              context,
+                              movieId: movie.id,
+                              movieTitle: movie.name,
+                              posterPath: movie.poster,
+                              currentlyInWatchlist: isBookmarked,
+                            ),
+                            onMarkWatched: () => _openQuickMarkWatchedSheet(
+                              context,
+                              movieId: movie.id,
+                              movieTitle: movie.name,
+                              isInWatchlist: isBookmarked,
+                              isRewatch: isPreviouslyWatched,
+                            ),
+                            onNotInterested: () =>
+                                _markMovieNotInterested(movie),
+                          ),
+                        );
+                      },
                     ),
-                    onMarkWatched: () => _openQuickMarkWatchedSheet(
-                      context,
-                      movieId: movie.id,
-                      movieTitle: movie.name,
-                      isInWatchlist: isBookmarked,
-                      isRewatch: isPreviouslyWatched,
-                    ),
-                    onNotInterested: () => _markMovieNotInterested(movie),
-                  ),
-                );
-              },
             ),
           ),
         ),
-        if (movies.length > 1) ...[
+        if (!_isLoadingRecommendations && movies.length > 1) ...[
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -1245,11 +1359,7 @@ class _HomeScreenState extends State<HomeScreen> {
           height: PersonalizedRecommendationCard.height,
           child: Padding(
             padding: EdgeInsets.only(left: 16, right: 10),
-            child: SkeletonBox(
-              width: double.infinity,
-              height: PersonalizedRecommendationCard.height,
-              borderRadius: 16,
-            ),
+            child: _RecommendationGeneratingCard(),
           ),
         ),
         SizedBox(height: 20),
@@ -1560,7 +1670,14 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_watchlistUpdatesInFlight.contains(movieId)) return;
     final existing = auth.dbUser?.movieWatchlist ?? [];
     final messenger = ScaffoldMessenger.of(context);
-    setState(() => _watchlistUpdatesInFlight.add(movieId));
+    setState(() {
+      _watchlistUpdatesInFlight.add(movieId);
+      if (currentlyInWatchlist) {
+        _watchlistMovieIds.remove(movieId);
+      } else {
+        _watchlistMovieIds.add(movieId);
+      }
+    });
     try {
       if (currentlyInWatchlist) {
         await _watchlistActions.removeFromWatchlist(userId, movieId);
@@ -1604,6 +1721,13 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       logger.w('[HomeScreen] watchlist toggle failed: $e');
       if (mounted) {
+        setState(() {
+          if (currentlyInWatchlist) {
+            _watchlistMovieIds.add(movieId);
+          } else {
+            _watchlistMovieIds.remove(movieId);
+          }
+        });
         messenger.showSnackBar(
           const SnackBar(content: Text('Could not update watchlist right now')),
         );
@@ -1786,6 +1910,190 @@ class _HomeScreenState extends State<HomeScreen> {
           auth.markActivityChanged();
         },
       ),
+    );
+  }
+}
+
+class _RecommendationGeneratingCard extends StatefulWidget {
+  const _RecommendationGeneratingCard();
+
+  @override
+  State<_RecommendationGeneratingCard> createState() =>
+      _RecommendationGeneratingCardState();
+}
+
+class _RecommendationGeneratingCardState
+    extends State<_RecommendationGeneratingCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1500),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller
+        ..stop()
+        ..value = 0.5;
+    } else if (!_controller.isAnimating) {
+      _controller.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            FlixieColors.primary.withValues(alpha: 0.18),
+            FlixieColors.surfaceElevated,
+            FlixieColors.tertiary.withValues(alpha: 0.10),
+          ],
+        ),
+        border: Border.all(
+          color: FlixieColors.primary.withValues(alpha: 0.28),
+        ),
+      ),
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          final movement = Curves.easeInOut.transform(_controller.value);
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              Positioned(
+                left: 34,
+                top: 68 - (movement * 8),
+                child: Transform.rotate(
+                  angle: -0.14 + (movement * 0.05),
+                  child: const _GeneratingPoster(
+                    color: FlixieColors.tertiary,
+                    icon: Icons.favorite_rounded,
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 34,
+                top: 68 + (movement * 8),
+                child: Transform.rotate(
+                  angle: 0.14 - (movement * 0.05),
+                  child: const _GeneratingPoster(
+                    color: FlixieColors.success,
+                    icon: Icons.thumb_up_alt_rounded,
+                  ),
+                ),
+              ),
+              Transform.translate(
+                offset: Offset(0, -10 + (movement * 5)),
+                child: Container(
+                  width: 88,
+                  height: 112,
+                  decoration: BoxDecoration(
+                    color: FlixieColors.tabBarBackgroundFocused,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: FlixieColors.primary.withValues(alpha: 0.7),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: FlixieColors.primary
+                            .withValues(alpha: 0.18 + movement * 0.12),
+                        blurRadius: 24,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.auto_awesome_rounded,
+                    color: FlixieColors.primary,
+                    size: 38,
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 46 + (movement * 5),
+                left: 112,
+                child: const Icon(
+                  Icons.star_rounded,
+                  color: FlixieColors.tertiary,
+                  size: 18,
+                ),
+              ),
+              Positioned(
+                top: 52 - (movement * 5),
+                right: 108,
+                child: const Icon(
+                  Icons.auto_awesome,
+                  color: FlixieColors.primary,
+                  size: 16,
+                ),
+              ),
+              const Positioned(
+                left: 20,
+                right: 20,
+                bottom: 52,
+                child: Text(
+                  'Mixing your movie magic…',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: FlixieColors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const Positioned(
+                left: 20,
+                right: 20,
+                bottom: 30,
+                child: Text(
+                  'Taste, favourites and a little sparkle',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: FlixieColors.medium,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _GeneratingPoster extends StatelessWidget {
+  const _GeneratingPoster({required this.color, required this.icon});
+
+  final Color color;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 66,
+      height: 88,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: color.withValues(alpha: 0.38)),
+      ),
+      child: Icon(icon, color: color, size: 25),
     );
   }
 }

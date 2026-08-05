@@ -35,6 +35,27 @@ void main() {
     );
   });
 
+  test('direct message opens the sender chat', () {
+    expect(
+      notificationDeepLinkPath({
+        'type': 'DIRECT_MESSAGE',
+        'senderId': 'friend-1',
+        'conversationId': 'conversation-1',
+      }),
+      '/chat/friend-1',
+    );
+  });
+
+  test('lowercase direct message payload opens its explicit chat route', () {
+    expect(
+      notificationDeepLinkPath({
+        'type': 'direct_message',
+        'route': '/chat/friend-2',
+      }),
+      '/chat/friend-2',
+    );
+  });
+
   test('watch request opens its full-page detail route', () {
     expect(
       notificationDeepLinkPath({

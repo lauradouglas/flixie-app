@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:flixie_app/models/notification.dart';
 import 'package:flixie_app/features/social/presentation/controllers/friend_actions_controller.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
+import 'package:flixie_app/core/auth/notification_deep_link.dart';
 import 'package:flixie_app/features/profile/data/notification_service.dart';
 import 'package:flixie_app/features/social/data/request_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -309,6 +310,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
           SnackBar(
             content: const Text('Watch time agreed'),
             backgroundColor: FlixieColors.success,
+            duration: const Duration(seconds: 4),
+            persist: false,
             action: SnackBarAction(
               label: 'Add to calendar',
               textColor: FlixieColors.background,
@@ -835,18 +838,26 @@ class _NotificationScreenState extends State<NotificationScreen> {
         onClose: () => _closeNotification(notification),
       );
     }
+    final deepLink = notificationDeepLinkPath({
+      ...?notification.data,
+      'type': notification.type,
+      if (notification.route != null) 'route': notification.route!,
+      if (notification.relatedId != null) 'relatedId': notification.relatedId!,
+      if (notification.senderUser?['id'] != null)
+        'friendId': notification.senderUser!['id'].toString(),
+    });
     return NotificationActivityCard(
       notification: notification,
       formatDate: _formatDate,
       onClose: () => _closeNotification(notification),
-      onOpen: notification.route == null
+      onOpen: deepLink == '/notifications'
           ? null
           : () async {
               final id = notification.id;
               if (id != null && !notification.isRead) {
                 await NotificationService.updateNotification(id, read: true);
               }
-              if (mounted) context.push(notification.route!);
+              if (mounted) context.push(deepLink);
             },
     );
   }

@@ -87,6 +87,9 @@ void main() async {
 
   // Register FCM background message handler (must be called before runApp).
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  // Capture a notification that launched the terminated app before auth and
+  // splash redirects can consume its intended destination.
+  unawaited(PushNotificationService.captureInitialNotification());
 
   // Clear stale movie cache from previous days
   MovieCacheService().clearStaleCache();
@@ -159,6 +162,7 @@ class _FlixieAppState extends State<FlixieApp> with WidgetsBindingObserver {
     // Create router once - it will refresh via authStatusListenable, not by rebuilding this widget
     final authProvider = context.read<AuthProvider>();
     _router = buildRouter(authProvider);
+    PushNotificationService.attachRouter(_router);
     // Give the navigator key to AuthProvider so push notifications can navigate.
     authProvider.setNavigatorKey(rootNavigatorKey);
   }

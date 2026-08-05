@@ -461,6 +461,8 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
             content: Text(
                 'Watch scheduled for ${_fullDateTime(selected.scheduledFor)}'),
             backgroundColor: FlixieColors.success,
+            duration: const Duration(seconds: 4),
+            persist: false,
             action: SnackBarAction(
               label: 'Add to calendar',
               textColor: FlixieColors.background,

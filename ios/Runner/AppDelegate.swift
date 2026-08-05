@@ -6,7 +6,10 @@ import UserNotifications
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate, MessagingDelegate {
   private let badgeChannelName = "flixie/app_badge"
+  private let pushTapChannelName = "flixie/push_taps"
   private var badgeChannel: FlutterMethodChannel?
+  private var pushTapChannel: FlutterMethodChannel?
+  private var pendingPushTap: [String: String]?
 
   override func application(
     _ application: UIApplication,
@@ -28,7 +31,7 @@ import UserNotifications
 
     if badgeChannel == nil,
        let controller = window?.rootViewController as? FlutterViewController {
-      registerBadgeChannel(with: controller.binaryMessenger)
+      registerChannels(with: controller.binaryMessenger)
     }
 
     return didFinish
@@ -36,7 +39,12 @@ import UserNotifications
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-    registerBadgeChannel(with: engineBridge.applicationRegistrar.messenger())
+    registerChannels(with: engineBridge.applicationRegistrar.messenger())
+  }
+
+  private func registerChannels(with messenger: FlutterBinaryMessenger) {
+    registerBadgeChannel(with: messenger)
+    registerPushTapChannel(with: messenger)
   }
 
   private func registerBadgeChannel(with messenger: FlutterBinaryMessenger) {
@@ -48,6 +56,44 @@ import UserNotifications
       self?.handleBadgeMethodCall(call, result: result)
     }
     badgeChannel = channel
+  }
+
+  private func registerPushTapChannel(with messenger: FlutterBinaryMessenger) {
+    guard pushTapChannel == nil else { return }
+    let channel = FlutterMethodChannel(name: pushTapChannelName, binaryMessenger: messenger)
+    channel.setMethodCallHandler { [weak self] call, result in
+      guard call.method == "getInitialPushTap" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      let payload = self?.pendingPushTap
+      self?.pendingPushTap = nil
+      result(payload)
+    }
+    pushTapChannel = channel
+  }
+
+  override func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    didReceive response: UNNotificationResponse,
+    withCompletionHandler completionHandler: @escaping () -> Void
+  ) {
+    let payload = response.notification.request.content.userInfo.reduce(into: [String: String]()) {
+      result, entry in
+      guard let key = entry.key as? String, key != "aps" else { return }
+      result[key] = String(describing: entry.value)
+    }
+    print("[FCM][iOS] Native notification tap payload: \(payload)")
+    if let channel = pushTapChannel {
+      channel.invokeMethod("notificationTapped", arguments: payload)
+    } else {
+      pendingPushTap = payload
+    }
+    super.userNotificationCenter(
+      center,
+      didReceive: response,
+      withCompletionHandler: completionHandler
+    )
   }
 
   // Forward APNs device tokens to Firebase Messaging so FCM can work on iOS.

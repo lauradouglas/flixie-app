@@ -194,6 +194,10 @@ class PersonalizedRecommendationCard extends StatelessWidget {
                                   ? Icons.replay_circle_filled_rounded
                                   : Icons.check_circle_outline_rounded,
                               color: FlixieColors.success,
+                              borderColor:
+                                  FlixieColors.success.withValues(alpha: 0.38),
+                              backgroundColor:
+                                  FlixieColors.success.withValues(alpha: 0.10),
                               onPressed: onMarkWatched,
                             ),
                             const SizedBox(width: 5),
@@ -205,21 +209,35 @@ class PersonalizedRecommendationCard extends StatelessWidget {
                                   ? Icons.bookmark_rounded
                                   : Icons.bookmark_outline_rounded,
                               color: FlixieColors.warning,
+                              borderColor:
+                                  FlixieColors.warning.withValues(alpha: 0.38),
+                              backgroundColor:
+                                  FlixieColors.warning.withValues(alpha: 0.10),
+                              isBusy: isBookmarkUpdating,
                               onPressed:
                                   isBookmarkUpdating ? null : onBookmarkTap,
                             ),
                             const SizedBox(width: 5),
                             _ActionButton(
                               tooltip: 'Not interested',
-                              icon: Icons.visibility_off_rounded,
-                              color: FlixieColors.medium,
+                              icon: Icons.visibility_off_outlined,
+                              color: FlixieColors.danger,
+                              borderColor:
+                                  FlixieColors.danger.withValues(alpha: 0.72),
+                              backgroundColor:
+                                  FlixieColors.danger.withValues(alpha: 0.08),
+                              animateBeforeAction: true,
                               onPressed: onNotInterested,
                             ),
                             const SizedBox(width: 5),
                             _ActionButton(
                               tooltip: 'Movie details',
                               icon: Icons.info_outline_rounded,
-                              color: FlixieColors.light,
+                              color: const Color(0xFF64B5F6),
+                              borderColor: const Color(0xFF64B5F6)
+                                  .withValues(alpha: 0.38),
+                              backgroundColor: const Color(0xFF64B5F6)
+                                  .withValues(alpha: 0.10),
                               onPressed: onTap,
                             ),
                           ],
@@ -261,35 +279,143 @@ class PersonalizedRecommendationCard extends StatelessWidget {
       );
 }
 
-class _ActionButton extends StatelessWidget {
+class _ActionButton extends StatefulWidget {
   const _ActionButton({
     required this.tooltip,
     required this.icon,
     required this.color,
     required this.onPressed,
+    this.borderColor,
+    this.backgroundColor,
+    this.animateBeforeAction = false,
+    this.isBusy = false,
   });
 
   final String tooltip;
   final IconData icon;
   final Color color;
   final VoidCallback? onPressed;
+  final Color? borderColor;
+  final Color? backgroundColor;
+  final bool animateBeforeAction;
+  final bool isBusy;
+
+  @override
+  State<_ActionButton> createState() => _ActionButtonState();
+}
+
+class _ActionButtonState extends State<_ActionButton>
+    with TickerProviderStateMixin {
+  late final AnimationController _tapController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 260),
+  );
+  late final Animation<double> _tapScale = TweenSequence<double>([
+    TweenSequenceItem(
+      tween: Tween(begin: 1.0, end: 0.78).chain(
+        CurveTween(curve: Curves.easeOutCubic),
+      ),
+      weight: 38,
+    ),
+    TweenSequenceItem(
+      tween: Tween(begin: 0.78, end: 1.12).chain(
+        CurveTween(curve: Curves.easeOutBack),
+      ),
+      weight: 34,
+    ),
+    TweenSequenceItem(
+      tween: Tween(begin: 1.12, end: 1.0).chain(
+        CurveTween(curve: Curves.easeInOut),
+      ),
+      weight: 28,
+    ),
+  ]).animate(_tapController);
+  late final AnimationController _busyController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 720),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isBusy) _busyController.repeat();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ActionButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isBusy == oldWidget.isBusy) return;
+    if (widget.isBusy && !MediaQuery.disableAnimationsOf(context)) {
+      _busyController.repeat();
+    } else {
+      _busyController
+        ..stop()
+        ..value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _tapController.dispose();
+    _busyController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handlePressed() async {
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    if (!reduceMotion) {
+      final animation = _tapController.forward(from: 0);
+      if (widget.animateBeforeAction) {
+        await animation;
+        if (!mounted) return;
+      }
+    }
+    widget.onPressed?.call();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Tooltip(
-      message: tooltip,
-      child: IconButton(
-        onPressed: onPressed,
-        icon: Icon(icon, size: 19),
-        color: color,
-        disabledColor: FlixieColors.mediumShade,
-        padding: EdgeInsets.zero,
-        constraints: const BoxConstraints.tightFor(width: 32, height: 32),
-        style: IconButton.styleFrom(
-          backgroundColor: FlixieColors.navy.withValues(alpha: 0.56),
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      message: widget.tooltip,
+      child: ScaleTransition(
+        scale: _tapScale,
+        child: IconButton(
+          onPressed: widget.onPressed == null ? null : _handlePressed,
+          icon: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 280),
+            switchInCurve: Curves.easeOutBack,
+            switchOutCurve: Curves.easeIn,
+            transitionBuilder: (child, animation) => RotationTransition(
+              turns: Tween<double>(begin: -0.08, end: 0).animate(animation),
+              child: ScaleTransition(scale: animation, child: child),
+            ),
+            child: RotationTransition(
+              key: ValueKey(widget.icon),
+              turns: widget.isBusy
+                  ? _busyController
+                  : const AlwaysStoppedAnimation<double>(0),
+              child: Icon(
+                widget.icon,
+                size: 19,
+              ),
+            ),
+          ),
+          color: widget.color,
+          // Keep the selected icon legible while its optimistic update is
+          // being confirmed by the API.
+          disabledColor: widget.color,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+          style: IconButton.styleFrom(
+            backgroundColor: widget.backgroundColor ??
+                FlixieColors.navy.withValues(alpha: 0.56),
+            side: BorderSide(
+              color: widget.borderColor ?? Colors.white.withValues(alpha: 0.08),
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
         ),
       ),
     );
