@@ -378,7 +378,7 @@ class ActivityTile extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              if (showMoviePreview && !isPerson) ...[
+              if (showMoviePreview) ...[
                 const SizedBox(height: 10),
                 InkWell(
                   onTap: mediaRoute != null
@@ -397,8 +397,10 @@ class ActivityTile extends StatelessWidget {
                               ? Container(
                                   color: FlixieColors.surfaceElevated,
                                   alignment: Alignment.center,
-                                  child: const Icon(
-                                    Icons.movie_outlined,
+                                  child: Icon(
+                                    isPerson
+                                        ? Icons.person_outline_rounded
+                                        : Icons.movie_outlined,
                                     color: FlixieColors.light,
                                   ),
                                 )
@@ -408,8 +410,10 @@ class ActivityTile extends StatelessWidget {
                                   errorWidget: (_, __, ___) => Container(
                                     color: FlixieColors.surfaceElevated,
                                     alignment: Alignment.center,
-                                    child: const Icon(
-                                      Icons.movie_outlined,
+                                    child: Icon(
+                                      isPerson
+                                          ? Icons.person_outline_rounded
+                                          : Icons.movie_outlined,
                                       color: FlixieColors.light,
                                     ),
                                   ),

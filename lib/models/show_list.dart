@@ -83,6 +83,8 @@ class CreateShowListRequest {
   final String visibility;
   final String? coverImageUrl;
   final String whoCanAddShows;
+  final String scope;
+  final List<String> collaboratorIds;
 
   const CreateShowListRequest({
     required this.name,
@@ -92,6 +94,8 @@ class CreateShowListRequest {
     this.visibility = ShowListVisibility.private,
     this.coverImageUrl,
     this.whoCanAddShows = 'owner',
+    this.scope = 'PERSONAL',
+    this.collaboratorIds = const [],
   });
 
   Map<String, dynamic> toJson() => {
@@ -104,6 +108,8 @@ class CreateShowListRequest {
         if (coverImageUrl != null && coverImageUrl!.trim().isNotEmpty)
           'coverImageUrl': coverImageUrl,
         'whoCanAddItems': whoCanAddShows,
+        'scope': scope,
+        if (collaboratorIds.isNotEmpty) 'collaboratorIds': collaboratorIds,
       };
 }
 

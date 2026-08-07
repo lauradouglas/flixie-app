@@ -9,6 +9,7 @@ import 'package:flixie_app/models/person.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/features/movies/data/person_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/core/utils/skeleton.dart';
 
 class PersonDetailScreen extends StatefulWidget {
   const PersonDetailScreen({super.key, required this.personId});
@@ -19,22 +20,230 @@ class PersonDetailScreen extends StatefulWidget {
   State<PersonDetailScreen> createState() => _PersonDetailScreenState();
 }
 
+class _PersonPhotoGridScreen extends StatelessWidget {
+  const _PersonPhotoGridScreen({required this.person, required this.images});
+
+  final Person person;
+  final List<PersonImage> images;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: FlixieColors.background,
+      appBar: AppBar(
+        backgroundColor: FlixieColors.background,
+        foregroundColor: FlixieColors.white,
+        titleSpacing: 0,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${person.name} photos',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            Text(
+              '${images.length} images',
+              style: const TextStyle(
+                color: FlixieColors.medium,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) => GridView.builder(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 28),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: constraints.maxWidth >= 700 ? 4 : 2,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+            childAspectRatio: .78,
+          ),
+          itemCount: images.length,
+          itemBuilder: (context, index) => Semantics(
+            button: true,
+            label: 'Open photo ${index + 1} of ${images.length}',
+            child: InkWell(
+              onTap: () => Navigator.of(context).push(
+                PageRouteBuilder<void>(
+                  pageBuilder: (_, animation, __) => FadeTransition(
+                    opacity: animation,
+                    child: _PersonPhotoViewer(
+                      personName: person.name,
+                      images: images,
+                      initialIndex: index,
+                    ),
+                  ),
+                ),
+              ),
+              borderRadius: BorderRadius.circular(12),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: CachedNetworkImage(
+                  imageUrl: images[index].thumbnailUrl,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => const ColoredBox(
+                    color: FlixieColors.surface,
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: FlixieColors.primary,
+                        strokeWidth: 2,
+                      ),
+                    ),
+                  ),
+                  errorWidget: (_, __, ___) => const ColoredBox(
+                    color: FlixieColors.surface,
+                    child: Icon(
+                      Icons.broken_image_outlined,
+                      color: FlixieColors.medium,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PersonPhotoViewer extends StatefulWidget {
+  const _PersonPhotoViewer({
+    required this.personName,
+    required this.images,
+    required this.initialIndex,
+  });
+
+  final String personName;
+  final List<PersonImage> images;
+  final int initialIndex;
+
+  @override
+  State<_PersonPhotoViewer> createState() => _PersonPhotoViewerState();
+}
+
+class _PersonPhotoViewerState extends State<_PersonPhotoViewer> {
+  late final PageController _controller =
+      PageController(initialPage: widget.initialIndex);
+  late int _index = widget.initialIndex;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            PageView.builder(
+              controller: _controller,
+              itemCount: widget.images.length,
+              onPageChanged: (index) => setState(() => _index = index),
+              itemBuilder: (_, index) => InteractiveViewer(
+                key: ValueKey(widget.images[index].imageUrl),
+                minScale: 1,
+                maxScale: 4,
+                child: Center(
+                  child: CachedNetworkImage(
+                    imageUrl: widget.images[index].originalUrl,
+                    fit: BoxFit.contain,
+                    placeholder: (_, __) => const Center(
+                      child: CircularProgressIndicator(
+                        color: FlixieColors.primary,
+                      ),
+                    ),
+                    errorWidget: (_, __, ___) => const Icon(
+                      Icons.broken_image_outlined,
+                      color: FlixieColors.medium,
+                      size: 48,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              left: 12,
+              child: IconButton.filledTonal(
+                onPressed: () => Navigator.of(context).pop(),
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.black.withValues(alpha: .65),
+                  foregroundColor: Colors.white,
+                ),
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ),
+            Positioned(
+              top: 14,
+              right: 16,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: .65),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Text(
+                  '${_index + 1} / ${widget.images.length}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 20,
+              right: 20,
+              bottom: 18,
+              child: Text(
+                widget.personName,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  shadows: [Shadow(color: Colors.black, blurRadius: 8)],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _PersonDetailScreenState extends State<PersonDetailScreen> {
   Person? _person;
   PersonCredits? _credits;
+  List<PersonImage> _images = const [];
+  bool _imagesLoading = false;
   bool _isLoading = true;
   String? _error;
   bool _bioExpanded = false;
   bool _isFavorite = false;
   bool _isFavoriteLoading = false;
   _CreditFilter _creditFilter = _CreditFilter.all;
+  _MediaCreditFilter _mediaCreditFilter = _MediaCreditFilter.all;
   _PersonalCreditFilter _personalCreditFilter = _PersonalCreditFilter.all;
   _CreditSort _creditSort = _CreditSort.popular;
+  bool _showAdvancedCreditFilters = false;
   final TextEditingController _filmographySearchController =
       TextEditingController();
   String _filmographyQuery = '';
   String? _filmographyYear;
-  bool _showAllKnownFor = false;
 
   static const _imgBase = 'https://image.tmdb.org/t/p/w500';
 
@@ -70,13 +279,17 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
         setState(() {
           _person = results[0] as Person;
           _credits = results[1] as PersonCredits;
+          _images = (results[0] as Person).images;
           _isLoading = false;
         });
+        _loadImages(id);
         // Set initial favorite state from cached user
         final user = context.read<AuthProvider>().dbUser;
-        final id = int.tryParse(widget.personId);
-        if (user != null && id != null) {
-          setState(() => _isFavorite = user.isPersonFavorite(id));
+        final favoritePersonId = int.tryParse(widget.personId);
+        if (user != null && favoritePersonId != null) {
+          setState(
+            () => _isFavorite = user.isPersonFavorite(favoritePersonId),
+          );
         }
       }
     } catch (e) {
@@ -86,6 +299,23 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _loadImages(int personId) async {
+    if (!mounted) return;
+    setState(() => _imagesLoading = true);
+    try {
+      final images = await PersonService.getPersonImages(personId);
+      if (!mounted) return;
+      setState(() {
+        _images = images;
+        _imagesLoading = false;
+      });
+    } catch (_) {
+      // Keep the compatible images bundled with the person response when the
+      // independently deployable images endpoint is unavailable.
+      if (mounted) setState(() => _imagesLoading = false);
     }
   }
 
@@ -192,11 +422,12 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
     return person.dateOfDeath == null ? 'Age $age' : 'Lived to $age';
   }
 
-  List<_PersonFilmCredit> _allMovieCredits(PersonCredits credits) {
-    final byId = <int, _PersonFilmCredit>{};
+  List<_PersonFilmCredit> _allCredits(PersonCredits credits) {
+    final byId = <String, _PersonFilmCredit>{};
 
-    for (final item in credits.allCredits.where((c) => c.type == 'movie')) {
-      byId[item.id] = _PersonFilmCredit(
+    for (final item in credits.allCredits) {
+      final key = '${item.type}:${item.id}';
+      byId[key] = _PersonFilmCredit(
         id: item.id,
         title: item.title,
         type: item.type,
@@ -211,10 +442,11 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
       );
     }
 
-    for (final item in credits.crewCredits.where((c) => c.type == 'movie')) {
-      final existing = byId[item.id];
+    for (final item in credits.crewCredits) {
+      final key = '${item.type}:${item.id}';
+      final existing = byId[key];
       if (existing == null) {
-        byId[item.id] = _PersonFilmCredit(
+        byId[key] = _PersonFilmCredit(
           id: item.id,
           title: item.title,
           type: item.type,
@@ -228,7 +460,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
           jobs: [item.job],
         );
       } else {
-        byId[item.id] = _PersonFilmCredit(
+        byId[key] = _PersonFilmCredit(
           id: existing.id,
           title: existing.title,
           type: existing.type,
@@ -248,13 +480,18 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
   }
 
   List<_PersonFilmCredit> _filteredCredits(PersonCredits credits) {
-    final filtered = _allMovieCredits(credits).where((credit) {
+    final filtered = _allCredits(credits).where((credit) {
       final matchesRole = switch (_creditFilter) {
         _CreditFilter.all => true,
         _CreditFilter.actor => credit.isCast,
         _CreditFilter.director => credit.isDirector,
         _CreditFilter.writer => credit.isWriter,
         _CreditFilter.producer => credit.isProducer,
+      };
+      final matchesMedia = switch (_mediaCreditFilter) {
+        _MediaCreditFilter.all => true,
+        _MediaCreditFilter.movies => credit.isMovie,
+        _MediaCreditFilter.tv => !credit.isMovie,
       };
       final query = _filmographyQuery.trim().toLowerCase();
       final matchesQuery = query.isEmpty ||
@@ -264,11 +501,18 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
           _filmographyYear == null || credit.year == _filmographyYear;
       final matchesPersonal = switch (_personalCreditFilter) {
         _PersonalCreditFilter.all => true,
-        _PersonalCreditFilter.watched => _movieInWatched(credit.id),
-        _PersonalCreditFilter.watchlist => _movieInWatchlist(credit.id),
-        _PersonalCreditFilter.favourites => _movieInFavorites(credit.id),
+        _PersonalCreditFilter.watched =>
+          credit.isMovie && _movieInWatched(credit.id),
+        _PersonalCreditFilter.watchlist =>
+          credit.isMovie && _movieInWatchlist(credit.id),
+        _PersonalCreditFilter.favourites =>
+          credit.isMovie && _movieInFavorites(credit.id),
       };
-      return matchesRole && matchesQuery && matchesYear && matchesPersonal;
+      return matchesRole &&
+          matchesMedia &&
+          matchesQuery &&
+          matchesYear &&
+          matchesPersonal;
     }).toList();
 
     filtered.sort((a, b) {
@@ -311,33 +555,9 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
         false;
   }
 
-  List<Widget> _personalBadges(int movieId) {
-    final badges = <Widget>[];
-    if (_movieInWatched(movieId)) {
-      badges.add(_miniBadge(
-        'Watched',
-        FlixieColors.success,
-        icon: Icons.check_circle_rounded,
-      ));
-    }
-    if (_movieInWatchlist(movieId)) {
-      badges.add(_miniBadge(
-        'Watchlist',
-        FlixieColors.warning,
-        icon: Icons.bookmark_rounded,
-      ));
-    }
-    if (_movieInFavorites(movieId)) {
-      badges.add(_miniBadge(
-        'Favourite',
-        FlixieColors.danger,
-        icon: Icons.favorite_rounded,
-      ));
-    }
-    return badges;
-  }
-
-  List<Widget> _posterStatusBadges(int movieId) {
+  List<Widget> _posterStatusBadges(PersonCreditItem item) {
+    if (item.type != 'movie') return const [];
+    final movieId = item.id;
     return [
       if (_movieInFavorites(movieId))
         _posterStatusBadge(
@@ -420,85 +640,54 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
       backgroundColor: FlixieColors.background,
       body: CustomScrollView(
         slivers: [
-          // ---- App bar with hero portrait ----------------------------------
-          SliverAppBar(
-            expandedHeight: 480,
-            pinned: true,
-            backgroundColor: FlixieColors.background,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: FlixieColors.light),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            title: Text(
-              (person.department?.trim().isNotEmpty ?? false)
-                  ? person.department!.toUpperCase()
-                  : 'FILM PERSON',
-              style: const TextStyle(
-                color: FlixieColors.light,
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-                letterSpacing: 1.5,
-              ),
-            ),
-            centerTitle: true,
-            actions: [
-              _isFavoriteLoading
-                  ? const Padding(
-                      padding: EdgeInsets.all(14),
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.red,
-                        ),
-                      ),
-                    )
-                  : IconButton(
-                      icon: Icon(
-                        _isFavorite ? Icons.favorite : Icons.favorite_border,
-                        color: _isFavorite ? Colors.red : FlixieColors.light,
-                      ),
-                      onPressed: _toggleFavorite,
-                    ),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              background: Stack(
-                fit: StackFit.expand,
-                children: [
-                  profileUrl != null
-                      ? CachedNetworkImage(
-                          imageUrl: profileUrl,
-                          fit: BoxFit.cover,
-                          alignment: Alignment.topCenter,
-                          errorWidget: (_, __, ___) =>
-                              _portraitFallback(person.name),
+          SliverToBoxAdapter(
+            child: Stack(
+              children: [
+                _buildCompactHero(person, profileUrl),
+                Positioned(
+                  top: MediaQuery.paddingOf(context).top + 8,
+                  left: 12,
+                  child: _heroNavigationButton(
+                    icon: Icons.arrow_back_rounded,
+                    label: 'Back',
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ),
+                Positioned(
+                  top: MediaQuery.paddingOf(context).top + 8,
+                  right: 12,
+                  child: _isFavoriteLoading
+                      ? Container(
+                          width: 44,
+                          height: 44,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: .5),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: FlixieColors.danger,
+                            ),
+                          ),
                         )
-                      : _portraitFallback(person.name),
-                  const DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Color(0x66000000),
-                          Color(0x00000000),
-                          Color(0x00000000),
-                          Color(0x661C0C36),
-                          FlixieColors.background,
-                        ],
-                        stops: [0, 0.18, 0.48, 0.76, 1],
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: 16,
-                    right: 16,
-                    bottom: 10,
-                    child: _buildHeroSummary(person),
-                  ),
-                ],
-              ),
+                      : _heroNavigationButton(
+                          icon: _isFavorite
+                              ? Icons.favorite_rounded
+                              : Icons.favorite_border_rounded,
+                          label: _isFavorite
+                              ? 'Remove favourite'
+                              : 'Add favourite',
+                          color: _isFavorite
+                              ? FlixieColors.danger
+                              : FlixieColors.light,
+                          onPressed: _toggleFavorite,
+                        ),
+                ),
+              ],
             ),
           ),
 
@@ -518,7 +707,12 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                   // opens a person profile.
                   if (_credits != null) _buildKnownForSection(_credits!),
 
-                  if (_credits != null) const SizedBox(height: 28),
+                  if (_credits != null) const SizedBox(height: 24),
+
+                  _buildPhotosSection(person),
+
+                  if (_imagesLoading || _images.isNotEmpty)
+                    const SizedBox(height: 28),
 
                   // Biography
                   if (person.biography != null && person.biography!.isNotEmpty)
@@ -546,6 +740,76 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
     );
   }
 
+  Widget _buildCompactHero(Person person, String? profileUrl) {
+    final width = MediaQuery.sizeOf(context).width;
+    final portraitWidth = (width * .42).clamp(140.0, 190.0);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 0, 12, 0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.only(
+              top: MediaQuery.paddingOf(context).top + 8,
+            ),
+            child: GestureDetector(
+              onTap: _images.isEmpty ? null : () => _openPhotoViewer(person, 0),
+              child: ClipRRect(
+                borderRadius:
+                    const BorderRadius.horizontal(right: Radius.circular(12)),
+                child: SizedBox(
+                  width: portraitWidth,
+                  height: portraitWidth * 1.48,
+                  child: profileUrl != null
+                      ? CachedNetworkImage(
+                          imageUrl: profileUrl,
+                          fit: BoxFit.cover,
+                          alignment: Alignment.topCenter,
+                          errorWidget: (_, __, ___) =>
+                              _portraitFallback(person.name),
+                        )
+                      : _portraitFallback(person.name),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(
+                top: MediaQuery.paddingOf(context).top + 12,
+              ),
+              child: _buildHeroSummary(person),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _heroNavigationButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+    Color color = FlixieColors.light,
+  }) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: IconButton(
+        tooltip: label,
+        onPressed: onPressed,
+        style: IconButton.styleFrom(
+          fixedSize: const Size.square(44),
+          backgroundColor: Colors.black.withValues(alpha: .5),
+          foregroundColor: color,
+          side: BorderSide(color: Colors.white.withValues(alpha: .1)),
+        ),
+        icon: Icon(icon),
+      ),
+    );
+  }
+
   Widget _buildHeroSummary(Person person) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -557,30 +821,38 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
         ],
         Text(
           person.name,
-          maxLines: 3,
+          maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(
             color: FlixieColors.white,
-            fontSize: 34,
+            fontSize: 30,
             fontWeight: FontWeight.w900,
             height: 1.04,
           ),
         ),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 12,
-          runSpacing: 8,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (person.dateOfBirth != null && person.dateOfBirth!.isNotEmpty)
               _heroMeta(Icons.calendar_today_outlined,
                   _formatDate(person.dateOfBirth)),
             if (person.dateOfDeath != null && person.dateOfDeath!.isNotEmpty)
-              _heroMeta(
-                  Icons.event_busy_outlined, _formatDate(person.dateOfDeath)),
+              Padding(
+                padding: const EdgeInsets.only(top: 7),
+                child: _heroMeta(
+                    Icons.event_busy_outlined, _formatDate(person.dateOfDeath)),
+              ),
             if (person.placeOfBirth != null && person.placeOfBirth!.isNotEmpty)
-              _heroMeta(Icons.place_outlined, person.placeOfBirth!),
+              Padding(
+                padding: const EdgeInsets.only(top: 7),
+                child: _heroMeta(Icons.place_outlined, person.placeOfBirth!),
+              ),
             if (_ageLabel(person) != null)
-              _heroMeta(Icons.cake_outlined, _ageLabel(person)!),
+              Padding(
+                padding: const EdgeInsets.only(top: 7),
+                child: _heroMeta(Icons.cake_outlined, _ageLabel(person)!),
+              ),
           ],
         ),
         if ((person.imdbId?.isNotEmpty ?? false) ||
@@ -633,17 +905,13 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
 
   Widget _heroMeta(IconData icon, String text) {
     return Row(
-      mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, color: FlixieColors.light, size: 14),
         const SizedBox(width: 6),
-        ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.sizeOf(context).width - 64,
-          ),
+        Expanded(
           child: Text(
             text,
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: FlixieColors.light,
@@ -656,78 +924,207 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
     );
   }
 
-  Widget _buildStatsStrip(Person person, PersonCredits credits) {
-    final allCredits = _allMovieCredits(credits);
-    final topRated = allCredits.where((c) => c.voteCount >= 25).toList()
-      ..sort((a, b) => b.voteAverage.compareTo(a.voteAverage));
-    final newest = allCredits.where((c) => c.releaseDate != null).toList()
-      ..sort((a, b) => b.releaseDate!.compareTo(a.releaseDate!));
-    final knownForCount =
-        credits.knownForCredits.where((c) => c.type == 'movie').length;
+  Widget _buildPhotosSection(Person person) {
+    if (_imagesLoading && _images.isEmpty) {
+      return const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Photos',
+            style: TextStyle(
+              color: FlixieColors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          SizedBox(height: 10),
+          SizedBox(
+            height: 150,
+            child: Row(
+              children: [
+                Expanded(child: SkeletonBox(height: 150, borderRadius: 12)),
+                SizedBox(width: 10),
+                Expanded(child: SkeletonBox(height: 150, borderRadius: 12)),
+                SizedBox(width: 10),
+                Expanded(child: SkeletonBox(height: 150, borderRadius: 12)),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+    if (_images.isEmpty) return const SizedBox.shrink();
 
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: _statTile(
-            'Known For',
-            knownForCount == 0 ? '-' : '$knownForCount',
-            Icons.auto_awesome_outlined,
-          ),
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Photos',
+                style: TextStyle(
+                  color: FlixieColors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () => _openPhotoGrid(person),
+              child: Text(
+                'See all (${_images.length})',
+                style: const TextStyle(
+                  color: FlixieColors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _statTile(
-            'Credits',
-            allCredits.isEmpty ? '-' : '${allCredits.length}',
-            Icons.local_movies_outlined,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _statTile(
-            'Top Film',
-            topRated.isEmpty
-                ? '-'
-                : topRated.first.voteAverage.toStringAsFixed(1),
-            Icons.star_border_rounded,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _statTile(
-            'Recent',
-            newest.isEmpty ? '-' : newest.first.year ?? '-',
-            Icons.update_rounded,
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 150,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: _images.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (_, index) {
+              final image = _images[index];
+              final width =
+                  (150 * (image.aspectRatio ?? .67)).clamp(100.0, 240.0);
+              return InkWell(
+                onTap: () => _openPhotoViewer(person, index),
+                borderRadius: BorderRadius.circular(12),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: CachedNetworkImage(
+                    imageUrl: image.thumbnailUrl,
+                    width: width,
+                    height: 150,
+                    fit: BoxFit.cover,
+                    placeholder: (_, __) => SkeletonBox(
+                      width: width,
+                      height: 150,
+                      borderRadius: 12,
+                    ),
+                    errorWidget: (_, __, ___) => Container(
+                      width: width,
+                      color: FlixieColors.surface,
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.broken_image_outlined,
+                        color: FlixieColors.medium,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ],
     );
   }
 
+  void _openPhotoGrid(Person person) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _PersonPhotoGridScreen(
+          person: person,
+          images: _images,
+        ),
+      ),
+    );
+  }
+
+  void _openPhotoViewer(Person person, int initialIndex) {
+    Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        pageBuilder: (_, animation, __) => FadeTransition(
+          opacity: animation,
+          child: _PersonPhotoViewer(
+            personName: person.name,
+            images: _images,
+            initialIndex: initialIndex,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatsStrip(Person person, PersonCredits credits) {
+    final allCredits = _allCredits(credits);
+    final topRated = allCredits.where((c) => c.voteCount >= 25).toList()
+      ..sort((a, b) => b.voteAverage.compareTo(a.voteAverage));
+    final knownForCount = credits.knownForCredits.length;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: FlixieColors.surface.withValues(alpha: .55),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: FlixieColors.tabBarBorder),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _statTile(
+              'Credits',
+              allCredits.isEmpty ? '-' : '${allCredits.length}',
+              Icons.local_movies_outlined,
+            ),
+          ),
+          const _PersonStatDivider(),
+          Expanded(
+            child: _statTile(
+              'Known for',
+              knownForCount == 0 ? '-' : '$knownForCount',
+              Icons.auto_awesome_outlined,
+            ),
+          ),
+          const _PersonStatDivider(),
+          Expanded(
+            child: _statTile(
+              'Top title',
+              topRated.isEmpty
+                  ? '-'
+                  : topRated.first.voteAverage.toStringAsFixed(1),
+              Icons.star_border_rounded,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _statTile(String label, String value, IconData icon) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-      decoration: BoxDecoration(
-        color: FlixieColors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: FlixieColors.tabBarBorder),
-      ),
+      decoration: const BoxDecoration(),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: FlixieColors.primary, size: 16),
-          const SizedBox(height: 5),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: FlixieColors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: FlixieColors.primary, size: 16),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: FlixieColors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 5),
           Text(
             label,
             maxLines: 1,
@@ -801,33 +1198,20 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
   Widget _buildBiographyCard(String bio) {
     const previewLines = 4;
     final shouldCollapse = bio.length > 380;
-    return Container(
+    return SizedBox(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: FlixieColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: FlixieColors.tabBarBorder),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
-            children: [
-              Icon(Icons.person_outline, color: FlixieColors.primary, size: 16),
-              SizedBox(width: 8),
-              Text(
-                'THE BIOGRAPHY',
-                style: TextStyle(
-                  color: FlixieColors.primary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.2,
-                ),
-              ),
-            ],
+          const Text(
+            'Biography',
+            style: TextStyle(
+              color: FlixieColors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           AnimatedCrossFade(
             duration: const Duration(milliseconds: 250),
             crossFadeState: _bioExpanded || !shouldCollapse
@@ -859,7 +1243,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
               child: Row(
                 children: [
                   Text(
-                    _bioExpanded ? 'SHOW LESS' : 'READ MORE',
+                    _bioExpanded ? 'Show less' : 'Read more',
                     style: const TextStyle(
                       color: FlixieColors.primary,
                       fontSize: 12,
@@ -923,8 +1307,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
   }
 
   Widget _buildKnownForSection(PersonCredits credits) {
-    final knownFor =
-        credits.knownForCredits.where((c) => c.type == 'movie').toList();
+    final knownFor = credits.knownForCredits;
     if (knownFor.isEmpty) {
       return _emptySection(
         'No known titles yet',
@@ -933,7 +1316,6 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
       );
     }
 
-    final visible = _showAllKnownFor ? knownFor : knownFor.take(6).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -948,53 +1330,24 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                     ),
               ),
             ),
-            if (knownFor.length > 6)
-              TextButton(
-                onPressed: () =>
-                    setState(() => _showAllKnownFor = !_showAllKnownFor),
-                child: Text(_showAllKnownFor ? 'Show less' : 'View all'),
+            Text(
+              '${knownFor.length} titles',
+              style: const TextStyle(
+                color: FlixieColors.primary,
+                fontWeight: FontWeight.w600,
               ),
+            ),
           ],
         ),
-        const SizedBox(height: 14),
-        _buildMovieStatusLegend(),
         const SizedBox(height: 12),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          padding: EdgeInsets.zero,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 16,
-            childAspectRatio: 0.48,
+        SizedBox(
+          height: 286,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: knownFor.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, index) => _knownForCard(knownFor[index]),
           ),
-          itemCount: visible.length,
-          itemBuilder: (context, index) => _knownForCard(visible[index]),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMovieStatusLegend() {
-    return const Wrap(
-      spacing: 12,
-      runSpacing: 7,
-      children: [
-        _StatusLegendItem(
-          icon: Icons.favorite_rounded,
-          label: 'Favourite',
-          color: FlixieColors.danger,
-        ),
-        _StatusLegendItem(
-          icon: Icons.bookmark_rounded,
-          label: 'Watchlist',
-          color: FlixieColors.warning,
-        ),
-        _StatusLegendItem(
-          icon: Icons.check_circle_rounded,
-          label: 'Watched',
-          color: FlixieColors.success,
         ),
       ],
     );
@@ -1002,11 +1355,11 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
 
   Widget _buildFilmographySection(PersonCredits credits) {
     final filmography = _filteredCredits(credits);
-    final allCredits = _allMovieCredits(credits);
+    final allCredits = _allCredits(credits);
 
     if (allCredits.isEmpty) {
       return _emptySection(
-        'No movie credits yet',
+        'No credits yet',
         'Credits will appear here once they are available.',
         Icons.local_movies_outlined,
       );
@@ -1027,7 +1380,23 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // ---- Filmography ---------------------------------------------
-        sectionTitle('Filmography'),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Expanded(child: sectionTitle('Filmography')),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Text(
+                '${allCredits.length} credits',
+                style: const TextStyle(
+                  color: FlixieColors.medium,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
         _buildCreditControls(),
         const SizedBox(height: 12),
         if (filmography.isEmpty)
@@ -1086,10 +1455,12 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
 
   Widget _knownForCard(PersonCreditItem item) {
     const posterBase = 'https://image.tmdb.org/t/p/w342';
-    final statusBadges = _posterStatusBadges(item.id);
+    final statusBadges = _posterStatusBadges(item);
     final role = _knownForRole(item);
     return GestureDetector(
-      onTap: () => context.push('/movies/${item.id}'),
+      onTap: () => context.push(
+        item.type == 'tv' ? '/shows/${item.id}' : '/movies/${item.id}',
+      ),
       child: SizedBox(
         width: 126,
         child: Column(
@@ -1136,7 +1507,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
             if (_year(item.releaseDate) != null) ...[
               const SizedBox(height: 3),
               Text(
-                _year(item.releaseDate)!,
+                '${_year(item.releaseDate)!} · ${item.type == 'tv' ? 'TV' : 'Movie'}',
                 style:
                     const TextStyle(color: FlixieColors.medium, fontSize: 11),
               ),
@@ -1173,20 +1544,50 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
   }
 
   Widget _buildCreditControls() {
-    final years = _credits == null
-        ? <String>[]
-        : _allMovieCredits(_credits!)
-            .map((credit) => credit.year)
-            .whereType<String>()
-            .toSet()
-            .toList()
+    final allCredits =
+        _credits == null ? <_PersonFilmCredit>[] : _allCredits(_credits!);
+    final years = allCredits
+        .map((credit) => credit.year)
+        .whereType<String>()
+        .toSet()
+        .toList()
       ..sort((a, b) => b.compareTo(a));
+    final roleFilters = <_CreditFilter>[
+      _CreditFilter.all,
+      if (allCredits.any((credit) => credit.isCast)) _CreditFilter.actor,
+      if (allCredits.any((credit) => credit.isDirector)) _CreditFilter.director,
+      if (allCredits.any((credit) => credit.isWriter)) _CreditFilter.writer,
+      if (allCredits.any((credit) => credit.isProducer)) _CreditFilter.producer,
+    ];
+    final personalFilters = <_PersonalCreditFilter>[
+      _PersonalCreditFilter.all,
+      if (allCredits.any(
+        (credit) => credit.isMovie && _movieInWatched(credit.id),
+      ))
+        _PersonalCreditFilter.watched,
+      if (allCredits.any(
+        (credit) => credit.isMovie && _movieInWatchlist(credit.id),
+      ))
+        _PersonalCreditFilter.watchlist,
+      if (allCredits.any(
+        (credit) => credit.isMovie && _movieInFavorites(credit.id),
+      ))
+        _PersonalCreditFilter.favourites,
+    ];
+    final advancedFilterCount = [
+      _creditFilter != _CreditFilter.all,
+      _personalCreditFilter != _PersonalCreditFilter.all,
+      _filmographyYear != null,
+      _creditSort != _CreditSort.popular,
+    ].where((active) => active).length;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TextField(
           controller: _filmographySearchController,
           onChanged: (value) => setState(() => _filmographyQuery = value),
+          onTapOutside: (_) => FocusScope.of(context).unfocus(),
           style: const TextStyle(color: FlixieColors.white),
           textInputAction: TextInputAction.search,
           decoration: InputDecoration(
@@ -1205,100 +1606,198 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: _CreditFilter.values.map((filter) {
-              final selected = _creditFilter == filter;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: ChoiceChip(
-                  label: Text(filter.label),
-                  selected: selected,
-                  onSelected: (_) => setState(() => _creditFilter = filter),
-                  selectedColor: FlixieColors.primary.withValues(alpha: 0.22),
-                  backgroundColor: FlixieColors.surface,
-                  labelStyle: TextStyle(
-                    color:
-                        selected ? FlixieColors.primary : FlixieColors.medium,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
-                  ),
-                  side: BorderSide(
-                    color: selected
-                        ? FlixieColors.primary.withValues(alpha: 0.55)
-                        : FlixieColors.tabBarBorder,
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-        const SizedBox(height: 8),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: _PersonalCreditFilter.values.map((filter) {
-              final selected = _personalCreditFilter == filter;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: ChoiceChip(
-                  avatar: Icon(
-                    filter.icon,
-                    size: 16,
-                    color: selected ? filter.color : FlixieColors.medium,
-                  ),
-                  label: Text(filter.label),
-                  selected: selected,
-                  showCheckmark: false,
-                  onSelected: (_) =>
-                      setState(() => _personalCreditFilter = filter),
-                  selectedColor: filter.color.withValues(alpha: .16),
-                  backgroundColor: FlixieColors.surface,
-                  labelStyle: TextStyle(
-                    color: selected ? filter.color : FlixieColors.medium,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
-                  ),
-                  side: BorderSide(
-                    color: selected
-                        ? filter.color.withValues(alpha: .65)
-                        : FlixieColors.tabBarBorder,
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        Row(
           children: [
-            _creditSortMenu(),
-            PopupMenuButton<String?>(
-              initialValue: _filmographyYear,
-              onSelected: (year) => setState(() => _filmographyYear = year),
-              color: FlixieColors.surface,
-              itemBuilder: (context) => [
-                const PopupMenuItem<String?>(
-                  value: null,
-                  child: Text('All years'),
+            Expanded(
+              child: Container(
+                height: 42,
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: FlixieColors.surface.withValues(alpha: .55),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: FlixieColors.tabBarBorder),
                 ),
-                ...years.map(
-                  (year) => PopupMenuItem<String?>(
-                    value: year,
-                    child: Text(year),
-                  ),
+                child: Row(
+                  children: _MediaCreditFilter.values.map((filter) {
+                    final selected = _mediaCreditFilter == filter;
+                    return Expanded(
+                      child: InkWell(
+                        onTap: () =>
+                            setState(() => _mediaCreditFilter = filter),
+                        borderRadius: BorderRadius.circular(19),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? FlixieColors.primary
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(19),
+                          ),
+                          child: Text(
+                            filter.label,
+                            style: TextStyle(
+                              color: selected
+                                  ? FlixieColors.white
+                                  : FlixieColors.medium,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(growable: false),
                 ),
-              ],
-              child: _controlChip(
-                Icons.calendar_month_outlined,
-                _filmographyYear ?? 'All years',
+              ),
+            ),
+            const SizedBox(width: 8),
+            InkWell(
+              onTap: () => setState(
+                () => _showAdvancedCreditFilters = !_showAdvancedCreditFilters,
+              ),
+              borderRadius: BorderRadius.circular(22),
+              child: Container(
+                height: 42,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: FlixieColors.tabBarBorder),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.tune_rounded,
+                      color: FlixieColors.medium,
+                      size: 17,
+                    ),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Filters',
+                      style: TextStyle(
+                        color: FlixieColors.light,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (advancedFilterCount > 0) ...[
+                      const SizedBox(width: 5),
+                      CircleAvatar(
+                        radius: 9,
+                        backgroundColor: FlixieColors.primary,
+                        child: Text(
+                          '$advancedFilterCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
           ],
         ),
+        if (_showAdvancedCreditFilters) ...[
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: roleFilters.map((filter) {
+                final selected = _creditFilter == filter;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(filter.label),
+                    selected: selected,
+                    onSelected: (_) => setState(() => _creditFilter = filter),
+                    selectedColor: FlixieColors.primary.withValues(alpha: 0.22),
+                    backgroundColor: FlixieColors.surface,
+                    labelStyle: TextStyle(
+                      color:
+                          selected ? FlixieColors.primary : FlixieColors.medium,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                    side: BorderSide(
+                      color: selected
+                          ? FlixieColors.primary.withValues(alpha: 0.55)
+                          : FlixieColors.tabBarBorder,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: personalFilters.map((filter) {
+                final selected = _personalCreditFilter == filter;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    avatar: Icon(
+                      filter.icon,
+                      size: 16,
+                      color: selected ? filter.color : FlixieColors.medium,
+                    ),
+                    label: Text(filter.label),
+                    selected: selected,
+                    showCheckmark: false,
+                    onSelected: (_) =>
+                        setState(() => _personalCreditFilter = filter),
+                    selectedColor: filter.color.withValues(alpha: .16),
+                    backgroundColor: FlixieColors.surface,
+                    labelStyle: TextStyle(
+                      color: selected ? filter.color : FlixieColors.medium,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                    side: BorderSide(
+                      color: selected
+                          ? filter.color.withValues(alpha: .65)
+                          : FlixieColors.tabBarBorder,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _creditSortMenu(),
+              PopupMenuButton<String?>(
+                initialValue: _filmographyYear,
+                onSelected: (year) => setState(() => _filmographyYear = year),
+                color: FlixieColors.surface,
+                itemBuilder: (context) => [
+                  const PopupMenuItem<String?>(
+                    value: null,
+                    child: Text('All years'),
+                  ),
+                  ...years.map(
+                    (year) => PopupMenuItem<String?>(
+                      value: year,
+                      child: Text(year),
+                    ),
+                  ),
+                ],
+                child: _controlChip(
+                  Icons.calendar_month_outlined,
+                  _filmographyYear ?? 'All years',
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }
@@ -1354,21 +1853,51 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
 
   Widget _creditListRow(_PersonFilmCredit item) {
     const thumbBase = 'https://image.tmdb.org/t/p/w185';
-    final badges = _personalBadges(item.id);
+    final statusIcons = <Widget>[
+      if (item.isMovie && _movieInWatched(item.id))
+        const Tooltip(
+          message: 'Watched',
+          child: Icon(
+            Icons.check_circle_rounded,
+            color: FlixieColors.success,
+            size: 15,
+          ),
+        ),
+      if (item.isMovie && _movieInWatchlist(item.id))
+        const Tooltip(
+          message: 'Watchlist',
+          child: Icon(
+            Icons.bookmark_rounded,
+            color: FlixieColors.warning,
+            size: 15,
+          ),
+        ),
+      if (item.isMovie && _movieInFavorites(item.id))
+        const Tooltip(
+          message: 'Favourite',
+          child: Icon(
+            Icons.favorite_rounded,
+            color: FlixieColors.danger,
+            size: 15,
+          ),
+        ),
+    ];
 
     return GestureDetector(
-      onTap: () => context.push('/movies/${item.id}'),
+      onTap: () => context.push(
+        item.type == 'tv' ? '/shows/${item.id}' : '/movies/${item.id}',
+      ),
       behavior: HitTestBehavior.opaque,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 6),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(6),
               child: SizedBox(
-                width: 48,
-                height: 72,
+                width: 40,
+                height: 60,
                 child: item.posterPath != null
                     ? CachedNetworkImage(
                         imageUrl: '$thumbBase${item.posterPath}',
@@ -1378,79 +1907,76 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                     : _posterFallback(),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     item.title,
-                    maxLines: 2,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: FlixieColors.white,
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    crossAxisAlignment: WrapCrossAlignment.center,
+                  const SizedBox(height: 2),
+                  Row(
                     children: [
                       if (item.year != null)
-                        Text(
-                          item.year!,
-                          style: const TextStyle(
-                            color: FlixieColors.medium,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 180),
-                        child: Text(
-                          item.roleLabel,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: FlixieColors.medium,
-                            fontSize: 12,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ),
-                      if (item.voteAverage > 0)
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.star_rounded,
-                                color: FlixieColors.warning, size: 13),
-                            const SizedBox(width: 2),
-                            Text(
-                              item.voteAverage.toStringAsFixed(1),
-                              style: const TextStyle(
-                                color: FlixieColors.warning,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                              ),
+                        Flexible(
+                          child: Text(
+                            '${item.year!} · ${item.isMovie ? 'Movie' : 'TV'}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: FlixieColors.medium,
+                              fontSize: 11,
                             ),
-                          ],
+                          ),
                         ),
+                      if (statusIcons.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        ...statusIcons.expand(
+                          (icon) => [icon, const SizedBox(width: 4)],
+                        ),
+                      ],
                     ],
                   ),
-                  if (badges.isNotEmpty) ...[
-                    const SizedBox(height: 7),
-                    Wrap(
-                      spacing: 5,
-                      runSpacing: 5,
-                      children: badges,
+                  const SizedBox(height: 2),
+                  Text(
+                    item.roleLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: FlixieColors.primaryTint,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
                     ),
-                  ],
+                  ),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
+            if (item.voteAverage > 0) ...[
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.star_rounded,
+                color: FlixieColors.warning,
+                size: 16,
+              ),
+              const SizedBox(width: 3),
+              Text(
+                item.voteAverage.toStringAsFixed(1),
+                style: const TextStyle(
+                  color: FlixieColors.warning,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+            const SizedBox(width: 4),
             const Icon(Icons.chevron_right_rounded,
                 color: FlixieColors.medium, size: 20),
           ],
@@ -1549,33 +2075,25 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
 
 enum _CreditFilter { all, actor, director, writer, producer }
 
-class _StatusLegendItem extends StatelessWidget {
-  const _StatusLegendItem({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
+enum _MediaCreditFilter { all, movies, tv }
 
-  final IconData icon;
-  final String label;
-  final Color color;
+extension _MediaCreditFilterView on _MediaCreditFilter {
+  String get label => switch (this) {
+        _MediaCreditFilter.all => 'All',
+        _MediaCreditFilter.movies => 'Movies',
+        _MediaCreditFilter.tv => 'TV',
+      };
+}
+
+class _PersonStatDivider extends StatelessWidget {
+  const _PersonStatDivider();
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: color, size: 15),
-        const SizedBox(width: 5),
-        Text(
-          label,
-          style: const TextStyle(
-            color: FlixieColors.medium,
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
+    return Container(
+      width: 1,
+      height: 42,
+      color: FlixieColors.tabBarBorder,
     );
   }
 }
@@ -1652,6 +2170,8 @@ class _PersonFilmCredit {
   final List<String> roles;
   final bool isCast;
   final List<String> jobs;
+
+  bool get isMovie => type == 'movie';
 
   String? get year => releaseDate != null && releaseDate!.length >= 4
       ? releaseDate!.substring(0, 4)

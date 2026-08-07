@@ -1,4 +1,5 @@
 import 'package:flixie_app/models/watch_provider.dart';
+import 'package:flixie_app/models/profile_avatar.dart';
 
 class TvShow {
   final int id;
@@ -300,6 +301,7 @@ class TvEpisode {
   final double? voteAverage;
   final bool watched;
   final double? userRating;
+  final int watchCount;
 
   const TvEpisode({
     required this.id,
@@ -313,6 +315,7 @@ class TvEpisode {
     this.voteAverage,
     this.watched = false,
     this.userRating,
+    this.watchCount = 0,
   });
 
   factory TvEpisode.fromJson(
@@ -341,7 +344,75 @@ class TvEpisode {
           false,
       userRating:
           _doubleValue(json['userRating'] ?? effectiveProgress?['rating']),
+      watchCount: _intValue(
+            json['watchCount'] ??
+                json['timesWatched'] ??
+                effectiveProgress?['watchCount'] ??
+                effectiveProgress?['timesWatched'],
+          ) ??
+          0,
     );
+  }
+}
+
+/// A read-only view of episode progress. Future episodes never contribute to
+/// completion, even when an upstream total includes them.
+class TvShowEpisodeProgress {
+  TvShowEpisodeProgress(TvShow show, {DateTime? now})
+      : _show = show,
+        now = now ?? DateTime.now();
+
+  final TvShow _show;
+  final DateTime now;
+
+  late final List<TvEpisode> allEpisodes = _allEpisodes(_show);
+  late final List<TvEpisode> releasedEpisodes = allEpisodes
+      .where((episode) => isReleased(episode))
+      .toList(growable: false);
+
+  bool isReleased(TvEpisode episode) {
+    final airDate = DateTime.tryParse(episode.airDate ?? '');
+    return airDate == null || !airDate.isAfter(now);
+  }
+
+  int get releasedCount => releasedEpisodes.isEmpty
+      ? _show.resolvedEpisodeCount
+      : releasedEpisodes.length;
+
+  int get watchedCount {
+    if (releasedEpisodes.isNotEmpty) {
+      return releasedEpisodes.where((episode) => episode.watched).length;
+    }
+    return (_show.watchedEpisodeCount ?? 0).clamp(0, releasedCount);
+  }
+
+  int get remainingCount =>
+      (releasedCount - watchedCount).clamp(0, releasedCount);
+  bool get hasStarted => watchedCount > 0;
+  bool get isCaughtUp => releasedCount > 0 && watchedCount >= releasedCount;
+
+  TvEpisode? get nextReleased =>
+      releasedEpisodes.where((episode) => !episode.watched).firstOrNull;
+  TvEpisode? get nextScheduled =>
+      allEpisodes.where((episode) => !isReleased(episode)).firstOrNull;
+
+  static List<TvEpisode> _allEpisodes(TvShow show) {
+    final byId = <int, TvEpisode>{};
+    for (final episode in show.episodes) {
+      byId[episode.id] = episode;
+    }
+    for (final season in show.seasons) {
+      for (final episode in season.episodes) {
+        byId[episode.id] = episode;
+      }
+    }
+    return byId.values.toList()
+      ..sort((a, b) {
+        final season = a.seasonNumber.compareTo(b.seasonNumber);
+        return season != 0
+            ? season
+            : a.episodeNumber.compareTo(b.episodeNumber);
+      });
   }
 }
 
@@ -381,6 +452,7 @@ class TvShowCredit {
       ),
       profilePath: _stringValue(
         json['profilePath'] ??
+            json['profileImage'] ??
             json['profile_path'] ??
             json['profileImgUrl'] ??
             person['profilePath'] ??
@@ -403,36 +475,60 @@ class TvShowCredits {
   factory TvShowCredits.fromJson(Map<String, dynamic> json) {
     return TvShowCredits(
       cast: _mapList(
-          json['cast'] ?? json['credits']?['cast'], TvShowCredit.fromJson),
+          json['cast'] ?? json['castMembers'] ?? json['credits']?['cast'],
+          TvShowCredit.fromJson),
       crew: _mapList(
-          json['crew'] ?? json['credits']?['crew'], TvShowCredit.fromJson),
+          json['crew'] ?? json['crewMembers'] ?? json['credits']?['crew'],
+          TvShowCredit.fromJson),
     );
   }
 }
 
 class TvShowFriendSummary {
+  final int friendCount;
   final int watchedCount;
+  final int ratedCount;
+  final int recommendedCount;
+  final int favouriteCount;
+  final int watchlistCount;
   final double? averageRating;
   final int followingCount;
   final String? highestName;
   final double? highestRating;
   final String? lowestName;
   final double? lowestRating;
+  final List<TvShowFriend> friends;
 
   const TvShowFriendSummary({
+    this.friendCount = 0,
     this.watchedCount = 0,
+    this.ratedCount = 0,
+    this.recommendedCount = 0,
+    this.favouriteCount = 0,
+    this.watchlistCount = 0,
     this.averageRating,
     this.followingCount = 0,
     this.highestName,
     this.highestRating,
     this.lowestName,
     this.lowestRating,
+    this.friends = const [],
   });
 
   factory TvShowFriendSummary.fromJson(Map<String, dynamic> json) {
     return TvShowFriendSummary(
+      friendCount: _intValue(json['friendCount']) ?? 0,
       watchedCount:
           _intValue(json['watchedCount'] ?? json['friendsWatched']) ?? 0,
+      ratedCount: _intValue(json['ratedCount']) ??
+          ((json['shouldIWatchThis']?['friends'] as Iterable?)?.length ?? 0),
+      recommendedCount: _intValue(
+            json['recommendedCount'] ??
+                json['shouldIWatchThis']?['recommendedCount'],
+          ) ??
+          0,
+      favouriteCount: _intValue(json['favouriteCount']) ?? 0,
+      watchlistCount: _intValue(json['watchlistCount']) ?? 0,
       averageRating: _doubleValue(json['averageRating']),
       followingCount:
           _intValue(json['followingCount'] ?? json['friendsFollowing']) ?? 0,
@@ -443,8 +539,53 @@ class TvShowFriendSummary {
       lowestName: _stringValue(json['lowestName'] ?? json['lowest']?['name']),
       lowestRating:
           _doubleValue(json['lowestRating'] ?? json['lowest']?['rating']),
+      friends: _mapList(
+        json['friends'] ?? json['shouldIWatchThis']?['friends'],
+        TvShowFriend.fromJson,
+      ),
     );
   }
+}
+
+class TvShowFriend {
+  final String userId;
+  final String username;
+  final ProfileAvatar? avatar;
+  final bool watched;
+  final bool favorited;
+  final bool onWatchlist;
+  final bool reviewed;
+  final double? rating;
+  final bool recommends;
+
+  const TvShowFriend({
+    required this.userId,
+    required this.username,
+    this.avatar,
+    this.watched = false,
+    this.favorited = false,
+    this.onWatchlist = false,
+    this.reviewed = false,
+    this.rating,
+    this.recommends = false,
+  });
+
+  factory TvShowFriend.fromJson(Map<String, dynamic> json) => TvShowFriend(
+        userId: _stringValue(json['userId']) ?? '',
+        username: _stringValue(
+              json['username'] ?? json['displayName'],
+            ) ??
+            'Friend',
+        avatar: json['avatar'] is Map<String, dynamic>
+            ? ProfileAvatar.fromJson(json['avatar'] as Map<String, dynamic>)
+            : null,
+        watched: json['watched'] == true || json['watchedAt'] != null,
+        favorited: json['favorited'] == true,
+        onWatchlist: json['onWatchlist'] == true,
+        reviewed: json['reviewed'] == true,
+        rating: _doubleValue(json['rating']),
+        recommends: json['recommends'] == true,
+      );
 }
 
 class TvShowFriendActivity {

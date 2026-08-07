@@ -427,6 +427,29 @@ class UserService {
     return Review.fromJson(data as Map<String, dynamic>);
   }
 
+  static Future<Review> addShowReview(Review review) async {
+    apiLogger.d('POST /users/add/SHOW/review');
+    final data = await ApiClient.post(
+      '/users/add/SHOW/review',
+      body: {
+        'review': {
+          'id': review.showId,
+          'userId': review.userId,
+          'mediaId': review.showId,
+          'title': review.title,
+          'body': review.body,
+          'rating': review.rating,
+          'recommended': review.recommended,
+          'language': review.language,
+          'containsSpoilers': review.containsSpoilers,
+          'upvotes': 0,
+          'downvotes': 0,
+        }
+      },
+    );
+    return Review.fromJson(data as Map<String, dynamic>);
+  }
+
   // ---- FCM Token Management ------------------------------------------------
 
   /// Saves (or updates) the FCM device token for push notifications.
@@ -650,18 +673,24 @@ class UserService {
 
   static Future<List<MovieList>> getMyListsContainingMovie(
     String userId,
-    int movieId,
-  ) async {
-    final lists = await getMovieLists(userId);
-    if (lists.isEmpty) return const <MovieList>[];
+    int movieId, {
+    List<MovieList>? lists,
+  }) async {
+    final availableLists = lists ?? await getMovieLists(userId);
+    if (availableLists.isEmpty) return const <MovieList>[];
 
+    final contents = await Future.wait(
+      availableLists.map(
+        (list) => getMovieListMovies(userId, list.id)
+            .catchError((_) => const <MovieListMovie>[]),
+      ),
+    );
     final result = <MovieList>[];
-    for (final list in lists) {
-      final movies = await getMovieListMovies(userId, list.id);
-      if (movies.any((entry) =>
+    for (var index = 0; index < availableLists.length; index++) {
+      if (contents[index].any((entry) =>
           !entry.removed &&
           (entry.movieId == movieId || entry.movie?.id == movieId))) {
-        result.add(list);
+        result.add(availableLists[index]);
       }
     }
     return result;

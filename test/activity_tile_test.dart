@@ -1,5 +1,6 @@
 import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -92,5 +93,34 @@ void main() {
     expect(find.textContaining('rewatched Jurassic Park (3 times)'),
         findsOneWidget);
     expect(find.text('Rewatched'), findsOneWidget);
+  });
+
+  testWidgets('favourite person activity renders the person portrait',
+      (tester) async {
+    final item = ActivityListItem.fromJson({
+      'id': 'person-favourite-1',
+      'userId': 'u1',
+      'username': 'Laura',
+      'personId': 287,
+      'type': 'favorite_person',
+      'createdAt': DateTime.now().toUtc().toIso8601String(),
+      'updatedAt': DateTime.now().toUtc().toIso8601String(),
+      'person': {
+        'id': 287,
+        'name': 'Brad Pitt',
+        'profileImgUrl': '/person-profile.jpg',
+      },
+    });
+
+    await tester.pumpWidget(_wrap(ActivityTile(item: item)));
+
+    expect(find.textContaining('Brad Pitt'), findsWidgets);
+    final portrait = tester.widget<CachedNetworkImage>(
+      find.byType(CachedNetworkImage).first,
+    );
+    expect(
+      portrait.imageUrl,
+      'https://image.tmdb.org/t/p/w342/person-profile.jpg',
+    );
   });
 }

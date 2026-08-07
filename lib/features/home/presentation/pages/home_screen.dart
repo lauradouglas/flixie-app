@@ -1359,7 +1359,10 @@ class _HomeScreenState extends State<HomeScreen> {
           height: PersonalizedRecommendationCard.height,
           child: Padding(
             padding: EdgeInsets.only(left: 16, right: 10),
-            child: _RecommendationGeneratingCard(),
+            child: SizedBox(
+              width: double.infinity,
+              child: _RecommendationGeneratingCard(),
+            ),
           ),
         ),
         SizedBox(height: 20),

@@ -8,28 +8,57 @@ import 'package:flixie_app/core/api/api_client.dart';
 class MovieListsProvider extends ChangeNotifier {
   MovieListsProvider({
     required this.userId,
-  });
+  }) : lists = List<MovieList>.from(
+          _listCache[userId]?.isFresh == true
+              ? _listCache[userId]!.lists
+              : const <MovieList>[],
+        );
+
+  static final Map<String, _CachedMovieLists> _listCache = {};
 
   final String userId;
 
-  List<MovieList> lists = [];
+  List<MovieList> lists;
   final Map<String, List<MovieListMovie>> listMovies = {};
 
   bool isLoading = false;
   String? error;
+  Future<void>? _loadFuture;
 
   Future<void> loadLists() async {
-    isLoading = true;
+    if (_loadFuture != null) return _loadFuture!;
+    final future = _loadLists();
+    _loadFuture = future;
+    await future;
+    _loadFuture = null;
+  }
+
+  Future<void> _loadLists() async {
+    isLoading = lists.isEmpty;
     error = null;
     notifyListeners();
     try {
       lists = await UserService.getMovieLists(userId);
+      _updateListCache();
     } catch (e) {
       error = _friendlyError(e);
     } finally {
       isLoading = false;
       notifyListeners();
     }
+  }
+
+  Future<void> ensureListsLoaded() async {
+    if (lists.isNotEmpty) return;
+    if (_loadFuture != null) await _loadFuture;
+    if (lists.isEmpty && error == null) await loadLists();
+  }
+
+  void _updateListCache() {
+    _listCache[userId] = _CachedMovieLists(
+      List<MovieList>.unmodifiable(lists),
+      DateTime.now(),
+    );
   }
 
   Future<MovieList?> createList(
@@ -58,6 +87,7 @@ class MovieListsProvider extends ChangeNotifier {
       );
       lists = [...lists, created]
         ..sort((a, b) => (a.createdAt ?? '').compareTo(b.createdAt ?? ''));
+      _updateListCache();
       notifyListeners();
       return created;
     } catch (e) {
@@ -109,6 +139,7 @@ class MovieListsProvider extends ChangeNotifier {
     try {
       await UserService.deleteMovieList(userId, listId);
       lists = lists.where((l) => l.id != listId).toList();
+      _updateListCache();
       listMovies.remove(listId);
       notifyListeners();
       return true;
@@ -184,6 +215,7 @@ class MovieListsProvider extends ChangeNotifier {
       final containing = await UserService.getMyListsContainingMovie(
         userId,
         movieId,
+        lists: lists,
       );
       return containing.where((list) => !list.removed).toList(growable: false);
     } catch (e) {
@@ -213,4 +245,14 @@ class MovieListsProvider extends ChangeNotifier {
   bool _entryMatchesShow(MovieListMovie entry, int showId) {
     return entry.showId == showId || entry.show?.id == showId;
   }
+}
+
+class _CachedMovieLists {
+  const _CachedMovieLists(this.lists, this.cachedAt);
+
+  static const maxAge = Duration(minutes: 5);
+  final List<MovieList> lists;
+  final DateTime cachedAt;
+
+  bool get isFresh => DateTime.now().difference(cachedAt) < maxAge;
 }

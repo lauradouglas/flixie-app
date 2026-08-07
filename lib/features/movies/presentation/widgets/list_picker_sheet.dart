@@ -27,6 +27,108 @@ class ListPickerItem {
   final List<MovieListCollaborator> collaborators;
 }
 
+class ListPickerLoadingSplash extends StatefulWidget {
+  const ListPickerLoadingSplash({super.key, required this.message});
+
+  final String message;
+
+  @override
+  State<ListPickerLoadingSplash> createState() =>
+      _ListPickerLoadingSplashState();
+}
+
+class _ListPickerLoadingSplashState extends State<ListPickerLoadingSplash>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1800),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: true,
+      child: Container(
+        height: MediaQuery.sizeOf(context).height * 0.62,
+        decoration: const BoxDecoration(
+          color: FlixieColors.background,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedBuilder(
+                animation: _controller,
+                builder: (context, _) => SizedBox(
+                  width: 116,
+                  height: 116,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        width: 76,
+                        height: 76,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: FlixieColors.primary.withValues(alpha: 0.13),
+                          border: Border.all(
+                            color: FlixieColors.primary.withValues(alpha: 0.34),
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.playlist_add_check_circle_rounded,
+                          color: FlixieColors.primary,
+                          size: 38,
+                        ),
+                      ),
+                      Transform.rotate(
+                        angle: _controller.value * 6.283,
+                        child: const Align(
+                          alignment: Alignment.topCenter,
+                          child: Icon(
+                            Icons.auto_awesome_rounded,
+                            color: FlixieColors.warning,
+                            size: 24,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Getting your lists ready',
+                style: TextStyle(
+                  color: FlixieColors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 7),
+              Text(
+                widget.message,
+                style: const TextStyle(
+                  color: FlixieColors.medium,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class ListPickerSheet extends StatefulWidget {
   const ListPickerSheet({
     super.key,
@@ -70,7 +172,7 @@ class _ListPickerSheetState extends State<ListPickerSheet> {
         .toList(growable: false);
 
     return SafeArea(
-      top: false,
+      top: true,
       child: Container(
         height: MediaQuery.sizeOf(context).height * 0.9,
         decoration: const BoxDecoration(

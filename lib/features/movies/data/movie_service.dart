@@ -1,6 +1,7 @@
 import 'package:flixie_app/models/friend_recommendation.dart';
 import 'package:flixie_app/models/friend_summary.dart';
 import 'package:flixie_app/models/movie.dart';
+import 'package:flixie_app/models/movie_images.dart';
 import 'package:flixie_app/models/movie_credits.dart';
 import 'package:flixie_app/models/movie_friend_activity.dart';
 import 'package:flixie_app/models/review.dart';
@@ -49,6 +50,11 @@ class MovieService {
       }
       rethrow;
     }
+  }
+
+  Future<MovieImages> getMovieImages(int id) async {
+    final data = await ApiClient.get('/movies/$id/images');
+    return MovieImages.fromJson(data as Map<String, dynamic>);
   }
 
   Future<List<Movie>> getMoviesByIds(List<int> ids) async {

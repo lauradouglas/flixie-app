@@ -124,12 +124,20 @@ class PersonImage {
 
   factory PersonImage.fromJson(Map<String, dynamic> json) {
     return PersonImage(
-      personId: json['personId'] as int,
+      personId: (json['personId'] as num?)?.toInt() ?? 0,
       aspectRatio: (json['aspectRatio'] as num?)?.toDouble(),
-      imageUrl: json['imageUrl'] as String,
+      imageUrl: json['imageUrl']?.toString() ?? '',
       imageType: json['imageType'] as String?,
     );
   }
+
+  String get thumbnailUrl => imageUrl.startsWith('http')
+      ? imageUrl
+      : 'https://image.tmdb.org/t/p/w500$imageUrl';
+
+  String get originalUrl => imageUrl.startsWith('http')
+      ? imageUrl
+      : 'https://image.tmdb.org/t/p/original$imageUrl';
 }
 
 class Person {

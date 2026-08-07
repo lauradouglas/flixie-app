@@ -7,14 +7,16 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 class WriteReviewSheet extends StatefulWidget {
   const WriteReviewSheet({
     super.key,
-    required this.movieId,
+    this.movieId,
+    this.showId,
     required this.userId,
     required this.onSubmitted,
     this.initialRating,
     this.initialRecommended,
-  });
+  }) : assert((movieId == null) != (showId == null));
 
-  final int movieId;
+  final int? movieId;
+  final int? showId;
   final String userId;
   final void Function(Review review) onSubmitted;
   final double? initialRating;
@@ -61,7 +63,7 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
         id: '',
         userId: widget.userId,
         movieId: widget.movieId,
-        showId: null,
+        showId: widget.showId,
         rating: _rating,
         title: _titleController.text.trim(),
         body: _bodyController.text.trim(),
@@ -74,7 +76,7 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
         updatedAt: DateTime.now().toIso8601String(),
       );
 
-      final created = await _reviewReactions.addMovieReview(draft);
+      final created = await _reviewReactions.addReview(draft);
       if (mounted) {
         widget.onSubmitted(created);
         setState(() => _submitted = true);
@@ -105,6 +107,7 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final mediaLabel = widget.showId != null ? 'show' : 'movie';
     return Container(
       decoration: const BoxDecoration(
         color: FlixieColors.surface,
@@ -260,7 +263,8 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
                       style: const TextStyle(color: FlixieColors.white),
                       maxLines: 6,
                       decoration: InputDecoration(
-                        hintText: 'Share your thoughts about the movie...',
+                        hintText:
+                            'Share your thoughts about the $mediaLabel...',
                         hintStyle: const TextStyle(color: FlixieColors.medium),
                         filled: true,
                         fillColor: FlixieColors.surfaceElevated,
@@ -275,7 +279,7 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
                     const SizedBox(height: 20),
                     // Toggles
                     _ToggleTile(
-                      label: 'I recommend this movie',
+                      label: 'I recommend this $mediaLabel',
                       value: _recommended,
                       onChanged: (v) => setState(() => _recommended = v),
                     ),

@@ -1965,6 +1965,7 @@ class _ProfileActivityCard extends StatelessWidget {
       item.type == ActivityListType.favoriteMovie ||
       item.type == ActivityListType.favoriteShow ||
       item.type == ActivityListType.favoritePerson;
+  bool get _isPerson => item.type == ActivityListType.favoritePerson;
 
   String get _action {
     if (_isFavourite) return 'You added';
@@ -2059,16 +2060,24 @@ class _ProfileActivityCard extends StatelessWidget {
                 child: poster == null
                     ? Container(
                         color: FlixieColors.surfaceElevated,
-                        child: const Icon(Icons.movie_outlined,
-                            color: FlixieColors.medium),
+                        child: Icon(
+                          _isPerson
+                              ? Icons.person_outline_rounded
+                              : Icons.movie_outlined,
+                          color: FlixieColors.medium,
+                        ),
                       )
                     : CachedNetworkImage(
                         imageUrl: poster,
                         fit: BoxFit.cover,
                         errorWidget: (_, __, ___) => Container(
                           color: FlixieColors.surfaceElevated,
-                          child: const Icon(Icons.movie_outlined,
-                              color: FlixieColors.medium),
+                          child: Icon(
+                            _isPerson
+                                ? Icons.person_outline_rounded
+                                : Icons.movie_outlined,
+                            color: FlixieColors.medium,
+                          ),
                         ),
                       ),
               ),

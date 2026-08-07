@@ -191,10 +191,15 @@ class ActivityListItem {
       type: type,
       mediaTitle: movie?['title'] as String? ??
           show?['title'] as String? ??
-          person?['name'] as String?,
+          person?['name'] as String? ??
+          json['personName'] as String?,
       mediaPosterPath: movie?['posterPath'] as String? ??
           show?['posterPath'] as String? ??
-          person?['profileImgUrl'] as String?,
+          person?['profileImgUrl'] as String? ??
+          person?['profilePath'] as String? ??
+          person?['profileImage'] as String? ??
+          json['profileImgUrl'] as String? ??
+          json['profilePath'] as String?,
       mediaRating: (json['rating'] as num?)?.toDouble() ??
           (review?['rating'] as num?)?.toDouble(),
       recommended:

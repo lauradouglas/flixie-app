@@ -12,6 +12,15 @@ class PersonService {
     return PersonCredits.fromJson(data as Map<String, dynamic>);
   }
 
+  static Future<List<PersonImage>> getPersonImages(int id) async {
+    final data = await ApiClient.get('/people/$id/images');
+    return (data as List<dynamic>)
+        .whereType<Map<String, dynamic>>()
+        .map(PersonImage.fromJson)
+        .where((image) => image.imageUrl.trim().isNotEmpty)
+        .toList(growable: false);
+  }
+
   static Future<void> favoritePerson(int personId, String userId) async {
     await ApiClient.post('/people/$personId/favorite/$userId', body: {});
   }

@@ -358,7 +358,7 @@ GoRouter buildRouter(AuthProvider authProvider) {
           GoRoute(
             path: '/invite-friend',
             pageBuilder: (context, state) =>
-                _pushPage(state, const InviteFriendScreen()),
+                _calmPage(state, const InviteFriendScreen()),
           ),
           // Widget deep-link targets
           GoRoute(

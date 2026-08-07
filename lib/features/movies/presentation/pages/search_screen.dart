@@ -487,73 +487,74 @@ class _SearchScreenState extends State<SearchScreen> {
       );
     }
 
-    final people = results
-        .where((item) => item.isPerson && item.person != null)
-        .map((item) => item.person!)
-        .toList();
-    final media = results.where((item) => !item.isPerson).toList();
+    final rankedResults = _rankedResults(results, _query);
     final total = _searchResults?.totalResults ?? results.length;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
       children: [
         _SearchSummary(query: _query.trim(), total: total),
-        if (people.isNotEmpty) ...[
-          const SizedBox(height: 24),
-          _ResultsSectionHeader(
-            icon: Icons.person_outline_rounded,
-            title: 'People',
-            onSeeAll: _searchMode == _SearchMode.all
-                ? () => _setSearchMode(_SearchMode.people)
-                : null,
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 116,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: people.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 10),
-              itemBuilder: (context, index) => _PersonResultTile(
-                person: people[index],
-                query: _query.trim(),
-                onTap: () => context.push('/people/${people[index].id}'),
-              ),
-            ),
-          ),
-        ],
-        if (media.isNotEmpty) ...[
-          const SizedBox(height: 24),
-          _ResultsSectionHeader(
-            icon: Icons.movie_filter_outlined,
-            title: _searchMode == _SearchMode.movies
-                ? 'Movies'
-                : _searchMode == _SearchMode.shows
-                    ? 'Shows'
-                    : 'Movies & shows',
-          ),
-          const SizedBox(height: 10),
-          ...media.map((item) {
-            if (item.isShow && item.show != null) {
-              return _SearchMediaTile.show(
-                show: item.show!,
-                query: _query.trim(),
-                onTap: () => context.push('/shows/${item.show!.id}'),
-              );
-            }
-            if (item.movie != null) {
-              return _SearchMediaTile.movie(
-                movie: item.movie!,
-                query: _query.trim(),
-                onTap: () => context.push('/movies/${item.movie!.id}'),
-              );
-            }
-            return const SizedBox.shrink();
-          }),
-        ],
+        const SizedBox(height: 18),
+        ...rankedResults.map((item) {
+          if (item.isPerson && item.person != null) {
+            return _PersonResultTile(
+              person: item.person!,
+              query: _query.trim(),
+              onTap: () => context.push('/people/${item.person!.id}'),
+            );
+          }
+          if (item.isShow && item.show != null) {
+            return _SearchMediaTile.show(
+              show: item.show!,
+              query: _query.trim(),
+              onTap: () => context.push('/shows/${item.show!.id}'),
+            );
+          }
+          if (item.movie != null) {
+            return _SearchMediaTile.movie(
+              movie: item.movie!,
+              query: _query.trim(),
+              onTap: () => context.push('/movies/${item.movie!.id}'),
+            );
+          }
+          return const SizedBox.shrink();
+        }),
       ],
     );
   }
+
+  List<SearchResultItem> _rankedResults(
+    List<SearchResultItem> results,
+    String query,
+  ) {
+    if (_searchMode != _SearchMode.all) return results;
+    final normalizedQuery = _normalizeSearchText(query);
+    final indexed = results.indexed.toList();
+    indexed.sort((a, b) {
+      final scoreComparison = _resultRelevance(b.$2, normalizedQuery)
+          .compareTo(_resultRelevance(a.$2, normalizedQuery));
+      return scoreComparison != 0 ? scoreComparison : a.$1.compareTo(b.$1);
+    });
+    return indexed.map((entry) => entry.$2).toList(growable: false);
+  }
+
+  int _resultRelevance(SearchResultItem item, String query) {
+    final name = _normalizeSearchText(
+      item.person?.name ?? item.show?.name ?? item.movie?.name ?? '',
+    );
+    if (name == query) return item.isPerson ? 1000 : 1100;
+    if (name.startsWith(query)) return item.isPerson ? 800 : 900;
+    if (name.contains(query)) return item.isPerson ? 600 : 700;
+    final queryWords = query.split(' ').where((word) => word.isNotEmpty);
+    final matchedWords = queryWords.where(name.contains).length;
+    return matchedWords * 100 + (item.isPerson ? 0 : 20);
+  }
+
+  String _normalizeSearchText(String value) => value
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+      .trim()
+      .replaceAll(RegExp(r'\s+'), ' ');
 }
 
 // ─── Section header with left accent bar ───────────────────────────────────
@@ -911,48 +912,6 @@ class _SearchSummary extends StatelessWidget {
   }
 }
 
-class _ResultsSectionHeader extends StatelessWidget {
-  const _ResultsSectionHeader({
-    required this.icon,
-    required this.title,
-    this.onSeeAll,
-  });
-
-  final IconData icon;
-  final String title;
-  final VoidCallback? onSeeAll;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, color: FlixieColors.primary, size: 20),
-        const SizedBox(width: 9),
-        Text(
-          title,
-          style: const TextStyle(
-            color: FlixieColors.white,
-            fontSize: 17,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const Spacer(),
-        if (onSeeAll != null)
-          TextButton(
-            onPressed: onSeeAll,
-            child: const Text(
-              'See all',
-              style: TextStyle(
-                color: FlixieColors.primary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
 class _SearchMediaTile extends StatelessWidget {
   const _SearchMediaTile._({
     required this.name,
@@ -1176,75 +1135,88 @@ class _PersonResultTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 188,
-      child: Card(
-        margin: EdgeInsets.zero,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: SizedBox(
-                    width: 64,
-                    height: 96,
-                    child: person.profileImgUrl != null
-                        ? CachedNetworkImage(
-                            imageUrl:
-                                'https://image.tmdb.org/t/p/w185${person.profileImgUrl}',
-                            fit: BoxFit.cover,
-                            errorWidget: (_, __, ___) => Container(
-                              color:
-                                  FlixieColors.secondary.withValues(alpha: 0.3),
-                              child: const Icon(Icons.person,
-                                  color: FlixieColors.secondary),
-                            ),
-                          )
-                        : Container(
-                            color:
-                                FlixieColors.secondary.withValues(alpha: 0.3),
-                            child: const Icon(Icons.person,
-                                color: FlixieColors.secondary),
-                          ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _HighlightedText(
-                        text: person.name,
-                        query: query,
-                        maxLines: 2,
-                        baseStyle: const TextStyle(
-                          color: FlixieColors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      if (person.department != null) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          person.department!,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(color: FlixieColors.medium),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 112),
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: Colors.white.withValues(alpha: .07)),
             ),
+          ),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(
+                  width: 67,
+                  height: 100,
+                  child: person.profileImgUrl != null
+                      ? CachedNetworkImage(
+                          imageUrl:
+                              'https://image.tmdb.org/t/p/w185${person.profileImgUrl}',
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) => _placeholder(),
+                        )
+                      : _placeholder(),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _HighlightedText(
+                      text: person.name,
+                      query: query,
+                      maxLines: 2,
+                      baseStyle: const TextStyle(
+                        color: FlixieColors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 5,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        const _MediaTypePill(
+                          label: 'Person',
+                          color: FlixieColors.secondary,
+                        ),
+                        if (person.department?.isNotEmpty ?? false)
+                          Text(
+                            person.department!,
+                            style: const TextStyle(
+                              color: FlixieColors.medium,
+                              fontSize: 13,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: FlixieColors.medium,
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+
+  Widget _placeholder() => Container(
+        color: FlixieColors.secondary.withValues(alpha: .3),
+        child: const Icon(Icons.person, color: FlixieColors.secondary),
+      );
 }

@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flixie_app/models/favorite_movie.dart';
 import 'package:flixie_app/models/friend_recommendation.dart';
 import 'package:flixie_app/models/movie.dart';
+import 'package:flixie_app/models/movie_images.dart';
 import 'package:flixie_app/models/movie_credits.dart';
 import 'package:flixie_app/models/movie_friend_activity.dart';
 import 'package:flixie_app/models/movie_friend_list_entry.dart';
@@ -63,6 +64,319 @@ class MovieDetailScreen extends StatefulWidget {
 
   @override
   State<MovieDetailScreen> createState() => _MovieDetailScreenState();
+}
+
+class _FullScreenMoviePoster extends StatelessWidget {
+  const _FullScreenMoviePoster({required this.movie});
+
+  final Movie movie;
+
+  @override
+  Widget build(BuildContext context) {
+    final posterPath = movie.posterPath;
+    final url = posterPath == null
+        ? null
+        : 'https://image.tmdb.org/t/p/original$posterPath';
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Center(
+              child: Hero(
+                tag: 'movie-poster-${movie.id}',
+                child: InteractiveViewer(
+                  minScale: 1,
+                  maxScale: 4,
+                  child: url == null
+                      ? const Center(
+                          child: Icon(
+                            Icons.movie_outlined,
+                            color: FlixieColors.medium,
+                            size: 48,
+                          ),
+                        )
+                      : CachedNetworkImage(
+                          imageUrl: url,
+                          fit: BoxFit.contain,
+                          placeholder: (_, __) => const Center(
+                            child: CircularProgressIndicator(
+                              color: FlixieColors.primary,
+                            ),
+                          ),
+                          errorWidget: (_, __, ___) => const Center(
+                            child: Icon(
+                              Icons.movie_outlined,
+                              color: FlixieColors.medium,
+                              size: 48,
+                            ),
+                          ),
+                        ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              left: 12,
+              child: IconButton.filledTonal(
+                tooltip: 'Close poster',
+                onPressed: () => Navigator.of(context).pop(),
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.black.withValues(alpha: .65),
+                  foregroundColor: Colors.white,
+                ),
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ),
+            Positioned(
+              left: 20,
+              right: 20,
+              bottom: 18,
+              child: Text(
+                movie.title,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  shadows: [Shadow(color: Colors.black, blurRadius: 8)],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MovieImageGridScreen extends StatelessWidget {
+  const _MovieImageGridScreen({
+    required this.movieTitle,
+    required this.images,
+  });
+
+  final String movieTitle;
+  final List<MovieImage> images;
+
+  void _openViewer(BuildContext context, int initialIndex) {
+    Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        opaque: true,
+        transitionDuration: const Duration(milliseconds: 220),
+        reverseTransitionDuration: const Duration(milliseconds: 180),
+        pageBuilder: (_, animation, __) => FadeTransition(
+          opacity: animation,
+          child: _MovieImageGalleryViewer(
+            movieTitle: movieTitle,
+            images: images,
+            initialIndex: initialIndex,
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: FlixieColors.background,
+      appBar: AppBar(
+        backgroundColor: FlixieColors.background,
+        foregroundColor: FlixieColors.white,
+        titleSpacing: 0,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '$movieTitle photos',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            Text(
+              '${images.length} images',
+              style: const TextStyle(
+                color: FlixieColors.medium,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final columns = constraints.maxWidth >= 700 ? 4 : 2;
+          return GridView.builder(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 28),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columns,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              childAspectRatio: 1.25,
+            ),
+            itemCount: images.length,
+            itemBuilder: (context, index) {
+              final image = images[index];
+              return Semantics(
+                button: true,
+                label: 'Open photo ${index + 1} of ${images.length}',
+                child: InkWell(
+                  onTap: () => _openViewer(context, index),
+                  borderRadius: BorderRadius.circular(12),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: CachedNetworkImage(
+                      imageUrl: image.thumbnailUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) =>
+                          const SkeletonBox(borderRadius: 12),
+                      errorWidget: (_, __, ___) => const ColoredBox(
+                        color: FlixieColors.surface,
+                        child: Center(
+                          child: Icon(
+                            Icons.broken_image_outlined,
+                            color: FlixieColors.medium,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _MovieImageGalleryViewer extends StatefulWidget {
+  const _MovieImageGalleryViewer({
+    required this.movieTitle,
+    required this.images,
+    required this.initialIndex,
+  });
+
+  final String movieTitle;
+  final List<MovieImage> images;
+  final int initialIndex;
+
+  @override
+  State<_MovieImageGalleryViewer> createState() =>
+      _MovieImageGalleryViewerState();
+}
+
+class _MovieImageGalleryViewerState extends State<_MovieImageGalleryViewer> {
+  late final PageController _controller =
+      PageController(initialPage: widget.initialIndex);
+  late int _currentIndex = widget.initialIndex;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            PageView.builder(
+              controller: _controller,
+              itemCount: widget.images.length,
+              onPageChanged: (index) => setState(() => _currentIndex = index),
+              itemBuilder: (context, index) {
+                final image = widget.images[index];
+                return InteractiveViewer(
+                  key: ValueKey(image.path),
+                  minScale: 1,
+                  maxScale: 4,
+                  child: Center(
+                    child: CachedNetworkImage(
+                      imageUrl: image.originalUrl,
+                      fit: BoxFit.contain,
+                      placeholder: (_, __) => const Center(
+                        child: CircularProgressIndicator(
+                          color: FlixieColors.primary,
+                        ),
+                      ),
+                      errorWidget: (_, __, ___) => const Center(
+                        child: Icon(
+                          Icons.broken_image_outlined,
+                          color: FlixieColors.medium,
+                          size: 48,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            Positioned(
+              top: 8,
+              left: 12,
+              child: IconButton.filledTonal(
+                tooltip: 'Close photos',
+                onPressed: () => Navigator.of(context).pop(),
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.black.withValues(alpha: .65),
+                  foregroundColor: Colors.white,
+                ),
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ),
+            Positioned(
+              top: 14,
+              right: 16,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: .65),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  child: Text(
+                    '${_currentIndex + 1} / ${widget.images.length}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 20,
+              right: 20,
+              bottom: 18,
+              child: Text(
+                widget.movieTitle,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  shadows: [Shadow(color: Colors.black, blurRadius: 8)],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 enum ListUpdateType { watchlist, watched, favorite }
@@ -155,6 +469,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   List<Review> _reviews = [];
   List<SimilarMovie> _similar = [];
   List<MovieCastMember> _cast = [];
+  MovieImages _movieImages = const MovieImages();
+  bool _movieImagesLoading = false;
   List<WatchProvider> _watchProviders = [];
   Set<int> _userProviderIds = {};
   WatchProviderTab _watchProviderTab = WatchProviderTab.stream;
@@ -332,6 +648,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           _isLoading = false;
         });
         _syncHeroControlContrast(results[0] as Movie);
+        _loadMovieImages(id);
         if (userId != null) {
           _loadWatchHistory(userId, id);
           _loadListsContainingMovie(userId, id);
@@ -346,6 +663,22 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _loadMovieImages(int movieId) async {
+    if (!mounted) return;
+    setState(() => _movieImagesLoading = true);
+    try {
+      final images = await context.read<MovieService>().getMovieImages(movieId);
+      if (!mounted) return;
+      setState(() {
+        _movieImages = images;
+        _movieImagesLoading = false;
+      });
+    } catch (error) {
+      apiLogger.w('Unable to load images for movie $movieId: $error');
+      if (mounted) setState(() => _movieImagesLoading = false);
     }
   }
 
@@ -1200,22 +1533,35 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                           bottomRight: Radius.circular(
                               _MovieDetailHeroTokens.posterRightRadius),
                         ),
-                        child: movie.posterPath == null
-                            ? Container(
-                                color: FlixieColors.tabBarBackgroundFocused,
-                                child: const Icon(Icons.movie_outlined,
-                                    color: FlixieColors.medium, size: 42),
-                              )
-                            : CachedNetworkImage(
-                                imageUrl:
-                                    'https://image.tmdb.org/t/p/w780${movie.posterPath}',
-                                fit: BoxFit.cover,
-                                alignment: Alignment.center,
-                                errorWidget: (_, __, ___) => const Center(
-                                  child: Icon(Icons.movie_outlined,
-                                      color: FlixieColors.medium, size: 42),
-                                ),
-                              ),
+                        child: Hero(
+                          tag: 'movie-poster-${movie.id}',
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: movie.posterPath == null
+                                  ? null
+                                  : () => _showPosterViewer(movie),
+                              child: movie.posterPath == null
+                                  ? Container(
+                                      color:
+                                          FlixieColors.tabBarBackgroundFocused,
+                                      child: const Icon(Icons.movie_outlined,
+                                          color: FlixieColors.medium, size: 42),
+                                    )
+                                  : CachedNetworkImage(
+                                      imageUrl:
+                                          'https://image.tmdb.org/t/p/w780${movie.posterPath}',
+                                      fit: BoxFit.cover,
+                                      alignment: Alignment.center,
+                                      errorWidget: (_, __, ___) => const Center(
+                                        child: Icon(Icons.movie_outlined,
+                                            color: FlixieColors.medium,
+                                            size: 42),
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -1365,6 +1711,20 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           ],
         );
       },
+    );
+  }
+
+  void _showPosterViewer(Movie movie) {
+    Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        opaque: true,
+        transitionDuration: const Duration(milliseconds: 260),
+        reverseTransitionDuration: const Duration(milliseconds: 220),
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            _FullScreenMoviePoster(movie: movie),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+            FadeTransition(opacity: animation, child: child),
+      ),
     );
   }
 
@@ -3746,6 +4106,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           _buildSynopsis(context, movie),
           _buildTopCastSection(context),
           _buildTrailersSection(context, movie),
+          _buildImagesSection(context, movie),
           _buildMoreLikeThisSection(context),
           _buildDirectorLink(context),
         ]),
@@ -4425,6 +4786,133 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             .map((entry) => entry.$2)
             .firstOrNull ??
         'Activity';
+  }
+
+  // ---- Photos -------------------------------------------------------------
+
+  Widget _buildImagesSection(BuildContext context, Movie movie) {
+    if (_movieImagesLoading) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader(context, 'Photos'),
+          const SizedBox(height: 10),
+          const SizedBox(
+            height: 126,
+            child: Row(
+              children: [
+                Expanded(child: SkeletonBox(height: 126, borderRadius: 14)),
+                SizedBox(width: 10),
+                Expanded(child: SkeletonBox(height: 126, borderRadius: 14)),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    final images = _movieImages.gallery;
+    if (images.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _buildSectionHeader(context, 'Photos'),
+            TextButton(
+              onPressed: () => _openImageGrid(movie, images),
+              child: Text(
+                'See all (${images.length})',
+                style: const TextStyle(
+                  color: FlixieColors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 126,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: images.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (context, index) {
+              final image = images[index];
+              final width = (126 * image.aspectRatio).clamp(84.0, 224.0);
+              return Semantics(
+                button: true,
+                label: 'Open photo ${index + 1} of ${images.length}',
+                child: InkWell(
+                  onTap: () => _openImageGallery(movie, images, index),
+                  borderRadius: BorderRadius.circular(14),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: CachedNetworkImage(
+                      imageUrl: image.thumbnailUrl,
+                      width: width,
+                      height: 126,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) => SkeletonBox(
+                        width: width,
+                        height: 126,
+                        borderRadius: 14,
+                      ),
+                      errorWidget: (_, __, ___) => Container(
+                        width: width,
+                        height: 126,
+                        color: FlixieColors.surface,
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          Icons.broken_image_outlined,
+                          color: FlixieColors.medium,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _openImageGallery(
+    Movie movie,
+    List<MovieImage> images,
+    int initialIndex,
+  ) {
+    Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        opaque: true,
+        transitionDuration: const Duration(milliseconds: 220),
+        reverseTransitionDuration: const Duration(milliseconds: 180),
+        pageBuilder: (_, animation, __) => FadeTransition(
+          opacity: animation,
+          child: _MovieImageGalleryViewer(
+            movieTitle: movie.title,
+            images: images,
+            initialIndex: initialIndex,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openImageGrid(Movie movie, List<MovieImage> images) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _MovieImageGridScreen(
+          movieTitle: movie.title,
+          images: images,
+        ),
+      ),
+    );
   }
 
   // ---- Trailers -----------------------------------------------------------

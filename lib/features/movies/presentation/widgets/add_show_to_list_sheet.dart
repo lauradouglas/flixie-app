@@ -7,6 +7,10 @@ import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/list_picker_sheet.dart';
+import 'package:flixie_app/features/social/data/friend_service.dart';
+import 'package:flixie_app/models/friendship.dart';
+import 'package:flixie_app/models/movie_list.dart';
+import 'package:flixie_app/models/show.dart';
 
 class AddShowToListSheet extends StatefulWidget {
   const AddShowToListSheet({
@@ -29,6 +33,7 @@ class AddShowToListSheet extends StatefulWidget {
 }
 
 class _AddShowToListSheetState extends State<AddShowToListSheet> {
+  static final Map<String, _CachedShowLists> _listCache = {};
   final TextEditingController _searchController = TextEditingController();
   final Set<String> _selectedListIds = <String>{};
   final Set<String> _initialListIds = <String>{};
@@ -52,12 +57,26 @@ class _AddShowToListSheetState extends State<AddShowToListSheet> {
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (userId == null) return;
     try {
-      final lists = await UserService.getShowLists(userId);
+      final cached = _listCache[userId];
+      final lists = cached?.isFresh == true
+          ? List<ShowList>.from(cached!.lists)
+          : await UserService.getShowLists(userId);
+      if (cached?.isFresh != true) {
+        _listCache[userId] = _CachedShowLists(
+          List<ShowList>.unmodifiable(lists),
+          DateTime.now(),
+        );
+      }
+      final contents = await Future.wait(
+        lists.map(
+          (list) => UserService.getShowListShows(userId, list.id)
+              .catchError((_) => const <TvShow>[]),
+        ),
+      );
       final selected = <String>{};
-      for (final list in lists) {
-        final shows = await UserService.getShowListShows(userId, list.id);
-        if (shows.any((show) => show.id == widget.showId)) {
-          selected.add(list.id);
+      for (var index = 0; index < lists.length; index++) {
+        if (contents[index].any((show) => show.id == widget.showId)) {
+          selected.add(lists[index].id);
         }
       }
       if (!mounted) return;
@@ -83,9 +102,8 @@ class _AddShowToListSheetState extends State<AddShowToListSheet> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const SizedBox(
-        height: 320,
-        child: Center(child: CircularProgressIndicator()),
+      return const ListPickerLoadingSplash(
+        message: 'Checking your show lists…',
       );
     }
     return ListPickerSheet(
@@ -319,12 +337,29 @@ class _AddShowToListSheetState extends State<AddShowToListSheet> {
       builder: (_) => const _CreateShowListSheet(),
     );
     if (!mounted || created == null) return;
+    final userId = context.read<AuthProvider>().dbUser?.id;
     setState(() {
       _lists = [..._lists, created];
       _searchController.clear();
       _selectedListIds.add(created.id);
     });
+    if (userId != null) {
+      _listCache[userId] = _CachedShowLists(
+        List<ShowList>.unmodifiable(_lists),
+        DateTime.now(),
+      );
+    }
   }
+}
+
+class _CachedShowLists {
+  const _CachedShowLists(this.lists, this.cachedAt);
+
+  static const maxAge = Duration(minutes: 5);
+  final List<ShowList> lists;
+  final DateTime cachedAt;
+
+  bool get isFresh => DateTime.now().difference(cachedAt) < maxAge;
 }
 
 class _CreateShowListSheet extends StatefulWidget {
@@ -337,9 +372,36 @@ class _CreateShowListSheet extends StatefulWidget {
 class _CreateShowListSheetState extends State<_CreateShowListSheet> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
+  final Set<String> _selectedFriendIds = <String>{};
   String _visibility = ShowListVisibility.friends;
-  String _whoCanAddShows = 'owner';
+  String _scope = ListScope.personal;
+  List<FriendshipUser> _friends = const [];
+  bool _loadingFriends = true;
   bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFriends();
+  }
+
+  Future<void> _loadFriends() async {
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (userId == null) return;
+    try {
+      final data = await FriendService.getFriends(userId);
+      if (!mounted) return;
+      setState(() {
+        _friends = data.friendships
+            .map((friendship) => friendship.friendUser)
+            .whereType<FriendshipUser>()
+            .toList(growable: false);
+        _loadingFriends = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingFriends = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -428,18 +490,66 @@ class _CreateShowListSheetState extends State<_CreateShowListSheet> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                initialValue: _whoCanAddShows,
-                decoration:
-                    const InputDecoration(labelText: 'Who can add items?'),
+                initialValue: _scope,
+                decoration: const InputDecoration(
+                  labelText: 'Who can add to this list?',
+                ),
                 items: const [
-                  DropdownMenuItem(value: 'owner', child: Text('Only me')),
-                  DropdownMenuItem(value: 'friends', child: Text('Friends')),
+                  DropdownMenuItem(
+                    value: ListScope.personal,
+                    child: Text('Just me'),
+                  ),
+                  DropdownMenuItem(
+                    value: ListScope.friends,
+                    child: Text('Me and selected friends'),
+                  ),
                 ],
                 onChanged: _submitting
                     ? null
-                    : (value) =>
-                        setState(() => _whoCanAddShows = value ?? 'owner'),
+                    : (value) => setState(() {
+                          _scope = value ?? ListScope.personal;
+                          if (_scope == ListScope.personal) {
+                            _selectedFriendIds.clear();
+                          }
+                        }),
               ),
+              if (_scope == ListScope.friends) ...[
+                const SizedBox(height: 14),
+                const Text(
+                  'Choose friends who can add to the list',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 9),
+                if (_loadingFriends)
+                  const Center(child: CircularProgressIndicator())
+                else if (_friends.isEmpty)
+                  const Text(
+                    'No accepted friends available.',
+                    style: TextStyle(color: FlixieColors.medium),
+                  )
+                else
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 7,
+                    children: _friends
+                        .map(
+                          (friend) => FilterChip(
+                            label: Text('@${friend.username}'),
+                            selected: _selectedFriendIds.contains(friend.id),
+                            onSelected: _submitting
+                                ? null
+                                : (selected) => setState(() {
+                                      if (selected) {
+                                        _selectedFriendIds.add(friend.id);
+                                      } else {
+                                        _selectedFriendIds.remove(friend.id);
+                                      }
+                                    }),
+                          ),
+                        )
+                        .toList(growable: false),
+                  ),
+              ],
               if (_submitting) ...[
                 const SizedBox(height: 16),
                 const Center(child: CircularProgressIndicator()),
@@ -461,6 +571,12 @@ class _CreateShowListSheetState extends State<_CreateShowListSheet> {
       );
       return;
     }
+    if (_scope == ListScope.friends && _selectedFriendIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select at least one friend')),
+      );
+      return;
+    }
 
     setState(() => _submitting = true);
     try {
@@ -470,7 +586,9 @@ class _CreateShowListSheetState extends State<_CreateShowListSheet> {
           name: name,
           description: _descriptionController.text.trim(),
           visibility: _visibility,
-          whoCanAddShows: _whoCanAddShows,
+          whoCanAddShows: _scope == ListScope.friends ? 'members' : 'owner',
+          scope: _scope,
+          collaboratorIds: _selectedFriendIds.toList(),
         ),
       );
       if (!mounted) return;

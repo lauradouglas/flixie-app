@@ -4,7 +4,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 import 'package:flixie_app/models/movie_short.dart';
 import 'package:flixie_app/models/movie_list.dart';
@@ -138,12 +137,6 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
     _loadMembership();
     return context.read<MovieListsProvider>().loadListMovies(widget.listId);
   }
-
-  Future<void> _shareList() => Share.share(
-        'Check out ${widget.listName} on Flixie\n'
-        'flixie:///movie-lists/${widget.listId}',
-        subject: widget.listName,
-      );
 
   Future<void> _showAddMovieSheet() async {
     final provider = context.read<MovieListsProvider>();
@@ -478,11 +471,6 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
         backgroundColor: FlixieColors.background,
         foregroundColor: FlixieColors.light,
         actions: [
-          IconButton(
-            tooltip: 'Share list',
-            onPressed: _shareList,
-            icon: const Icon(Icons.ios_share_rounded),
-          ),
           PopupMenuButton<String>(
             tooltip: 'List actions',
             color: FlixieColors.tabBarBackgroundFocused,

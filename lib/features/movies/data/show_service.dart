@@ -128,6 +128,13 @@ class ShowService {
         .toList();
   }
 
+  static Future<TvShowFriendSummary?> getFriendSummary(int showId) async {
+    final data = await ApiClient.get('/shows/$showId/friend-summary');
+    return data is Map<String, dynamic>
+        ? TvShowFriendSummary.fromJson(data)
+        : null;
+  }
+
   static Future<List<WatchProvider>> getShowWatchProviders(
     int showId,
     String region,

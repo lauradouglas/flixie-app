@@ -24,4 +24,8 @@ class ReviewReactionsController {
 
   Future<Review> addMovieReview(Review review) =>
       UserService.addMovieReview(review);
+
+  Future<Review> addReview(Review review) => review.showId != null
+      ? UserService.addShowReview(review)
+      : UserService.addMovieReview(review);
 }

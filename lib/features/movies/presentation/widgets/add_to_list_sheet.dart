@@ -7,6 +7,8 @@ import 'package:flixie_app/features/movies/presentation/controllers/movie_lists_
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/list_picker_sheet.dart';
+import 'package:flixie_app/features/social/data/friend_service.dart';
+import 'package:flixie_app/models/friendship.dart';
 
 class AddToListSheet extends StatelessWidget {
   const AddToListSheet({
@@ -86,6 +88,7 @@ class _AddToListSheetBodyState extends State<_AddToListSheetBody> {
 
   Future<void> _loadMembership() async {
     final provider = context.read<MovieListsProvider>();
+    await provider.ensureListsLoaded();
     final containing = await provider.getListsContainingMovie(widget.movieId);
     if (!mounted) return;
     setState(() {
@@ -109,9 +112,8 @@ class _AddToListSheetBodyState extends State<_AddToListSheetBody> {
   Widget build(BuildContext context) {
     final provider = context.watch<MovieListsProvider>();
     if (provider.isLoading || _loadingMembership) {
-      return const SizedBox(
-        height: 320,
-        child: Center(child: CircularProgressIndicator()),
+      return const ListPickerLoadingSplash(
+        message: 'Checking your movie lists…',
       );
     }
     return ListPickerSheet(
@@ -413,10 +415,37 @@ class _CreateListFromMovieSheet extends StatefulWidget {
 class _CreateListFromMovieSheetState extends State<_CreateListFromMovieSheet> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
+  final Set<String> _selectedFriendIds = <String>{};
 
   String _visibility = ListVisibility.friends;
-  String _whoCanAddMovies = 'owner';
+  String _scope = ListScope.personal;
+  List<FriendshipUser> _friends = const [];
+  bool _loadingFriends = true;
   bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFriends();
+  }
+
+  Future<void> _loadFriends() async {
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (userId == null) return;
+    try {
+      final data = await FriendService.getFriends(userId);
+      if (!mounted) return;
+      setState(() {
+        _friends = data.friendships
+            .map((friendship) => friendship.friendUser)
+            .whereType<FriendshipUser>()
+            .toList(growable: false);
+        _loadingFriends = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingFriends = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -515,18 +544,66 @@ class _CreateListFromMovieSheetState extends State<_CreateListFromMovieSheet> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                initialValue: _whoCanAddMovies,
-                decoration:
-                    const InputDecoration(labelText: 'Who can add items?'),
+                initialValue: _scope,
+                decoration: const InputDecoration(
+                  labelText: 'Who can add to this list?',
+                ),
                 items: const [
-                  DropdownMenuItem(value: 'owner', child: Text('Only me')),
-                  DropdownMenuItem(value: 'friends', child: Text('Friends')),
+                  DropdownMenuItem(
+                    value: ListScope.personal,
+                    child: Text('Just me'),
+                  ),
+                  DropdownMenuItem(
+                    value: ListScope.friends,
+                    child: Text('Me and selected friends'),
+                  ),
                 ],
                 onChanged: _submitting
                     ? null
-                    : (value) =>
-                        setState(() => _whoCanAddMovies = value ?? 'owner'),
+                    : (value) => setState(() {
+                          _scope = value ?? ListScope.personal;
+                          if (_scope == ListScope.personal) {
+                            _selectedFriendIds.clear();
+                          }
+                        }),
               ),
+              if (_scope == ListScope.friends) ...[
+                const SizedBox(height: 14),
+                const Text(
+                  'Choose friends who can add to the list',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 9),
+                if (_loadingFriends)
+                  const Center(child: CircularProgressIndicator())
+                else if (_friends.isEmpty)
+                  const Text(
+                    'No accepted friends available.',
+                    style: TextStyle(color: FlixieColors.medium),
+                  )
+                else
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 7,
+                    children: _friends
+                        .map(
+                          (friend) => FilterChip(
+                            label: Text('@${friend.username}'),
+                            selected: _selectedFriendIds.contains(friend.id),
+                            onSelected: _submitting
+                                ? null
+                                : (selected) => setState(() {
+                                      if (selected) {
+                                        _selectedFriendIds.add(friend.id);
+                                      } else {
+                                        _selectedFriendIds.remove(friend.id);
+                                      }
+                                    }),
+                          ),
+                        )
+                        .toList(growable: false),
+                  ),
+              ],
               if (_submitting) ...[
                 const SizedBox(height: 16),
                 const Center(child: CircularProgressIndicator()),
@@ -546,6 +623,12 @@ class _CreateListFromMovieSheetState extends State<_CreateListFromMovieSheet> {
       );
       return;
     }
+    if (_scope == ListScope.friends && _selectedFriendIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select at least one friend')),
+      );
+      return;
+    }
 
     setState(() => _submitting = true);
     final provider = context.read<MovieListsProvider>();
@@ -553,7 +636,9 @@ class _CreateListFromMovieSheetState extends State<_CreateListFromMovieSheet> {
       name,
       description: _descriptionController.text.trim(),
       visibility: _visibility,
-      whoCanAddMovies: _whoCanAddMovies,
+      whoCanAddMovies: _scope == ListScope.friends ? 'members' : 'owner',
+      scope: _scope,
+      collaboratorIds: _selectedFriendIds.toList(),
     );
     if (!mounted) return;
     setState(() => _submitting = false);
