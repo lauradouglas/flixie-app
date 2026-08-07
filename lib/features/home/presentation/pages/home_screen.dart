@@ -530,7 +530,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: _isLoading
-          ? const HomeScreenSkeleton()
+          ? const HomeBootLoadingScreen()
           : _error != null
               ? ErrorRetryWidget(
                   message: _error!,

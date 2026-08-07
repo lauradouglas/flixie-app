@@ -940,14 +940,18 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
           SizedBox(height: 10),
           SizedBox(
             height: 150,
-            child: Row(
-              children: [
-                Expanded(child: SkeletonBox(height: 150, borderRadius: 12)),
-                SizedBox(width: 10),
-                Expanded(child: SkeletonBox(height: 150, borderRadius: 12)),
-                SizedBox(width: 10),
-                Expanded(child: SkeletonBox(height: 150, borderRadius: 12)),
-              ],
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: NeverScrollableScrollPhysics(),
+              child: Row(
+                children: [
+                  SkeletonBox(width: 100, height: 150, borderRadius: 12),
+                  SizedBox(width: 10),
+                  SkeletonBox(width: 100, height: 150, borderRadius: 12),
+                  SizedBox(width: 10),
+                  SkeletonBox(width: 225, height: 150, borderRadius: 12),
+                ],
+              ),
             ),
           ),
         ],

@@ -85,7 +85,7 @@ class _GroupWatchRequestsOverviewState
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const WatchRequestsSkeleton();
+    if (_loading) return const GroupWatchRequestsSkeleton();
     final active = _items.where((item) => item.request.isActive).toList();
     final completed = _items
         .where((item) => item.request.status == WatchRequestStatus.completed)

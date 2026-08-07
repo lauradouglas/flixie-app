@@ -3641,7 +3641,7 @@ class _ShowTabsHeaderDelegate extends SliverPersistentHeaderDelegate {
     const labels = {
       _ShowDetailTab.overview: 'Overview',
       _ShowDetailTab.episodes: 'Episodes',
-      _ShowDetailTab.reviews: 'Reviews',
+      // TODO(show-reviews): Restore when the show review experience is ready.
       _ShowDetailTab.activity: 'My Activity',
       _ShowDetailTab.details: 'Details',
     };

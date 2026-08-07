@@ -4799,12 +4799,16 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           const SizedBox(height: 10),
           const SizedBox(
             height: 126,
-            child: Row(
-              children: [
-                Expanded(child: SkeletonBox(height: 126, borderRadius: 14)),
-                SizedBox(width: 10),
-                Expanded(child: SkeletonBox(height: 126, borderRadius: 14)),
-              ],
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: NeverScrollableScrollPhysics(),
+              child: Row(
+                children: [
+                  SkeletonBox(width: 224, height: 126, borderRadius: 14),
+                  SizedBox(width: 10),
+                  SkeletonBox(width: 224, height: 126, borderRadius: 14),
+                ],
+              ),
             ),
           ),
         ],
