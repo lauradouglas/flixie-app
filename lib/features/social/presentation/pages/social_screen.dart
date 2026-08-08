@@ -79,10 +79,14 @@ class _SocialScreenState extends State<SocialScreen> {
           ),
         ),
         actions: [
-          IconButton(
+          TextButton.icon(
             onPressed: () => context.push('/invite-friend?from=social'),
-            icon: const Icon(Icons.ios_share_outlined),
-            tooltip: 'Invite a friend to Flixie',
+            icon: const Icon(Icons.person_add_alt_1_rounded, size: 19),
+            label: const Text('Invite'),
+            style: TextButton.styleFrom(
+              foregroundColor: FlixieColors.primary,
+              textStyle: const TextStyle(fontWeight: FontWeight.w800),
+            ),
           ),
           IconButton(
             onPressed: () {
@@ -313,6 +317,8 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const _InviteFriendsBanner(),
+            const SizedBox(height: 14),
             Row(children: [
               Expanded(
                 child: _FriendSearchField(controller: _searchController),
@@ -456,6 +462,102 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
 // ---------------------------------------------------------------------------
 // Friends widgets
 // ---------------------------------------------------------------------------
+
+class _InviteFriendsBanner extends StatelessWidget {
+  const _InviteFriendsBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => context.push('/invite-friend?from=social_banner'),
+      borderRadius: BorderRadius.circular(18),
+      child: Ink(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(16, 15, 12, 15),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              FlixieColors.primary.withValues(alpha: .25),
+              FlixieColors.secondary.withValues(alpha: .12),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: FlixieColors.primary.withValues(alpha: .45),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: FlixieColors.primary.withValues(alpha: .2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.group_add_rounded,
+                color: FlixieColors.primary,
+                size: 27,
+              ),
+            ),
+            const SizedBox(width: 13),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Flixie is better together',
+                    style: TextStyle(
+                      color: FlixieColors.light,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Invite friends to compare favourites and plan what to watch.',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: FlixieColors.medium,
+                      fontSize: 12.5,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              decoration: BoxDecoration(
+                color: FlixieColors.primary,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Invite',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  SizedBox(width: 3),
+                  Icon(Icons.arrow_forward_rounded,
+                      color: Colors.black, size: 16),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _RequestBell extends StatelessWidget {
   const _RequestBell({required this.count, required this.onTap});

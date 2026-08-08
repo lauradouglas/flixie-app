@@ -840,10 +840,10 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
         ],
         ListsPreviewSection(
           userId: widget.userId,
-          title: 'PUBLIC LISTS',
-          emptyMessage: 'No public lists yet.',
+          title: 'LISTS',
+          emptyMessage: 'No lists shared with you yet.',
           embedded: true,
-          publicOnly: true,
+          publicOnly: widget.previewMode,
         ),
         if (user.favoriteMovies?.isNotEmpty == true) ...[
           const SizedBox(height: 18),

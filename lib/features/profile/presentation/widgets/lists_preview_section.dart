@@ -8,7 +8,7 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/media_lists_section.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 
-class ListsPreviewSection extends StatelessWidget {
+class ListsPreviewSection extends StatefulWidget {
   const ListsPreviewSection({
     super.key,
     required this.userId,
@@ -27,19 +27,48 @@ class ListsPreviewSection extends StatelessWidget {
   final bool publicOnly;
 
   @override
+  State<ListsPreviewSection> createState() => _ListsPreviewSectionState();
+}
+
+class _ListsPreviewSectionState extends State<ListsPreviewSection> {
+  late Future<List<MovieList>> _listsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _listsFuture = UserService.getMovieLists(widget.userId);
+  }
+
+  @override
+  void didUpdateWidget(covariant ListsPreviewSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.userId != widget.userId) {
+      _listsFuture = UserService.getMovieLists(widget.userId);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final cachedLists = context.watch<AuthProvider>().cachedMovieLists;
+    final auth = context.watch<AuthProvider>();
+    final isOwnProfile = auth.dbUser?.id == widget.userId;
+    final cachedLists = isOwnProfile ? auth.cachedMovieLists : null;
     return FutureBuilder<List<MovieList>>(
-      future: cachedLists == null ? UserService.getMovieLists(userId) : null,
+      future: cachedLists == null ? _listsFuture : null,
       initialData: cachedLists,
       builder: (context, snapshot) {
-        final loadedLists = snapshot.data ?? const <MovieList>[];
-        final lists = publicOnly
+        final loadedLists = (snapshot.data ?? const <MovieList>[])
+            .where((list) =>
+                isOwnProfile ||
+                list.userId == null ||
+                list.userId == widget.userId)
+            .toList(growable: false);
+        final lists = widget.publicOnly
             ? loadedLists
                 .where((list) => list.visibility == ListVisibility.public)
                 .toList(growable: false)
             : loadedLists;
-        final previewLists = lists.take(4).map((list) {
+        final previewLists =
+            (widget.allowManage ? lists.take(4) : lists).map((list) {
           final posters = list.previewPosterUrls.map(_posterUrl).toList();
           return MediaDetailListItem(
             id: list.id,
@@ -61,7 +90,7 @@ class ListsPreviewSection extends StatelessWidget {
                 friendLists: const [],
                 loading: true,
                 itemLabel: 'items',
-                title: title,
+                title: widget.title,
                 onEdit: () {},
                 onOpenList: (_) {},
               )
@@ -70,7 +99,7 @@ class ListsPreviewSection extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        title,
+                        widget.title,
                         style: const TextStyle(
                           color: FlixieColors.white,
                           fontSize: 18,
@@ -78,7 +107,7 @@ class ListsPreviewSection extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 10),
-                      Text(emptyMessage,
+                      Text(widget.emptyMessage,
                           style: const TextStyle(color: FlixieColors.medium)),
                     ],
                   )
@@ -87,25 +116,26 @@ class ListsPreviewSection extends StatelessWidget {
                     friendLists: const [],
                     loading: false,
                     itemLabel: 'items',
-                    title: title,
+                    title: widget.title,
                     ownSummary:
                         '${lists.length} ${lists.length == 1 ? 'list' : 'lists'}',
                     editLabel: 'Manage',
                     showOwnItemCount: true,
-                    showEdit: allowManage,
+                    showEdit: widget.allowManage,
                     onEdit: () => context.push('/movie-lists'),
-                    onSeeAll:
-                        allowManage ? () => context.push('/movie-lists') : null,
+                    onSeeAll: widget.allowManage
+                        ? () => context.push('/movie-lists')
+                        : null,
                     onOpenList: (item) {
                       final list =
                           lists.firstWhere((list) => list.id == item.id);
                       context.push(
-                        '/movie-lists/${list.id}?name=${Uri.encodeComponent(list.name)}&owner=${Uri.encodeComponent(list.userId ?? userId)}',
+                        '/movie-lists/${list.id}?name=${Uri.encodeComponent(list.name)}&owner=${Uri.encodeComponent(list.userId ?? widget.userId)}&isOwner=${list.isOwner}&canEdit=${list.canEdit}',
                       );
                     },
                   );
 
-        if (embedded) {
+        if (widget.embedded) {
           return content;
         }
 
