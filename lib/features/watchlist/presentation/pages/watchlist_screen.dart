@@ -1189,9 +1189,21 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         );
       }).toList();
     }
-    // Upcoming requires episode/season release metadata not carried by the
-    // compact watchlist entry.
-    if (_selectedTab == 2) return const [];
+    if (_selectedTab == 2) {
+      final today = DateTime.now();
+      final upcoming = _filteredShowWatchlist.where((item) {
+        final date = DateTime.tryParse(item.firstAirDate ?? '');
+        return date != null && date.isAfter(today);
+      }).toList();
+      upcoming.sort((a, b) {
+        final dateA = DateTime.tryParse(a.firstAirDate ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final dateB = DateTime.tryParse(b.firstAirDate ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        return dateA.compareTo(dateB);
+      });
+      return upcoming;
+    }
     return _filteredShowWatchlist;
   }
 
@@ -1199,6 +1211,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     final movieItems = _visibleWatchlist();
     final showItems = _visibleShowWatchlist();
     final items = <Object>[...movieItems, ...showItems];
+    if (_mediaFilter == 0) items.sort(_compareWatchlistItems);
     final user = context.read<AuthProvider>().dbUser;
     final hasItems = _allWatchlist.isNotEmpty || _allShowWatchlist.isNotEmpty;
 
@@ -1302,6 +1315,27 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         );
       },
     );
+  }
+
+  int _compareWatchlistItems(Object first, Object second) {
+    final firstTitle = first is WatchlistMovie
+        ? first.movie?.title ?? ''
+        : (first as _WatchlistShowEntry).title;
+    final secondTitle = second is WatchlistMovie
+        ? second.movie?.title ?? ''
+        : (second as _WatchlistShowEntry).title;
+    if (_sortBy == 'titleAsc') return firstTitle.compareTo(secondTitle);
+    if (_sortBy == 'titleDesc') return secondTitle.compareTo(firstTitle);
+
+    final firstAddedAt = DateTime.tryParse(first is WatchlistMovie
+            ? first.createdAt ?? ''
+            : (first as _WatchlistShowEntry).createdAt ?? '') ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+    final secondAddedAt = DateTime.tryParse(second is WatchlistMovie
+            ? second.createdAt ?? ''
+            : (second as _WatchlistShowEntry).createdAt ?? '') ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+    return secondAddedAt.compareTo(firstAddedAt);
   }
 
   Widget _buildMediaFilter() {
@@ -1616,6 +1650,7 @@ class _WatchlistShowEntry {
     required this.removed,
     required this.watched,
     this.posterPath,
+    this.firstAirDate,
     this.status,
     this.numberOfEpisodes,
     this.createdAt,
@@ -1626,6 +1661,7 @@ class _WatchlistShowEntry {
   final bool removed;
   final bool watched;
   final String? posterPath;
+  final String? firstAirDate;
   final String? status;
   final int? numberOfEpisodes;
   final String? createdAt;
@@ -1640,6 +1676,10 @@ class _WatchlistShowEntry {
       removed: json['removed'] == true,
       watched: json['watched'] == true,
       posterPath: show['posterPath']?.toString(),
+      firstAirDate: (show['firstAirDate'] ??
+              show['first_air_date'] ??
+              show['releaseDate'])
+          ?.toString(),
       status: show['status']?.toString(),
       numberOfEpisodes: _watchlistInt(show['numberOfEpisodes']),
       createdAt: json['createdAt']?.toString(),

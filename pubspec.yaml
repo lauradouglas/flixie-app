@@ -2,7 +2,7 @@ name: flixie_app
 description: Flixie - A Flutter frontend for the Flixie backend, available on Android and iOS.
 publish_to: 'none'
 
-version: 1.0.0+47
+version: 1.0.0+49
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -73,4 +73,4 @@ flutter_launcher_icons:
   ios: true
   image_path: "assets/icon/logo_icon.png"
   adaptive_icon_background: "#172B4D" # Your background color
-  adaptive_icon_foreground: "assets/icon/logo_icon_foreground.png"
+  adaptive_icon_foreground: "assets/icon/flixie_text_1024.png"

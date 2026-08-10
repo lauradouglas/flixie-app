@@ -13,7 +13,6 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
 import 'package:flixie_app/features/settings/presentation/widgets/change_password_sheet.dart';
 import 'package:flixie_app/features/settings/presentation/widgets/favorite_genres_sheet.dart';
-import 'package:flixie_app/features/settings/presentation/widgets/icon_color_sheet.dart';
 import 'package:flixie_app/features/settings/presentation/widgets/settings_tile.dart';
 import 'package:flixie_app/features/settings/presentation/widgets/watch_providers_sheet.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/change_avatar_sheet.dart';
@@ -133,11 +132,6 @@ class SettingsScreen extends StatelessWidget {
                 icon: Icons.tune_outlined,
                 label: 'Content Preferences',
                 onTap: () => _showFavoriteGenresSheet(context),
-              ),
-              SettingsTile(
-                icon: Icons.palette_outlined,
-                label: 'Avatar Colour',
-                onTap: () => _showIconColorSheet(context),
                 isLast: true,
               ),
             ],
@@ -236,20 +230,6 @@ class SettingsScreen extends StatelessWidget {
       backgroundColor: Colors.transparent,
       builder: (_) => FavoriteGenresSheet(
           userId: dbUser.id, currentGenres: dbUser.favoriteGenres ?? []),
-    );
-  }
-
-  void _showIconColorSheet(BuildContext context) {
-    final dbUser = context.read<AuthProvider>().dbUser;
-    if (dbUser == null) return;
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => IconColorSheet(
-        userId: dbUser.id,
-        currentColorId: dbUser.iconColorId,
-      ),
     );
   }
 

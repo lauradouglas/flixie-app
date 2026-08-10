@@ -75,15 +75,9 @@ class _HomeScreenState extends State<HomeScreen> {
   int _heroPage = 0;
   int _forYouPage = 0;
 
-  List<MovieShort> get _heroMovies {
-    if (_forYouMovies.isEmpty) return _featuredMovies;
-    final forYouIds = _forYouMovies.map((movie) => movie.id).toSet();
-    final matchingTrending =
-        _featuredMovies.where((movie) => forYouIds.contains(movie.id));
-    final remainingTrending =
-        _featuredMovies.where((movie) => !forYouIds.contains(movie.id));
-    return [...matchingTrending, ...remainingTrending];
-  }
+  // Preserve the ranking returned by the trending endpoint. Recommendations
+  // load independently and must not reshuffle an already-visible carousel.
+  List<MovieShort> get _heroMovies => _featuredMovies;
 
   @override
   void didChangeDependencies() {
@@ -616,7 +610,7 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.only(left: 14),
             child: PageView.builder(
               controller: _heroPageController,
-              padEnds: true,
+              padEnds: false,
               clipBehavior: Clip.none,
               onPageChanged: (i) => setState(() => _heroPage = i),
               itemCount: count,
@@ -624,36 +618,30 @@ class _HomeScreenState extends State<HomeScreen> {
                 final posterCard =
                     _buildInactiveHeroCard(context, movies[index]);
                 final detailCard = _buildHeroCard(context, movies[index]);
-                final leadingInset = MediaQuery.sizeOf(context).width *
-                    (1 - _heroViewportFraction) /
-                    2;
-                return Transform.translate(
-                  offset: Offset(index == 0 ? -leadingInset : 0, 0),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: AnimatedBuilder(
-                      animation: _heroPageController,
-                      builder: (context, _) {
-                        final page = _heroPageController.hasClients
-                            ? (_heroPageController.page ?? _heroPage.toDouble())
-                            : _heroPage.toDouble();
-                        final detailOpacity =
-                            (1 - (page - index).abs()).clamp(0.0, 1.0);
-                        return Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            posterCard,
-                            IgnorePointer(
-                              ignoring: detailOpacity < 0.98,
-                              child: Opacity(
-                                opacity: detailOpacity,
-                                child: detailCard,
-                              ),
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: AnimatedBuilder(
+                    animation: _heroPageController,
+                    builder: (context, _) {
+                      final page = _heroPageController.hasClients
+                          ? (_heroPageController.page ?? _heroPage.toDouble())
+                          : _heroPage.toDouble();
+                      final detailOpacity =
+                          (1 - (page - index).abs()).clamp(0.0, 1.0);
+                      return Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          posterCard,
+                          IgnorePointer(
+                            ignoring: detailOpacity < 0.98,
+                            child: Opacity(
+                              opacity: detailOpacity,
+                              child: detailCard,
                             ),
-                          ],
-                        );
-                      },
-                    ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 );
               },
@@ -693,6 +681,8 @@ class _HomeScreenState extends State<HomeScreen> {
   ) {
     final inWatchlist = _watchlistMovieIds.contains(movie.id);
     final isUpdating = _watchlistUpdatesInFlight.contains(movie.id);
+    final friendActivityLoading = context.read<AuthProvider>().dbUser != null &&
+        !_heroFriendInteractions.containsKey(movie.id);
     final interactions = _heroFriendInteractions[movie.id] ?? const [];
     final watchlistedBy =
         interactions.where((interaction) => interaction.onWatchlist).toList();
@@ -833,6 +823,21 @@ class _HomeScreenState extends State<HomeScreen> {
                               fontWeight: FontWeight.w800,
                             ),
                           ),
+                        ] else ...[
+                          const Icon(
+                            Icons.star_outline_rounded,
+                            color: FlixieColors.medium,
+                            size: 19,
+                          ),
+                          const SizedBox(width: 4),
+                          const Text(
+                            'Not rated yet',
+                            style: TextStyle(
+                              color: FlixieColors.medium,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ],
                         if ((movie.trailer?.key ?? '').trim().isNotEmpty) ...[
                           const SizedBox(width: 10),
@@ -879,9 +884,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ],
                     ),
-                    if (watchlistedBy.isNotEmpty ||
-                        favouritedBy.isNotEmpty) ...[
-                      const SizedBox(height: 7),
+                    const SizedBox(height: 7),
+                    if (watchlistedBy.isNotEmpty || favouritedBy.isNotEmpty)
                       Row(
                         children: [
                           if (watchlistedBy.isNotEmpty)
@@ -938,8 +942,48 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ],
                         ],
+                      )
+                    else if (friendActivityLoading)
+                      const SizedBox(
+                        height: 30,
+                        child: Row(
+                          children: [
+                            SkeletonBox(
+                              width: 26,
+                              height: 26,
+                              borderRadius: 13,
+                            ),
+                            SizedBox(width: 8),
+                            SkeletonBox(width: 132, height: 10),
+                          ],
+                        ),
+                      )
+                    else
+                      const SizedBox(
+                        height: 30,
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.people_outline_rounded,
+                              color: FlixieColors.medium,
+                              size: 19,
+                            ),
+                            SizedBox(width: 7),
+                            Expanded(
+                              child: Text(
+                                'No friends have saved or favourited this yet',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: FlixieColors.medium,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
                   ],
                 ),
               ),
