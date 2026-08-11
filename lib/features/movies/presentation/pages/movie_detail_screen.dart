@@ -45,6 +45,8 @@ import 'package:flixie_app/features/social/data/friend_service.dart';
 import 'package:flixie_app/features/social/data/chat_service.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
+import 'package:flixie_app/features/sharing/models/share_card_data.dart';
+import 'package:flixie_app/features/sharing/presentation/share_card_sheet.dart';
 import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/models/group.dart';
 
@@ -1018,6 +1020,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     var writeReview = false;
     double? reviewRating;
     bool? reviewRecommended;
+    String? shareNote;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -1035,6 +1038,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           try {
             reviewRating = rating;
             reviewRecommended = recommended;
+            shareNote = notes;
             if (entry == null) {
               await WatchlistActionsController.instance.logMovieWatch(
                 userId,
@@ -1150,6 +1154,24 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         initialRating: reviewRating,
         initialRecommended: reviewRecommended,
       );
+    } else if (didSubmit && reviewRating != null && mounted) {
+      final user = authProvider.dbUser;
+      final movie = _movie;
+      if (user != null && movie != null) {
+        promptShareCard(
+          context,
+          ShareCardData.rating(
+            mediaType: ShareCardMediaType.movie,
+            mediaId: movieId,
+            title: movie.title,
+            posterPath: movie.posterPath,
+            user: user,
+            rating: reviewRating!.round(),
+            recommended: reviewRecommended,
+            note: shareNote,
+          ),
+        );
+      }
     }
     return didSubmit;
   }
@@ -2746,6 +2768,18 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           _movie = updatedMovie;
           _isRatingLoading = false;
         });
+        promptShareCard(
+          context,
+          ShareCardData.rating(
+            mediaType: ShareCardMediaType.movie,
+            mediaId: movieId,
+            title: updatedMovie.title,
+            posterPath: updatedMovie.posterPath,
+            user: user,
+            rating: rating,
+            recommended: recommended,
+          ),
+        );
       }
     } catch (e) {
       debugPrint('Failed to set rating: $e');
@@ -5302,7 +5336,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final movieId = int.tryParse(widget.movieId);
     if (movieId == null) return;
 
-    await showModalBottomSheet<void>(
+    final review = await showModalBottomSheet<Review>(
       context: context,
       useRootNavigator: false,
       isScrollControlled: true,
@@ -5318,6 +5352,19 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           auth.invalidateCachedReviews();
           auth.markActivityChanged();
         },
+      ),
+    );
+    final movie = _movie;
+    if (!mounted || review == null || movie == null) return;
+    promptShareCard(
+      this.context,
+      ShareCardData.review(
+        mediaType: ShareCardMediaType.movie,
+        mediaId: movieId,
+        title: movie.title,
+        posterPath: movie.posterPath,
+        user: user,
+        review: review,
       ),
     );
   }

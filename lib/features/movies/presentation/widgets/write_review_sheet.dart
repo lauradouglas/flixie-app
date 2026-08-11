@@ -52,8 +52,6 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
     super.dispose();
   }
 
-  bool _submitted = false;
-
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSubmitting = true);
@@ -79,9 +77,7 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
       final created = await _reviewReactions.addReview(draft);
       if (mounted) {
         widget.onSubmitted(created);
-        setState(() => _submitted = true);
-        await Future.delayed(const Duration(milliseconds: 1400));
-        if (mounted) Navigator.of(context).pop();
+        Navigator.of(context).pop(created);
       }
     } catch (e) {
       if (mounted) {
@@ -293,64 +289,37 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
                     // Submit
                     AnimatedSwitcher(
                       duration: const Duration(milliseconds: 300),
-                      child: _submitted
-                          ? Container(
-                              key: const ValueKey('success'),
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              decoration: BoxDecoration(
-                                color: Colors.green.shade700,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.check_circle,
-                                      color: Colors.white, size: 20),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Review submitted!',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 15,
-                                    ),
+                      child: SizedBox(
+                        key: const ValueKey('button'),
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: FlixieColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: _isSubmitting ? null : _submit,
+                          child: _isSubmitting
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: Colors.white,
                                   ),
-                                ],
-                              ),
-                            )
-                          : SizedBox(
-                              key: const ValueKey('button'),
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: FlixieColors.primary,
-                                  foregroundColor: Colors.white,
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 14),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                )
+                              : const Text(
+                                  'Submit Review',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
                                   ),
                                 ),
-                                onPressed: _isSubmitting ? null : _submit,
-                                child: _isSubmitting
-                                    ? const SizedBox(
-                                        height: 20,
-                                        width: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2.5,
-                                          color: Colors.white,
-                                        ),
-                                      )
-                                    : const Text(
-                                        'Submit Review',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 15,
-                                        ),
-                                      ),
-                              ),
-                            ),
+                        ),
+                      ),
                     ),
                   ],
                 ),

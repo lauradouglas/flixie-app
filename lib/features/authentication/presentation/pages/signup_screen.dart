@@ -20,7 +20,9 @@ import 'package:flixie_app/models/profile_avatar.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 
 class SignupScreen extends StatefulWidget {
-  const SignupScreen({super.key});
+  const SignupScreen({super.key, this.referralCode});
+
+  final String? referralCode;
 
   @override
   State<SignupScreen> createState() => _SignupScreenState();
@@ -62,6 +64,13 @@ class _SignupScreenState extends State<SignupScreen> {
   @override
   void initState() {
     super.initState();
+    final referralCode = widget.referralCode?.trim();
+    if (referralCode != null && referralCode.isNotEmpty) {
+      _referralCodeController.text = referralCode.toUpperCase();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _checkReferralCode();
+      });
+    }
     _loadCountries();
   }
 

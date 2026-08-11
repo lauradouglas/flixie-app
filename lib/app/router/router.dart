@@ -124,10 +124,19 @@ GoRouter buildRouter(AuthProvider authProvider) {
       final isAuthRoute = state.matchedLocation.startsWith('/auth');
       final isSplash = state.matchedLocation == '/splash';
       final isOnboarding = state.matchedLocation == '/onboarding';
+      final isReferralInvite = state.matchedLocation == '/invite';
 
       // Show splash only while Firebase resolves initial auth state
       if (status == AuthStatus.unknown) {
         return isSplash ? null : '/splash';
+      }
+
+      if (status == AuthStatus.unauthenticated && isReferralInvite) {
+        final code = state.uri.queryParameters['code'];
+        return Uri(
+          path: '/auth/signup',
+          queryParameters: code == null ? null : {'code': code},
+        ).toString();
       }
 
       if (status == AuthStatus.unauthenticated && !isAuthRoute) {
@@ -381,6 +390,17 @@ GoRouter buildRouter(AuthProvider authProvider) {
             _calmPage(state, const OnboardingScreen()),
       ),
 
+      GoRoute(
+        path: '/invite',
+        redirect: (_, state) {
+          final code = state.uri.queryParameters['code'];
+          return Uri(
+            path: '/auth/signup',
+            queryParameters: code == null ? null : {'code': code},
+          ).toString();
+        },
+      ),
+
       // Auth routes (unauthenticated)
       GoRoute(
         path: '/auth/login',
@@ -388,7 +408,13 @@ GoRouter buildRouter(AuthProvider authProvider) {
       ),
       GoRoute(
         path: '/auth/signup',
-        pageBuilder: (context, state) => _calmPage(state, const SignupScreen()),
+        pageBuilder: (context, state) => _calmPage(
+          state,
+          SignupScreen(
+            referralCode: state.uri.queryParameters['code'] ??
+                state.uri.queryParameters['referralCode'],
+          ),
+        ),
       ),
       GoRoute(
         path: '/auth/forgot-password',

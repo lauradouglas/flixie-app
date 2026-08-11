@@ -19,6 +19,8 @@ import 'package:flixie_app/features/watchlist/presentation/controllers/watchlist
 import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_sheet.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/watch_follow_up_sheet.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/write_review_sheet.dart';
+import 'package:flixie_app/features/sharing/models/share_card_data.dart';
+import 'package:flixie_app/features/sharing/presentation/share_card_sheet.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/social/presentation/widgets/group_watch_requests_overview.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
@@ -473,7 +475,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     }
 
     if (mounted && choice.writeReview) {
-      await showModalBottomSheet<void>(
+      final review = await showModalBottomSheet<Review>(
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
@@ -487,6 +489,21 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
           },
         ),
       );
+      if (!mounted) return;
+      final user = context.read<AuthProvider>().dbUser;
+      if (review != null && user != null) {
+        promptShareCard(
+          context,
+          ShareCardData.review(
+            mediaType: ShareCardMediaType.movie,
+            mediaId: movie.id,
+            title: movie.title,
+            posterPath: movie.posterPath,
+            user: user,
+            review: review,
+          ),
+        );
+      }
     }
   }
 

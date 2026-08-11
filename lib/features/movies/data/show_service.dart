@@ -20,6 +20,13 @@ class ShowService {
         .toList();
   }
 
+  static Future<void> dismissContinueWatching(
+    String userId,
+    int showId,
+  ) async {
+    await ApiClient.delete('/users/$userId/shows/$showId/continue-watching');
+  }
+
   static Future<TvShow> getShowById(int id, {String? userId}) async {
     final data = await ApiClient.get(
       '/shows/id/$id',

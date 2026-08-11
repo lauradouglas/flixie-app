@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:flixie_app/models/movie_short.dart';
 import 'package:flixie_app/models/movie_watch_entry.dart';
+import 'package:flixie_app/models/review.dart';
 import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/models/friend_media_interaction.dart';
 import 'package:flixie_app/models/watch_request.dart';
@@ -36,6 +37,8 @@ import 'package:flixie_app/features/home/presentation/widgets/trending_friends_s
 import 'package:flixie_app/features/home/presentation/widgets/personalized_recommendation_card.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_sheet.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/write_review_sheet.dart';
+import 'package:flixie_app/features/sharing/models/share_card_data.dart';
+import 'package:flixie_app/features/sharing/presentation/share_card_sheet.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 
@@ -592,10 +595,38 @@ class _HomeScreenState extends State<HomeScreen> {
         ContinueWatchingCarousel(
           shows: _continueWatchingShows,
           onTap: (show) => context.push('/shows/${show.showId}'),
+          onRemove: _removeContinueWatchingShow,
         ),
         const SizedBox(height: 20),
       ],
     );
+  }
+
+  Future<void> _removeContinueWatchingShow(ContinueWatchingShow show) async {
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (userId == null) return;
+    final index = _continueWatchingShows.indexWhere(
+      (item) => item.showId == show.showId,
+    );
+    if (index < 0) return;
+
+    setState(() => _continueWatchingShows.removeAt(index));
+    try {
+      await ShowService.dismissContinueWatching(userId, show.showId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${show.name} removed from Continue Watching')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        final restoredIndex = index.clamp(0, _continueWatchingShows.length);
+        _continueWatchingShows.insert(restoredIndex, show);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not remove that show right now')),
+      );
+    }
   }
 
   // ── Hero carousel ──────────────────────────────────────────────────────────
@@ -1146,6 +1177,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   action: value,
                                   movieId: item.movieId,
                                   movieTitle: item.movie?.title ?? 'Movie',
+                                  posterPath: item.movie?.posterPath,
                                   isInWatchlist: true,
                                 );
                               },
@@ -1332,6 +1364,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               context,
                               movieId: movie.id,
                               movieTitle: movie.name,
+                              posterPath: movie.poster,
                               isInWatchlist: isBookmarked,
                               isRewatch: isPreviouslyWatched,
                             ),
@@ -1790,6 +1823,7 @@ class _HomeScreenState extends State<HomeScreen> {
     BuildContext context, {
     required int movieId,
     required String movieTitle,
+    String? posterPath,
     required bool isInWatchlist,
   }) {
     showModalBottomSheet<void>(
@@ -1812,6 +1846,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   context,
                   movieId: movieId,
                   movieTitle: movieTitle,
+                  posterPath: posterPath,
                   isInWatchlist: isInWatchlist,
                 );
               },
@@ -1844,6 +1879,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required String action,
     required int movieId,
     required String movieTitle,
+    String? posterPath,
     required bool isInWatchlist,
   }) {
     switch (action) {
@@ -1852,6 +1888,7 @@ class _HomeScreenState extends State<HomeScreen> {
           context,
           movieId: movieId,
           movieTitle: movieTitle,
+          posterPath: posterPath,
           isInWatchlist: isInWatchlist,
         );
         break;
@@ -1871,6 +1908,7 @@ class _HomeScreenState extends State<HomeScreen> {
     BuildContext context, {
     required int movieId,
     required String movieTitle,
+    String? posterPath,
     required bool isInWatchlist,
     bool isRewatch = false,
   }) async {
@@ -1883,6 +1921,7 @@ class _HomeScreenState extends State<HomeScreen> {
     var watchSaved = false;
     double? reviewRating;
     bool? reviewRecommended;
+    String? shareNote;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -1900,6 +1939,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }) async {
           reviewRating = rating;
           reviewRecommended = recommended;
+          shareNote = notes;
           await _watchlistActions.logMovieWatch(
             userId,
             LogMovieWatchRequest(
@@ -1942,22 +1982,51 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
 
-    if (!mounted || !context.mounted || !watchSaved || !writeReview) return;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => WriteReviewSheet(
-        movieId: movieId,
-        userId: userId,
-        initialRating: reviewRating,
-        initialRecommended: reviewRecommended,
-        onSubmitted: (_) {
-          auth.invalidateCachedReviews();
-          auth.markActivityChanged();
-        },
-      ),
-    );
+    final user = auth.dbUser;
+    if (!mounted || !context.mounted || !watchSaved || user == null) return;
+    if (writeReview) {
+      final review = await showModalBottomSheet<Review>(
+        context: this.context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => WriteReviewSheet(
+          movieId: movieId,
+          userId: userId,
+          initialRating: reviewRating,
+          initialRecommended: reviewRecommended,
+          onSubmitted: (_) {
+            auth.invalidateCachedReviews();
+            auth.markActivityChanged();
+          },
+        ),
+      );
+      if (!mounted || review == null) return;
+      promptShareCard(
+        this.context,
+        ShareCardData.review(
+          mediaType: ShareCardMediaType.movie,
+          mediaId: movieId,
+          title: movieTitle,
+          posterPath: posterPath,
+          user: user,
+          review: review,
+        ),
+      );
+    } else if (reviewRating != null) {
+      promptShareCard(
+        this.context,
+        ShareCardData.rating(
+          mediaType: ShareCardMediaType.movie,
+          mediaId: movieId,
+          title: movieTitle,
+          posterPath: posterPath,
+          user: user,
+          rating: reviewRating!.round(),
+          recommended: reviewRecommended,
+          note: shareNote,
+        ),
+      );
+    }
   }
 }
 

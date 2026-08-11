@@ -66,6 +66,8 @@
 	</dict>
 	<key>NSCalendarsUsageDescription</key>
 	<string>Flixie uses your calendar to save an agreed watch time.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Flixie saves the share images you choose to your photo library.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

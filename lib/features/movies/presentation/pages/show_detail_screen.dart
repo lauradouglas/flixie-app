@@ -726,7 +726,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     final user = context.read<AuthProvider>().dbUser;
     final show = _show;
     if (user == null || show == null) return;
-    await showModalBottomSheet<void>(
+    await showModalBottomSheet<Review>(
       context: context,
       useRootNavigator: false,
       isScrollControlled: true,

@@ -240,6 +240,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _removeContinueWatchingShow(ContinueWatchingShow show) async {
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (userId == null) return;
+    final index = _continueWatching.indexWhere(
+      (item) => item.showId == show.showId,
+    );
+    if (index < 0) return;
+
+    setState(() => _continueWatching.removeAt(index));
+    try {
+      await ShowService.dismissContinueWatching(userId, show.showId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${show.name} removed from Continue Watching')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        final restoredIndex = index.clamp(0, _continueWatching.length);
+        _continueWatching.insert(restoredIndex, show);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not remove that show right now')),
+      );
+    }
+  }
+
   Future<void> _openWatchProviders() async {
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (userId == null) return;
@@ -560,7 +587,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
         if (userId != null) ...[
           if (_continueWatching.isNotEmpty) ...[
-            _ProfileContinueWatching(shows: _continueWatching),
+            _ProfileContinueWatching(
+              shows: _continueWatching,
+              onRemove: _removeContinueWatchingShow,
+            ),
             const SizedBox(height: 20),
           ],
           ListsPreviewSection(
@@ -2192,9 +2222,13 @@ class _ProfileActivityCard extends StatelessWidget {
 }
 
 class _ProfileContinueWatching extends StatelessWidget {
-  const _ProfileContinueWatching({required this.shows});
+  const _ProfileContinueWatching({
+    required this.shows,
+    required this.onRemove,
+  });
 
   final List<ContinueWatchingShow> shows;
+  final ValueChanged<ContinueWatchingShow> onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -2217,6 +2251,7 @@ class _ProfileContinueWatching extends StatelessWidget {
           shows: shows.take(10).toList(),
           contentPadding: EdgeInsets.zero,
           onTap: (show) => context.push('/shows/${show.showId}'),
+          onRemove: onRemove,
         ),
       ],
     );

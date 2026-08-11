@@ -3,6 +3,7 @@ import 'package:firebase_analytics/firebase_analytics.dart';
 abstract interface class AnalyticsBackend {
   Future<void> setCollectionEnabled(bool enabled);
   Future<void> logEvent(String name, Map<String, Object>? parameters);
+  Future<void> logScreenView(String screenName);
 }
 
 class FirebaseAnalyticsBackend implements AnalyticsBackend {
@@ -21,4 +22,8 @@ class FirebaseAnalyticsBackend implements AnalyticsBackend {
     Map<String, Object>? parameters,
   ) =>
       _analytics.logEvent(name: name, parameters: parameters);
+
+  @override
+  Future<void> logScreenView(String screenName) =>
+      _analytics.logScreenView(screenName: screenName);
 }

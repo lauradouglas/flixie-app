@@ -9,11 +9,13 @@ class ContinueWatchingCarousel extends StatelessWidget {
     super.key,
     required this.shows,
     required this.onTap,
+    this.onRemove,
     this.contentPadding = const EdgeInsets.symmetric(horizontal: 16),
   });
 
   final List<ContinueWatchingShow> shows;
   final ValueChanged<ContinueWatchingShow> onTap;
+  final ValueChanged<ContinueWatchingShow>? onRemove;
   final EdgeInsetsGeometry contentPadding;
 
   @override
@@ -30,10 +32,39 @@ class ContinueWatchingCarousel extends StatelessWidget {
           return ContinueWatchingCard(
             show: show,
             onTap: () => onTap(show),
+            onRemove:
+                onRemove == null ? null : () => _confirmRemove(context, show),
           );
         },
       ),
     );
+  }
+
+  Future<void> _confirmRemove(
+    BuildContext context,
+    ContinueWatchingShow show,
+  ) async {
+    final remove = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Remove from Continue Watching?'),
+        content: Text(
+          '${show.name} will be hidden here. Your watched episodes and '
+          'progress will stay saved.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Keep watching'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (remove == true) onRemove?.call(show);
   }
 }
 
@@ -42,10 +73,12 @@ class ContinueWatchingCard extends StatelessWidget {
     super.key,
     required this.show,
     required this.onTap,
+    this.onRemove,
   });
 
   final ContinueWatchingShow show;
   final VoidCallback onTap;
+  final VoidCallback? onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -94,20 +127,26 @@ class ContinueWatchingCard extends StatelessWidget {
                 Positioned(
                   top: 7,
                   right: 7,
-                  child: Container(
+                  child: SizedBox(
                     width: 29,
                     height: 29,
-                    decoration: BoxDecoration(
+                    child: Material(
                       color: Colors.black.withValues(alpha: .68),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: .24),
+                      shape: CircleBorder(
+                        side: BorderSide(
+                          color: Colors.white.withValues(alpha: .24),
+                        ),
                       ),
-                    ),
-                    child: const Icon(
-                      Icons.play_arrow_rounded,
-                      color: Colors.white,
-                      size: 19,
+                      child: IconButton(
+                        tooltip: 'Remove from Continue Watching',
+                        padding: EdgeInsets.zero,
+                        onPressed: onRemove,
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
                     ),
                   ),
                 ),
