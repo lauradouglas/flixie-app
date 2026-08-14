@@ -29,6 +29,7 @@ import 'package:flixie_app/features/social/presentation/widgets/social_section_h
 import 'package:flixie_app/features/social/presentation/widgets/segmented_toggle.dart';
 import 'package:flixie_app/features/social/presentation/widgets/visibility_chip.dart';
 import 'package:flixie_app/features/social/presentation/widgets/activity_filter_bar.dart';
+import 'package:flixie_app/features/social/presentation/widgets/conversations_hub.dart';
 
 class SocialScreen extends StatefulWidget {
   const SocialScreen({super.key});
@@ -38,7 +39,7 @@ class SocialScreen extends StatefulWidget {
 }
 
 class _SocialScreenState extends State<SocialScreen> {
-  int _selectedTab = 0; // 0 = Friends, 1 = Groups
+  int _selectedTab = 0; // 0 = Friends, 1 = Chats, 2 = Groups
   int _refreshRevision = 0;
 
   @override
@@ -92,7 +93,7 @@ class _SocialScreenState extends State<SocialScreen> {
           ),
           IconButton(
             onPressed: () {
-              if (_selectedTab == 0) {
+              if (_selectedTab != 2) {
                 _showAddFriendSheet();
                 return;
               }
@@ -102,7 +103,7 @@ class _SocialScreenState extends State<SocialScreen> {
               );
             },
             icon: const Icon(Icons.person_add_alt_1_outlined),
-            tooltip: _selectedTab == 0 ? 'Find friends' : 'Create group',
+            tooltip: _selectedTab == 2 ? 'Create group' : 'Find friends',
           ),
         ],
       ),
@@ -110,7 +111,7 @@ class _SocialScreenState extends State<SocialScreen> {
         children: [
           SocialSegmentedToggle(
             selectedIndex: _selectedTab,
-            labels: const ['Friends', 'Groups'],
+            labels: const ['Friends', 'Chats', 'Groups'],
             onChanged: (i) => setState(() => _selectedTab = i),
           ),
           Expanded(
@@ -118,6 +119,7 @@ class _SocialScreenState extends State<SocialScreen> {
               index: _selectedTab,
               children: [
                 _FriendsSubView(key: ValueKey('friends-$_refreshRevision')),
+                ConversationsHub(key: ValueKey('chats-$_refreshRevision')),
                 _GroupsSubView(key: ValueKey('groups-$_refreshRevision')),
               ],
             ),

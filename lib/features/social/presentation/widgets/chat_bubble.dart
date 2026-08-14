@@ -4,8 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
-import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/core/analytics/detail_source.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
+import 'package:flixie_app/features/social/presentation/utils/movie_share_payload.dart';
 import 'package:flixie_app/models/profile_avatar.dart';
 
 class ChatBubble extends StatelessWidget {
@@ -20,6 +21,7 @@ class ChatBubble extends StatelessWidget {
     this.profileBadges = const [],
     this.replyTo,
     this.onLongPress,
+    this.onSenderTap,
   });
 
   final String message;
@@ -31,6 +33,7 @@ class ChatBubble extends StatelessWidget {
   final List<String> profileBadges;
   final String? replyTo;
   final VoidCallback? onLongPress;
+  final VoidCallback? onSenderTap;
 
   @override
   Widget build(BuildContext context) {
@@ -58,12 +61,27 @@ class ChatBubble extends StatelessWidget {
             if (!isMe)
               Padding(
                 padding: const EdgeInsets.only(left: 46, bottom: 4),
-                child: Text(
-                  senderUsername,
-                  style: const TextStyle(
-                    color: FlixieColors.medium,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                child: Semantics(
+                  button: onSenderTap != null,
+                  label: onSenderTap == null
+                      ? senderUsername
+                      : 'Open $senderUsername profile',
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: onSenderTap,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Text(
+                        senderUsername,
+                        style: TextStyle(
+                          color: onSenderTap == null
+                              ? FlixieColors.medium
+                              : FlixieColors.primaryTint,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -129,7 +147,7 @@ class ChatBubble extends StatelessWidget {
   }
 
   Widget _buildMessageBody(BuildContext context) {
-    final movieShare = _parseMovieSharePayload(message);
+    final movieShare = parseMovieSharePayload(message);
     if (movieShare != null) {
       return _buildMovieShareCard(context, movieShare);
     }
@@ -190,8 +208,7 @@ class ChatBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildMovieShareCard(
-      BuildContext context, _MovieSharePayload payload) {
+  Widget _buildMovieShareCard(BuildContext context, MovieSharePayload payload) {
     final cardColor = isMe
         ? Colors.white.withValues(alpha: 0.14)
         : FlixieColors.tabBarBackgroundFocused.withValues(alpha: 0.9);
@@ -310,37 +327,6 @@ class ChatBubble extends StatelessWidget {
     return match?.group(0);
   }
 
-  _MovieSharePayload? _parseMovieSharePayload(String text) {
-    final match = RegExp(
-      r'\[FLIXIE_MOVIE_SHARE\]([\s\S]*?)\[/FLIXIE_MOVIE_SHARE\]',
-      multiLine: true,
-    ).firstMatch(text);
-    if (match == null) return null;
-
-    final block = match.group(1) ?? '';
-    final data = <String, String>{};
-    for (final rawLine in block.split('\n')) {
-      final line = rawLine.trim();
-      if (line.isEmpty) continue;
-      final separator = line.indexOf('=');
-      if (separator <= 0) continue;
-      final key = line.substring(0, separator).trim();
-      final value = line.substring(separator + 1).trim();
-      data[key] = Uri.decodeComponent(value);
-    }
-
-    final title = data['title']?.trim() ?? '';
-    final link = data['link']?.trim() ?? '';
-    if (title.isEmpty || link.isEmpty) return null;
-
-    return _MovieSharePayload(
-      title: title,
-      link: link,
-      posterUrl: data['poster']?.trim() ?? '',
-      prompt: data['message']?.trim() ?? '',
-    );
-  }
-
   String _labelForLink(String rawLink) {
     if (rawLink.startsWith('flixie://movies/') ||
         rawLink.startsWith('flixie:///movies/')) {
@@ -383,18 +369,4 @@ class ChatBubble extends StatelessWidget {
 
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
-}
-
-class _MovieSharePayload {
-  const _MovieSharePayload({
-    required this.title,
-    required this.link,
-    required this.posterUrl,
-    required this.prompt,
-  });
-
-  final String title;
-  final String link;
-  final String posterUrl;
-  final String prompt;
 }

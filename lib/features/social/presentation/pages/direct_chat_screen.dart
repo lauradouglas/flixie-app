@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -148,27 +149,38 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF0F081E),
         titleSpacing: 0,
-        title: Row(
-          children: [
-            ProfileAvatarView(
-              avatar: otherUser?.avatar,
-              fallbackText: otherUser?.initials ??
-                  (otherUser?.username.isNotEmpty == true
-                      ? otherUser!.username[0].toUpperCase()
-                      : '?'),
-              fallbackColor: FlixieColors.primary,
-              size: 34,
-              profileBadges: otherUser?.profileBadges ?? const [],
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+        title: Semantics(
+          button: true,
+          label: 'Open $title profile',
+          child: InkWell(
+            onTap: () => context.push('/friends/${widget.otherUserId}'),
+            borderRadius: BorderRadius.circular(24),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 4),
+              child: Row(
+                children: [
+                  ProfileAvatarView(
+                    avatar: otherUser?.avatar,
+                    fallbackText: otherUser?.initials ??
+                        (otherUser?.username.isNotEmpty == true
+                            ? otherUser!.username[0].toUpperCase()
+                            : '?'),
+                    fallbackColor: FlixieColors.primary,
+                    size: 34,
+                    profileBadges: otherUser?.profileBadges ?? const [],
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ),
       body: Column(
@@ -223,6 +235,9 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
                       profileBadges: isMe
                           ? const []
                           : (otherUser?.profileBadges ?? const []),
+                      onSenderTap: isMe
+                          ? null
+                          : () => context.push('/friends/${msg.senderId}'),
                     );
                   },
                 );

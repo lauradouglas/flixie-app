@@ -40,14 +40,13 @@ class _LoginScreenState extends State<LoginScreen> {
       _passwordController.text,
     );
 
-    if (!_rememberMe) {
-      _emailController.clear();
-      _passwordController.clear();
-    }
-
     if (!mounted) return;
     if (success) {
-      TextInput.finishAutofillContext(shouldSave: true);
+      TextInput.finishAutofillContext(shouldSave: _rememberMe);
+      if (!_rememberMe) {
+        _emailController.clear();
+        _passwordController.clear();
+      }
       context.go('/');
       return;
     }
@@ -123,6 +122,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: textTheme.bodyMedium?.copyWith(
                           color: FlixieColors.textPrimary,
                           fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      subtitle: const Text(
+                        'Save with this device’s password manager',
+                        style: TextStyle(
+                          color: FlixieColors.medium,
+                          fontSize: 11,
                         ),
                       ),
                       controlAffinity: ListTileControlAffinity.leading,

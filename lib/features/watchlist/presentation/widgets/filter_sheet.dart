@@ -35,6 +35,8 @@ class _WatchlistFilterSheetState extends State<WatchlistFilterSheet> {
   double? _minRating;
   int? _year;
   int? _maxRuntime;
+  bool _isEdgeSwipe = false;
+  double _edgeSwipeDistance = 0;
 
   static const _runtimeOptions = [
     (null, 'Any'),
@@ -111,163 +113,196 @@ class _WatchlistFilterSheetState extends State<WatchlistFilterSheet> {
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
-    return Container(
-      padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottom),
-      decoration: const BoxDecoration(
-        color: FlixieColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Handle
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: FlixieColors.medium,
-                    borderRadius: BorderRadius.circular(2),
+    final sheet = Container(
+        padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottom),
+        decoration: const BoxDecoration(
+          color: FlixieColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Handle
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: FlixieColors.medium,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Sort & Filter',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold)),
-                  TextButton(
-                    onPressed: () => setState(() {
-                      _sort = 'recent';
-                      _genre = null;
-                      _minRating = null;
-                      _year = null;
-                      _maxRuntime = null;
-                    }),
-                    child: const Text('Reset',
-                        style: TextStyle(color: FlixieColors.primary)),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Sort & Filter',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold)),
+                    TextButton(
+                      onPressed: () => setState(() {
+                        _sort = 'recent';
+                        _genre = null;
+                        _minRating = null;
+                        _year = null;
+                        _maxRuntime = null;
+                      }),
+                      child: const Text('Reset',
+                          style: TextStyle(color: FlixieColors.primary)),
+                    ),
+                  ],
+                ),
+
+                // Sort
+                _sectionLabel('Sort By'),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _sortOptions.map((opt) {
+                    final selected = _sort == opt.$1;
+                    return _optionChip(
+                      label: opt.$2,
+                      selected: selected,
+                      onSelected: () => setState(() => _sort = opt.$1),
+                    );
+                  }).toList(),
+                ),
+
+                // Runtime
+                _sectionLabel('Max Runtime'),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _runtimeOptions.map((opt) {
+                    final selected = _maxRuntime == opt.$1;
+                    return _optionChip(
+                      label: opt.$2,
+                      selected: selected,
+                      onSelected: () => setState(() => _maxRuntime = opt.$1),
+                    );
+                  }).toList(),
+                ),
+
+                // Min Rating
+                _sectionLabel('Minimum Rating'),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _ratingOptions.map((opt) {
+                    final selected = _minRating == opt.$1;
+                    return _optionChip(
+                      label: opt.$2,
+                      selected: selected,
+                      onSelected: () => setState(() => _minRating = opt.$1),
+                    );
+                  }).toList(),
+                ),
+
+                // Genre
+                if (widget.genres.isNotEmpty) ...[
+                  _sectionLabel('Genre'),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _optionChip(
+                        label: 'All',
+                        selected: _genre == null,
+                        onSelected: () => setState(() => _genre = null),
+                      ),
+                      ...widget.genres.map((g) {
+                        final selected = _genre == g;
+                        return _optionChip(
+                          label: g,
+                          selected: selected,
+                          onSelected: () => setState(() => _genre = g),
+                        );
+                      }),
+                    ],
                   ),
                 ],
-              ),
 
-              // Sort
-              _sectionLabel('Sort By'),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _sortOptions.map((opt) {
-                  final selected = _sort == opt.$1;
-                  return _optionChip(
-                    label: opt.$2,
-                    selected: selected,
-                    onSelected: () => setState(() => _sort = opt.$1),
-                  );
-                }).toList(),
-              ),
+                // Release Year
+                if (widget.years.isNotEmpty) ...[
+                  _sectionLabel('Release Year'),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _optionChip(
+                        label: 'All',
+                        selected: _year == null,
+                        onSelected: () => setState(() => _year = null),
+                      ),
+                      ...widget.years.map((y) {
+                        final selected = _year == y;
+                        return _optionChip(
+                          label: '$y',
+                          selected: selected,
+                          onSelected: () => setState(() => _year = y),
+                        );
+                      }),
+                    ],
+                  ),
+                ],
 
-              // Runtime
-              _sectionLabel('Max Runtime'),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _runtimeOptions.map((opt) {
-                  final selected = _maxRuntime == opt.$1;
-                  return _optionChip(
-                    label: opt.$2,
-                    selected: selected,
-                    onSelected: () => setState(() => _maxRuntime = opt.$1),
-                  );
-                }).toList(),
-              ),
-
-              // Min Rating
-              _sectionLabel('Minimum Rating'),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _ratingOptions.map((opt) {
-                  final selected = _minRating == opt.$1;
-                  return _optionChip(
-                    label: opt.$2,
-                    selected: selected,
-                    onSelected: () => setState(() => _minRating = opt.$1),
-                  );
-                }).toList(),
-              ),
-
-              // Genre
-              if (widget.genres.isNotEmpty) ...[
-                _sectionLabel('Genre'),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _optionChip(
-                      label: 'All',
-                      selected: _genre == null,
-                      onSelected: () => setState(() => _genre = null),
-                    ),
-                    ...widget.genres.map((g) {
-                      final selected = _genre == g;
-                      return _optionChip(
-                        label: g,
-                        selected: selected,
-                        onSelected: () => setState(() => _genre = g),
-                      );
-                    }),
-                  ],
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      widget.onApply(
+                          _genre, _minRating, _year, _maxRuntime, _sort);
+                    },
+                    style: FilledButton.styleFrom(
+                        backgroundColor: FlixieColors.primary),
+                    child: const Text('Apply'),
+                  ),
                 ),
               ],
-
-              // Release Year
-              if (widget.years.isNotEmpty) ...[
-                _sectionLabel('Release Year'),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _optionChip(
-                      label: 'All',
-                      selected: _year == null,
-                      onSelected: () => setState(() => _year = null),
-                    ),
-                    ...widget.years.map((y) {
-                      final selected = _year == y;
-                      return _optionChip(
-                        label: '$y',
-                        selected: selected,
-                        onSelected: () => setState(() => _year = y),
-                      );
-                    }),
-                  ],
-                ),
-              ],
-
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    widget.onApply(
-                        _genre, _minRating, _year, _maxRuntime, _sort);
-                  },
-                  style: FilledButton.styleFrom(
-                      backgroundColor: FlixieColors.primary),
-                  child: const Text('Apply'),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+        ));
+
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragStart: (details) {
+        _isEdgeSwipe = details.globalPosition.dx <= 32;
+        _edgeSwipeDistance = 0;
+      },
+      onHorizontalDragUpdate: (details) {
+        if (!_isEdgeSwipe) return;
+        setState(() {
+          _edgeSwipeDistance =
+              (_edgeSwipeDistance + details.delta.dx).clamp(0, 120);
+        });
+      },
+      onHorizontalDragEnd: (details) {
+        if (!_isEdgeSwipe) return;
+        final shouldDismiss =
+            _edgeSwipeDistance >= 72 || (details.primaryVelocity ?? 0) > 500;
+        _isEdgeSwipe = false;
+        if (shouldDismiss) {
+          Navigator.of(context).pop();
+        } else {
+          setState(() => _edgeSwipeDistance = 0);
+        }
+      },
+      onHorizontalDragCancel: () {
+        _isEdgeSwipe = false;
+        if (mounted) setState(() => _edgeSwipeDistance = 0);
+      },
+      child: Transform.translate(
+        offset: Offset(_edgeSwipeDistance, 0),
+        child: sheet,
       ),
     );
   }

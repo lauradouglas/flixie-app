@@ -84,6 +84,26 @@ class ChatService {
     });
   }
 
+  /// All direct and group conversations visible to [userId], updated live.
+  static Stream<List<Conversation>> conversationsStream(String userId) {
+    return _db
+        .collection('conversations')
+        .where('memberIds', arrayContains: userId)
+        .snapshots()
+        .map((snapshot) {
+      final conversations =
+          snapshot.docs.map(Conversation.fromFirestore).toList();
+      conversations.sort((left, right) {
+        final leftAt =
+            left.lastMessageAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final rightAt =
+            right.lastMessageAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return rightAt.compareTo(leftAt);
+      });
+      return conversations;
+    });
+  }
+
   /// Fetch the members subcollection once and return a userId→username map.
   static Future<Map<String, String>> fetchMemberUsernames(
       String conversationId) async {

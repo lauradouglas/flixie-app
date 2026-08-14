@@ -72,6 +72,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
 
   _FriendshipStatus _friendshipStatus = _FriendshipStatus.none;
   String? _friendshipId;
+  bool _friendshipStatusLoading = true;
   bool _actionLoading = false;
 
   int? _compatibilityScore;
@@ -83,7 +84,47 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _useCachedFriendshipStatus();
     _loadAll();
+  }
+
+  void _useCachedFriendshipStatus() {
+    final cached = context.read<AuthProvider>().cachedFriends;
+    if (cached == null) return;
+    _applyFriendshipStatus(cached, cachedOnly: true);
+  }
+
+  bool _applyFriendshipStatus(FriendsData data, {bool cachedOnly = false}) {
+    for (final friendship in data.friendships) {
+      if (friendship.friendUser?.id == widget.userId) {
+        _friendshipStatus = _FriendshipStatus.friends;
+        _friendshipId = friendship.id;
+        _friendshipStatusLoading = false;
+        return true;
+      }
+    }
+    for (final friendship in data.pendingFriends) {
+      if (friendship.friendUser?.id == widget.userId) {
+        _friendshipStatus = _FriendshipStatus.pending;
+        _friendshipId = friendship.id;
+        _friendshipStatusLoading = false;
+        return true;
+      }
+    }
+    for (final friendship in data.requestedFriends) {
+      if (friendship.friendUser?.id == widget.userId) {
+        _friendshipStatus = _FriendshipStatus.requested;
+        _friendshipId = friendship.id;
+        _friendshipStatusLoading = false;
+        return true;
+      }
+    }
+    if (!cachedOnly) {
+      _friendshipStatus = _FriendshipStatus.none;
+      _friendshipId = null;
+      _friendshipStatusLoading = false;
+    }
+    return false;
   }
 
   Future<void> _loadAll() async {
@@ -191,7 +232,10 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
   Future<void> _loadFriendshipStatus() async {
     final auth = context.read<AuthProvider>();
     final myId = auth.dbUser?.id;
-    if (myId == null) return;
+    if (myId == null) {
+      if (mounted) setState(() => _friendshipStatusLoading = false);
+      return;
+    }
 
     try {
       // Always fetch fresh data - the cache may be stale after sending a request.
@@ -199,38 +243,12 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
 
       if (!mounted) return;
 
-      for (final f in data.friendships) {
-        if (f.friendUser?.id == widget.userId) {
-          setState(() {
-            _friendshipStatus = _FriendshipStatus.friends;
-            _friendshipId = f.id;
-          });
-          return;
-        }
-      }
-      // pending = requests sent TO the logged-in user (they are the recipient).
-      for (final f in data.pendingFriends) {
-        if (f.friendUser?.id == widget.userId) {
-          setState(() {
-            _friendshipStatus = _FriendshipStatus.pending;
-            _friendshipId = f.id;
-          });
-          return;
-        }
-      }
-      // requested = requests sent BY the logged-in user (they are the requester).
-      for (final f in data.requestedFriends) {
-        if (f.friendUser?.id == widget.userId) {
-          setState(() {
-            _friendshipStatus = _FriendshipStatus.requested;
-            _friendshipId = f.id;
-          });
-          return;
-        }
-      }
-      setState(() => _friendshipStatus = _FriendshipStatus.none);
+      setState(() {
+        _applyFriendshipStatus(data);
+      });
     } catch (e) {
       logger.e('[FriendProfileScreen] friendship status load error: $e');
+      if (mounted) setState(() => _friendshipStatusLoading = false);
     }
   }
 
@@ -734,22 +752,31 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
   }
 
   Widget _profileActions() {
+    if (_friendshipStatusLoading) {
+      return Container(
+        height: 50,
+        decoration: BoxDecoration(
+          color: FlixieColors.surface.withValues(alpha: .55),
+          borderRadius: BorderRadius.circular(24),
+        ),
+      );
+    }
     if (_friendshipStatus != _FriendshipStatus.friends) {
       return SizedBox(width: double.infinity, child: _buildFriendshipButton());
     }
     return Row(children: [
-      Expanded(
-        child: OutlinedButton.icon(
+      Tooltip(
+        message: 'Message ${_user?.username ?? 'friend'}',
+        child: IconButton.outlined(
           onPressed: () => context.push('/chat/${widget.userId}'),
-          icon: const Icon(Icons.chat_bubble_outline),
-          label: const Text('Message'),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(50),
+          icon: const Icon(Icons.chat_bubble_outline_rounded),
+          style: IconButton.styleFrom(
+            minimumSize: const Size(50, 50),
             side: const BorderSide(color: FlixieColors.primary),
           ),
         ),
       ),
-      const SizedBox(width: 10),
+      const SizedBox(width: 12),
       Expanded(
         child: FilledButton.icon(
           onPressed: _inviteToWatch,

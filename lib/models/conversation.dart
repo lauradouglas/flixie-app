@@ -78,6 +78,7 @@ class Conversation {
   final List<String> memberIds;
   final String? lastMessage;
   final DateTime? lastMessageAt;
+  final String? lastMessageSenderId;
   final String? name;
   final String? pgGroupId; // links to Prisma group id
 
@@ -87,6 +88,7 @@ class Conversation {
     required this.memberIds,
     this.lastMessage,
     this.lastMessageAt,
+    this.lastMessageSenderId,
     this.name,
     this.pgGroupId,
   });
@@ -97,8 +99,9 @@ class Conversation {
       id: doc.id,
       type: data['type'] as String? ?? 'group',
       memberIds: (data['memberIds'] as List<dynamic>?)?.cast<String>() ?? [],
-      lastMessage: data['lastMessage'] as String?,
+      lastMessage: (data['lastMessageText'] ?? data['lastMessage']) as String?,
       lastMessageAt: (data['lastMessageAt'] as Timestamp?)?.toDate(),
+      lastMessageSenderId: data['lastMessageSenderId'] as String?,
       name: data['name'] as String?,
       pgGroupId: data['pgGroupId'] as String?,
     );
@@ -109,10 +112,11 @@ class Conversation {
       id: data['id'] as String? ?? '',
       type: data['type'] as String? ?? 'group',
       memberIds: (data['memberIds'] as List<dynamic>?)?.cast<String>() ?? [],
-      lastMessage: data['lastMessage'] as String?,
+      lastMessage: (data['lastMessageText'] ?? data['lastMessage']) as String?,
       lastMessageAt: data['lastMessageAt'] != null
           ? DateTime.tryParse(data['lastMessageAt'].toString())
           : null,
+      lastMessageSenderId: data['lastMessageSenderId'] as String?,
       name: data['name'] as String?,
       pgGroupId: data['pgGroupId'] as String?,
     );

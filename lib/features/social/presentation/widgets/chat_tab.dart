@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'package:flixie_app/models/conversation.dart';
@@ -816,6 +817,8 @@ class GroupChatTabState extends State<GroupChatTab> {
                       avatar: member?.avatar,
                       initials: member?.initials,
                       profileBadges: member?.profileBadges ?? const [],
+                      onSenderTap:
+                          isMe ? null : () => context.push('/friends/$sid'),
                       replyTo:
                           msg.replyToMessageId != null ? '↩ replied' : null,
                       onLongPress: isMe
