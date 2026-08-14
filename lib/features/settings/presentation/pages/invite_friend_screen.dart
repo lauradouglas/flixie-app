@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -38,7 +39,12 @@ class _InviteFriendScreenState extends State<InviteFriendScreen> {
           box == null ? null : box.localToGlobal(Offset.zero) & box.size,
     );
     if (mounted) {
-      await context.read<AnalyticsController>().referralInviteShared();
+      final entryPoint = GoRouterState.of(context).uri.queryParameters['from'];
+      final source = entryPoint == 'settings' ? 'settings' : 'social';
+      await context.read<AnalyticsController>().friendInviteSent(
+            inviteMethod: 'referral_link',
+            source: source,
+          );
     }
   }
 

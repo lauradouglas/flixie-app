@@ -9,6 +9,7 @@ class MovieShort {
   final Trailer? trailer;
   final String? mediaType;
   final double? voteAverage;
+  final double? popularity;
   final double? recommendationScore;
   final List<String> recommendationReasons;
   final List<String> recommendationSourceTypes;
@@ -25,6 +26,7 @@ class MovieShort {
     this.trailer,
     this.mediaType,
     this.voteAverage,
+    this.popularity,
     this.recommendationScore,
     this.recommendationReasons = const [],
     this.recommendationSourceTypes = const [],
@@ -54,6 +56,7 @@ class MovieShort {
       mediaType: stringValue(json['mediaType'] ?? json['media_type']),
       voteAverage:
           ((json['voteAverage'] ?? json['vote_average']) as num?)?.toDouble(),
+      popularity: (json['popularity'] as num?)?.toDouble(),
       recommendationScore: (json['score'] as num?)?.toDouble(),
       recommendationReasons: (json['reasons'] as List<dynamic>? ?? const [])
           .whereType<String>()
@@ -79,6 +82,7 @@ class MovieShort {
       'trailer': trailer?.toJson(),
       'mediaType': mediaType,
       'voteAverage': voteAverage,
+      'popularity': popularity,
       'score': recommendationScore,
       'reasons': recommendationReasons,
       'sourceTypes': recommendationSourceTypes,

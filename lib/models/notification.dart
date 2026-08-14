@@ -1,4 +1,5 @@
 import 'package:flixie_app/models/profile_avatar.dart';
+import 'package:flixie_app/models/watch_request.dart';
 
 class FlixieNotification {
   // Notification type constants
@@ -141,6 +142,11 @@ class FlixieNotification {
     final l = link;
     if (l == null) return null;
     return l['request'] as Map<String, dynamic>?;
+  }
+
+  WatchRequest? get linkedWatchRequest {
+    final request = _linkedWatchRequest;
+    return request == null ? null : WatchRequest.fromJson(request);
   }
 
   DateTime? get watchRequestScheduledFor {

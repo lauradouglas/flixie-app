@@ -19,6 +19,7 @@ import 'package:flixie_app/features/movies/presentation/controllers/movie_lists_
 import 'package:flixie_app/features/movies/data/search_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
 
 enum _ListSort { recentlyAdded, title, rating }
 
@@ -585,16 +586,20 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                               onOpen: () {
                                 final movieId = _entryMovieId(entry);
                                 if (movieId > 0) {
-                                  final source = widget.listName
-                                          .startsWith('Movie Match with @')
-                                      ? '?source=movie_match'
-                                      : '';
-                                  context.push('/movies/$movieId$source');
+                                  context.push(movieDetailPath(
+                                    movieId,
+                                    source: DetailSource.list,
+                                    fromMovieMatch: widget.listName
+                                        .startsWith('Movie Match with @'),
+                                  ));
                                   return;
                                 }
                                 final showId = _entryShowId(entry);
                                 if (showId > 0) {
-                                  context.push('/shows/$showId');
+                                  context.push(showDetailPath(
+                                    showId,
+                                    source: DetailSource.list,
+                                  ));
                                 }
                               },
                               onRemove: () => _confirmRemove(

@@ -225,7 +225,18 @@ class _NotificationScreenState extends State<NotificationScreen> {
           await analytics.friendConnected();
         } else if (notification.type == FlixieNotification.movieWatchRequest ||
             notification.type == FlixieNotification.showWatchRequest) {
-          await analytics.watchInvitationAccepted(recipientType: 'friend');
+          final request = notification.linkedWatchRequest;
+          await analytics.watchPlanAccepted(
+            watchPlanId: requestId,
+            contentId: request?.analyticsContentId,
+            contentType: request?.analyticsContentType ??
+                (notification.type == FlixieNotification.showWatchRequest
+                    ? 'show'
+                    : 'movie'),
+            planType: 'friend',
+            participantCount: 2,
+            source: 'notification',
+          );
         }
       }
 
@@ -304,7 +315,14 @@ class _NotificationScreenState extends State<NotificationScreen> {
       if (!mounted) return;
       final scheduledFor = state.request.scheduledFor;
       if (decision == 'accepted' && scheduledFor != null) {
-        await analytics.watchScheduled(recipientType: 'friend');
+        await analytics.watchPlanScheduled(
+          watchPlanId: state.request.id,
+          contentId: state.request.analyticsContentId,
+          contentType: state.request.analyticsContentType,
+          planType: state.request.analyticsPlanType,
+          participantCount: state.request.analyticsParticipantCount,
+          source: 'notification',
+        );
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

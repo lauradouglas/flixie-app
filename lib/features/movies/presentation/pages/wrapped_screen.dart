@@ -80,19 +80,38 @@ class _WrappedViewState extends State<_WrappedView> {
   }
 
   Widget _buildYearSelector() {
-    return DropdownButton<int>(
-      value: _year,
-      underline: const SizedBox(),
-      dropdownColor: FlixieColors.tabBarBackgroundFocused,
-      items: List.generate(
-        DateTime.now().year - widget.joinYear + 1,
-        (i) => DateTime.now().year - i,
-      ).map((y) => DropdownMenuItem(value: y, child: Text('$y'))).toList(),
-      onChanged: (value) {
-        if (value == null) return;
-        setState(() => _year = value);
-        context.read<MovieWrappedProvider>().loadYear(value);
-      },
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 13),
+      decoration: BoxDecoration(
+        color: FlixieColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: FlixieColors.primary.withValues(alpha: .3),
+        ),
+      ),
+      child: DropdownButton<int>(
+        value: _year,
+        underline: const SizedBox(),
+        dropdownColor: FlixieColors.tabBarBackgroundFocused,
+        icon: const Icon(
+          Icons.keyboard_arrow_down_rounded,
+          color: FlixieColors.light,
+        ),
+        style: const TextStyle(
+          color: FlixieColors.white,
+          fontWeight: FontWeight.w700,
+        ),
+        items: List.generate(
+          DateTime.now().year - widget.joinYear + 1,
+          (i) => DateTime.now().year - i,
+        ).map((y) => DropdownMenuItem(value: y, child: Text('$y'))).toList(),
+        onChanged: (value) {
+          if (value == null) return;
+          setState(() => _year = value);
+          context.read<MovieWrappedProvider>().loadYear(value);
+        },
+      ),
     );
   }
 
@@ -114,11 +133,11 @@ class _WrappedViewState extends State<_WrappedView> {
                 ),
               )
             : ListView(
-                padding: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.only(bottom: 28),
                 children: [
                   if (widget.embedded) ...[
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                      padding: const EdgeInsets.fromLTRB(18, 10, 18, 14),
                       child: Align(
                         alignment: Alignment.centerRight,
                         child: _buildYearSelector(),
@@ -129,32 +148,31 @@ class _WrappedViewState extends State<_WrappedView> {
                   ],
                   if (wrapped.wrappedCard != null) ...[
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 18),
                       child: WrappedSummaryCard(card: wrapped.wrappedCard!),
                     ),
                     const SizedBox(height: 20),
                   ],
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: WrappedHeadlineCard(
-                      title: 'Movies Watched',
-                      value: '${wrapped.totalMoviesWatched}',
-                      icon: Icons.movie_outlined,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
                     child: Row(
                       children: [
                         Expanded(
                           child: WrappedHeadlineCard(
-                            title: 'Total Watches',
+                            title: 'Movies',
+                            value: '${wrapped.totalMoviesWatched}',
+                            icon: Icons.movie_outlined,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: WrappedHeadlineCard(
+                            title: 'Rewatches',
                             value: '${wrapped.rewatchCount}',
                             icon: Icons.replay,
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: WrappedHeadlineCard(
                             title: 'Hours',
@@ -165,7 +183,7 @@ class _WrappedViewState extends State<_WrappedView> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
                   const HomeSectionHeader(title: 'Monthly Activity'),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),

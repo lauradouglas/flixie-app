@@ -205,6 +205,7 @@ class WatchRequest {
   final String status;
   final String? response;
   final int? movieId;
+  final int? showId;
   final String type;
   final String? createdAt;
   final String? updatedAt;
@@ -244,6 +245,7 @@ class WatchRequest {
     required this.status,
     this.response,
     this.movieId,
+    this.showId,
     required this.type,
     this.createdAt,
     this.updatedAt,
@@ -278,6 +280,7 @@ class WatchRequest {
 
   factory WatchRequest.fromJson(Map<String, dynamic> json) {
     final movie = json['movie'] as Map<String, dynamic>?;
+    final show = json['show'] as Map<String, dynamic>?;
     final createdBy = json['createdBy'] as Map<String, dynamic>?;
     final participantsRaw = json['participants'] as List<dynamic>? ?? [];
     final proposalsRaw = json['scheduleProposals'] as List<dynamic>? ?? [];
@@ -297,6 +300,7 @@ class WatchRequest {
       status: json['status'] as String? ?? 'open',
       response: json['response'] as String?,
       movieId: _intValue(json['movieId'] ?? movie?['id']),
+      showId: _intValue(json['showId'] ?? show?['id']),
       type: json['type'] as String? ?? 'MOVIE_WATCH_REQUEST',
       createdAt: json['createdAt'] as String?,
       updatedAt: json['updatedAt'] as String?,
@@ -369,6 +373,24 @@ class WatchRequest {
   bool get isWatchRequest =>
       normalizedType == 'MOVIE_WATCH_REQUEST' ||
       normalizedType == 'SHOW_WATCH_REQUEST';
+  String get analyticsContentType =>
+      normalizedType == 'SHOW_WATCH_REQUEST' ? 'show' : 'movie';
+  int? get analyticsContentId =>
+      analyticsContentType == 'show' ? showId : movieId;
+  String get analyticsPlanType => groupId == null ? 'friend' : 'group';
+
+  /// Total intended participants, including the creator. Direct requests are
+  /// always one creator plus one friend. Group responses represent invitees.
+  int get analyticsParticipantCount {
+    if (groupId == null) return 2;
+    final inviteeIds = participants
+        .map((participant) => participant.user?.id)
+        .whereType<String>()
+        .where((id) => id.isNotEmpty && id != requesterId)
+        .toSet();
+    return 1 + inviteeIds.length;
+  }
+
   bool get isPending =>
       normalizedStatus == 'pending' || normalizedStatus == 'open';
   bool get isAccepted => normalizedStatus == 'accepted';
@@ -381,7 +403,7 @@ class WatchRequest {
   bool get isDeclined => normalizedStatus == 'declined';
   bool get isTerminal => isCompleted || isCancelled || isExpired || isDeclined;
   bool get isAwaitingScheduleApproval =>
-    isAccepted && normalizedScheduleStatus != 'AGREED';
+      isAccepted && normalizedScheduleStatus != 'AGREED';
 
   String get displayStatusLabel {
     if (normalizedWatchedStatus == 'WATCHED') return 'Watched';

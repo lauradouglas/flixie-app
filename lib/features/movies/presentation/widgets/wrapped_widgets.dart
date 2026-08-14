@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
 
 import 'package:flixie_app/models/movie_wrapped.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -36,25 +37,59 @@ class WrappedHeadlineCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      height: 104,
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: FlixieColors.tabBarBackgroundFocused,
-        borderRadius: BorderRadius.circular(12),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            FlixieColors.surfaceElevated,
+            FlixieColors.tabBarBackgroundFocused,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: FlixieColors.primary.withValues(alpha: .22),
+        ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Icon(icon, color: FlixieColors.primary),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(value,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 20)),
-                Text(title, style: const TextStyle(color: FlixieColors.medium)),
-              ],
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: FlixieColors.primary.withValues(alpha: .14),
+              borderRadius: BorderRadius.circular(9),
             ),
+            child: Icon(icon, color: FlixieColors.primary, size: 17),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 19,
+                  letterSpacing: -.3,
+                ),
+              ),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: FlixieColors.medium,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -77,10 +112,10 @@ class WrappedMonthGrid extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-        childAspectRatio: 1.1,
+        crossAxisCount: 6,
+        crossAxisSpacing: 6,
+        mainAxisSpacing: 6,
+        childAspectRatio: .9,
       ),
       itemCount: 12,
       itemBuilder: (_, i) {
@@ -95,7 +130,12 @@ class WrappedMonthGrid extends StatelessWidget {
         return Container(
           decoration: BoxDecoration(
             color: bg,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: FlixieColors.primary.withValues(
+                alpha: .14 + (intensity * .25),
+              ),
+            ),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -103,7 +143,7 @@ class WrappedMonthGrid extends StatelessWidget {
               Text(
                 wrappedMonthNames[i],
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 10,
                   fontWeight: FontWeight.w600,
                   color: intensity > 0.4 ? Colors.white : FlixieColors.light,
                 ),
@@ -112,7 +152,7 @@ class WrappedMonthGrid extends StatelessWidget {
               Text(
                 '$count',
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 15,
                   fontWeight: FontWeight.bold,
                   color: intensity > 0.4 ? Colors.white : FlixieColors.medium,
                 ),
@@ -160,28 +200,39 @@ class WrappedDirectorList extends StatelessWidget {
     return Column(
       children: directors.map((d) {
         final tappable = d.personId != null;
-        return ListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(
-            d.name,
-            style: TextStyle(
-              color: tappable ? FlixieColors.primary : FlixieColors.white,
-              fontWeight: FontWeight.w500,
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: ListTile(
+            dense: true,
+            visualDensity: const VisualDensity(vertical: -2),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
-          ),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('${d.count} film${d.count == 1 ? '' : 's'}',
-                  style: const TextStyle(color: FlixieColors.medium)),
-              if (tappable) ...[
-                const SizedBox(width: 4),
-                const Icon(Icons.chevron_right,
-                    color: FlixieColors.medium, size: 18),
+            tileColor: FlixieColors.surfaceElevated.withValues(alpha: .55),
+            title: Text(
+              d.name,
+              style: TextStyle(
+                color: tappable ? FlixieColors.primary : FlixieColors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('${d.count} film${d.count == 1 ? '' : 's'}',
+                    style: const TextStyle(color: FlixieColors.medium)),
+                if (tappable) ...[
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right,
+                      color: FlixieColors.medium, size: 18),
+                ],
               ],
-            ],
+            ),
+            onTap: tappable
+                ? () => context.push(personDetailPath(d.personId!))
+                : null,
           ),
-          onTap: tappable ? () => context.push('/people/${d.personId}') : null,
         );
       }).toList(),
     );
@@ -495,21 +546,24 @@ class _MovieRowBase extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => context.push('/movies/$movieId'),
+      onTap: () => context.push(movieDetailPath(movieId)),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(10),
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: FlixieColors.tabBarBackgroundFocused,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: FlixieColors.primary.withValues(alpha: .16),
+          ),
         ),
         child: Row(
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: SizedBox(
-                width: 44,
-                height: 64,
+                width: 39,
+                height: 56,
                 child: posterUrl == null
                     ? Container(
                         color: const Color(0xFF1E1E2E),

@@ -31,19 +31,29 @@ void promptShareCard(BuildContext context, ShareCardData data) {
   messenger.showSnackBar(
     SnackBar(
       behavior: SnackBarBehavior.floating,
-      duration: const Duration(seconds: 6),
-      content: const Row(
+      duration: const Duration(seconds: 5),
+      content: Row(
         children: [
-          Icon(Icons.auto_awesome_rounded,
+          const Icon(Icons.auto_awesome_rounded,
               color: FlixieColors.tertiary, size: 19),
-          SizedBox(width: 9),
-          Expanded(child: Text('Saved! Want to share your take?')),
+          const SizedBox(width: 9),
+          const Expanded(child: Text('Saved! Want to share your take?')),
+          const SizedBox(width: 8),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: FlixieColors.white,
+              backgroundColor: FlixieColors.primary,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              minimumSize: const Size(0, 38),
+              textStyle: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+            onPressed: () {
+              messenger.hideCurrentSnackBar();
+              showShareCardSheet(context, data);
+            },
+            child: const Text('Share'),
+          ),
         ],
-      ),
-      action: SnackBarAction(
-        label: 'Share',
-        textColor: FlixieColors.secondary,
-        onPressed: () => showShareCardSheet(context, data),
       ),
     ),
   );
@@ -117,7 +127,10 @@ class _ShareCardSheetState extends State<ShareCardSheet> {
           origin: origin,
         );
         if (mounted) {
-          await context.read<AnalyticsController>().referralInviteShared();
+          await context.read<AnalyticsController>().friendInviteSent(
+                inviteMethod: 'referral_link',
+                source: 'movie_detail',
+              );
         }
       } else {
         final bytes = await _imageBytes();
@@ -127,6 +140,18 @@ class _ShareCardSheetState extends State<ShareCardSheet> {
             data: widget.data,
             origin: origin,
           );
+          if (mounted) {
+            await context.read<AnalyticsController>().shareCreated(
+                  shareType: widget.data.variant == ShareCardVariant.review
+                      ? 'review'
+                      : widget.data.mediaLabel,
+                  contentType: widget.data.mediaLabel,
+                  contentId: widget.data.mediaId,
+                  source: widget.data.variant == ShareCardVariant.review
+                      ? 'movie_detail'
+                      : 'watch_history',
+                );
+          }
         } else {
           await _exportService.save(bytes: bytes, data: widget.data);
           if (mounted) {

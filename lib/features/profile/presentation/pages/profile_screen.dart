@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
 import 'package:provider/provider.dart';
 
 import 'package:flixie_app/models/activity_list_item.dart';
@@ -21,6 +22,7 @@ import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
+import 'package:flixie_app/core/utils/favourite_limits.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/friends_row.dart';
@@ -408,15 +410,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final bio = dbUser?.bio;
     final userId = dbUser?.id;
 
-    final favoriteMovies = dbUser?.favoriteMovies ?? [];
+    final favoriteMovies = (dbUser?.favoriteMovies ?? [])
+        .where((favorite) => favorite.removed != true)
+        .toList(growable: false);
+    final favoriteShows = (dbUser?.favoriteShows ?? const <dynamic>[])
+        .where(isActiveFavouriteShow)
+        .toList(growable: false);
     final favoritePeople = dbUser?.favoritePeople ?? [];
     final watchedCount = (dbUser?.watchedMovies?.length ?? 0) +
         (dbUser?.watchedShows?.length ?? 0);
     final watchlistCount = (dbUser?.movieWatchlist?.length ?? 0) +
         (dbUser?.showWatchlist?.length ?? 0);
-    final favoritesCount = favoriteMovies.length +
-        (dbUser?.favoriteShows?.length ?? 0) +
-        favoritePeople.length;
+    final favoritesCount = favoriteMovies.length;
     final averageRating = _averageRatingLabel(_ratings);
 
     final visibleActivity = _activity;
@@ -509,7 +514,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             userId: userId,
                             favoriteMovies: favoriteMovies,
                             favoritePeople: favoritePeople,
-                            favoriteShows: dbUser?.favoriteShows ?? const [],
+                            favoriteShows: favoriteShows,
                             favoriteGenres: dbUser?.favoriteGenres ?? const [],
                             user: dbUser,
                             visibleActivity: visibleActivity,
@@ -572,7 +577,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             people: favoritePeople,
             shows: favoriteShows,
           ),
-          const SizedBox(height: 20),
         ] else
           _ProfileEmptyAction(
             icon: Icons.favorite_outline_rounded,
@@ -581,9 +585,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             label: 'Find movies',
             onPressed: () => context.push('/search'),
           ),
+        const SizedBox(height: 20),
         if (_profileExtrasLoading) ...[
-          const SizedBox(height: 20),
           const _ProfileExtrasLoadingIndicator(),
+          const SizedBox(height: 20),
         ],
         if (userId != null) ...[
           if (_continueWatching.isNotEmpty) ...[
@@ -600,7 +605,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             allowManage: true,
             embedded: true,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
         ],
         if (_reviews.isNotEmpty) ...[
           _RecentReviewsSummary(reviews: _reviews),
@@ -952,7 +957,11 @@ class _FavouritesLibrary extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (movieItems.isNotEmpty)
-          _FavouritePosterRail(title: 'Favourite movies', items: movieItems),
+          _FavouritePosterRail(
+            title: 'Favourite movies',
+            items: movieItems,
+            limit: maxFavouriteMovies,
+          ),
         if (movieItems.isNotEmpty &&
             (peopleItems.isNotEmpty || showItems.isNotEmpty))
           const SizedBox(height: 18),
@@ -965,7 +974,11 @@ class _FavouritesLibrary extends StatelessWidget {
         if (peopleItems.isNotEmpty && showItems.isNotEmpty)
           const SizedBox(height: 18),
         if (showItems.isNotEmpty)
-          _FavouritePosterRail(title: 'Favourite shows', items: showItems),
+          _FavouritePosterRail(
+            title: 'Favourite shows',
+            items: showItems,
+            limit: maxFavouriteShows,
+          ),
       ],
     );
   }
@@ -987,11 +1000,13 @@ class _FavouritePosterRail extends StatelessWidget {
   const _FavouritePosterRail({
     required this.title,
     required this.items,
+    this.limit,
     this.circular = false,
   });
 
   final String title;
   final List<_FavouriteDisplayItem> items;
+  final int? limit;
   final bool circular;
 
   @override
@@ -1003,6 +1018,7 @@ class _FavouritePosterRail extends StatelessWidget {
         children: [
           FlixieSectionHeader(
             title: title,
+            trailingLabel: limit == null ? null : '${items.length} of $limit',
             uppercase: false,
             accentHeight: 22,
             titleStyle: const TextStyle(
@@ -1139,7 +1155,7 @@ class _ProfileReviewCard extends StatelessWidget {
         child: InkWell(
           onTap: review.movieId == null
               ? null
-              : () => context.push('/movies/${review.movieId}'),
+              : () => context.push(movieDetailPath(review.movieId!)),
           child: Container(
             decoration: BoxDecoration(
               border: Border.all(color: FlixieColors.tabBarBorder),
@@ -1642,7 +1658,7 @@ class _TopDirectorCard extends StatelessWidget {
     return GestureDetector(
       onTap: director.personId == null
           ? null
-          : () => context.push('/people/${director.personId}'),
+          : () => context.push(personDetailPath(director.personId!)),
       child: SizedBox(
         width: 260,
         child: Row(children: [
@@ -1723,7 +1739,7 @@ class _RecentRatingTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final path = rating.movie?.posterPath;
     return GestureDetector(
-      onTap: () => context.push('/movies/${rating.movieId}'),
+      onTap: () => context.push(movieDetailPath(rating.movieId)),
       child: SizedBox(
           width: 88,
           child:
@@ -2053,9 +2069,9 @@ class _ProfileActivityCard extends StatelessWidget {
   }
 
   void _open(BuildContext context) {
-    if (item.movieId != null) context.push('/movies/${item.movieId}');
-    if (item.showId != null) context.push('/shows/${item.showId}');
-    if (item.personId != null) context.push('/people/${item.personId}');
+    if (item.movieId != null) context.push(movieDetailPath(item.movieId!));
+    if (item.showId != null) context.push(showDetailPath(item.showId!));
+    if (item.personId != null) context.push(personDetailPath(item.personId!));
   }
 
   @override
@@ -2250,7 +2266,7 @@ class _ProfileContinueWatching extends StatelessWidget {
         ContinueWatchingCarousel(
           shows: shows.take(10).toList(),
           contentPadding: EdgeInsets.zero,
-          onTap: (show) => context.push('/shows/${show.showId}'),
+          onTap: (show) => context.push(showDetailPath(show.showId)),
           onRemove: onRemove,
         ),
       ],

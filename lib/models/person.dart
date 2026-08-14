@@ -151,6 +151,7 @@ class Person {
   final String? department;
   final String? imdbId;
   final String? instagramId;
+  final double? popularity;
   final List<PersonImage> images;
 
   const Person({
@@ -164,6 +165,7 @@ class Person {
     this.department,
     this.imdbId,
     this.instagramId,
+    this.popularity,
     this.images = const [],
   });
 
@@ -180,6 +182,7 @@ class Person {
       department: json['department'] as String?,
       imdbId: json['imdbId'] as String?,
       instagramId: json['instagramId'] as String?,
+      popularity: (json['popularity'] as num?)?.toDouble(),
       images: (json['images'] as List<dynamic>?)
               ?.map((e) => PersonImage.fromJson(e as Map<String, dynamic>))
               .toList() ??

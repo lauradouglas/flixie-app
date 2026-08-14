@@ -15,6 +15,7 @@ import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_shee
 import 'package:flixie_app/features/movies/presentation/widgets/write_review_sheet.dart';
 import 'package:flixie_app/features/sharing/models/share_card_data.dart';
 import 'package:flixie_app/features/sharing/presentation/share_card_sheet.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
 
 const List<String> _kMonths = [
   'Jan',
@@ -345,7 +346,10 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
                     return _WatchedMovieCard(
                       entry: entry,
                       formattedDate: _formatDate(entry.watchedAt),
-                      onTap: () => context.push('/movies/${entry.movieId}'),
+                      onTap: () => context.push(movieDetailPath(
+                        entry.movieId,
+                        source: DetailSource.watchHistory,
+                      )),
                       onLogAgain: () => _openWatchEntry(entry),
                       onEditEntry: entry.watches.isEmpty
                           ? null

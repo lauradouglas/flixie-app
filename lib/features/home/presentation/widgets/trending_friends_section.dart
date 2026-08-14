@@ -6,6 +6,7 @@ import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/home/presentation/widgets/section_header.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
 
 class FriendsWatchingSection extends StatelessWidget {
   const FriendsWatchingSection({super.key, required this.activity});
@@ -55,7 +56,10 @@ class FriendsWatchingSection extends StatelessWidget {
                       ? rawPoster
                       : 'https://image.tmdb.org/t/p/w342$rawPoster';
               return GestureDetector(
-                onTap: () => context.push('/movies/${item.movieId}'),
+                onTap: () => context.push(movieDetailPath(
+                  item.movieId!,
+                  source: DetailSource.friendsWatching,
+                )),
                 child: SizedBox(
                   width: 110,
                   child: Column(
@@ -226,7 +230,10 @@ class TrendingAmongFriendsSection extends StatelessWidget {
             itemBuilder: (context, i) {
               final entry = items[i];
               return GestureDetector(
-                onTap: () => context.push('/movies/${entry.movieId}'),
+                onTap: () => context.push(movieDetailPath(
+                  entry.movieId,
+                  source: DetailSource.friendsWatching,
+                )),
                 child: SizedBox(
                   width: 110,
                   child: Column(

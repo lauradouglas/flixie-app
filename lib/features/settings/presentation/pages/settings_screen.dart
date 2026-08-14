@@ -141,6 +141,11 @@ class SettingsScreen extends StatelessWidget {
           _SettingsGroup(
             children: [
               SettingsTile(
+                icon: Icons.explore_outlined,
+                label: 'Flixie guide',
+                onTap: () => context.push('/getting-started?from=settings'),
+              ),
+              SettingsTile(
                 icon: Icons.help_outline,
                 label: 'Help Center',
                 onTap: () => context.push('/help-support'),

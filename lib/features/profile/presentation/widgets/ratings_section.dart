@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
 
 import 'package:flixie_app/models/movie_rating.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -83,7 +84,7 @@ class _RatingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final movie = rating.movie;
     return GestureDetector(
-      onTap: () => context.push('/movies/${rating.movieId}'),
+      onTap: () => context.push(movieDetailPath(rating.movieId)),
       child: SizedBox(
         width: 100,
         child: Column(
@@ -324,7 +325,7 @@ class _RatingListTile extends StatelessWidget {
       child: InkWell(
         onTap: () {
           Navigator.of(context).pop();
-          context.push('/movies/${rating.movieId}');
+          context.push(movieDetailPath(rating.movieId));
         },
         borderRadius: BorderRadius.circular(12),
         child: Container(

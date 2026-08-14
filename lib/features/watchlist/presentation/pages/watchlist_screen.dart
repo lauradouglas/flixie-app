@@ -10,6 +10,8 @@ import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/features/movies/data/search_service.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/models/favorite_movie.dart';
+import 'package:flixie_app/core/utils/favourite_limits.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/favourite_limit_sheet.dart';
 import 'package:flixie_app/models/watched_movie.dart';
 import 'package:flixie_app/models/watchlist_movie.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
@@ -21,6 +23,7 @@ import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'package:flixie_app/features/watchlist/presentation/controllers/watchlist_actions_controller.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_sheet.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
 import 'package:flixie_app/features/movies/data/movie_service.dart';
 import 'package:flixie_app/features/movies/data/show_service.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
@@ -438,8 +441,11 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     try {
       final addedResponse =
           await UserService.addToWatchlist(user.id, selected.id);
-      await analytics.watchlistItemAdded(source: 'watchlist');
-      await analytics.movieAddedToWatchlist();
+      await analytics.watchlistAdded(
+        contentType: 'movie',
+        contentId: selected.id,
+        source: 'watchlist',
+      );
       final added = _entryWithMovieFallback(addedResponse, selected);
       final currentWatchlist =
           List<WatchlistMovie>.from(user.movieWatchlist ?? []);
@@ -821,6 +827,21 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       return;
     }
 
+    final activeFavouriteCount =
+        (user.favoriteMovies ?? const <FavoriteMovie>[])
+            .where((favorite) => favorite.removed != true)
+            .length;
+    if (activeFavouriteCount >= maxFavouriteMovies) {
+      if (mounted) {
+        showFavouriteLimitPrompt(
+          context,
+          type: FavouriteLimitType.movie,
+          onSpaceMade: () => _addToFavorites(item),
+        );
+      }
+      return;
+    }
+
     try {
       final addedFavorite = await UserService.addToFavorites(user.id, movieId);
       await analytics.movieFavourited();
@@ -845,12 +866,20 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     } catch (e) {
       debugPrint('Error adding to favorites: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to add to favourites'),
-            backgroundColor: FlixieColors.danger,
-          ),
-        );
+        if (isFavouriteLimitError(e)) {
+          showFavouriteLimitPrompt(
+            context,
+            type: FavouriteLimitType.movie,
+            onSpaceMade: () => _addToFavorites(item),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to add to favourites'),
+              backgroundColor: FlixieColors.danger,
+            ),
+          );
+        }
       }
     }
   }
@@ -1397,7 +1426,10 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       canWatchNow: canWatchNow,
       isLoadingProviders: isLoadingProviders,
       recommendations: _recommendationsByMovieId[item.movieId] ?? const [],
-      onTap: () => context.push('/movies/${item.movieId}'),
+      onTap: () => context.push(movieDetailPath(
+        item.movieId,
+        source: DetailSource.watchlist,
+      )),
       onMarkAsWatched: () => _markAsWatched(item),
       onAddToFavourites: () => _addToFavorites(item),
       onAddToList: () => _showAddToListSheet(item),
@@ -1425,7 +1457,10 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => context.push('/shows/${item.showId}'),
+        onTap: () => context.push(showDetailPath(
+          item.showId,
+          source: DetailSource.watchlist,
+        )),
         borderRadius: BorderRadius.circular(24),
         child: Ink(
           decoration: BoxDecoration(

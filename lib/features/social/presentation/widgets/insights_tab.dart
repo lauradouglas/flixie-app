@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
 
 import 'package:flixie_app/models/group_insights.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
@@ -336,7 +337,7 @@ class InsightHighlightCard extends StatelessWidget {
     return InkWell(
       onTap: movie.movieId == null
           ? null
-          : () => context.push('/movies/${movie.movieId}'),
+          : () => context.push(movieDetailPath(movie.movieId!)),
       borderRadius: BorderRadius.circular(16),
       child: Container(
         height: 188,
@@ -725,7 +726,7 @@ class _SignalTile extends StatelessWidget {
     final movie = signal.movie;
     return InkWell(
       onTap: movie?.movieId != null
-          ? () => context.push('/movies/${movie!.movieId}')
+          ? () => context.push(movieDetailPath(movie!.movieId!))
           : null,
       borderRadius: BorderRadius.circular(12),
       child: Container(
@@ -832,7 +833,7 @@ class InsightMovieCard extends StatelessWidget {
 
     return InkWell(
       onTap: movie.movieId != null
-          ? () => context.push('/movies/${movie.movieId}')
+          ? () => context.push(movieDetailPath(movie.movieId!))
           : null,
       borderRadius: BorderRadius.circular(14),
       child: Container(
@@ -1080,7 +1081,7 @@ class _InsightReviewCardState extends State<InsightReviewCard> {
         children: [
           GestureDetector(
             onTap: review.movieId != null
-                ? () => context.push('/movies/${review.movieId}')
+                ? () => context.push(movieDetailPath(review.movieId!))
                 : null,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(9),
@@ -1155,7 +1156,7 @@ class _InsightReviewCardState extends State<InsightReviewCard> {
                 const SizedBox(height: 7),
                 GestureDetector(
                   onTap: review.movieId != null
-                      ? () => context.push('/movies/${review.movieId}')
+                      ? () => context.push(movieDetailPath(review.movieId!))
                       : null,
                   child: Text(
                     review.movieTitle,

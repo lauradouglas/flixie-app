@@ -18,6 +18,8 @@ import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'package:flixie_app/models/review.dart';
 import 'package:flixie_app/models/similar_movie.dart';
 import 'package:flixie_app/models/watch_provider.dart';
+import 'package:flixie_app/core/utils/favourite_limits.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/favourite_limit_sheet.dart';
 import 'package:flixie_app/models/watched_movie.dart';
 import 'package:flixie_app/models/watchlist_movie.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
@@ -45,6 +47,8 @@ import 'package:flixie_app/features/social/data/friend_service.dart';
 import 'package:flixie_app/features/social/data/chat_service.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
+import 'package:flixie_app/core/analytics/recommendation_attribution.dart';
 import 'package:flixie_app/features/sharing/models/share_card_data.dart';
 import 'package:flixie_app/features/sharing/presentation/share_card_sheet.dart';
 import 'package:flixie_app/models/friendship.dart';
@@ -59,10 +63,14 @@ class MovieDetailScreen extends StatefulWidget {
     super.key,
     required this.movieId,
     this.fromMovieMatch = false,
+    this.source = DetailSource.unknown,
+    this.recommendation,
   });
 
   final String movieId;
   final bool fromMovieMatch;
+  final DetailSource source;
+  final RecommendationAttribution? recommendation;
 
   @override
   State<MovieDetailScreen> createState() => _MovieDetailScreenState();
@@ -525,6 +533,14 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   @override
   void initState() {
     super.initState();
+    final id = int.tryParse(widget.movieId);
+    if (id != null && id > 0) {
+      context.read<AnalyticsController?>()?.contentOpened(
+            contentType: 'movie',
+            contentId: id,
+            source: widget.source.value,
+          );
+    }
     _load();
   }
 
@@ -794,11 +810,23 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           : WatchlistActionsController.instance
               .addToWatchlist(user.id, movieId));
       if (_inWatchlist) {
-        await analytics.watchlistItemRemoved(source: 'movie_detail');
-        await analytics.movieRemovedFromWatchlist();
+        await analytics.watchlistRemoved(
+          contentType: 'movie',
+          contentId: movieId,
+          source: 'movie_detail',
+        );
       } else {
-        await analytics.watchlistItemAdded(source: 'movie_detail');
-        await analytics.movieAddedToWatchlist();
+        await analytics.watchlistAdded(
+          contentType: 'movie',
+          contentId: movieId,
+          source: 'movie_detail',
+        );
+        final recommendation = widget.recommendation;
+        if (recommendation != null) {
+          await analytics.recommendationSaved(
+            attribution: recommendation,
+          );
+        }
       }
 
       // Successfully updated on server, toggle UI state and update user list
@@ -934,6 +962,19 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
     if (user == null || movieId == null) return;
 
+    final activeFavouriteCount =
+        (user.favoriteMovies ?? const <FavoriteMovie>[])
+            .where((favorite) => favorite.removed != true)
+            .length;
+    if (!_isFavorite && activeFavouriteCount >= maxFavouriteMovies) {
+      showFavouriteLimitPrompt(
+        context,
+        type: FavouriteLimitType.movie,
+        onSpaceMade: _toggleFavorite,
+      );
+      return;
+    }
+
     setState(() => _currentlyUpdating = ListUpdateType.favorite);
     try {
       final FavoriteMovie? addedFavorite;
@@ -978,9 +1019,17 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       logger.e('Error toggling favorite: $e');
       if (mounted) {
         setState(() => _currentlyUpdating = null);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update favorites: $e')),
-        );
+        if (isFavouriteLimitError(e)) {
+          showFavouriteLimitPrompt(
+            context,
+            type: FavouriteLimitType.movie,
+            onSpaceMade: _toggleFavorite,
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to update favorites: $e')),
+          );
+        }
       }
     }
   }
@@ -1119,6 +1168,27 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 ),
               );
               didSubmit = true;
+            }
+            if (entry == null) {
+              await analytics.watchLogged(
+                contentType: 'movie',
+                contentId: movieId,
+                source: 'movie_detail',
+              );
+              final recommendation = widget.recommendation;
+              if (recommendation != null) {
+                await analytics.recommendationWatched(
+                  attribution: recommendation,
+                );
+              }
+              if (rating != null) {
+                await analytics.ratingAdded(
+                  contentType: 'movie',
+                  contentId: movieId,
+                  source: recommendation?.source ?? 'movie_detail',
+                  recommendation: recommendation,
+                );
+              }
             }
             await _loadWatchHistory(userId, movieId);
             // Evict the cache and re-fetch the movie so the updated
@@ -1640,8 +1710,12 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                                   ),
                                 ),
                                 GestureDetector(
-                                  onTap: () =>
-                                      context.push('/people/${_director!.id}'),
+                                  onTap: () => context.push(personDetailPath(
+                                    _director!.id,
+                                    source: DetailSource.personCredits,
+                                    parentContentId: movie.id,
+                                    parentContentType: 'movie',
+                                  )),
                                   child: Text(
                                     _director!.name,
                                     style: TextStyle(
@@ -2745,7 +2819,12 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       // Add rating and get updated vote average and count
       final response = await movieService.addMovieRating(
           movieId, user.id, rating, recommended);
-      await analytics.ratingSaved(source: 'movie_detail');
+      await analytics.ratingAdded(
+        contentType: 'movie',
+        contentId: movieId,
+        source: widget.recommendation?.source ?? 'movie_detail',
+        recommendation: widget.recommendation,
+      );
 
       // Extract updated vote data from response (safely parse types)
       final newVoteAverage = _parseDouble(response['voteAverage']);
@@ -5275,7 +5354,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _AllCastSheet(cast: _cast),
+      builder: (_) => _AllCastSheet(
+        cast: _cast,
+        parentContentId: int.parse(widget.movieId),
+      ),
     );
   }
 
@@ -5317,7 +5399,11 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             scrollDirection: Axis.horizontal,
             itemCount: _cast.length > 6 ? 6 : _cast.length,
             separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, i) => CastCard(member: _cast[i]),
+            itemBuilder: (context, i) => CastCard(
+              member: _cast[i],
+              parentContentId: int.parse(widget.movieId),
+              parentContentType: 'movie',
+            ),
           ),
         ),
       ],
@@ -5549,7 +5635,12 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => context.push('/people/${director.id}'),
+        onTap: () => context.push(personDetailPath(
+          director.id,
+          source: DetailSource.personCredits,
+          parentContentId: int.tryParse(widget.movieId),
+          parentContentType: 'movie',
+        )),
         child: Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 13),
@@ -5585,9 +5676,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 }
 
 class _AllCastSheet extends StatefulWidget {
-  const _AllCastSheet({required this.cast});
+  const _AllCastSheet({required this.cast, required this.parentContentId});
 
   final List<MovieCastMember> cast;
+  final int parentContentId;
 
   @override
   State<_AllCastSheet> createState() => _AllCastSheetState();
@@ -5782,8 +5874,10 @@ class _AllCastSheetState extends State<_AllCastSheet> {
                           ),
                         ),
                       ),
-                      itemBuilder: (context, index) =>
-                          _FullCastCard(member: filtered[index]),
+                      itemBuilder: (context, index) => _FullCastCard(
+                        member: filtered[index],
+                        parentContentId: widget.parentContentId,
+                      ),
                     ),
             ),
           ],
@@ -5794,9 +5888,13 @@ class _AllCastSheetState extends State<_AllCastSheet> {
 }
 
 class _FullCastCard extends StatelessWidget {
-  const _FullCastCard({required this.member});
+  const _FullCastCard({
+    required this.member,
+    required this.parentContentId,
+  });
 
   final MovieCastMember member;
+  final int parentContentId;
 
   @override
   Widget build(BuildContext context) {
@@ -5808,7 +5906,12 @@ class _FullCastCard extends StatelessWidget {
         onTap: () {
           final router = GoRouter.of(context);
           Navigator.pop(context);
-          router.push('/people/${member.id}');
+          router.push(personDetailPath(
+            member.id,
+            source: DetailSource.personCredits,
+            parentContentId: parentContentId,
+            parentContentType: 'movie',
+          ));
         },
         child: SizedBox(
           height: 94,

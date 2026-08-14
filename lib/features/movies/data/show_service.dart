@@ -120,8 +120,10 @@ class ShowService {
     await ApiClient.delete('/users/$userId/show/watchlist/$showId');
   }
 
-  static Future<void> addToFavourites(String userId, int showId) async {
-    await ApiClient.post('/users/$userId/show/favorite/$showId');
+  static Future<Map<String, dynamic>> addToFavourites(
+      String userId, int showId) async {
+    final data = await ApiClient.post('/users/$userId/show/favorite/$showId');
+    return Map<String, dynamic>.from(data as Map);
   }
 
   static Future<void> removeFromFavourites(String userId, int showId) async {

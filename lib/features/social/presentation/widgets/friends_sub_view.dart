@@ -6,6 +6,7 @@ import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/friends_row.dart';
 import 'package:flixie_app/features/social/data/friend_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -200,7 +201,10 @@ class _FriendsSubViewState extends State<FriendsSubView> {
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: _activity.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (_, i) => ActivityTile(item: _activity[i]),
+                itemBuilder: (_, i) => ActivityTile(
+                  item: _activity[i],
+                  detailSource: DetailSource.friendActivity,
+                ),
               ),
             const SizedBox(height: 24),
           ],

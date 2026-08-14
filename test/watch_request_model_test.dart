@@ -4,6 +4,34 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('WatchRequest', () {
+    test('analytics participants include the creator and direct friend', () {
+      final request = WatchRequest.fromJson({
+        'id': 'wr-direct',
+        'requesterId': 'u-1',
+        'recipientId': 'u-2',
+        'status': 'open',
+        'type': 'MOVIE_WATCH_REQUEST',
+        'movieId': 42,
+      });
+
+      expect(request.analyticsPlanType, 'friend');
+      expect(request.analyticsParticipantCount, 2);
+      expect(request.analyticsContentId, 42);
+    });
+
+    test('show requests expose their actual analytics content type and id', () {
+      final request = WatchRequest.fromJson({
+        'id': 'wr-show',
+        'requesterId': 'u-1',
+        'recipientId': 'u-2',
+        'status': 'open',
+        'type': 'SHOW_WATCH_REQUEST',
+        'showId': 99,
+      });
+
+      expect(request.analyticsContentType, 'show');
+      expect(request.analyticsContentId, 99);
+    });
     test('parses independently optional proposed time and location', () {
       final request = WatchRequest.fromJson({
         'id': 'request-1',

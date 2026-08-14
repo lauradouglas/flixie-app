@@ -24,6 +24,7 @@ import 'package:flixie_app/features/sharing/presentation/share_card_sheet.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/social/presentation/widgets/group_watch_requests_overview.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
 
 const List<String> _kMonths = [
   'Jan',
@@ -404,8 +405,13 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
       try {
         await RequestService.updateRequest(request.id, response);
         if (response == 'ACCEPTED') {
-          await analytics.watchInvitationAccepted(
-            recipientType: request.groupId == null ? 'friend' : 'group',
+          await analytics.watchPlanAccepted(
+            watchPlanId: request.id,
+            contentId: request.analyticsContentId,
+            contentType: request.analyticsContentType,
+            planType: request.analyticsPlanType,
+            participantCount: request.analyticsParticipantCount,
+            source: 'watch_plan',
           );
         }
         await _load();
@@ -466,6 +472,16 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
             );
             await WatchlistActionsController.instance
                 .addToWatched(userId, movie.id);
+            if (mounted) {
+              await context.read<AnalyticsController>().watchLogged(
+                    contentType: request.analyticsContentType,
+                    contentId: movie.id,
+                    source: 'watch_plan',
+                    watchPlanId: request.id,
+                    planType: request.analyticsPlanType,
+                    participantCount: request.analyticsParticipantCount,
+                  );
+            }
             if (mounted) {
               context.read<AuthProvider>().markActivityChanged();
             }
@@ -633,8 +649,13 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         _replaceRequest(state.request);
         final agreedTime = state.request.scheduledFor ?? proposal.proposedFor;
         if (decision == 'accepted' && agreedTime != null) {
-          await analytics.watchScheduled(
-            recipientType: request.groupId == null ? 'friend' : 'group',
+          await analytics.watchPlanScheduled(
+            watchPlanId: state.request.id,
+            contentId: state.request.analyticsContentId,
+            contentType: state.request.analyticsContentType,
+            planType: state.request.analyticsPlanType,
+            participantCount: state.request.analyticsParticipantCount,
+            source: 'watch_plan',
           );
         }
         if (!mounted) return;
@@ -691,6 +712,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
 
   Future<void> _confirmWatched(WatchRequest request) async {
     final userId = context.read<AuthProvider>().dbUser?.id;
+    final analytics = context.read<AnalyticsController>();
     if (userId == null || userId.isEmpty) return;
     final result = await showModalBottomSheet<
         ({bool watched, int? rating, String? reviewText})>(
@@ -711,6 +733,16 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
           reviewText: result.reviewText,
         );
         _replaceRequest(state.request);
+        if (!request.isCompleted && state.request.isCompleted) {
+          await analytics.watchPlanCompleted(
+            watchPlanId: state.request.id,
+            contentId: state.request.analyticsContentId,
+            contentType: state.request.analyticsContentType,
+            planType: state.request.analyticsPlanType,
+            participantCount: state.request.analyticsParticipantCount,
+            source: 'watch_plan',
+          );
+        }
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1061,7 +1093,10 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
       scheduledLabel: _formatFriendlyDateTime(request.scheduledFor),
       busyAction: _busyActions[request.id],
       onMovieTap: request.movieId != null
-          ? () => context.push('/movies/${request.movieId}')
+          ? () => context.push(movieDetailPath(
+                request.movieId!,
+                source: DetailSource.watchPlan,
+              ))
           : null,
       onAccept: () => _respond(request, 'ACCEPTED'),
       onDecline: () => _respond(request, 'DECLINED'),

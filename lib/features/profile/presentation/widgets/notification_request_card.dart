@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
 
 import 'package:flixie_app/models/notification.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -431,7 +432,12 @@ class NotificationRequestCard extends StatelessWidget {
       alignment: PlaceholderAlignment.baseline,
       baseline: TextBaseline.alphabetic,
       child: GestureDetector(
-        onTap: movieId != null ? () => context.push('/movies/$movieId') : null,
+        onTap: movieId != null
+            ? () => context.push(movieDetailPath(
+                  movieId,
+                  source: DetailSource.notification,
+                ))
+            : null,
         child: Text(
           title,
           style: TextStyle(

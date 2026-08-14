@@ -5,6 +5,7 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
 import 'package:flixie_app/features/social/data/friend_service.dart';
 import 'package:flixie_app/models/activity_list_item.dart';
 
@@ -132,7 +133,10 @@ class _FriendsActivityScreenState extends State<FriendsActivityScreen> {
                               ],
                             );
                           }
-                          return ActivityTile(item: _items[index - 1]);
+                          return ActivityTile(
+                            item: _items[index - 1],
+                            detailSource: DetailSource.friendActivity,
+                          );
                         },
                       ),
       ),

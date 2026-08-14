@@ -9,6 +9,7 @@ import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/review_card.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
 
 class ActivityTile extends StatelessWidget {
   const ActivityTile({
@@ -16,11 +17,13 @@ class ActivityTile extends StatelessWidget {
     required this.item,
     this.compact = false,
     this.showMoviePreview = true,
+    this.detailSource = DetailSource.unknown,
   });
 
   final ActivityListItem item;
   final bool compact;
   final bool showMoviePreview;
+  final DetailSource detailSource;
 
   static const String _posterBase = 'https://image.tmdb.org/t/p/w342';
 
@@ -259,9 +262,15 @@ class ActivityTile extends StatelessWidget {
 
   String? _mediaRoute() {
     final isPerson = item.type == ActivityListType.favoritePerson;
-    if (isPerson && item.personId != null) return '/people/${item.personId}';
-    if (item.movieId != null) return '/movies/${item.movieId}';
-    if (item.showId != null) return '/shows/${item.showId}';
+    if (isPerson && item.personId != null) {
+      return personDetailPath(item.personId!, source: detailSource);
+    }
+    if (item.movieId != null) {
+      return movieDetailPath(item.movieId!, source: detailSource);
+    }
+    if (item.showId != null) {
+      return showDetailPath(item.showId!, source: detailSource);
+    }
     return null;
   }
 

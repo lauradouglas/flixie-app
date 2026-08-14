@@ -38,7 +38,7 @@ void main() {
     expect(data.title, 'The Film');
     expect(data.posterUrl, 'https://image.tmdb.org/t/p/w780/poster.jpg');
     expect(data.note, 'A proper favourite.');
-    expect(data.deepLink, 'flixie://movies/42');
+    expect(data.deepLink, 'flixie://movies/42?source=shared_link');
     expect(data.avatarColorValue, 0xFF00D1C7);
   });
 
@@ -59,7 +59,7 @@ void main() {
     expect(data.reviewTitle, isNull);
     expect(data.reviewExcerpt, endsWith('…'));
     expect(data.reviewExcerpt!.length, lessThanOrEqualTo(280));
-    expect(data.deepLink, 'flixie://shows/7');
+    expect(data.deepLink, 'flixie://shows/7?source=shared_link');
   });
 
   testWidgets('optional rating content is omitted cleanly', (tester) async {

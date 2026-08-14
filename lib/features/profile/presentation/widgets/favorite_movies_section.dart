@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
 
 import 'package:flixie_app/models/favorite_movie.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -125,7 +126,9 @@ class _MoviePosterCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: movieId != null ? () => context.push('/movies/$movieId') : null,
+      onTap: movieId != null
+          ? () => context.push(movieDetailPath(movieId!))
+          : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,

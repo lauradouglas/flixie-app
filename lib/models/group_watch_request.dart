@@ -359,8 +359,9 @@ class GroupWatchRequest {
               ?.toString() ??
           '',
       message: json['message'] as String?,
-      mediaType: json['mediaType'] as String?,
-      mediaId: (json['movieId'] ?? json['mediaId']) as int?,
+      mediaType: json['mediaType'] as String? ??
+          (json['showId'] != null ? 'show' : 'movie'),
+      mediaId: _intValue(json['movieId'] ?? json['showId'] ?? json['mediaId']),
       createdAt: json['createdAt'] as String?,
       updatedAt: json['updatedAt'] as String?,
       movieTitle: movie?['title'] as String? ?? json['movieTitle'] as String?,
@@ -413,6 +414,22 @@ class GroupWatchRequest {
       status == WatchRequestStatus.open ||
       status == WatchRequestStatus.accepted ||
       status == WatchRequestStatus.scheduled;
+
+  String get analyticsContentType =>
+      mediaType?.toLowerCase() == 'show' ? 'show' : 'movie';
+
+  /// Total intended participants, including the creator. Response rows are
+  /// created for each invited group member, including pending responses.
+  int get analyticsParticipantCount {
+    final inviteeIds = memberStatuses
+        .map((status) => status.memberId)
+        .where((id) => id.isNotEmpty && id != userId)
+        .toSet();
+    if (inviteeIds.isNotEmpty) return 1 + inviteeIds.length;
+    final knownInvitees =
+        responseCount > acceptedCount ? responseCount : acceptedCount;
+    return 1 + knownInvitees;
+  }
 
   /// True when the request is completed, expired, or cancelled.
   bool get isArchived =>
@@ -488,4 +505,10 @@ bool? _boolValue(dynamic value) {
   if (value is bool) return value;
   if (value is String) return bool.tryParse(value);
   return null;
+}
+
+int? _intValue(dynamic value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse(value?.toString() ?? '');
 }

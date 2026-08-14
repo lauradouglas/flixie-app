@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
 import 'package:provider/provider.dart';
 
 import 'package:flixie_app/models/review.dart';
@@ -235,7 +236,9 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
           review: _filteredReviews[index],
           onTap: () {
             if (_filteredReviews[index].movieId != null) {
-              context.push('/movies/${_filteredReviews[index].movieId}');
+              context.push(
+                movieDetailPath(_filteredReviews[index].movieId!),
+              );
             }
           },
         );

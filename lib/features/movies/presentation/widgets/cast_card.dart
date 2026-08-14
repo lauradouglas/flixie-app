@@ -4,11 +4,19 @@ import 'package:go_router/go_router.dart';
 
 import 'package:flixie_app/models/movie_credits.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
 
 class CastCard extends StatelessWidget {
-  const CastCard({super.key, required this.member});
+  const CastCard({
+    super.key,
+    required this.member,
+    required this.parentContentId,
+    required this.parentContentType,
+  });
 
   final MovieCastMember member;
+  final int parentContentId;
+  final String parentContentType;
 
   @override
   Widget build(BuildContext context) {
@@ -16,7 +24,12 @@ class CastCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () => context.push('/people/${member.id}'),
+        onTap: () => context.push(personDetailPath(
+          member.id,
+          source: DetailSource.personCredits,
+          parentContentId: parentContentId,
+          parentContentType: parentContentType,
+        )),
         child: Container(
           width: 112,
           height: 230,

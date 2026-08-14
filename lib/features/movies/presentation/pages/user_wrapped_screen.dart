@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
 import 'package:provider/provider.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -308,7 +309,7 @@ class _FilmGrid extends StatelessWidget {
         itemBuilder: (context, i) {
           final film = films[i];
           return InkWell(
-            onTap: () => context.push('/movies/${film.id}'),
+            onTap: () => context.push(movieDetailPath(film.id)),
             borderRadius: BorderRadius.circular(14),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(14),
@@ -352,7 +353,7 @@ class _Standout extends StatelessWidget {
   final WrappedRatedMovie movie;
   @override
   Widget build(BuildContext context) => InkWell(
-        onTap: () => context.push('/movies/${movie.movieId}'),
+        onTap: () => context.push(movieDetailPath(movie.movieId)),
         borderRadius: BorderRadius.circular(16),
         child: Container(
           height: 116,

@@ -8,6 +8,7 @@ import 'package:flixie_app/models/group_member.dart';
 import 'package:flixie_app/models/group_watch_request.dart';
 import 'package:flixie_app/models/notification.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
+import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/features/social/data/chat_service.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/features/profile/data/notification_service.dart';
@@ -162,6 +163,7 @@ class GroupChatTabState extends State<GroupChatTab> {
     final conversationId = _conversationId;
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (text.isEmpty || conversationId == null || userId == null) return;
+    final analytics = context.read<AnalyticsController>();
 
     setState(() => _sending = true);
     _messageController.clear();
@@ -171,6 +173,7 @@ class GroupChatTabState extends State<GroupChatTab> {
         senderId: userId,
         text: text,
       );
+      await analytics.groupMessageSent(groupType: 'unknown');
     } catch (e) {
       logger.e('Send message error: $e');
       if (mounted) {
@@ -245,6 +248,7 @@ class GroupChatTabState extends State<GroupChatTab> {
       String pgId, WatchResponseDecision decision) async {
     final conversationId = _conversationId;
     final userId = _authProvider?.dbUser?.id;
+    final analytics = context.read<AnalyticsController>();
     if (conversationId == null || userId == null) return;
     setState(() {
       _respondingIds.add(pgId);
@@ -253,6 +257,17 @@ class GroupChatTabState extends State<GroupChatTab> {
     try {
       await GroupService.respondToWatchRequest(
           conversationId, pgId, userId, decision);
+      final request = _requestCache[pgId];
+      if (decision == WatchResponseDecision.accepted && request != null) {
+        await analytics.watchPlanAccepted(
+          watchPlanId: request.databaseRequestId ?? request.id,
+          contentId: request.mediaId,
+          contentType: request.analyticsContentType,
+          planType: 'group',
+          participantCount: request.analyticsParticipantCount,
+          source: 'group',
+        );
+      }
       // Dismiss any watch-request notifications linked to this request.
       NotificationService.getNotifications(userId).then((notifs) {
         for (final n in notifs) {

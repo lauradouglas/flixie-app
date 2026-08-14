@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'package:flixie_app/models/review.dart';
 import 'package:flixie_app/features/profile/presentation/controllers/review_reactions_controller.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 
 class WriteReviewSheet extends StatefulWidget {
   const WriteReviewSheet({
@@ -76,6 +78,12 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
 
       final created = await _reviewReactions.addReview(draft);
       if (mounted) {
+        await context.read<AnalyticsController>().reviewCreated(
+              contentType: widget.showId == null ? 'movie' : 'show',
+              contentId: widget.movieId ?? widget.showId!,
+              source: widget.showId == null ? 'movie_detail' : 'show_detail',
+            );
+        if (!mounted) return;
         widget.onSubmitted(created);
         Navigator.of(context).pop(created);
       }

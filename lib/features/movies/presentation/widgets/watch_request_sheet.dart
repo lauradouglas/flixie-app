@@ -205,6 +205,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
     final analytics = context.read<AnalyticsController>();
     setState(() => _isSending = true);
     try {
+      String? watchPlanId;
       if (_isGroupMode) {
         // Legacy fallback: POST /groups/:groupId/send-request
         // The response may now include a conversationId from the updated backend.
@@ -216,6 +217,9 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
           widget.movieId!,
         );
         final conversationId = result?['conversationId'] as String?;
+        final watchRequest = result?['watchRequest'] as Map<String, dynamic>?;
+        watchPlanId = (watchRequest?['pgGroupRequestId'] ?? watchRequest?['id'])
+            ?.toString();
         logger.d('[WatchRequest] group send result: $result, '
             'conversationId: $conversationId');
       } else {
@@ -226,15 +230,21 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
           'message': _messageController.text.trim(),
           'type': 'MOVIE_WATCH_REQUEST',
         });
+        final request = result?['request'] as Map<String, dynamic>?;
+        watchPlanId = request?['id']?.toString();
         final notification = result?['notification'] as Map<String, dynamic>?;
         logger.d('[WatchRequest] notification created: $notification');
       }
-      await analytics.watchInvitationSent(
-        recipientType: _isGroupMode ? 'group' : 'friend',
+      await analytics.watchPlanCreated(
+        watchPlanId: watchPlanId,
+        contentId: widget.movieId,
+        contentType: 'movie',
+        planType: _isGroupMode ? 'group' : 'friend',
+        participantCount: _isGroupMode
+            ? (_groupMemberCount > 0 ? _groupMemberCount : null)
+            : 2,
+        source: widget.fromMovieMatch ? 'recommendations' : 'movie_detail',
       );
-      if (widget.fromMovieMatch) {
-        await analytics.matchedMovieInvitationSent();
-      }
       if (mounted) Navigator.pop(context);
       widget.onSuccess();
     } catch (e) {

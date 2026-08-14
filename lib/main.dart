@@ -15,6 +15,7 @@ import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/core/auth/auth_service.dart';
 import 'package:flixie_app/core/auth/firebase_options.dart';
 import 'package:flixie_app/core/auth/push_notification_service.dart';
+import 'package:flixie_app/core/auth/referral_attribution_store.dart';
 import 'package:flixie_app/core/analytics/analytics_backend.dart';
 import 'package:flixie_app/core/analytics/analytics_consent_prompt.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
@@ -154,6 +155,8 @@ class FlixieApp extends StatefulWidget {
 
 class _FlixieAppState extends State<FlixieApp> with WidgetsBindingObserver {
   late final GoRouter _router;
+  final ReferralAttributionStore _referralStore =
+      SharedPreferencesReferralAttributionStore();
 
   @override
   void initState() {
@@ -161,7 +164,11 @@ class _FlixieAppState extends State<FlixieApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     // Create router once - it will refresh via authStatusListenable, not by rebuilding this widget
     final authProvider = context.read<AuthProvider>();
-    _router = buildRouter(authProvider);
+    _router = buildRouter(
+      authProvider,
+      context.read<AnalyticsController>(),
+      _referralStore,
+    );
     PushNotificationService.attachRouter(_router);
     // Give the navigator key to AuthProvider so push notifications can navigate.
     authProvider.setNavigatorKey(rootNavigatorKey);

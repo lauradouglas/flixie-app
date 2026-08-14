@@ -10,6 +10,7 @@ import 'package:flixie_app/models/person.dart';
 import 'package:flixie_app/models/search_result.dart';
 import 'package:flixie_app/models/show.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
 import 'package:flixie_app/features/movies/data/search_service.dart';
 import 'package:flixie_app/features/home/data/trending_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -351,7 +352,10 @@ class _SearchScreenState extends State<SearchScreen> {
               itemCount: _trendingMovies.length,
               itemBuilder: (context, i) => _TrendingPosterCard(
                 movie: _trendingMovies[i],
-                onTap: () => context.push('/movies/${_trendingMovies[i].id}'),
+                onTap: () => context.push(movieDetailPath(
+                  _trendingMovies[i].id,
+                  source: DetailSource.trending,
+                )),
               ),
             ),
           ],
@@ -487,7 +491,7 @@ class _SearchScreenState extends State<SearchScreen> {
       );
     }
 
-    final rankedResults = _rankedResults(results, _query);
+    final rankedResults = _rankedResults(results);
     final total = _searchResults?.totalResults ?? results.length;
 
     return ListView(
@@ -500,21 +504,30 @@ class _SearchScreenState extends State<SearchScreen> {
             return _PersonResultTile(
               person: item.person!,
               query: _query.trim(),
-              onTap: () => context.push('/people/${item.person!.id}'),
+              onTap: () => context.push(personDetailPath(
+                item.person!.id,
+                source: DetailSource.search,
+              )),
             );
           }
           if (item.isShow && item.show != null) {
             return _SearchMediaTile.show(
               show: item.show!,
               query: _query.trim(),
-              onTap: () => context.push('/shows/${item.show!.id}'),
+              onTap: () => context.push(showDetailPath(
+                item.show!.id,
+                source: DetailSource.search,
+              )),
             );
           }
           if (item.movie != null) {
             return _SearchMediaTile.movie(
               movie: item.movie!,
               query: _query.trim(),
-              onTap: () => context.push('/movies/${item.movie!.id}'),
+              onTap: () => context.push(movieDetailPath(
+                item.movie!.id,
+                source: DetailSource.search,
+              )),
             );
           }
           return const SizedBox.shrink();
@@ -525,36 +538,11 @@ class _SearchScreenState extends State<SearchScreen> {
 
   List<SearchResultItem> _rankedResults(
     List<SearchResultItem> results,
-    String query,
-  ) {
-    if (_searchMode != _SearchMode.all) return results;
-    final normalizedQuery = _normalizeSearchText(query);
-    final indexed = results.indexed.toList();
-    indexed.sort((a, b) {
-      final scoreComparison = _resultRelevance(b.$2, normalizedQuery)
-          .compareTo(_resultRelevance(a.$2, normalizedQuery));
-      return scoreComparison != 0 ? scoreComparison : a.$1.compareTo(b.$1);
-    });
-    return indexed.map((entry) => entry.$2).toList(growable: false);
-  }
-
-  int _resultRelevance(SearchResultItem item, String query) {
-    final name = _normalizeSearchText(
-      item.person?.name ?? item.show?.name ?? item.movie?.name ?? '',
-    );
-    if (name == query) return item.isPerson ? 1000 : 1100;
-    if (name.startsWith(query)) return item.isPerson ? 800 : 900;
-    if (name.contains(query)) return item.isPerson ? 600 : 700;
-    final queryWords = query.split(' ').where((word) => word.isNotEmpty);
-    final matchedWords = queryWords.where(name.contains).length;
-    return matchedWords * 100 + (item.isPerson ? 0 : 20);
-  }
-
-  String _normalizeSearchText(String value) => value
-      .toLowerCase()
-      .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
-      .trim()
-      .replaceAll(RegExp(r'\s+'), ' ');
+  ) =>
+      rankSearchResultsByPopularity(
+        results,
+        groupByMediaType: _searchMode == _SearchMode.all,
+      );
 }
 
 // ─── Section header with left accent bar ───────────────────────────────────

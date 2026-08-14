@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:flixie_app/models/group.dart';
 import 'package:flixie_app/models/group_member.dart';
 import 'package:flixie_app/models/notification.dart';
+import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/features/profile/data/notification_service.dart';
@@ -143,8 +144,15 @@ class _GroupsSubViewState extends State<GroupsSubView> {
   Future<void> _respondToInvite(Group group, String status) async {
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (userId == null || group.id == null) return;
+    final analytics = context.read<AnalyticsController>();
     try {
       await GroupService.updateMemberInviteStatus(group.id!, userId, status);
+      if (status == 'ACCEPTED') {
+        await analytics.groupJoined(
+          groupType: group.visibility?.toLowerCase() ?? 'unknown',
+          source: 'group',
+        );
+      }
       // Also update the associated GROUP_INVITE notification so it reflects
       // the accept/decline on the notifications screen.
       final notif = _inviteNotifications[group.id];

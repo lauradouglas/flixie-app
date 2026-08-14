@@ -1,3 +1,5 @@
+import 'package:flixie_app/core/analytics/detail_source.dart';
+
 String notificationDeepLinkPath(Map<String, dynamic> data) {
   final route = data['route']?.toString();
   final type = (data['type']?.toString() ?? '').toUpperCase();
@@ -42,7 +44,9 @@ String notificationDeepLinkPath(Map<String, dynamic> data) {
     return '/watch-requests/$requestId';
   }
 
-  if (route != null && route.startsWith('/')) return route;
+  if (route != null && route.startsWith('/')) {
+    return _attributeNotificationDetailRoute(route);
+  }
 
   if ((type == 'MOVIE_WATCH_REQUEST' ||
           type == 'SHOW_WATCH_REQUEST' ||
@@ -61,6 +65,18 @@ String notificationDeepLinkPath(Map<String, dynamic> data) {
   }
 
   return '/notifications';
+}
+
+String _attributeNotificationDetailRoute(String route) {
+  final uri = Uri.tryParse(route);
+  if (uri == null || uri.pathSegments.length < 2) return route;
+  if (!const {'movies', 'shows', 'people'}.contains(uri.pathSegments.first)) {
+    return route;
+  }
+  return uri.replace(queryParameters: {
+    ...uri.queryParameters,
+    'source': DetailSource.notification.value,
+  }).toString();
 }
 
 String? _watchRequestId(

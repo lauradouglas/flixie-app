@@ -99,4 +99,14 @@ void main() {
       '/friends/friend-1',
     );
   });
+
+  test('content route opened from a notification carries its source', () {
+    expect(
+      notificationDeepLinkPath({
+        'type': 'MOVIE_SHARED',
+        'route': '/movies/42',
+      }),
+      '/movies/42?source=notification',
+    );
+  });
 }

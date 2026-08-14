@@ -11,6 +11,8 @@ import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
+import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/features/social/presentation/widgets/group_hero_banner.dart';
 import 'package:flixie_app/features/social/presentation/widgets/pending_request_preview_tile.dart';
 import 'package:flixie_app/models/movie_list.dart';
@@ -413,7 +415,10 @@ class GroupActivityTabState extends State<GroupActivityTab> {
                     (item) => Padding(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 4),
-                      child: ActivityTile(item: item),
+                      child: ActivityTile(
+                        item: item,
+                        detailSource: DetailSource.group,
+                      ),
                     ),
                   )),
 
@@ -455,6 +460,7 @@ class GroupActivityTabState extends State<GroupActivityTab> {
                       onRespond: (status) async {
                         final userId = context.read<AuthProvider>().dbUser?.id;
                         if (userId == null) return;
+                        final analytics = context.read<AnalyticsController>();
                         // Use conversation-scoped endpoint when possible;
                         // fall back to legacy PUT endpoint.
                         final convId = widget.conversationId ?? req.groupId;
@@ -469,6 +475,17 @@ class GroupActivityTabState extends State<GroupActivityTab> {
                                 'New respond endpoint failed, using legacy: $e');
                             await GroupService.updateWatchRequestForMember(
                                 req.id, userId, '', status);
+                          }
+                          if (WatchResponseDecision.fromString(status) ==
+                              WatchResponseDecision.accepted) {
+                            await analytics.watchPlanAccepted(
+                              watchPlanId: req.databaseRequestId ?? req.id,
+                              contentId: req.mediaId,
+                              contentType: req.analyticsContentType,
+                              planType: 'group',
+                              participantCount: req.analyticsParticipantCount,
+                              source: 'group',
+                            );
                           }
                           await _refresh();
                         } catch (e) {

@@ -1,0 +1,47 @@
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:flixie_app/core/utils/favourite_limits.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/favourite_limit_sheet.dart';
+import 'package:flixie_app/models/favorite_movie.dart';
+import 'package:flixie_app/models/user.dart';
+
+void main() {
+  test('removed movies are not treated as current favourites', () {
+    final user = User(
+      id: 'user-1',
+      externalId: 'external-1',
+      username: 'flixie',
+      email: 'flixie@example.com',
+      iconColorId: 1,
+      completedSetup: true,
+      darkMode: true,
+      favoriteMovies: const [
+        FavoriteMovie(
+          id: 'favourite-1',
+          userId: 'user-1',
+          movieId: 42,
+          removed: true,
+        ),
+      ],
+    );
+
+    expect(user.isMovieFavorite(42), isFalse);
+  });
+
+  test('favourite limits and active show filtering stay consistent', () {
+    expect(maxFavouriteMovies, 25);
+    expect(maxFavouriteShows, 25);
+    expect(isActiveFavouriteShow({'showId': 1, 'removed': false}), isTrue);
+    expect(isActiveFavouriteShow({'showId': 2, 'removed': true}), isFalse);
+  });
+
+  test('recognises server favourite-limit failures', () {
+    expect(
+      isFavouriteLimitError(
+        Exception('You can favourite up to 25 movies and 25 shows'),
+      ),
+      isTrue,
+    );
+    expect(isFavouriteLimitError(Exception('Network unavailable')), isFalse);
+  });
+}

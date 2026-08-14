@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:flixie_app/models/similar_movie.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
 
 class SimilarMovieCard extends StatelessWidget {
   const SimilarMovieCard({super.key, required this.movie});
@@ -13,7 +14,7 @@ class SimilarMovieCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => context.push('/movies/${movie.id}'),
+      onTap: () => context.push(movieDetailPath(movie.id)),
       child: SizedBox(
         width: 120,
         child: Column(

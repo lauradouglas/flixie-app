@@ -166,7 +166,10 @@ class User {
       watchedMovies?.any((item) => item.movieId == movieId) ?? false;
 
   bool isMovieFavorite(int movieId) =>
-      favoriteMovies?.any((item) => item.movieId == movieId) ?? false;
+      favoriteMovies?.any(
+        (item) => item.movieId == movieId && item.removed != true,
+      ) ??
+      false;
 
   String? get countryAbbreviation => _countryString('abbreviation');
 

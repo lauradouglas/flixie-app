@@ -6,11 +6,13 @@ import 'package:flixie_app/core/analytics/analytics_backend.dart';
 import 'package:flixie_app/core/analytics/analytics_consent.dart';
 import 'package:flixie_app/core/analytics/analytics_consent_prompt.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
+import 'package:flixie_app/core/analytics/recommendation_attribution.dart';
 
 class _FakeBackend implements AnalyticsBackend {
   final List<bool> collectionStates = [];
   final List<({String name, Map<String, Object>? parameters})> events = [];
   bool throwOnOperation = false;
+  final List<String> screens = [];
 
   @override
   Future<void> setCollectionEnabled(bool enabled) async {
@@ -25,6 +27,12 @@ class _FakeBackend implements AnalyticsBackend {
   ) async {
     if (throwOnOperation) throw StateError('analytics unavailable');
     events.add((name: name, parameters: parameters));
+  }
+
+  @override
+  Future<void> logScreenView(String screenName) async {
+    if (throwOnOperation) throw StateError('analytics unavailable');
+    screens.add(screenName);
   }
 }
 
@@ -127,94 +135,224 @@ void main() {
     await expectLater(controller.friendRequestSent(), completes);
   });
 
-  test('approved events emit only controlled safe parameters', () async {
+  test('event contract keeps only approved parameters and normalises source',
+      () async {
     final backend = _FakeBackend();
     final controller =
         _controller(backend, _FakeConsentStore(AnalyticsConsent.accepted));
     await controller.initialize();
 
-    await controller.watchInvitationSent(recipientType: 'unexpected-value');
-    await controller.watchlistItemAdded(source: 'free form text');
-    await controller.watchlistItemRemoved(source: 'show_detail');
-    await controller.favouriteSelected(favouriteCount: 500);
+    await controller.logEvent('content_opened', {
+      'content_type': 'movie',
+      'content_id': 42,
+      'source': 'home',
+      'email': 'private@example.com',
+      'username': 'private_user',
+      'review_text': 'private review',
+    });
+    await controller.watchlistAdded(
+      contentType: 'show',
+      contentId: 9,
+      source: 'free form text',
+    );
 
-    expect(backend.events[0].parameters, {'recipient_type': 'friend'});
-    expect(backend.events[1].parameters, {'source': 'home'});
-    expect(backend.events[2].name, 'watchlist_item_removed');
-    expect(backend.events[2].parameters, {'source': 'show_detail'});
-    expect(backend.events[3].parameters, {'favourite_count': 5});
+    expect(backend.events.first.name, 'content_opened');
+    expect(backend.events.first.parameters, {
+      'content_type': 'movie',
+      'content_id': 42,
+      'source': 'home',
+    });
+    expect(backend.events.last.parameters, {
+      'content_type': 'show',
+      'content_id': 9,
+      'source': 'unknown',
+    });
+  });
+
+  test('content events share canonical names and content parameters', () async {
+    final backend = _FakeBackend();
+    final controller =
+        _controller(backend, _FakeConsentStore(AnalyticsConsent.accepted));
+    await controller.initialize();
+
+    await controller.contentOpened(
+      contentType: 'movie',
+      contentId: 123,
+      genre: 'Adventure',
+      source: 'search',
+    );
+    await controller.ratingAdded(
+      contentType: 'show',
+      contentId: 456,
+      source: 'show_detail',
+    );
+    await controller.reviewCreated(
+      contentType: 'movie',
+      contentId: 123,
+      source: 'movie_detail',
+    );
+
+    expect(
+      backend.events.map((event) => event.name),
+      ['content_opened', 'rating_added', 'review_created'],
+    );
+    expect(backend.events.first.parameters?['genre'], 'Adventure');
+    expect(backend.events[1].parameters?['content_type'], 'show');
+  });
+
+  test('person opens include attribution without identity data', () async {
+    final backend = _FakeBackend();
+    final controller =
+        _controller(backend, _FakeConsentStore(AnalyticsConsent.accepted));
+    await controller.initialize();
+
+    await controller.personOpened(
+      personId: 88,
+      source: 'person_credits',
+      parentContentId: 42,
+      parentContentType: 'movie',
+    );
+
+    expect(backend.events.single.name, 'person_opened');
+    expect(backend.events.single.parameters, {
+      'person_id': 88,
+      'source': 'person_credits',
+      'parent_content_id': 42,
+      'parent_content_type': 'movie',
+    });
+  });
+
+  test('recommendation impressions are deduplicated but actions are not',
+      () async {
+    final backend = _FakeBackend();
+    final controller =
+        _controller(backend, _FakeConsentStore(AnalyticsConsent.accepted));
+    await controller.initialize();
+    const attribution = RecommendationAttribution(
+      contentId: 7,
+      contentType: 'movie',
+      source: 'just_for_you',
+      position: 0,
+      algorithm: 'weighted_taste_profile',
+      version: 'v1',
+      reason: 'taste_profile',
+      predictedScore: .82,
+    );
+
+    Future<void> impression() => controller.recommendationImpression(
+          attribution: attribution,
+        );
+    await impression();
+    await impression();
+    await controller.recommendationOpened(
+      attribution: attribution,
+    );
+
+    expect(
+      backend.events.map((event) => event.name),
+      ['recommendation_impression', 'recommendation_opened'],
+    );
+    expect(backend.events.first.parameters, attribution.analyticsParameters);
+  });
+
+  test('rating can retain recommendation attribution', () async {
+    final backend = _FakeBackend();
+    final controller =
+        _controller(backend, _FakeConsentStore(AnalyticsConsent.accepted));
+    await controller.initialize();
+    const attribution = RecommendationAttribution(
+      contentId: 7,
+      contentType: 'movie',
+      source: 'just_for_you',
+      position: 2,
+      algorithm: 'weighted_taste_profile',
+      version: 'v1',
+      reason: 'rewatch',
+      predictedScore: .7,
+    );
+
+    await controller.ratingAdded(
+      contentType: 'movie',
+      contentId: 7,
+      source: 'just_for_you',
+      recommendation: attribution,
+    );
+
+    expect(backend.events.single.name, 'rating_added');
+    expect(
+      backend.events.single.parameters,
+      {'source': 'just_for_you', ...attribution.analyticsParameters},
+    );
+  });
+
+  test('watch-plan lifecycle keeps stable funnel dimensions', () async {
+    final backend = _FakeBackend();
+    final controller =
+        _controller(backend, _FakeConsentStore(AnalyticsConsent.accepted));
+    await controller.initialize();
+
+    await controller.watchPlanCreated(
+      watchPlanId: 'plan-1',
+      contentId: 42,
+      contentType: 'movie',
+      planType: 'group',
+      participantCount: 4,
+      source: 'movie_detail',
+    );
+    await controller.watchLogged(
+      contentType: 'movie',
+      contentId: 42,
+      source: 'watch_plan',
+      watchPlanId: 'plan-1',
+      planType: 'group',
+      participantCount: 4,
+    );
+
+    expect(backend.events.map((event) => event.name),
+        ['watch_plan_created', 'watch_logged']);
     for (final event in backend.events) {
-      final approvedKeys = AnalyticsController.approvedEvents[event.name]!;
-      expect(
-        (event.parameters?.keys ?? const <String>[])
-            .every(approvedKeys.contains),
-        isTrue,
-      );
+      expect(event.parameters, containsPair('watch_plan_id', 'plan-1'));
+      expect(event.parameters, containsPair('plan_type', 'group'));
+      expect(event.parameters, containsPair('participant_count', 4));
+      expect(event.parameters, containsPair('content_id', 42));
     }
   });
 
-  test('media collection events use identifier-free event types', () async {
+  test('friend invite conversion and friendship remain distinct events',
+      () async {
     final backend = _FakeBackend();
     final controller =
         _controller(backend, _FakeConsentStore(AnalyticsConsent.accepted));
     await controller.initialize();
 
-    await controller.movieFavourited();
-    await controller.movieUnfavourited();
-    await controller.showFavourited();
-    await controller.showUnfavourited();
-    await controller.movieAddedToWatchlist();
-    await controller.movieRemovedFromWatchlist();
-    await controller.showAddedToWatchlist();
-    await controller.showRemovedFromWatchlist();
-    await controller.movieAddedToList();
-    await controller.movieRemovedFromList();
-    await controller.showAddedToList();
-    await controller.showRemovedFromList();
-
-    expect(
-      backend.events.map((event) => event.name),
-      [
-        'movie_favourited',
-        'movie_unfavourited',
-        'show_favourited',
-        'show_unfavourited',
-        'movie_added_to_watchlist',
-        'movie_removed_from_watchlist',
-        'show_added_to_watchlist',
-        'show_removed_from_watchlist',
-        'movie_added_to_list',
-        'movie_removed_from_list',
-        'show_added_to_list',
-        'show_removed_from_list',
-      ],
+    await controller.friendInviteConverted(
+      inviteMethod: 'referral_link',
+      source: 'shared_link',
     );
-    expect(backend.events.every((event) => event.parameters == null), isTrue);
+    await controller.friendConnected(source: 'shared_link');
+
+    expect(backend.events.map((event) => event.name),
+        ['friend_invite_converted', 'friend_connected']);
+    expect(backend.events.first.parameters, {
+      'invite_method': 'referral_link',
+      'source': 'shared_link',
+    });
   });
 
-  test('referral reward events contain no identity or referral code', () async {
+  test('first-run referral open waits for analytics consent', () async {
     final backend = _FakeBackend();
     final controller =
-        _controller(backend, _FakeConsentStore(AnalyticsConsent.accepted));
+        _controller(backend, _FakeConsentStore(AnalyticsConsent.unknown));
     await controller.initialize();
 
-    await controller.referralInviteShared();
-    await controller.referralQualified();
-    await controller.rewardUnlocked();
-    await controller.tasteMatchViewed();
-    await controller.matchedMovieInvitationSent();
+    await controller.referralLinkOpened();
+    expect(backend.events, isEmpty);
 
-    expect(
-      backend.events.map((event) => event.name),
-      [
-        'referral_invite_shared',
-        'referral_qualified',
-        'reward_unlocked',
-        'taste_match_viewed',
-        'matched_movie_invitation_sent',
-      ],
-    );
-    expect(backend.events.every((event) => event.parameters == null), isTrue);
+    await controller.allow();
+    await controller.referralLinkOpened();
+
+    expect(backend.events.map((event) => event.name),
+        ['friend_invite_opened', 'shared_link_opened']);
   });
 
   test('signup and onboarding lifecycle events are not duplicated', () async {
@@ -238,9 +376,23 @@ void main() {
         'signup_started',
         'signup_completed',
         'onboarding_started',
-        'onboarding_completed',
+        'taste_profile_completed',
       ],
     );
+  });
+
+  test('screen views are meaningful and consecutive duplicates are ignored',
+      () async {
+    final backend = _FakeBackend();
+    final controller =
+        _controller(backend, _FakeConsentStore(AnalyticsConsent.accepted));
+    await controller.initialize();
+
+    await controller.screenViewed('Home');
+    await controller.screenViewed('Home');
+    await controller.screenViewed('Movie Detail');
+
+    expect(backend.screens, ['Home', 'Movie Detail']);
   });
 
   test('a failed product operation does not emit its success event', () async {

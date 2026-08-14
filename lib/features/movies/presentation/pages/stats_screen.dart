@@ -69,16 +69,25 @@ class _StatsScreenState extends State<StatsScreen> {
   Widget _buildYearDropdown(List<int> years) {
     if (years.isEmpty) return const SizedBox.shrink();
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Align(
-        alignment: Alignment.centerRight,
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Container(
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 13),
+        decoration: BoxDecoration(
+          color: FlixieColors.surfaceElevated,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: FlixieColors.primary.withValues(alpha: .3),
+          ),
+        ),
         child: DropdownButton<int?>(
           value: _selectedYear,
           underline: const SizedBox(),
           dropdownColor: FlixieColors.tabBarBackgroundFocused,
           style: const TextStyle(color: Colors.white, fontSize: 14),
-          icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+          icon: const Icon(Icons.keyboard_arrow_down_rounded,
+              color: FlixieColors.light),
           items: [
             const DropdownMenuItem(value: null, child: Text('All Time')),
             ...years.map(
@@ -109,9 +118,10 @@ class _StatsScreenState extends State<StatsScreen> {
 
     return ListView(
       key: const ValueKey('recap-stats'),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 32),
       children: [
         _buildYearDropdown(years),
+        const SizedBox(height: 14),
         Row(
           children: [
             StatsCard(
@@ -119,7 +129,7 @@ class _StatsScreenState extends State<StatsScreen> {
               value: _totalMovies > 0 ? '$_totalMovies' : '-',
               icon: Icons.movie_outlined,
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             StatsCard(
               label: 'Total Runtime',
               value: _totalMovies > 0 ? _runtimeLabel : '-',
@@ -127,7 +137,7 @@ class _StatsScreenState extends State<StatsScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         Row(
           children: [
             StatsCard(
@@ -135,7 +145,7 @@ class _StatsScreenState extends State<StatsScreen> {
               value: _avgRating > 0 ? _avgRating.toStringAsFixed(1) : '-',
               icon: Icons.star_outline,
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             StatsCard(
               label: 'Most Active',
               value: mostActive >= 0 ? _kMonthNames[mostActive] : '-',
@@ -145,17 +155,27 @@ class _StatsScreenState extends State<StatsScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: 24),
         SectionHeader(
           title: _selectedYear != null
               ? 'Monthly Activity ($_selectedYear)'
               : 'Monthly Activity (${DateTime.now().year})',
         ),
-        const SizedBox(height: 12),
-        MonthlyBarChart(
-          buckets: buckets,
-          maxValue: maxBucket,
-          mostActiveIndex: mostActive,
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.fromLTRB(14, 18, 14, 12),
+          decoration: BoxDecoration(
+            color: FlixieColors.surfaceElevated.withValues(alpha: .72),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: FlixieColors.primary.withValues(alpha: .18),
+            ),
+          ),
+          child: MonthlyBarChart(
+            buckets: buckets,
+            maxValue: maxBucket,
+            mostActiveIndex: mostActive,
+          ),
         ),
         if (topGenres.isNotEmpty) ...[
           const SizedBox(height: 28),
@@ -287,47 +307,66 @@ class _StatsScreenState extends State<StatsScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: SegmentedButton<_RecapTab>(
-              segments: const [
-                ButtonSegment<_RecapTab>(
-                  value: _RecapTab.stats,
-                  label: Text('Stats'),
-                  icon: Icon(Icons.bar_chart_outlined),
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 6),
+            child: SizedBox(
+              height: 48,
+              width: double.infinity,
+              child: SegmentedButton<_RecapTab>(
+                segments: const [
+                  ButtonSegment<_RecapTab>(
+                    value: _RecapTab.stats,
+                    label: Text('Stats'),
+                    icon: Icon(Icons.bar_chart_outlined),
+                  ),
+                  ButtonSegment<_RecapTab>(
+                    value: _RecapTab.wrapped,
+                    label: Text('Year in Review'),
+                    icon: Icon(Icons.auto_graph_outlined),
+                  ),
+                ],
+                style: ButtonStyle(
+                  backgroundColor: WidgetStateProperty.resolveWith((states) {
+                    return states.contains(WidgetState.selected)
+                        ? FlixieColors.primary
+                        : FlixieColors.surfaceElevated;
+                  }),
+                  side: WidgetStatePropertyAll(
+                    BorderSide(
+                      color: FlixieColors.primary.withValues(alpha: .4),
+                    ),
+                  ),
+                  shape: WidgetStatePropertyAll(
+                    RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  foregroundColor: WidgetStateProperty.resolveWith((states) {
+                    if (states.contains(WidgetState.selected)) {
+                      return FlixieColors.white;
+                    }
+                    return FlixieColors.light;
+                  }),
+                  iconColor: WidgetStateProperty.resolveWith((states) {
+                    if (states.contains(WidgetState.selected)) {
+                      return FlixieColors.white;
+                    }
+                    return FlixieColors.light;
+                  }),
+                  textStyle: WidgetStateProperty.resolveWith((states) {
+                    return TextStyle(
+                      fontSize: 15,
+                      fontWeight: states.contains(WidgetState.selected)
+                          ? FontWeight.w700
+                          : FontWeight.w600,
+                    );
+                  }),
                 ),
-                ButtonSegment<_RecapTab>(
-                  value: _RecapTab.wrapped,
-                  label: Text('Year in Review'),
-                  icon: Icon(Icons.auto_graph_outlined),
-                ),
-              ],
-              style: ButtonStyle(
-                foregroundColor: WidgetStateProperty.resolveWith((states) {
-                  if (states.contains(WidgetState.selected)) {
-                    return FlixieColors.navy;
-                  }
-                  return FlixieColors.light;
-                }),
-                iconColor: WidgetStateProperty.resolveWith((states) {
-                  if (states.contains(WidgetState.selected)) {
-                    return FlixieColors.navy;
-                  }
-                  return FlixieColors.light;
-                }),
-                textStyle: WidgetStateProperty.resolveWith((states) {
-                  return TextStyle(
-                    fontSize: 15,
-                    fontWeight: states.contains(WidgetState.selected)
-                        ? FontWeight.w700
-                        : FontWeight.w600,
-                  );
-                }),
+                selected: {_selectedTab},
+                showSelectedIcon: false,
+                onSelectionChanged: (selection) {
+                  setState(() => _selectedTab = selection.first);
+                },
               ),
-              selected: {_selectedTab},
-              showSelectedIcon: false,
-              onSelectionChanged: (selection) {
-                setState(() => _selectedTab = selection.first);
-              },
             ),
           ),
           Expanded(

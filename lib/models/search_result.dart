@@ -44,6 +44,32 @@ class SearchResultItem {
       show: show,
     );
   }
+
+  double get popularity =>
+      person?.popularity ?? show?.popularity ?? movie?.popularity ?? 0;
+}
+
+List<SearchResultItem> rankSearchResultsByPopularity(
+  List<SearchResultItem> results, {
+  bool groupByMediaType = false,
+}) {
+  final indexed = results.indexed.toList();
+  indexed.sort((a, b) {
+    if (groupByMediaType) {
+      final typeComparison =
+          _searchMediaTypeRank(a.$2).compareTo(_searchMediaTypeRank(b.$2));
+      if (typeComparison != 0) return typeComparison;
+    }
+    final comparison = b.$2.popularity.compareTo(a.$2.popularity);
+    return comparison != 0 ? comparison : a.$1.compareTo(b.$1);
+  });
+  return indexed.map((entry) => entry.$2).toList(growable: false);
+}
+
+int _searchMediaTypeRank(SearchResultItem item) {
+  if (item.movie != null) return 0;
+  if (item.isShow) return 1;
+  return 2;
 }
 
 class SearchResults {

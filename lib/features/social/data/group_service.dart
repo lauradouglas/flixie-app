@@ -291,15 +291,16 @@ class GroupService {
   }
 
   /// PATCH /conversations/:conversationId/watch-requests/:requestId/complete
-  static Future<void> completeWatchRequest(
+  static Future<GroupWatchRequest> completeWatchRequest(
     String conversationId,
     String requestId,
     String userId,
   ) async {
-    await ApiClient.patch(
+    final data = await ApiClient.patch(
       '/conversations/$conversationId/watch-requests/$requestId/complete',
       body: {'userId': userId},
     );
+    return GroupWatchRequest.fromJson(data as Map<String, dynamic>);
   }
 
   /// PATCH /conversations/:conversationId/watch-requests/:requestId/cancel
@@ -315,14 +316,14 @@ class GroupService {
   }
 
   /// PATCH /conversations/:conversationId/watch-requests/:requestId/schedule
-  static Future<void> scheduleWatchRequest(
+  static Future<GroupWatchRequest> scheduleWatchRequest(
     String conversationId,
     String requestId, {
     required String userId,
     required String? scheduledFor,
     String? location,
   }) async {
-    await ApiClient.patch(
+    final data = await ApiClient.patch(
       '/conversations/$conversationId/watch-requests/$requestId/schedule',
       body: {
         'userId': userId,
@@ -331,6 +332,7 @@ class GroupService {
           'location': location.trim(),
       },
     );
+    return GroupWatchRequest.fromJson(data as Map<String, dynamic>);
   }
 
   static Future<void> deleteWatchRequest(

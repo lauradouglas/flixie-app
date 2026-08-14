@@ -1,10 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:flixie_app/core/auth/auth_provider.dart';
+import 'package:flixie_app/core/auth/referral_attribution_store.dart';
+import 'package:flixie_app/core/analytics/flixie_analytics.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
+import 'package:flixie_app/core/analytics/recommendation_attribution.dart';
 import 'package:flixie_app/core/navigation/tab_refresh_controller.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/home/presentation/pages/home_screen.dart';
@@ -37,6 +42,7 @@ import 'package:flixie_app/features/authentication/presentation/pages/login_scre
 import 'package:flixie_app/features/authentication/presentation/pages/signup_screen.dart';
 import 'package:flixie_app/features/authentication/presentation/pages/forgot_password_screen.dart';
 import 'package:flixie_app/features/authentication/presentation/pages/onboarding_screen.dart';
+import 'package:flixie_app/features/authentication/presentation/pages/getting_started_guide_screen.dart';
 
 /// Global navigator key shared between [buildRouter] and
 /// [PushNotificationService] so the service can navigate without a BuildContext.
@@ -75,20 +81,20 @@ String _screenNameFor(GoRouterState state) {
     '/' => 'Home',
     '/search' => 'Search',
     '/watchlist' => 'Watchlist',
-    '/social' => 'Friends',
-    '/friends-activity' => 'Friend Activity',
-    '/groups/:id' => 'Group',
+    '/social' => 'Social',
+    '/friends-activity' => 'Friends Activity',
+    '/groups/:id' => 'Group Detail',
     '/groups/:id/members' => 'Group Members',
     '/profile' => 'Profile',
     '/friends/:id' => 'Friend Profile',
-    '/movies/:id' => 'Movie Details',
-    '/shows/:id' => 'Show Details',
-    '/people/:id' => 'Person Details',
+    '/movies/:id' => 'Movie Detail',
+    '/shows/:id' => 'Show Detail',
+    '/people/:id' => 'Person Detail',
     '/chat/:id' => 'Friend Chat',
     '/notifications' => 'Notifications',
     '/watch-history' => 'Watch History',
-    '/movie-lists' => 'Movie Lists',
-    '/movie-lists/:id' => 'Movie List Details',
+    '/movie-lists' => 'Lists',
+    '/movie-lists/:id' => 'List Detail',
     '/my-reviews' => 'My Reviews',
     '/stats' => 'Stats',
     '/wrapped' || '/wrapped/:userId' => 'Wrapped',
@@ -99,6 +105,7 @@ String _screenNameFor(GoRouterState state) {
     '/about-credits' => 'About Flixie',
     '/invite-friend' => 'Invite Friend',
     '/onboarding' => 'Onboarding',
+    '/getting-started' => 'Getting Started',
     '/auth/login' => 'Login',
     '/auth/signup' => 'Sign Up',
     '/auth/forgot-password' => 'Forgot Password',
@@ -107,24 +114,68 @@ String _screenNameFor(GoRouterState state) {
   };
 }
 
-FirebaseAnalyticsObserver _analyticsObserver() => FirebaseAnalyticsObserver(
-      analytics: FirebaseAnalytics.instance,
-    );
+class _FlixieAnalyticsObserver extends NavigatorObserver {
+  _FlixieAnalyticsObserver(this.analytics);
+
+  final AnalyticsController analytics;
+
+  void _record(Route<dynamic>? route) {
+    final name = route?.settings.name;
+    if (name != null && name.isNotEmpty) analytics.screenViewed(name);
+  }
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPush(route, previousRoute);
+    _record(route);
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+    _record(newRoute);
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPop(route, previousRoute);
+    _record(previousRoute);
+  }
+}
 
 /// Builds the GoRouter, refreshing only when auth status changes (not user data).
-GoRouter buildRouter(AuthProvider authProvider) {
+GoRouter buildRouter(
+  AuthProvider authProvider,
+  AnalyticsController analytics,
+  ReferralAttributionStore referralStore,
+) {
+  final recordedInviteCodes = <String>{};
   return GoRouter(
     navigatorKey: rootNavigatorKey,
-    observers: [_analyticsObserver()],
+    observers: [_FlixieAnalyticsObserver(analytics)],
     refreshListenable: authProvider.authStatusListenable,
     initialLocation: '/',
-    redirect: (context, state) {
+    redirect: (context, state) async {
       final status = authProvider.status;
       final hasCompletedSetup = authProvider.dbUser?.completedSetup ?? false;
       final isAuthRoute = state.matchedLocation.startsWith('/auth');
       final isSplash = state.matchedLocation == '/splash';
       final isOnboarding = state.matchedLocation == '/onboarding';
       final isReferralInvite = state.matchedLocation == '/invite';
+      final referralCode = isReferralInvite
+          ? state.uri.queryParameters['code']?.trim().toUpperCase()
+          : null;
+
+      if (referralCode != null && referralCode.isNotEmpty) {
+        try {
+          await referralStore.save(referralCode);
+        } catch (_) {
+          // Persistence improves recovery but must never break a valid link.
+        }
+        if (recordedInviteCodes.add(referralCode)) {
+          unawaited(analytics.referralLinkOpened());
+        }
+      }
 
       // Show splash only while Firebase resolves initial auth state
       if (status == AuthStatus.unknown) {
@@ -132,18 +183,31 @@ GoRouter buildRouter(AuthProvider authProvider) {
       }
 
       if (status == AuthStatus.unauthenticated && isReferralInvite) {
-        final code = state.uri.queryParameters['code'];
         return Uri(
           path: '/auth/signup',
-          queryParameters: code == null ? null : {'code': code},
+          queryParameters: referralCode == null ? null : {'code': referralCode},
         ).toString();
       }
 
       if (status == AuthStatus.unauthenticated && !isAuthRoute) {
+        try {
+          final pendingReferral = await referralStore.read();
+          if (pendingReferral != null) {
+            return Uri(
+              path: '/auth/signup',
+              queryParameters: {'code': pendingReferral},
+            ).toString();
+          }
+        } catch (_) {
+          // Fall back to the normal login route if local storage is unavailable.
+        }
         return '/auth/login';
       }
 
       if (status == AuthStatus.authenticated) {
+        // Referral codes apply only to new account creation. Never carry one
+        // into an existing authenticated account or a later sign-up.
+        unawaited(referralStore.clear().catchError((_) {}));
         // New users must complete onboarding before entering the app shell.
         if (!hasCompletedSetup) {
           if (isOnboarding) return null;
@@ -163,10 +227,19 @@ GoRouter buildRouter(AuthProvider authProvider) {
         path: '/splash',
         pageBuilder: (context, state) => _calmPage(state, const SplashScreen()),
       ),
+      GoRoute(
+        path: '/getting-started',
+        pageBuilder: (context, state) => _pushPage(
+          state,
+          GettingStartedGuideScreen(
+            openedFromSettings: state.uri.queryParameters['from'] == 'settings',
+          ),
+        ),
+      ),
 
       // Main shell (authenticated)
       ShellRoute(
-        observers: [_analyticsObserver()],
+        observers: [_FlixieAnalyticsObserver(analytics)],
         builder: (context, state, child) => MainNavigationShell(child: child),
         routes: [
           GoRoute(
@@ -232,8 +305,22 @@ GoRouter buildRouter(AuthProvider authProvider) {
               state,
               MovieDetailScreen(
                 movieId: state.pathParameters['id'] ?? '0',
+                source: DetailSource.fromValue(
+                  state.uri.queryParameters['source'],
+                ),
                 fromMovieMatch:
-                    state.uri.queryParameters['source'] == 'movie_match',
+                    state.uri.queryParameters['source'] == 'movie_match' ||
+                        state.uri.queryParameters['movieMatch'] == '1',
+                recommendation: state.uri.queryParameters['recSource'] == null
+                    ? null
+                    : RecommendationAttribution.fromRoute(
+                        contentId: int.tryParse(
+                              state.pathParameters['id'] ?? '',
+                            ) ??
+                            0,
+                        contentType: 'movie',
+                        query: state.uri.queryParameters,
+                      ),
               ),
             ),
           ),
@@ -241,14 +328,29 @@ GoRouter buildRouter(AuthProvider authProvider) {
             path: '/shows/:id',
             pageBuilder: (context, state) => _pushPage(
               state,
-              ShowDetailScreen(showId: state.pathParameters['id'] ?? '0'),
+              ShowDetailScreen(
+                showId: state.pathParameters['id'] ?? '0',
+                source: DetailSource.fromValue(
+                  state.uri.queryParameters['source'],
+                ),
+              ),
             ),
           ),
           GoRoute(
             path: '/people/:id',
             pageBuilder: (context, state) => _pushPage(
               state,
-              PersonDetailScreen(personId: state.pathParameters['id'] ?? '0'),
+              PersonDetailScreen(
+                personId: state.pathParameters['id'] ?? '0',
+                source: DetailSource.fromValue(
+                  state.uri.queryParameters['source'],
+                ),
+                parentContentId: int.tryParse(
+                  state.uri.queryParameters['parentContentId'] ?? '',
+                ),
+                parentContentType:
+                    state.uri.queryParameters['parentContentType'],
+              ),
             ),
           ),
           GoRoute(
@@ -413,6 +515,7 @@ GoRouter buildRouter(AuthProvider authProvider) {
           SignupScreen(
             referralCode: state.uri.queryParameters['code'] ??
                 state.uri.queryParameters['referralCode'],
+            referralStore: referralStore,
           ),
         ),
       ),

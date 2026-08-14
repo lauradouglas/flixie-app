@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
 import 'package:provider/provider.dart';
 
 import 'package:flixie_app/features/authentication/presentation/pages/auth_ui.dart';
@@ -884,7 +885,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
           review: _reviews[i],
           onTap: () {
             final id = _reviews[i].movieId;
-            if (id != null) context.push('/movies/$id');
+            if (id != null) context.push(movieDetailPath(id));
           },
         ),
       ),
@@ -902,7 +903,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
             review: review,
             onTap: () {
               if (review.movieId != null) {
-                context.push('/movies/${review.movieId}');
+                context.push(movieDetailPath(review.movieId!));
               }
             },
           ),

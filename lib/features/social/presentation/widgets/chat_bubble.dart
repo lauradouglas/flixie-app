@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
 import 'package:flixie_app/models/profile_avatar.dart';
 
 class ChatBubble extends StatelessWidget {
@@ -357,17 +358,25 @@ class ChatBubble extends StatelessWidget {
 
       // New format: flixie://movies/<id>?source=share
       if (uri.host == 'movies' && uri.pathSegments.isNotEmpty) {
-        routePath = '/movies/${uri.pathSegments.first}';
+        routePath = movieDetailPath(
+          uri.pathSegments.first,
+          source: DetailSource.sharedLink,
+        );
       }
 
       // Legacy format: flixie:///movies/<id>?source=share
       if (routePath == null && uri.path.startsWith('/movies/')) {
-        routePath = uri.path;
+        final id = uri.pathSegments.length > 1 ? uri.pathSegments[1] : null;
+        if (id != null) {
+          routePath = movieDetailPath(
+            id,
+            source: DetailSource.sharedLink,
+          );
+        }
       }
 
       if (routePath != null) {
-        final query = uri.query.isEmpty ? '' : '?${uri.query}';
-        context.push('$routePath$query');
+        context.push(routePath);
         return;
       }
     }

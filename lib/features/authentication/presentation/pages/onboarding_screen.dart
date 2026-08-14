@@ -131,9 +131,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       selectedMap[movie.id] = movie;
     });
     if (isNewFavourite) {
-      await context
-          .read<AnalyticsController>()
-          .favouriteSelected(favouriteCount: _favourites.length);
+      await context.read<AnalyticsController>().tasteSignalAdded(
+            signalType: 'favourite_movie',
+          );
+    } else if (bucket == _MovieBucket.recentlyWatched) {
+      await context.read<AnalyticsController>().tasteSignalAdded(
+            signalType: 'watched_movie',
+          );
     }
   }
 
@@ -169,9 +173,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         await UserService.addFavoriteGenres(userId, _selectedGenreIds.toList());
       }
       final referralQualified = await auth.completeOnboarding();
-      await analytics.onboardingCompleted(favouriteCount: _favourites.length);
+      // The setup-completion response can omit newly-created relationship
+      // collections. Reload the full user after the bulk writes so the first
+      // profile visit immediately contains the selected favourites/watches.
+      await auth.refreshDbUser();
+      await analytics.tasteProfileCompleted(
+        signalCount: _favourites.length +
+            _recentlyWatched.length +
+            _selectedGenreIds.length,
+      );
       if (referralQualified) {
-        await analytics.referralQualified();
         await analytics.rewardUnlocked();
       }
       if (!mounted) return;
@@ -291,8 +302,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         ),
         const SizedBox(height: 22),
         PrimaryButton(
-          label: 'Enter Flixie',
-          onPressed: () => context.go('/'),
+          label: 'Show me around',
+          onPressed: () => context.go('/getting-started'),
         ),
       ],
     );

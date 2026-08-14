@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'package:flixie_app/core/auth/auth_provider.dart';
+import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/models/group_watch_request.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/features/social/data/watch_request_cache.dart';
@@ -367,6 +368,7 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
 
     setState(() => _processing[req.id] = true);
     try {
+      final analytics = context.read<AnalyticsController>();
       final decision = WatchResponseDecision.fromString(status);
       try {
         await GroupService.respondToWatchRequest(
@@ -375,6 +377,16 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
         logger.d('New respond endpoint failed, using legacy: $e');
         await GroupService.updateWatchRequestForMember(
             req.id, userId, '', status);
+      }
+      if (decision == WatchResponseDecision.accepted) {
+        await analytics.watchPlanAccepted(
+          watchPlanId: req.databaseRequestId ?? req.id,
+          contentId: req.mediaId,
+          contentType: req.analyticsContentType,
+          planType: 'group',
+          participantCount: req.analyticsParticipantCount,
+          source: 'group',
+        );
       }
       if (mounted) setState(() => _myResponses[req.id] = status);
       if (status == 'ACCEPTED' && mounted) {
@@ -405,9 +417,22 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
   Future<void> _markWatched(GroupWatchRequest req) async {
     final userId = widget.currentUserId;
     final convId = widget.conversationId ?? req.groupId;
+    final analytics = context.read<AnalyticsController>();
     setState(() => _processing[req.id] = true);
     try {
-      await GroupService.completeWatchRequest(convId, req.id, userId);
+      final updated =
+          await GroupService.completeWatchRequest(convId, req.id, userId);
+      if (req.status != WatchRequestStatus.completed &&
+          updated.status == WatchRequestStatus.completed) {
+        await analytics.watchPlanCompleted(
+          watchPlanId: updated.databaseRequestId ?? updated.id,
+          contentId: updated.mediaId,
+          contentType: updated.analyticsContentType,
+          planType: 'group',
+          participantCount: updated.analyticsParticipantCount,
+          source: 'group',
+        );
+      }
       await _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -445,14 +470,23 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
 
     final userId = widget.currentUserId;
     final convId = widget.conversationId ?? req.groupId;
+    final analytics = context.read<AnalyticsController>();
     setState(() => _processing[req.id] = true);
     try {
-      await GroupService.scheduleWatchRequest(
+      final updated = await GroupService.scheduleWatchRequest(
         convId,
         req.id,
         userId: userId,
         scheduledFor: selected.scheduledFor.toUtc().toIso8601String(),
         location: selected.location,
+      );
+      await analytics.watchPlanScheduled(
+        watchPlanId: updated.databaseRequestId ?? updated.id,
+        contentId: updated.mediaId,
+        contentType: updated.analyticsContentType,
+        planType: 'group',
+        participantCount: updated.analyticsParticipantCount,
+        source: 'group',
       );
       await _load();
       if (mounted) {

@@ -7,6 +7,7 @@ import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/media_lists_section.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
+import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 
 class ListsPreviewSection extends StatefulWidget {
   const ListsPreviewSection({
@@ -98,17 +99,26 @@ class _ListsPreviewSectionState extends State<ListsPreviewSection> {
                 ? Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        widget.title,
-                        style: const TextStyle(
+                      FlixieSectionHeader(
+                        title: widget.title,
+                        uppercase: false,
+                        accentHeight: 22,
+                        titleStyle: const TextStyle(
                           color: FlixieColors.white,
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
+                          letterSpacing: .5,
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      Text(widget.emptyMessage,
-                          style: const TextStyle(color: FlixieColors.medium)),
+                      const SizedBox(height: 12),
+                      Text(
+                        widget.emptyMessage,
+                        style: const TextStyle(
+                          color: FlixieColors.medium,
+                          fontSize: 14,
+                          height: 1.35,
+                        ),
+                      ),
                     ],
                   )
                 : MediaListsSection(

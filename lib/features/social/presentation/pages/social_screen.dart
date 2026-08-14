@@ -9,6 +9,8 @@ import 'package:flixie_app/models/group_member.dart';
 import 'package:flixie_app/models/notification.dart';
 import 'package:flixie_app/features/social/presentation/controllers/friend_actions_controller.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
+import 'package:flixie_app/core/analytics/flixie_analytics.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/add_friend_sheet.dart';
 import 'package:flixie_app/features/social/data/chat_service.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
@@ -413,31 +415,21 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
                 itemCount:
                     filteredActivity.take(_showMoreActivity ? 10 : 5).length,
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (_, i) => ActivityTile(item: filteredActivity[i]),
+                itemBuilder: (_, i) => ActivityTile(
+                  item: filteredActivity[i],
+                  detailSource: DetailSource.friendActivity,
+                ),
               ),
               if (filteredActivity.length > 5) ...[
                 const SizedBox(height: 10),
-                Row(
-                  children: [
-                    if (!_showMoreActivity)
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () =>
-                              setState(() => _showMoreActivity = true),
-                          icon: const Icon(Icons.expand_more_rounded),
-                          label: const Text('Show more'),
-                        ),
-                      ),
-                    if (!_showMoreActivity) const SizedBox(width: 10),
-                    Expanded(
-                      child: TextButton.icon(
-                        onPressed: () => context.push('/friends-activity'),
-                        icon: const Icon(Icons.people_outline_rounded),
-                        label: const Text('Show all'),
-                      ),
+                if (!_showMoreActivity)
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: () => setState(() => _showMoreActivity = true),
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                      label: const Text('Show more activity'),
                     ),
-                  ],
-                ),
+                  ),
               ],
             ],
             const SizedBox(height: 24),
@@ -1390,8 +1382,15 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
   Future<void> _respondToInvite(Group group, String status) async {
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (userId == null || group.id == null) return;
+    final analytics = context.read<AnalyticsController>();
     try {
       await GroupService.updateMemberInviteStatus(group.id!, userId, status);
+      if (status == 'ACCEPTED') {
+        await analytics.groupJoined(
+          groupType: group.visibility?.toLowerCase() ?? 'unknown',
+          source: 'group',
+        );
+      }
 
       // Keep Firestore members in sync immediately after accepting an invite.
       if (status == 'ACCEPTED') {
@@ -2000,6 +1999,7 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
               'inviteStatus': 'PENDING',
             }),
       ];
+      final analytics = context.read<AnalyticsController>();
       final group = await GroupService.createGroup({
         'name': _nameController.text.trim(),
         if (_abbrController.text.trim().isNotEmpty)
@@ -2010,6 +2010,10 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
         'ownerId': userId,
         'members': members,
       });
+      await analytics.groupCreated(
+        groupType: _isPublic ? 'public' : 'private',
+        source: 'group',
+      );
       widget.onCreated?.call(group);
     } catch (e) {
       logger.e('Create group error: $e');

@@ -143,8 +143,12 @@ class ShareCardData {
   String get mediaLabel =>
       mediaType == ShareCardMediaType.movie ? 'movie' : 'show';
 
-  String get deepLink =>
-      'flixie://${mediaType == ShareCardMediaType.movie ? 'movies' : 'shows'}/$mediaId';
+  String get deepLink => Uri(
+        scheme: 'flixie',
+        host: mediaType == ShareCardMediaType.movie ? 'movies' : 'shows',
+        path: '/$mediaId',
+        queryParameters: const {'source': 'shared_link'},
+      ).toString();
 
   String get fileName {
     final safeTitle = title

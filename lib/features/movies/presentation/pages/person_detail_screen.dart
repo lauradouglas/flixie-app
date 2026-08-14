@@ -7,14 +7,25 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:flixie_app/models/person.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
+import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/features/movies/data/person_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 
 class PersonDetailScreen extends StatefulWidget {
-  const PersonDetailScreen({super.key, required this.personId});
+  const PersonDetailScreen({
+    super.key,
+    required this.personId,
+    this.source = DetailSource.unknown,
+    this.parentContentId,
+    this.parentContentType,
+  });
 
   final String personId;
+  final DetailSource source;
+  final int? parentContentId;
+  final String? parentContentType;
 
   @override
   State<PersonDetailScreen> createState() => _PersonDetailScreenState();
@@ -250,6 +261,15 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
   @override
   void initState() {
     super.initState();
+    final id = int.tryParse(widget.personId);
+    if (id != null && id > 0) {
+      context.read<AnalyticsController?>()?.personOpened(
+            personId: id,
+            source: widget.source.value,
+            parentContentId: widget.parentContentId,
+            parentContentType: widget.parentContentType,
+          );
+    }
     _load();
   }
 
@@ -270,6 +290,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
       }
       return;
     }
+    final auth = context.read<AuthProvider>();
     try {
       final results = await Future.wait([
         PersonService.getPersonById(id),
@@ -284,7 +305,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
         });
         _loadImages(id);
         // Set initial favorite state from cached user
-        final user = context.read<AuthProvider>().dbUser;
+        final user = auth.dbUser;
         final favoritePersonId = int.tryParse(widget.personId);
         if (user != null && favoritePersonId != null) {
           setState(
@@ -1463,7 +1484,9 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
     final role = _knownForRole(item);
     return GestureDetector(
       onTap: () => context.push(
-        item.type == 'tv' ? '/shows/${item.id}' : '/movies/${item.id}',
+        item.type == 'tv'
+            ? showDetailPath(item.id, source: DetailSource.personCredits)
+            : movieDetailPath(item.id, source: DetailSource.personCredits),
       ),
       child: SizedBox(
         width: 126,
@@ -1889,7 +1912,9 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
 
     return GestureDetector(
       onTap: () => context.push(
-        item.type == 'tv' ? '/shows/${item.id}' : '/movies/${item.id}',
+        item.type == 'tv'
+            ? showDetailPath(item.id, source: DetailSource.personCredits)
+            : movieDetailPath(item.id, source: DetailSource.personCredits),
       ),
       behavior: HitTestBehavior.opaque,
       child: Padding(

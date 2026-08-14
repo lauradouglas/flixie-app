@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import 'package:flixie_app/models/country.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
+import 'package:flixie_app/core/auth/referral_attribution_store.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 import 'package:flixie_app/features/settings/data/reference_data_service.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
@@ -20,9 +21,14 @@ import 'package:flixie_app/models/profile_avatar.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 
 class SignupScreen extends StatefulWidget {
-  const SignupScreen({super.key, this.referralCode});
+  const SignupScreen({
+    super.key,
+    this.referralCode,
+    required this.referralStore,
+  });
 
   final String? referralCode;
+  final ReferralAttributionStore referralStore;
 
   @override
   State<SignupScreen> createState() => _SignupScreenState();
@@ -68,7 +74,9 @@ class _SignupScreenState extends State<SignupScreen> {
     if (referralCode != null && referralCode.isNotEmpty) {
       _referralCodeController.text = referralCode.toUpperCase();
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _checkReferralCode();
+        if (mounted) {
+          _checkReferralCode();
+        }
       });
     }
     _loadCountries();
@@ -230,6 +238,8 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    final auth = context.read<AuthProvider>();
+    final analytics = context.read<AnalyticsController>();
 
     // Always revalidate immediately before creating the Firebase account.
     // The earlier debounced result is only UI feedback and may be stale.
@@ -260,12 +270,16 @@ class _SignupScreenState extends State<SignupScreen> {
         );
         return;
       }
+      try {
+        await widget.referralStore.save(_referralCodeController.text);
+      } catch (_) {
+        // The validated code still travels to the backend in this submission.
+      }
     }
 
-    final auth = context.read<AuthProvider>();
     if (!_signupStartedLogged) {
       _signupStartedLogged = true;
-      unawaited(context.read<AnalyticsController>().signupStarted());
+      unawaited(analytics.signupStarted());
     }
     final success = await auth.beginAvatarSignUp(
       email: _emailController.text.trim(),
@@ -328,6 +342,19 @@ class _SignupScreenState extends State<SignupScreen> {
     if (success && !_signupCompletedLogged) {
       _signupCompletedLogged = true;
       await analytics.signupCompleted();
+      if (_referralCodeController.text.trim().isNotEmpty) {
+        await analytics.sharedLinkSignup(shareType: 'profile');
+        await analytics.friendInviteConverted(
+          inviteMethod: 'referral_link',
+          source: 'shared_link',
+        );
+        await analytics.friendConnected(source: 'shared_link');
+        try {
+          await widget.referralStore.clear();
+        } catch (_) {
+          // Account creation succeeded; local cleanup cannot undo it.
+        }
+      }
     }
     if (!mounted || success) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(

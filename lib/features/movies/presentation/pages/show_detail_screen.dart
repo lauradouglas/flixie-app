@@ -9,6 +9,8 @@ import 'package:flixie_app/models/show_list.dart';
 import 'package:flixie_app/models/watch_provider.dart';
 import 'package:flixie_app/models/review.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
+import 'package:flixie_app/core/utils/favourite_limits.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/favourite_limit_sheet.dart';
 import 'package:flixie_app/features/movies/data/show_service.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -19,6 +21,7 @@ import 'package:flixie_app/features/movies/presentation/widgets/write_review_she
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/media_lists_section.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 
 enum _ShowAction { watchlist, favorite }
@@ -28,9 +31,14 @@ enum _ShowDetailTab { overview, episodes, reviews, activity, details }
 enum _ShowProviderTab { stream, rent, buy }
 
 class ShowDetailScreen extends StatefulWidget {
-  const ShowDetailScreen({super.key, required this.showId});
+  const ShowDetailScreen({
+    super.key,
+    required this.showId,
+    this.source = DetailSource.unknown,
+  });
 
   final String showId;
+  final DetailSource source;
 
   @override
   State<ShowDetailScreen> createState() => _ShowDetailScreenState();
@@ -71,6 +79,14 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
   @override
   void initState() {
     super.initState();
+    final id = int.tryParse(widget.showId);
+    if (id != null && id > 0) {
+      context.read<AnalyticsController?>()?.contentOpened(
+            contentType: 'show',
+            contentId: id,
+            source: widget.source.value,
+          );
+    }
     _load();
   }
 
@@ -238,17 +254,35 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     final showId = _show?.id;
     if (user == null || showId == null) return;
 
+    final activeFavouriteCount = (user.favoriteShows ?? const <dynamic>[])
+        .where(isActiveFavouriteShow)
+        .length;
+    if (!_isFavorite && activeFavouriteCount >= maxFavouriteShows) {
+      showFavouriteLimitPrompt(
+        context,
+        type: FavouriteLimitType.show,
+        onSpaceMade: _toggleFavorite,
+      );
+      return;
+    }
+
     setState(() => _updatingAction = _ShowAction.watchlist);
     try {
       final nextInWatchlist = !_inWatchlist;
       if (_inWatchlist) {
         await ShowService.removeFromWatchlist(user.id, showId);
-        await analytics.watchlistItemRemoved(source: 'show_detail');
-        await analytics.showRemovedFromWatchlist();
+        await analytics.watchlistRemoved(
+          contentType: 'show',
+          contentId: showId,
+          source: 'show_detail',
+        );
       } else {
         await ShowService.addToWatchlist(user.id, showId);
-        await analytics.watchlistItemAdded(source: 'show_detail');
-        await analytics.showAddedToWatchlist();
+        await analytics.watchlistAdded(
+          contentType: 'show',
+          contentId: showId,
+          source: 'show_detail',
+        );
       }
       if (!mounted) return;
       HapticFeedback.lightImpact();
@@ -281,11 +315,12 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     setState(() => _updatingAction = _ShowAction.favorite);
     try {
       final nextIsFavorite = !_isFavorite;
+      Map<String, dynamic>? addedFavorite;
       if (_isFavorite) {
         await ShowService.removeFromFavourites(user.id, showId);
         await analytics.showUnfavourited();
       } else {
-        await ShowService.addToFavourites(user.id, showId);
+        addedFavorite = await ShowService.addToFavourites(user.id, showId);
         await analytics.showFavourited();
       }
       if (!mounted) return;
@@ -296,17 +331,31 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       });
       context.read<AuthProvider>()
         ..updateUserList(
-          favoriteShows: _updatedShowIdList(
-            user.favoriteShows,
-            showId,
-            nextIsFavorite,
-          ),
+          favoriteShows: nextIsFavorite && addedFavorite != null
+              ? <dynamic>[
+                  ...(user.favoriteShows ?? const <dynamic>[])
+                      .where((item) => !_dynamicShowIdMatches(item, showId)),
+                  addedFavorite,
+                ]
+              : _updatedShowIdList(
+                  user.favoriteShows,
+                  showId,
+                  nextIsFavorite,
+                ),
         )
         ..markActivityChanged();
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() => _updatingAction = null);
-      _showSnack('Unable to update favourites');
+      if (isFavouriteLimitError(error)) {
+        showFavouriteLimitPrompt(
+          context,
+          type: FavouriteLimitType.show,
+          onSpaceMade: _toggleFavorite,
+        );
+      } else {
+        _showSnack('Unable to update favourites');
+      }
     }
   }
 
@@ -407,7 +456,11 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     setState(() => _isRatingLoading = true);
     try {
       final response = await ShowService.addShowRating(showId, user.id, rating);
-      await analytics.ratingSaved(source: 'show_detail');
+      await analytics.ratingAdded(
+        contentType: 'show',
+        contentId: showId,
+        source: 'show_detail',
+      );
       final updatedVoteAverage = _parseDouble(response['voteAverage']);
       final updatedVoteCount = _parseInt(response['voteCount']);
       if (!mounted) return;
@@ -1209,7 +1262,12 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
               credit: cast[index],
               onTap: cast[index].id <= 0
                   ? null
-                  : () => context.push('/people/${cast[index].id}'),
+                  : () => context.push(personDetailPath(
+                        cast[index].id,
+                        source: DetailSource.personCredits,
+                        parentContentId: show.id,
+                        parentContentType: 'show',
+                      )),
             ),
           ),
         ),
@@ -1234,7 +1292,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
               final similar = show.similarShows[index];
               return _SimilarShowCard(
                 show: similar,
-                onTap: () => context.push('/shows/${similar.id}'),
+                onTap: () => context.push(showDetailPath(similar.id)),
               );
             },
           ),
