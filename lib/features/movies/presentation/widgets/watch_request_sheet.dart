@@ -96,7 +96,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
       return;
     }
     final auth = context.read<AuthProvider>();
-    final region = auth.dbUser?.countryAbbreviation ?? 'GB';
+    final region = auth.dbUser?.watchProviderRegion ?? 'GB';
     try {
       final results = await Future.wait([
         MovieService().getMovieWatchProviders(movieId, region),

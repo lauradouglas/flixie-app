@@ -8,22 +8,26 @@ class ChatInput extends StatelessWidget {
     required this.controller,
     required this.sending,
     required this.onSend,
+    this.focusNode,
   });
 
   final TextEditingController controller;
   final bool sending;
   final VoidCallback onSend;
+  final FocusNode? focusNode;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.fromLTRB(
-          16, 10, 16, MediaQuery.of(context).viewInsets.bottom + 10),
+        16,
+        10,
+        16,
+        MediaQuery.of(context).viewInsets.bottom + 10,
+      ),
       decoration: const BoxDecoration(
         color: FlixieColors.background,
-        border: Border(
-          top: BorderSide(color: FlixieColors.tabBarBorder),
-        ),
+        border: Border(top: BorderSide(color: FlixieColors.tabBarBorder)),
       ),
       child: SafeArea(
         top: false,
@@ -38,6 +42,7 @@ class ChatInput extends StatelessWidget {
               Expanded(
                 child: TextField(
                   controller: controller,
+                  focusNode: focusNode,
                   style: const TextStyle(color: FlixieColors.textPrimary),
                   maxLines: null,
                   textInputAction: TextInputAction.send,
@@ -46,8 +51,10 @@ class ChatInput extends StatelessWidget {
                     hintText: 'Message…',
                     hintStyle: TextStyle(color: FlixieColors.medium),
                     border: InputBorder.none,
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 11,
+                    ),
                   ),
                 ),
               ),
@@ -58,13 +65,17 @@ class ChatInput extends StatelessWidget {
                         width: 20,
                         height: 20,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2, color: FlixieColors.primary),
+                          strokeWidth: 2,
+                          color: FlixieColors.primary,
+                        ),
                       ),
                     )
                   : IconButton(
                       onPressed: onSend,
-                      icon: const Icon(Icons.send_rounded,
-                          color: FlixieColors.primary),
+                      icon: const Icon(
+                        Icons.send_rounded,
+                        color: FlixieColors.primary,
+                      ),
                     ),
             ],
           ),

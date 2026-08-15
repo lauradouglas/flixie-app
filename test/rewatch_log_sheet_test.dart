@@ -31,10 +31,10 @@ void main() {
       ),
     );
 
-    expect(find.text('Write a review after saving'), findsOneWidget);
-    expect(find.text('Add a specific watch date'), findsOneWidget);
+    expect(find.text('Details (optional)'), findsOneWidget);
     expect(find.text('Rating (optional)'), findsOneWidget);
-    await tester.tap(find.text('Write a review after saving'));
+    await tester.ensureVisible(find.text('Write a review after logging'));
+    await tester.tap(find.text('Write a review after logging'));
     await tester.ensureVisible(find.text('Mark watched without rating'));
     await tester.tap(find.text('Mark watched without rating'));
     await tester.pumpAndSettle();

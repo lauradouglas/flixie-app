@@ -461,8 +461,11 @@ class UserService {
   }
 
   /// Removes the stored FCM device token (call on sign-out).
-  static Future<void> removeFcmToken(String userId) async {
-    await ApiClient.delete('/users/$userId/fcm-token');
+  static Future<void> removeFcmToken(String userId, String token) async {
+    await ApiClient.delete(
+      '/users/$userId/fcm-token',
+      body: {'token': token},
+    );
   }
 
   // ---- Ratings -------------------------------------------------------------

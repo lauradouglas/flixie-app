@@ -2645,6 +2645,7 @@ class _ProfileTabSelector extends StatelessWidget {
           final isSelected = tab == selected;
           return ChoiceChip(
             selected: isSelected,
+            showCheckmark: false,
             avatar: Icon(
               _tabIcon(tab),
               size: 16,

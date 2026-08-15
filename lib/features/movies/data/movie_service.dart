@@ -173,7 +173,6 @@ class MovieService {
           : (data as List<dynamic>? ?? const []);
       return rawList
           .map((e) => WatchProvider.fromJson(e as Map<String, dynamic>))
-          .where((p) => p.displayPriority <= 50)
           .toList();
     }
 

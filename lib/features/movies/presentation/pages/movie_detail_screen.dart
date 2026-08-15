@@ -568,7 +568,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
     try {
       final movieService = context.read<MovieService>();
-      final region = authProvider.dbUser?.countryAbbreviation ?? 'GB';
+      final region = authProvider.dbUser?.watchProviderRegion ?? 'GB';
 
       Future<T> withStep<T>(String step, Future<T> future) async {
         try {
@@ -1076,6 +1076,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => RewatchLogSheet(
         initial: entry,
+        isRewatch: entry == null && _movieWatchHistory.isNotEmpty,
+        previousWatch: entry == null && _movieWatchHistory.isNotEmpty
+            ? _movieWatchHistory.first
+            : null,
         showReviewOption: entry == null,
         onReviewSelected: (selected) => writeReview = selected,
         onSubmit: ({
@@ -1224,7 +1228,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         initialRating: reviewRating,
         initialRecommended: reviewRecommended,
       );
-    } else if (didSubmit && reviewRating != null && mounted) {
+    }
+    if (didSubmit && reviewRating != null && mounted) {
       final user = authProvider.dbUser;
       final movie = _movie;
       if (user != null && movie != null) {
@@ -5422,7 +5427,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final movieId = int.tryParse(widget.movieId);
     if (movieId == null) return;
 
-    final review = await showModalBottomSheet<Review>(
+    await showModalBottomSheet<Review>(
       context: context,
       useRootNavigator: false,
       isScrollControlled: true,
@@ -5438,19 +5443,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           auth.invalidateCachedReviews();
           auth.markActivityChanged();
         },
-      ),
-    );
-    final movie = _movie;
-    if (!mounted || review == null || movie == null) return;
-    promptShareCard(
-      this.context,
-      ShareCardData.review(
-        mediaType: ShareCardMediaType.movie,
-        mediaId: movieId,
-        title: movie.title,
-        posterPath: movie.posterPath,
-        user: user,
-        review: review,
       ),
     );
   }

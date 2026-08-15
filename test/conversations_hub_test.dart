@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:flixie_app/features/social/presentation/utils/movie_share_payload.dart';
+import 'package:flixie_app/features/social/presentation/utils/activity_reply_payload.dart';
 import 'package:flixie_app/features/social/presentation/widgets/conversations_hub.dart';
 import 'package:flixie_app/models/conversation.dart';
 import 'package:flixie_app/models/friendship.dart';
@@ -95,5 +96,31 @@ message=You%20would%20love%20this
   test('ordinary messages remain unchanged in conversation previews', () {
     expect(conversationMessagePreview('Fancy watching this?'),
         'Fancy watching this?');
+  });
+
+  test('activity reply payload retains rating and review context', () {
+    const payload = ActivityReplyPayload(
+      username: 'Bundha',
+      activityLabel: 'review',
+      title: 'Project Hail Mary',
+      link: 'flixie://movies/42',
+      posterUrl: 'https://image.example/poster.jpg',
+      rating: 9,
+      recommended: true,
+      reviewTitle: 'Absolutely incredible',
+      reviewBody: 'Smart, emotional and completely gripping.',
+      containsSpoilers: true,
+    );
+
+    final encoded = payload.withMessage('Movie night Friday?');
+    final parsed = parseActivityReplyPayload(encoded);
+
+    expect(parsed?.message, 'Movie night Friday?');
+    expect(parsed?.title, 'Project Hail Mary');
+    expect(parsed?.rating, 9);
+    expect(parsed?.recommended, isTrue);
+    expect(parsed?.reviewTitle, 'Absolutely incredible');
+    expect(parsed?.containsSpoilers, isTrue);
+    expect(conversationMessagePreview(encoded), 'Movie night Friday?');
   });
 }

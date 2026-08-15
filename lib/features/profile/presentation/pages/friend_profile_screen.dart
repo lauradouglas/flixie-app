@@ -1,4 +1,7 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flixie_app/core/analytics/detail_source.dart';
 import 'package:provider/provider.dart';
@@ -25,6 +28,11 @@ import 'package:flixie_app/features/profile/presentation/widgets/movie_taste_bad
 import 'package:flixie_app/features/profile/presentation/widgets/profile_stats_row.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/watch_request_sheet.dart';
 import 'package:flixie_app/core/safety/safety_actions.dart';
+import 'package:flixie_app/features/social/presentation/utils/activity_reply_payload.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
+import 'package:flixie_app/models/activity_list_item.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/review_card.dart'
+    show showReviewDetailSheet;
 
 enum _FriendshipStatus { none, pending, requested, friends }
 
@@ -61,12 +69,251 @@ class _EmptyProfileTab extends StatelessWidget {
       );
 }
 
+class _FriendRecentReviewCard extends StatefulWidget {
+  const _FriendRecentReviewCard({
+    required this.review,
+    required this.username,
+    required this.onTap,
+    required this.onViewReview,
+    this.onReply,
+  });
+
+  final Review review;
+  final String username;
+  final VoidCallback onTap;
+  final VoidCallback onViewReview;
+  final VoidCallback? onReply;
+
+  @override
+  State<_FriendRecentReviewCard> createState() =>
+      _FriendRecentReviewCardState();
+}
+
+class _FriendRecentReviewCardState extends State<_FriendRecentReviewCard> {
+  bool _spoilerRevealed = false;
+
+  void _handleCardTap() {
+    if (widget.review.containsSpoilers && !_spoilerRevealed) {
+      setState(() => _spoilerRevealed = true);
+      return;
+    }
+    widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final review = widget.review;
+    final parsedDate = DateTime.tryParse(review.createdAt)?.toLocal();
+    final date = parsedDate == null
+        ? ''
+        : '${parsedDate.day}/${parsedDate.month}/${parsedDate.year.toString().substring(2)}';
+    final posterPath = review.moviePosterPath?.trim() ?? '';
+    final posterUrl = posterPath.isEmpty || posterPath.startsWith('http')
+        ? posterPath
+        : 'https://image.tmdb.org/t/p/w342$posterPath';
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _handleCardTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: FlixieColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: FlixieColors.tabBarBorder),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  width: 76,
+                  height: 114,
+                  child: posterUrl.isEmpty
+                      ? Container(
+                          color: FlixieColors.surfaceElevated,
+                          child: const Icon(
+                            Icons.movie_outlined,
+                            color: FlixieColors.medium,
+                          ),
+                        )
+                      : CachedNetworkImage(
+                          imageUrl: posterUrl,
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) => Container(
+                            color: FlixieColors.surfaceElevated,
+                            child: const Icon(
+                              Icons.movie_outlined,
+                              color: FlixieColors.medium,
+                            ),
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            review.movieTitle ?? 'Movie review',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: FlixieColors.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              height: 1.15,
+                            ),
+                          ),
+                        ),
+                        if (date.isNotEmpty)
+                          Text(
+                            date,
+                            style: const TextStyle(
+                              color: FlixieColors.medium,
+                              fontSize: 10.5,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 7),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 5,
+                            children: [
+                              Text(
+                                '★ ${review.rating}/10',
+                                style: const TextStyle(
+                                  color: FlixieColors.warning,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              Text(
+                                '${review.recommended ? '👍' : '👎'} ${review.recommended ? 'Recommends' : 'Doesn’t recommend'}',
+                                style: TextStyle(
+                                  color: review.recommended
+                                      ? FlixieColors.success
+                                      : FlixieColors.danger,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (widget.onReply != null)
+                          TextButton.icon(
+                            onPressed: widget.onReply,
+                            style: TextButton.styleFrom(
+                              foregroundColor: FlixieColors.primaryTint,
+                              minimumSize: const Size(0, 28),
+                              padding: const EdgeInsets.only(left: 6),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            icon: const Icon(Icons.reply_rounded, size: 15),
+                            label: const Text(
+                              'Reply',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      review.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: FlixieColors.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    ImageFiltered(
+                      imageFilter: review.containsSpoilers && !_spoilerRevealed
+                          ? ImageFilter.blur(sigmaX: 4, sigmaY: 4)
+                          : ImageFilter.blur(sigmaX: 0, sigmaY: 0),
+                      child: Text(
+                        review.body,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: review.containsSpoilers && !_spoilerRevealed
+                              ? FlixieColors.light.withValues(alpha: .72)
+                              : FlixieColors.light,
+                          fontSize: 12.5,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                    if (review.containsSpoilers && !_spoilerRevealed) ...[
+                      const SizedBox(height: 5),
+                      TextButton(
+                        onPressed: _handleCardTap,
+                        style: TextButton.styleFrom(
+                          foregroundColor: FlixieColors.warning,
+                          minimumSize: const Size(0, 24),
+                          padding: EdgeInsets.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text(
+                          '⚠ Contains spoilers · tap to reveal',
+                          style: TextStyle(
+                              fontSize: 10.5, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 6),
+                    TextButton.icon(
+                      onPressed: widget.onViewReview,
+                      style: TextButton.styleFrom(
+                        foregroundColor: FlixieColors.primaryTint,
+                        minimumSize: const Size(0, 28),
+                        padding: EdgeInsets.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      icon: const Icon(Icons.open_in_new_rounded, size: 14),
+                      label: const Text(
+                        'View full review',
+                        style: TextStyle(
+                            fontSize: 11.5, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _FriendProfileScreenState extends State<FriendProfileScreen> {
   User? _user;
   bool _userLoading = true;
 
   List<Review> _reviews = [];
   bool _reviewsLoading = true;
+  List<ActivityListItem> _activity = const [];
+  bool _activityLoading = true;
   bool _showAllReviews = false;
   static const int _initialReviewCount = 5;
 
@@ -130,8 +377,12 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
   Future<void> _loadAll() async {
     // _loadUser must complete first: compatibility uses _user.favoriteMovies
     await _loadUser();
-    await Future.wait(
-        [_loadReviews(), _loadFriendshipStatus(), _loadCompatibility()]);
+    await Future.wait([
+      _loadReviews(),
+      _loadActivity(),
+      _loadFriendshipStatus(),
+      _loadCompatibility(),
+    ]);
   }
 
   Future<void> _loadUser() async {
@@ -161,6 +412,20 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     } catch (e) {
       logger.e('[FriendProfileScreen] reviews load error: $e');
       if (mounted) setState(() => _reviewsLoading = false);
+    }
+  }
+
+  Future<void> _loadActivity() async {
+    try {
+      final activity = await UserService.getUserActivity(widget.userId);
+      if (!mounted) return;
+      setState(() {
+        _activity = activity.where((item) => !item.removed).toList();
+        _activityLoading = false;
+      });
+    } catch (e) {
+      logger.e('[FriendProfileScreen] activity load error: $e');
+      if (mounted) setState(() => _activityLoading = false);
     }
   }
 
@@ -883,15 +1148,39 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
         ],
       ];
 
-  List<Widget> _activityContent(User user) => [
-        if (user.watchedMovies?.isNotEmpty == true)
-          FriendMiniStats(watchedMovies: user.watchedMovies!),
-        if (user.watchedMovies?.isEmpty != false)
-          const _EmptyProfileTab(
-            icon: Icons.timeline_outlined,
-            text: 'No public activity yet.',
+  List<Widget> _activityContent(User user) {
+    if (_activityLoading) {
+      return const [
+        Padding(
+          padding: EdgeInsets.symmetric(vertical: 56),
+          child: Center(
+            child: CircularProgressIndicator(color: FlixieColors.primary),
           ),
+        ),
       ];
+    }
+    if (_activity.isEmpty) {
+      return const [
+        _EmptyProfileTab(
+          icon: Icons.timeline_outlined,
+          text: 'No public activity yet.',
+        ),
+      ];
+    }
+    return [
+      if (user.watchedMovies?.isNotEmpty == true) ...[
+        FriendMiniStats(watchedMovies: user.watchedMovies!),
+        const SizedBox(height: 14),
+      ],
+      for (var index = 0; index < _activity.length; index++) ...[
+        ActivityTile(
+          item: _activity[index],
+          detailSource: DetailSource.friendActivity,
+        ),
+        if (index != _activity.length - 1) const SizedBox(height: 10),
+      ],
+    ];
+  }
 
   List<Widget> _reviewsContent() {
     if (_reviewsLoading) {
@@ -908,15 +1197,50 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
         physics: const NeverScrollableScrollPhysics(),
         itemCount: _reviews.length,
         separatorBuilder: (_, __) => const SizedBox(height: 10),
-        itemBuilder: (_, i) => ReviewCard(
+        itemBuilder: (_, i) => _FriendRecentReviewCard(
           review: _reviews[i],
+          username: _user?.username ?? 'Friend',
           onTap: () {
             final id = _reviews[i].movieId;
-            if (id != null) context.push(movieDetailPath(id));
+            if (id != null) {
+              context.push(
+                movieDetailPath(id, source: DetailSource.friendActivity),
+              );
+            }
           },
+          onViewReview: () => _openReview(_reviews[i]),
+          onReply:
+              widget.previewMode ? null : () => _replyToReview(_reviews[i]),
         ),
       ),
     ];
+  }
+
+  void _replyToReview(Review review) {
+    if (review.movieId == null) return;
+    context.push(
+      '/chat/${widget.userId}',
+      extra: ActivityReplyPayload(
+        username: _user?.username ?? 'Friend',
+        activityLabel: 'review',
+        title: review.movieTitle ?? 'Movie review',
+        link: 'flixie://movies/${review.movieId}',
+        posterUrl: _reviewPosterUrl(review.moviePosterPath),
+        rating: review.rating.toDouble(),
+        recommended: review.recommended,
+        reviewTitle: review.title,
+        reviewBody: review.body,
+        containsSpoilers: review.containsSpoilers,
+      ),
+    );
+  }
+
+  void _openReview(Review review) {
+    showReviewDetailSheet(
+      context,
+      review: review,
+      currentUserId: context.read<AuthProvider>().dbUser?.id,
+    );
   }
 
   Widget _recentReview(Review review) => Column(
@@ -926,16 +1250,32 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
               style:
                   TextStyle(fontWeight: FontWeight.w800, letterSpacing: 1.4)),
           const SizedBox(height: 10),
-          ReviewCard(
+          _FriendRecentReviewCard(
             review: review,
+            username: _user?.username ?? 'Friend',
             onTap: () {
               if (review.movieId != null) {
-                context.push(movieDetailPath(review.movieId!));
+                context.push(
+                  movieDetailPath(
+                    review.movieId!,
+                    source: DetailSource.friendActivity,
+                  ),
+                );
               }
             },
+            onViewReview: () => _openReview(review),
+            onReply: widget.previewMode || review.movieId == null
+                ? null
+                : () => _replyToReview(review),
           ),
         ],
       );
+
+  String _reviewPosterUrl(String? path) {
+    final value = path?.trim() ?? '';
+    if (value.isEmpty || value.startsWith('http')) return value;
+    return 'https://image.tmdb.org/t/p/w342$value';
+  }
 
   // Kept temporarily while the public-profile redesign settles, so its mature
   // loading/error variants remain available during follow-up visual QA.

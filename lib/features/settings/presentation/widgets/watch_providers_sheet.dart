@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'package:flixie_app/models/watch_provider.dart';
 import 'package:flixie_app/features/settings/presentation/controllers/settings_controller.dart';
 import 'package:flixie_app/features/settings/data/reference_data_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/core/auth/auth_provider.dart';
 
 class WatchProvidersSheet extends StatefulWidget {
   const WatchProvidersSheet({
@@ -100,6 +102,10 @@ class _WatchProvidersSheetState extends State<WatchProvidersSheet> {
       );
 
       if (!mounted) return;
+
+      context
+          .read<AuthProvider>()
+          .updateCachedUserWatchProviderIds(_selectedProviderIds);
 
       Navigator.pop(context);
 

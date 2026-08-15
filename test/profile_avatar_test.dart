@@ -58,6 +58,22 @@ void main() {
     expect(parsed.darkMode, isFalse);
   });
 
+  test('uses the profile country for watch providers and defaults to GB', () {
+    User userWithCountry(Map<String, dynamic>? country) => User.fromJson({
+          'id': 'u1',
+          'username': 'laura',
+          'email': 'l@example.com',
+          'iconColorId': 1,
+          'completedSetup': true,
+          'darkMode': true,
+          'country': country,
+        });
+
+    expect(userWithCountry({'isoCode': 'us'}).watchProviderRegion, 'US');
+    expect(userWithCountry({'abbreviation': 'UK'}).watchProviderRegion, 'GB');
+    expect(userWithCountry(null).watchProviderRegion, 'GB');
+  });
+
   test('download URLs are cached by storage path', () async {
     var calls = 0;
     final resolver = AvatarUrlResolver(loader: (path) async {

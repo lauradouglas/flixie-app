@@ -10,6 +10,7 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/review_card.dart';
 import 'package:flixie_app/core/analytics/detail_source.dart';
+import 'package:flixie_app/features/social/presentation/utils/activity_reply_payload.dart';
 
 class ActivityTile extends StatelessWidget {
   const ActivityTile({
@@ -230,7 +231,10 @@ class ActivityTile extends StatelessWidget {
   }
 
   void _openReviewSheet(
-      BuildContext context, Review review, String? currentUserId) {
+    BuildContext context,
+    Review review,
+    String? currentUserId,
+  ) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -274,6 +278,14 @@ class ActivityTile extends StatelessWidget {
     return null;
   }
 
+  void _replyToActivity(
+    BuildContext context,
+    ActivityReplyPayload payload,
+  ) {
+    if (item.userId.isEmpty) return;
+    context.push('/chat/${item.userId}', extra: payload);
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUserId = context.read<AuthProvider?>()?.dbUser?.id;
@@ -294,6 +306,11 @@ class ActivityTile extends StatelessWidget {
             ? rawPoster
             : '$_posterBase$rawPoster';
     final contextText = _contextBadgeText(currentUserId);
+    final activityReply = ActivityReplyPayload.fromActivity(item);
+    final canReply = activityReply.isUsable &&
+        detailSource == DetailSource.friendActivity &&
+        item.userId.isNotEmpty &&
+        item.userId != currentUserId;
 
     final tile = ClipRRect(
       borderRadius: BorderRadius.circular(16),
@@ -351,8 +368,10 @@ class ActivityTile extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 7),
-                          const Text('·',
-                              style: TextStyle(color: FlixieColors.medium)),
+                          const Text(
+                            '·',
+                            style: TextStyle(color: FlixieColors.medium),
+                          ),
                           const SizedBox(width: 7),
                           Flexible(
                             child: Text(
@@ -371,8 +390,24 @@ class ActivityTile extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Icon(Icons.more_horiz_rounded,
-                      color: FlixieColors.medium, size: 21),
+                  if (canReply)
+                    TextButton.icon(
+                      onPressed: () => _replyToActivity(context, activityReply),
+                      icon: const Icon(Icons.reply_rounded, size: 16),
+                      label: const Text('Reply'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: FlixieColors.primaryTint,
+                        minimumSize: const Size(0, 34),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    )
+                  else
+                    const Icon(
+                      Icons.more_horiz_rounded,
+                      color: FlixieColors.medium,
+                      size: 21,
+                    ),
                 ],
               ),
               const SizedBox(height: 6),
@@ -483,10 +518,13 @@ class ActivityTile extends StatelessWidget {
                               Container(
                                 width: double.infinity,
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 9, vertical: 7),
+                                  horizontal: 9,
+                                  vertical: 7,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: FlixieColors.surface
-                                      .withValues(alpha: 0.8),
+                                  color: FlixieColors.surface.withValues(
+                                    alpha: 0.8,
+                                  ),
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
                                     color: Colors.white.withValues(alpha: 0.08),

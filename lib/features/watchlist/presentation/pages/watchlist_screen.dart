@@ -265,7 +265,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     setState(() => _loadingShowWatchProviderAvailability = true);
     try {
       await authProvider.ensureWatchProviderCache(movieIds: const []);
-      final region = user.countryAbbreviation ?? 'GB';
+      final region = user.watchProviderRegion;
       final entries = await Future.wait(
         watchlist.map((item) async {
           try {

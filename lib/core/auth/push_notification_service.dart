@@ -285,8 +285,11 @@ class PushNotificationService {
     _onMessageSubscription = null;
     _onMessageOpenedSubscription = null;
     try {
-      await UserService.removeFcmToken(userId);
-      logger.i('[FCM] Token removed from backend');
+      final token = await _messaging.getToken();
+      if (token != null) {
+        await UserService.removeFcmToken(userId, token);
+        logger.i('[FCM] This device token removed from backend');
+      }
     } catch (e) {
       logger.w('[FCM] Failed to remove FCM token from backend: $e');
     }

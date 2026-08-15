@@ -119,6 +119,7 @@ class AuthProvider extends ChangeNotifier {
   bool _isPrefetching = false;
   final Map<int, List<WatchProvider>> _cachedWatchProvidersByMovieId = {};
   Set<int>? _cachedUserWatchProviderIds;
+  String? _cachedWatchProviderRegion;
   Future<void>? _watchProviderCacheFuture;
 
   int _unreadNotificationCount = 0;
@@ -162,6 +163,14 @@ class AuthProvider extends ChangeNotifier {
       _cachedUserWatchProviderIds == null
           ? null
           : Set.unmodifiable(_cachedUserWatchProviderIds!);
+
+  /// Updates provider preference cache after the user saves their selection,
+  /// so watchlist availability styling updates immediately.
+  void updateCachedUserWatchProviderIds(Iterable<int> providerIds) {
+    _cachedUserWatchProviderIds = providerIds.toSet();
+    notifyListeners();
+  }
+
   int get unreadNotificationCount => _unreadNotificationCount;
 
   void _syncUnreadNotificationCount(int count) {
@@ -331,10 +340,8 @@ class AuthProvider extends ChangeNotifier {
         logger.d('Name: ${_dbUser?.firstName} ${_dbUser?.lastName}');
         _status = AuthStatus.authenticated;
         // Kick off background prefetch so screens have data ready immediately
-        final region =
-            (_dbUser?.country?['isoCode'] as String?)?.toUpperCase() ?? 'US';
         if (_prefetchAfterAuth && _dbUser?.id != null) {
-          _prefetch(_dbUser!.id, region: region);
+          _prefetch(_dbUser!.id);
         }
       } catch (e, stackTrace) {
         logger.e('Error fetching database user: $e',
@@ -368,6 +375,7 @@ class AuthProvider extends ChangeNotifier {
       _cachedWatchRequests = null;
       _cachedWatchProvidersByMovieId.clear();
       _cachedUserWatchProviderIds = null;
+      _cachedWatchProviderRegion = null;
       _watchProviderCacheFuture = null;
       _notificationPoller.stop();
       _syncUnreadNotificationCount(0);
@@ -400,7 +408,14 @@ class AuthProvider extends ChangeNotifier {
   }
 
   /// Fetches profile/friend/home cache in parallel right after login.
-  void _prefetch(String userId, {String region = 'US'}) {
+  void _prefetch(String userId, {String? region}) {
+    final providerRegion = region ?? _dbUser?.watchProviderRegion ?? 'GB';
+    if (_cachedWatchProviderRegion != null &&
+        _cachedWatchProviderRegion != providerRegion) {
+      _cachedWatchProvidersByMovieId.clear();
+      _cachedUserWatchProviderIds = null;
+    }
+    _cachedWatchProviderRegion = providerRegion;
     _isPrefetching = true;
     if (!_hasResetAppBadgeThisSession) {
       _hasResetAppBadgeThisSession = true;
@@ -416,7 +431,7 @@ class AuthProvider extends ChangeNotifier {
     _prefetchCoordinator
         .prefetch(
       userId,
-      region: region,
+      region: providerRegion,
       watchlistMovieIds: watchlistMovieIds,
     )
         .then((snapshot) {
@@ -484,6 +499,12 @@ class AuthProvider extends ChangeNotifier {
   Future<void> ensureWatchProviderCache({Iterable<int>? movieIds}) async {
     final user = _dbUser;
     if (user == null) return;
+    final providerRegion = user.watchProviderRegion;
+    if (_cachedWatchProviderRegion != providerRegion) {
+      _cachedWatchProvidersByMovieId.clear();
+      _cachedUserWatchProviderIds = null;
+      _cachedWatchProviderRegion = providerRegion;
+    }
     final requestedIds = (movieIds ??
             user.movieWatchlist
                 ?.where((item) => item.removed != true)
@@ -504,7 +525,7 @@ class AuthProvider extends ChangeNotifier {
         .fetchWatchProviders(
       user.id,
       missing,
-      region: user.countryAbbreviation ?? 'GB',
+      region: providerRegion,
     )
         .then((value) {
       _cachedWatchProvidersByMovieId.addAll(value.providersByMovieId);
@@ -545,9 +566,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       _dbUser = await UserService.getUserByExternalId(firebaseUid);
       notifyListeners();
-      final region =
-          (_dbUser?.country?['isoCode'] as String?)?.toUpperCase() ?? 'US';
-      if (_dbUser?.id != null) _prefetch(_dbUser!.id, region: region);
+      if (_dbUser?.id != null) _prefetch(_dbUser!.id);
     } catch (e) {
       logger.w('[AuthProvider] refreshUserData error: $e');
     }
@@ -758,7 +777,7 @@ class AuthProvider extends ChangeNotifier {
 
       _status = AuthStatus.authenticated;
       if (_prefetchAfterAuth && _dbUser?.id != null) {
-        _prefetch(_dbUser!.id); // region defaults to 'US' for new sign-ups
+        _prefetch(_dbUser!.id);
       }
       // Defer router notification so GoRouter navigates *after* the current
       // frame builds cleanly (same pattern as _onAuthStateChanged).

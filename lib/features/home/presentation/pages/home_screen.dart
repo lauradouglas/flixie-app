@@ -39,10 +39,10 @@ import 'package:flixie_app/features/home/presentation/widgets/trending_friends_s
 import 'package:flixie_app/features/home/presentation/widgets/personalized_recommendation_card.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_sheet.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/write_review_sheet.dart';
-import 'package:flixie_app/features/sharing/models/share_card_data.dart';
-import 'package:flixie_app/features/sharing/presentation/share_card_sheet.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
+import 'package:flixie_app/features/sharing/models/share_card_data.dart';
+import 'package:flixie_app/features/sharing/presentation/share_card_sheet.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -52,6 +52,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static _HomeSessionSnapshot? _sessionSnapshot;
   // Keep hero carousel concise so primary CTA and dots remain visible above fold.
   static const int _maxHeroCarouselItems = 12;
   static const double _heroViewportFraction = 0.84;
@@ -73,15 +74,18 @@ class _HomeScreenState extends State<HomeScreen> {
   AuthProvider? _authProvider;
   final WatchlistActionsController _watchlistActions =
       WatchlistActionsController.instance;
-  final PageController _heroPageController =
-      PageController(viewportFraction: _heroViewportFraction);
-  final PageController _forYouPageController =
-      PageController(viewportFraction: 0.88);
+  final PageController _heroPageController = PageController(
+    viewportFraction: _heroViewportFraction,
+  );
+  final PageController _forYouPageController = PageController(
+    viewportFraction: 0.88,
+  );
   final ScrollController _homeScrollController = ScrollController();
   final GlobalKey _forYouSectionKey = GlobalKey();
   bool _recommendationVisibilityCheckScheduled = false;
   int _heroPage = 0;
   int _forYouPage = 0;
+  bool _didAttemptSessionRestore = false;
 
   // Preserve the ranking returned by the trending endpoint. Recommendations
   // load independently and must not reshuffle an already-visible carousel.
@@ -91,6 +95,10 @@ class _HomeScreenState extends State<HomeScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     _authProvider ??= context.read<AuthProvider>();
+    if (!_didAttemptSessionRestore) {
+      _didAttemptSessionRestore = true;
+      _restoreSessionSnapshot();
+    }
   }
 
   @override
@@ -101,12 +109,13 @@ class _HomeScreenState extends State<HomeScreen> {
       _authProvider?.addListener(_onAuthChanged);
       TabRefreshController.home.addListener(_onHomeTabRefresh);
       _homeScrollController.addListener(_scheduleRecommendationVisibilityCheck);
-      _loadAll();
+      if (_loadedForUserId == null) _loadAll();
     });
   }
 
   @override
   void dispose() {
+    _storeSessionSnapshot();
     _authProvider?.removeListener(_onAuthChanged);
     TabRefreshController.home.removeListener(_onHomeTabRefresh);
     _heroPageController.dispose();
@@ -123,13 +132,92 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onHomeTabRefresh() {
-    if (mounted) unawaited(_refreshAll());
+    if (!mounted || !_homeScrollController.hasClients) return;
+    unawaited(
+      _homeScrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+      ),
+    );
   }
 
-  Future<void> _refreshAll() => _loadAll(
-        refreshRecommendations: true,
-        showFullLoading: false,
+  void _restoreSessionSnapshot() {
+    final snapshot = _sessionSnapshot;
+    final userId = _authProvider?.dbUser?.id;
+    if (snapshot == null || userId == null || snapshot.userId != userId) return;
+
+    _featuredMovies = List.of(snapshot.featuredMovies);
+    _forYouMovies = List.of(snapshot.forYouMovies);
+    _continueWatchingShows = List.of(snapshot.continueWatchingShows);
+    _friendsActivity = List.of(snapshot.friendsActivity);
+    _heroFriendInteractions
+      ..clear()
+      ..addAll(
+        snapshot.heroFriendInteractions.map(
+          (movieId, interactions) => MapEntry(movieId, List.of(interactions)),
+        ),
       );
+    _showMoreFriendActivity = snapshot.showMoreFriendActivity;
+    _watchlistMovieIds = Set.of(snapshot.watchlistMovieIds);
+    _watchRequestsNeedingResponse = snapshot.watchRequestsNeedingResponse;
+    _upcomingWatchPlan = snapshot.upcomingWatchPlan;
+    _heroPage = snapshot.heroPage;
+    _forYouPage = snapshot.forYouPage;
+    _loadedForUserId = userId;
+    _isLoading = false;
+    _isLoadingRecommendations = false;
+    _error = null;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_heroPageController.hasClients && _featuredMovies.isNotEmpty) {
+        _heroPageController.jumpToPage(
+          _heroPage.clamp(0, _featuredMovies.length - 1),
+        );
+      }
+      if (_forYouPageController.hasClients && _forYouMovies.isNotEmpty) {
+        _forYouPageController.jumpToPage(
+          _forYouPage.clamp(0, _forYouMovies.length - 1),
+        );
+      }
+      if (_homeScrollController.hasClients) {
+        _homeScrollController.jumpTo(
+          snapshot.scrollOffset.clamp(
+            0,
+            _homeScrollController.position.maxScrollExtent,
+          ),
+        );
+      }
+      _scheduleRecommendationVisibilityCheck();
+    });
+  }
+
+  void _storeSessionSnapshot() {
+    final userId = _loadedForUserId;
+    if (userId == null || _isLoading || _error != null) return;
+    _sessionSnapshot = _HomeSessionSnapshot(
+      userId: userId,
+      featuredMovies: List.of(_featuredMovies),
+      forYouMovies: List.of(_forYouMovies),
+      continueWatchingShows: List.of(_continueWatchingShows),
+      friendsActivity: List.of(_friendsActivity),
+      heroFriendInteractions: _heroFriendInteractions.map(
+        (movieId, interactions) => MapEntry(movieId, List.of(interactions)),
+      ),
+      showMoreFriendActivity: _showMoreFriendActivity,
+      watchlistMovieIds: Set.of(_watchlistMovieIds),
+      watchRequestsNeedingResponse: _watchRequestsNeedingResponse,
+      upcomingWatchPlan: _upcomingWatchPlan,
+      heroPage: _heroPage,
+      forYouPage: _forYouPage,
+      scrollOffset:
+          _homeScrollController.hasClients ? _homeScrollController.offset : 0,
+    );
+  }
+
+  Future<void> _refreshAll() =>
+      _loadAll(refreshRecommendations: true, showFullLoading: false);
 
   Future<void> _loadAll({
     bool refreshRecommendations = false,
@@ -162,9 +250,7 @@ class _HomeScreenState extends State<HomeScreen> {
               cachedTrending != null &&
               cachedTrending.isNotEmpty
           ? Future.value(cachedTrending)
-          : TrendingService.getTrendingMovies(
-              refresh: refreshRecommendations,
-            );
+          : TrendingService.getTrendingMovies(refresh: refreshRecommendations);
       final trendingMovies = await trendingFuture;
 
       // The branded boot screen is the loading state. Do not reveal Home and
@@ -213,16 +299,20 @@ class _HomeScreenState extends State<HomeScreen> {
     final urls = paths
         .whereType<String>()
         .where((path) => path.trim().isNotEmpty)
-        .map((path) => path.startsWith('http')
-            ? path
-            : 'https://image.tmdb.org/t/p/w500$path')
+        .map(
+          (path) => path.startsWith('http')
+              ? path
+              : 'https://image.tmdb.org/t/p/w500$path',
+        )
         .toSet();
     if (urls.isEmpty) return;
 
     await Future.wait(
       urls.map(
-        (url) => precacheImage(CachedNetworkImageProvider(url), context)
-            .catchError((_) {}),
+        (url) => precacheImage(
+          CachedNetworkImageProvider(url),
+          context,
+        ).catchError((_) {}),
       ),
     ).timeout(const Duration(seconds: 4), onTimeout: () => []);
   }
@@ -282,8 +372,11 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) setState(() => _isLoadingRecommendations = true);
 
     final results = await Future.wait([
-      FriendService.getFriendsActivityLists(user.id, days: 30, limit: 200)
-          .catchError((_) => <ActivityListItem>[]),
+      FriendService.getFriendsActivityLists(
+        user.id,
+        days: 30,
+        limit: 200,
+      ).catchError((_) => <ActivityListItem>[]),
       RecommendationService.getUserRecommendations(
         user.id,
         refresh: refreshRecommendations,
@@ -291,10 +384,12 @@ class _HomeScreenState extends State<HomeScreen> {
       _watchlistActions
           .getUserWatchlist(user.id)
           .catchError((_) => <WatchlistMovie>[]),
-      RequestService.getWatchRequests(user.id)
-          .catchError((_) => <WatchRequest>[]),
-      ShowService.getContinueWatching(user.id)
-          .catchError((_) => <ContinueWatchingShow>[]),
+      RequestService.getWatchRequests(
+        user.id,
+      ).catchError((_) => <WatchRequest>[]),
+      ShowService.getContinueWatching(
+        user.id,
+      ).catchError((_) => <ContinueWatchingShow>[]),
     ]);
     if (!mounted || _loadedForUserId != user.id) return;
 
@@ -307,8 +402,10 @@ class _HomeScreenState extends State<HomeScreen> {
       _watchlistMovieIds = (results[2] as List<WatchlistMovie>)
           .map((item) => item.movieId)
           .toSet();
-      _watchRequestsNeedingResponse =
-          _countWatchRequestsNeedingResponse(watchRequests, user.id);
+      _watchRequestsNeedingResponse = _countWatchRequestsNeedingResponse(
+        watchRequests,
+        user.id,
+      );
       _upcomingWatchPlan = _nearestUpcomingWatchPlan(watchRequests);
       _continueWatchingShows = results[4] as List<ContinueWatchingShow>;
       _isLoadingRecommendations = false;
@@ -359,11 +456,13 @@ class _HomeScreenState extends State<HomeScreen> {
           attribution: attribution,
         );
     if (mounted) {
-      context.push(movieDetailPath(
-        movie.id,
-        source: DetailSource.justForYou,
-        recommendation: attribution,
-      ));
+      context.push(
+        movieDetailPath(
+          movie.id,
+          source: DetailSource.justForYou,
+          recommendation: attribution,
+        ),
+      );
     }
   }
 
@@ -372,8 +471,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final user = context.read<AuthProvider>().dbUser;
     if (user == null) return;
 
-    final originalIndex =
-        _forYouMovies.indexWhere((item) => item.id == movie.id);
+    final originalIndex = _forYouMovies.indexWhere(
+      (item) => item.id == movie.id,
+    );
     if (originalIndex < 0) return;
     setState(() => _forYouMovies.removeAt(originalIndex));
 
@@ -397,10 +497,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                   if (mounted &&
                       !_forYouMovies.any((item) => item.id == movie.id)) {
-                    setState(() => _forYouMovies.insert(
-                          originalIndex.clamp(0, _forYouMovies.length),
-                          movie,
-                        ));
+                    setState(
+                      () => _forYouMovies.insert(
+                        originalIndex.clamp(0, _forYouMovies.length),
+                        movie,
+                      ),
+                    );
                   }
                 } catch (error) {
                   logger.e('[HomeScreen] undo not-interested error: $error');
@@ -412,10 +514,12 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (error) {
       logger.e('[HomeScreen] not-interested error: $error');
       if (mounted && !_forYouMovies.any((item) => item.id == movie.id)) {
-        setState(() => _forYouMovies.insert(
-              originalIndex.clamp(0, _forYouMovies.length),
-              movie,
-            ));
+        setState(
+          () => _forYouMovies.insert(
+            originalIndex.clamp(0, _forYouMovies.length),
+            movie,
+          ),
+        );
       }
       messenger.showSnackBar(
         const SnackBar(content: Text('Couldn\'t update recommendations.')),
@@ -491,20 +595,20 @@ class _HomeScreenState extends State<HomeScreen> {
           scheduledFor.isAfter(now);
     }).toList()
       ..sort(
-          (left, right) => left.scheduledFor!.compareTo(right.scheduledFor!));
+        (left, right) => left.scheduledFor!.compareTo(right.scheduledFor!),
+      );
     return upcoming.isEmpty ? null : upcoming.first;
   }
 
   Future<void> _toggleHeroWatchlist(
-      BuildContext context, MovieShort movie) async {
+    BuildContext context,
+    MovieShort movie,
+  ) async {
     final authProvider = context.read<AuthProvider>();
     final analytics = context.read<AnalyticsController>();
     final user = authProvider.dbUser;
     if (user == null) {
-      context.push(movieDetailPath(
-        movie.id,
-        source: DetailSource.trending,
-      ));
+      context.push(movieDetailPath(movie.id, source: DetailSource.trending));
       return;
     }
     final movieId = movie.id;
@@ -519,8 +623,9 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     });
     try {
-      final currentWatchlist =
-          List<WatchlistMovie>.from(user.movieWatchlist ?? []);
+      final currentWatchlist = List<WatchlistMovie>.from(
+        user.movieWatchlist ?? [],
+      );
       if (inWatchlist) {
         await _watchlistActions.removeFromWatchlist(user.id, movieId);
         await analytics.watchlistRemoved(
@@ -578,10 +683,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _openHeroTrailer(
-    BuildContext context,
-    MovieShort movie,
-  ) async {
+  Future<void> _openHeroTrailer(BuildContext context, MovieShort movie) async {
     final rawUrl = movie.trailer?.key;
     if (rawUrl == null || rawUrl.trim().isEmpty) return;
     final watchUrl = rawUrl.replaceFirst(
@@ -648,10 +750,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: _isLoading
           ? const HomeBootLoadingScreen()
           : _error != null
-              ? ErrorRetryWidget(
-                  message: _error!,
-                  onRetry: _loadAll,
-                )
+              ? ErrorRetryWidget(message: _error!, onRetry: _loadAll)
               : RefreshIndicator(
                   color: FlixieColors.primary,
                   backgroundColor: FlixieColors.background,
@@ -766,8 +865,10 @@ class _HomeScreenState extends State<HomeScreen> {
               onPageChanged: (i) => setState(() => _heroPage = i),
               itemCount: count,
               itemBuilder: (context, index) {
-                final posterCard =
-                    _buildInactiveHeroCard(context, movies[index]);
+                final posterCard = _buildInactiveHeroCard(
+                  context,
+                  movies[index],
+                );
                 final detailCard = _buildHeroCard(context, movies[index]);
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -777,8 +878,17 @@ class _HomeScreenState extends State<HomeScreen> {
                       final page = _heroPageController.hasClients
                           ? (_heroPageController.page ?? _heroPage.toDouble())
                           : _heroPage.toDouble();
-                      final detailOpacity =
-                          (1 - (page - index).abs()).clamp(0.0, 1.0);
+                      // With padEnds disabled a partial-width PageView cannot
+                      // physically scroll all the way to the final page index.
+                      // Without this, the last card's detail layer settles
+                      // slightly transparent over its poster-only layer.
+                      const trailingPageOffset =
+                          (1 - _heroViewportFraction) / _heroViewportFraction;
+                      final isAtTrailingEdge = index == count - 1 &&
+                          page >= index - trailingPageOffset - 0.001;
+                      final detailOpacity = isAtTrailingEdge
+                          ? 1.0
+                          : (1 - (page - index).abs()).clamp(0.0, 1.0);
                       return Stack(
                         fit: StackFit.expand,
                         children: [
@@ -826,10 +936,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildHeroCard(
-    BuildContext context,
-    MovieShort movie,
-  ) {
+  Widget _buildHeroCard(BuildContext context, MovieShort movie) {
     final inWatchlist = _watchlistMovieIds.contains(movie.id);
     final isUpdating = _watchlistUpdatesInFlight.contains(movie.id);
     final friendActivityLoading = context.read<AuthProvider>().dbUser != null &&
@@ -850,10 +957,9 @@ class _HomeScreenState extends State<HomeScreen> {
         side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: InkWell(
-        onTap: () => context.push(movieDetailPath(
-          movie.id,
-          source: DetailSource.trending,
-        )),
+        onTap: () => context.push(
+          movieDetailPath(movie.id, source: DetailSource.trending),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -967,8 +1073,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     Row(
                       children: [
                         if ((movie.voteAverage ?? 0) > 0) ...[
-                          const Icon(Icons.star_rounded,
-                              color: FlixieColors.warning, size: 19),
+                          const Icon(
+                            Icons.star_rounded,
+                            color: FlixieColors.warning,
+                            size: 19,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             movie.voteAverage!.toStringAsFixed(1),
@@ -1034,10 +1143,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           tooltip: 'Details',
                           icon: Icons.info_outline_rounded,
                           foregroundColor: FlixieColors.light,
-                          onPressed: () => context.push(movieDetailPath(
-                            movie.id,
-                            source: DetailSource.trending,
-                          )),
+                          onPressed: () => context.push(
+                            movieDetailPath(
+                              movie.id,
+                              source: DetailSource.trending,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -1161,10 +1272,9 @@ class _HomeScreenState extends State<HomeScreen> {
         side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: InkWell(
-        onTap: () => context.push(movieDetailPath(
-          movie.id,
-          source: DetailSource.trending,
-        )),
+        onTap: () => context.push(
+          movieDetailPath(movie.id, source: DetailSource.trending),
+        ),
         child: movie.poster != null
             ? CachedNetworkImage(
                 imageUrl: 'https://image.tmdb.org/t/p/w780${movie.poster}',
@@ -1216,16 +1326,16 @@ class _HomeScreenState extends State<HomeScreen> {
             separatorBuilder: (_, __) => const SizedBox(width: 10),
             itemBuilder: (context, index) {
               final item = watchlist[index];
-              final isUpdating =
-                  _watchlistUpdatesInFlight.contains(item.movieId);
+              final isUpdating = _watchlistUpdatesInFlight.contains(
+                item.movieId,
+              );
               final posterUrl = item.movie?.posterPath != null
                   ? 'https://image.tmdb.org/t/p/w342${item.movie!.posterPath}'
                   : null;
               return GestureDetector(
-                onTap: () => context.push(movieDetailPath(
-                  item.movieId,
-                  source: DetailSource.watchlist,
-                )),
+                onTap: () => context.push(
+                  movieDetailPath(item.movieId, source: DetailSource.watchlist),
+                ),
                 onLongPress: () => _showQuickMovieActions(
                   context,
                   movieId: item.movieId,
@@ -1251,15 +1361,19 @@ class _HomeScreenState extends State<HomeScreen> {
                                       errorWidget: (_, __, ___) => Container(
                                         color: FlixieColors
                                             .tabBarBackgroundFocused,
-                                        child: const Icon(Icons.movie_outlined,
-                                            color: FlixieColors.medium),
+                                        child: const Icon(
+                                          Icons.movie_outlined,
+                                          color: FlixieColors.medium,
+                                        ),
                                       ),
                                     )
                                   : Container(
                                       color:
                                           FlixieColors.tabBarBackgroundFocused,
-                                      child: const Icon(Icons.movie_outlined,
-                                          color: FlixieColors.medium),
+                                      child: const Icon(
+                                        Icons.movie_outlined,
+                                        color: FlixieColors.medium,
+                                      ),
                                     ),
                             ),
                           ),
@@ -1300,8 +1414,11 @@ class _HomeScreenState extends State<HomeScreen> {
                             right: 2,
                             child: PopupMenuButton<String>(
                               tooltip: 'Quick actions',
-                              icon: const Icon(Icons.more_vert_rounded,
-                                  color: FlixieColors.light, size: 20),
+                              icon: const Icon(
+                                Icons.more_vert_rounded,
+                                color: FlixieColors.light,
+                                size: 20,
+                              ),
                               color: FlixieColors.tabBarBackgroundFocused,
                               onSelected: (value) {
                                 _handleQuickActionSelection(
@@ -1336,9 +1453,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                            color: FlixieColors.light,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600),
+                          color: FlixieColors.light,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
@@ -1460,8 +1578,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       },
                       itemBuilder: (context, index) {
                         final movie = movies[index];
-                        final isBookmarked =
-                            _watchlistMovieIds.contains(movie.id);
+                        final isBookmarked = _watchlistMovieIds.contains(
+                          movie.id,
+                        );
                         final isPreviouslyWatched = movie.previouslyWatched ||
                             (context
                                     .read<AuthProvider>()
@@ -1715,8 +1834,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
                 const SizedBox(width: 8),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 7,
+                  ),
                   decoration: BoxDecoration(
                     color: FlixieColors.success.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(999),
@@ -1818,8 +1939,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 onPressed: () => setState(() => _showMoreFriendActivity = true),
                 style: TextButton.styleFrom(
                   foregroundColor: FlixieColors.primary,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 8,
+                  ),
                 ),
                 icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
                 label: Text(
@@ -1852,9 +1975,7 @@ class _HomeScreenState extends State<HomeScreen> {
               SizedBox(width: 8),
               SkeletonBox(width: 110, height: 148, borderRadius: 11),
               SizedBox(width: 8),
-              Expanded(
-                child: SkeletonBox(height: 148, borderRadius: 11),
-              ),
+              Expanded(child: SkeletonBox(height: 148, borderRadius: 11)),
             ],
           ),
         ),
@@ -1948,9 +2069,11 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         messenger.showSnackBar(
           SnackBar(
-            content: Text(currentlyInWatchlist
-                ? '$movieTitle removed from watchlist'
-                : '$movieTitle added to watchlist'),
+            content: Text(
+              currentlyInWatchlist
+                  ? '$movieTitle removed from watchlist'
+                  : '$movieTitle added to watchlist',
+            ),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -1994,8 +2117,10 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.check_circle_outline,
-                  color: FlixieColors.success),
+              leading: const Icon(
+                Icons.check_circle_outline,
+                color: FlixieColors.success,
+              ),
               title: const Text('Mark as watched'),
               onTap: () {
                 Navigator.of(sheetContext).pop();
@@ -2009,8 +2134,10 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.bookmark_remove_outlined,
-                  color: FlixieColors.warning),
+              leading: const Icon(
+                Icons.bookmark_remove_outlined,
+                color: FlixieColors.warning,
+              ),
               title: const Text('Remove from watchlist'),
               onTap: () {
                 Navigator.of(sheetContext).pop();
@@ -2151,7 +2278,10 @@ class _HomeScreenState extends State<HomeScreen> {
               if (_forYouMovies.isEmpty) {
                 _forYouPage = 0;
               } else {
-                _forYouPage = _forYouPage.clamp(0, _forYouMovies.length - 1);
+                _forYouPage = _forYouPage.clamp(
+                  0,
+                  _forYouMovies.length - 1,
+                );
               }
             });
             messenger.showSnackBar(
@@ -2162,10 +2292,9 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
 
-    final user = auth.dbUser;
-    if (!mounted || !context.mounted || !watchSaved || user == null) return;
+    if (!mounted || !context.mounted || !watchSaved) return;
     if (writeReview) {
-      final review = await showModalBottomSheet<Review>(
+      await showModalBottomSheet<Review>(
         context: this.context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
@@ -2180,19 +2309,11 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         ),
       );
-      if (!mounted || review == null) return;
-      promptShareCard(
-        this.context,
-        ShareCardData.review(
-          mediaType: ShareCardMediaType.movie,
-          mediaId: movieId,
-          title: movieTitle,
-          posterPath: posterPath,
-          user: user,
-          review: review,
-        ),
-      );
-    } else if (reviewRating != null) {
+    }
+    if (!mounted) return;
+    if (reviewRating != null) {
+      final user = auth.dbUser;
+      if (user == null) return;
       promptShareCard(
         this.context,
         ShareCardData.rating(
@@ -2208,6 +2329,38 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
   }
+}
+
+class _HomeSessionSnapshot {
+  const _HomeSessionSnapshot({
+    required this.userId,
+    required this.featuredMovies,
+    required this.forYouMovies,
+    required this.continueWatchingShows,
+    required this.friendsActivity,
+    required this.heroFriendInteractions,
+    required this.showMoreFriendActivity,
+    required this.watchlistMovieIds,
+    required this.watchRequestsNeedingResponse,
+    required this.upcomingWatchPlan,
+    required this.heroPage,
+    required this.forYouPage,
+    required this.scrollOffset,
+  });
+
+  final String userId;
+  final List<MovieShort> featuredMovies;
+  final List<MovieShort> forYouMovies;
+  final List<ContinueWatchingShow> continueWatchingShows;
+  final List<ActivityListItem> friendsActivity;
+  final Map<int, List<FriendMediaInteraction>> heroFriendInteractions;
+  final bool showMoreFriendActivity;
+  final Set<int> watchlistMovieIds;
+  final int watchRequestsNeedingResponse;
+  final WatchRequest? upcomingWatchPlan;
+  final int heroPage;
+  final int forYouPage;
+  final double scrollOffset;
 }
 
 class _RecommendationGeneratingCard extends StatefulWidget {
@@ -2258,9 +2411,7 @@ class _RecommendationGeneratingCardState
             FlixieColors.tertiary.withValues(alpha: 0.10),
           ],
         ),
-        border: Border.all(
-          color: FlixieColors.primary.withValues(alpha: 0.28),
-        ),
+        border: Border.all(color: FlixieColors.primary.withValues(alpha: 0.28)),
       ),
       child: AnimatedBuilder(
         animation: _controller,
@@ -2305,8 +2456,9 @@ class _RecommendationGeneratingCardState
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: FlixieColors.primary
-                            .withValues(alpha: 0.18 + movement * 0.12),
+                        color: FlixieColors.primary.withValues(
+                          alpha: 0.18 + movement * 0.12,
+                        ),
                         blurRadius: 24,
                         spreadRadius: 2,
                       ),
@@ -2397,18 +2549,17 @@ class _GeneratingPoster extends StatelessWidget {
 // Kept temporarily for hot-reload compatibility with older element trees.
 // ignore: unused_element
 class _ContinueWatchingCard extends StatelessWidget {
-  const _ContinueWatchingCard({
-    required this.show,
-    required this.onTap,
-  });
+  const _ContinueWatchingCard({required this.show, required this.onTap});
 
   final ContinueWatchingShow show;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final cardWidth =
-        (MediaQuery.sizeOf(context).width * 0.46).clamp(170.0, 340.0);
+    final cardWidth = (MediaQuery.sizeOf(context).width * 0.46).clamp(
+      170.0,
+      340.0,
+    );
     final episode = show.lastWatchedEpisode;
     final episodeLabel = episode == null
         ? '${show.watchedEpisodes} episodes watched'
@@ -2528,11 +2679,7 @@ class _ContinueWatchingCard extends StatelessWidget {
     return Container(
       color: FlixieColors.tabBarBackgroundFocused,
       alignment: Alignment.center,
-      child: const Icon(
-        Icons.tv_rounded,
-        color: FlixieColors.medium,
-        size: 38,
-      ),
+      child: const Icon(Icons.tv_rounded, color: FlixieColors.medium, size: 38),
     );
   }
 }
@@ -2552,7 +2699,7 @@ String _formatHeroDate(String raw) {
     'Sep',
     'Oct',
     'Nov',
-    'Dec'
+    'Dec',
   ];
   return '${date.day} ${months[date.month - 1]} ${date.year}';
 }

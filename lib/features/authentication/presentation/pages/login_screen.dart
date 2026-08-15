@@ -124,13 +124,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      subtitle: const Text(
-                        'Save with this device’s password manager',
-                        style: TextStyle(
-                          color: FlixieColors.medium,
-                          fontSize: 11,
-                        ),
-                      ),
                       controlAffinity: ListTileControlAffinity.leading,
                       contentPadding: EdgeInsets.zero,
                       dense: true,

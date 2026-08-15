@@ -39,7 +39,7 @@ class AuthPrefetchCoordinator {
 
   Future<AuthPrefetchSnapshot> prefetch(
     String userId, {
-    String region = 'US',
+    String region = 'GB',
     Iterable<int> watchlistMovieIds = const [],
   }) async {
     List<ActivityListItem>? activity;

@@ -64,7 +64,7 @@ class ShareCardExportService {
     required Rect origin,
   }) async {
     await Share.share(
-      'Join me on Flixie — we can build joint lists, share recommendations '
+      'Join me on Flixie - we can build joint lists, share recommendations '
       'and see what each other is watching.\n\n'
       '$inviteUrl\n\nReferral code: $referralCode',
       subject: 'Join me on Flixie',

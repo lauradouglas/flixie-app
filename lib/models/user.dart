@@ -173,6 +173,23 @@ class User {
 
   String? get countryAbbreviation => _countryString('abbreviation');
 
+  /// The ISO 3166-1 alpha-2 region sent to TMDB for availability data.
+  ///
+  /// Profiles have historically returned either `isoCode` or `abbreviation`,
+  /// so keep that API detail in one place and use GB when a profile has not
+  /// selected a country yet.
+  String get watchProviderRegion {
+    final raw = _countryString('isoCode') ??
+        _countryString('iso_code') ??
+        countryAbbreviation ??
+        _countryString('code');
+    final region = raw?.trim().toUpperCase();
+    if (region == 'UK') return 'GB';
+    return region != null && RegExp(r'^[A-Z]{2}$').hasMatch(region)
+        ? region
+        : 'GB';
+  }
+
   String? _countryString(String key) {
     final value = country?[key];
     if (value is String && value.trim().isNotEmpty) return value;

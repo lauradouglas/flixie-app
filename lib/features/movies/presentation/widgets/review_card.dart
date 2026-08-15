@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -21,6 +23,49 @@ class ReviewCard extends StatefulWidget {
 
   @override
   State<ReviewCard> createState() => _ReviewCardState();
+}
+
+Future<void> showReviewDetailSheet(
+  BuildContext context, {
+  required Review review,
+  required String? currentUserId,
+}) {
+  final username = review.user?.username ?? 'Anonymous';
+  final initials = username.isNotEmpty ? username[0].toUpperCase() : '?';
+  final date = DateTime.tryParse(review.createdAt);
+  final formattedDate = date == null
+      ? review.createdAt
+      : '${date.day.toString().padLeft(2, '0')} '
+          '${const [
+          'Jan',
+          'Feb',
+          'Mar',
+          'Apr',
+          'May',
+          'Jun',
+          'Jul',
+          'Aug',
+          'Sep',
+          'Oct',
+          'Nov',
+          'Dec'
+        ][date.month - 1]} '
+          '${date.year.toString().substring(2)}';
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => ReviewDetailSheet(
+      review: review,
+      currentUserId: currentUserId,
+      initialReactions: review.reactions,
+      initialMyReaction: review.myReaction,
+      onReactionChanged: (_, __) {},
+      displayName: username,
+      initials: initials,
+      formattedDate: formattedDate,
+    ),
+  );
 }
 
 // Ordered list of supported reactions: (emoji, reactionType key)
@@ -104,11 +149,11 @@ class _ReviewCardState extends State<ReviewCard> {
   }
 
   void _openFullReview(BuildContext context) {
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _ReviewDetailSheet(
+      builder: (_) => ReviewDetailSheet(
         review: widget.review,
         currentUserId: widget.currentUserId,
         initialReactions: _reactions,
@@ -359,8 +404,9 @@ class _ReviewCardState extends State<ReviewCard> {
 // Full-review bottom sheet
 // ---------------------------------------------------------------------------
 
-class _ReviewDetailSheet extends StatefulWidget {
-  const _ReviewDetailSheet({
+class ReviewDetailSheet extends StatefulWidget {
+  const ReviewDetailSheet({
+    super.key,
     required this.review,
     required this.currentUserId,
     required this.initialReactions,
@@ -382,10 +428,10 @@ class _ReviewDetailSheet extends StatefulWidget {
   final String formattedDate;
 
   @override
-  State<_ReviewDetailSheet> createState() => _ReviewDetailSheetState();
+  State<ReviewDetailSheet> createState() => _ReviewDetailSheetState();
 }
 
-class _ReviewDetailSheetState extends State<_ReviewDetailSheet> {
+class _ReviewDetailSheetState extends State<ReviewDetailSheet> {
   final ReviewReactionsController _reviewReactions =
       ReviewReactionsController.instance;
   late Map<String, int> _reactions;
@@ -584,72 +630,52 @@ class _ReviewDetailSheetState extends State<_ReviewDetailSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (review.containsSpoilers && !_spoilerRevealed)
-                      Container(
-                        width: double.infinity,
-                        margin: const EdgeInsets.only(bottom: 18),
-                        padding: const EdgeInsets.all(18),
-                        decoration: BoxDecoration(
-                          color: FlixieColors.warning.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                              color:
-                                  FlixieColors.warning.withValues(alpha: 0.35)),
-                        ),
-                        child: Column(
-                          children: [
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: review.containsSpoilers && !_spoilerRevealed
+                          ? () => setState(() => _spoilerRevealed = true)
+                          : null,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ImageFiltered(
+                            imageFilter:
+                                review.containsSpoilers && !_spoilerRevealed
+                                    ? ImageFilter.blur(sigmaX: 5, sigmaY: 5)
+                                    : ImageFilter.blur(sigmaX: 0, sigmaY: 0),
+                            child: Text(
+                              review.body,
+                              style: TextStyle(
+                                color: review.containsSpoilers &&
+                                        !_spoilerRevealed
+                                    ? FlixieColors.light.withValues(alpha: .72)
+                                    : FlixieColors.light,
+                                fontSize: 14,
+                                height: 1.6,
+                              ),
+                            ),
+                          ),
+                          if (review.containsSpoilers && !_spoilerRevealed) ...[
+                            const SizedBox(height: 12),
                             const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(Icons.warning_amber_rounded,
-                                    color: FlixieColors.warning, size: 22),
-                                SizedBox(width: 10),
-                                Flexible(
-                                  child: Text(
-                                    'This review contains spoilers',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: FlixieColors.warning,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                                    color: FlixieColors.warning, size: 18),
+                                SizedBox(width: 7),
+                                Text(
+                                  'Contains spoilers · tap review to reveal',
+                                  style: TextStyle(
+                                    color: FlixieColors.warning,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 10),
-                            const Text(
-                              'Reveal it only when you’re ready.',
-                              style: TextStyle(
-                                color: FlixieColors.warning,
-                                fontSize: 13,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            OutlinedButton(
-                              onPressed: () =>
-                                  setState(() => _spoilerRevealed = true),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: FlixieColors.warning,
-                                side: const BorderSide(
-                                    color: FlixieColors.warning),
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 20, vertical: 11),
-                              ),
-                              child: const Text('Reveal review'),
-                            ),
                           ],
-                        ),
+                        ],
                       ),
-                    if (!review.containsSpoilers || _spoilerRevealed)
-                      Text(
-                        review.body,
-                        style: const TextStyle(
-                          color: FlixieColors.light,
-                          fontSize: 14,
-                          height: 1.6,
-                        ),
-                      ),
+                    ),
                     if (review.recommended) ...[
                       const SizedBox(height: 20),
                       Container(

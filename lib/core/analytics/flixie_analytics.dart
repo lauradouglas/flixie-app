@@ -4,6 +4,7 @@ import 'analytics_backend.dart';
 import 'analytics_consent.dart';
 import 'detail_source.dart';
 import 'recommendation_attribution.dart';
+import '../utils/app_logger.dart';
 
 /// Firebase event names use lowercase_snake_case and describe completed
 /// product actions. See docs/analytics.md for the canonical event contract.
@@ -223,7 +224,9 @@ class AnalyticsController extends ChangeNotifier {
         : Map<String, Object>.fromEntries(parameters.entries.where(
             (entry) => allowedKeys.contains(entry.key),
           ));
-    if (kDebugMode) debugPrint('[Analytics] $name ${safe ?? const {}}');
+    if (kDebugMode && verboseFlutterLogs) {
+      debugPrint('[Analytics] $name ${safe ?? const {}}');
+    }
     await _safely(() => _backend.logEvent(name, safe));
   }
 
@@ -235,7 +238,9 @@ class AnalyticsController extends ChangeNotifier {
   Future<void> screenViewed(String screenName) async {
     if (!isEnabled || screenName == _lastScreenName) return;
     _lastScreenName = screenName;
-    if (kDebugMode) debugPrint('[Analytics] screen_view {$screenName}');
+    if (kDebugMode && verboseFlutterLogs) {
+      debugPrint('[Analytics] screen_view {$screenName}');
+    }
     await _safely(() => _backend.logScreenView(screenName));
   }
 

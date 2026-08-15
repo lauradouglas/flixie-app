@@ -175,77 +175,82 @@ class _ShareCardSheetState extends State<ShareCardSheet> {
   Widget build(BuildContext context) {
     final screen = MediaQuery.sizeOf(context);
     final previewHeight = (screen.height * .57).clamp(360.0, 570.0);
-    return SafeArea(
-      top: true,
-      child: Container(
-        constraints: BoxConstraints(maxHeight: screen.height * .94),
-        decoration: const BoxDecoration(
-          color: FlixieColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 10),
-            Container(
-              width: 42,
-              height: 4,
-              decoration: BoxDecoration(
-                color: FlixieColors.mediumShade,
-                borderRadius: BorderRadius.circular(2),
+    return ColoredBox(
+      color: FlixieColors.surface,
+      child: SafeArea(
+        top: true,
+        bottom: true,
+        child: Container(
+          constraints: BoxConstraints(maxHeight: screen.height * .94),
+          decoration: const BoxDecoration(
+            color: FlixieColors.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 10),
+              Container(
+                width: 42,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: FlixieColors.mediumShade,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 12, 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Saved — share your take',
-                            style: TextStyle(
-                              color: FlixieColors.textPrimary,
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
-                            )),
-                        const SizedBox(height: 3),
-                        Text('Made for Stories, Messages and more',
-                            style: TextStyle(
-                              color: FlixieColors.medium.withValues(alpha: .95),
-                              fontSize: 13,
-                            )),
-                      ],
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 12, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Saved - share your take',
+                              style: TextStyle(
+                                color: FlixieColors.textPrimary,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                              )),
+                          const SizedBox(height: 3),
+                          Text('Made for Stories, Messages and more',
+                              style: TextStyle(
+                                color:
+                                    FlixieColors.medium.withValues(alpha: .95),
+                                fontSize: 13,
+                              )),
+                        ],
+                      ),
                     ),
-                  ),
-                  IconButton(
-                    tooltip: 'Not now',
-                    onPressed: _activeAction == null
-                        ? () => Navigator.of(context).pop()
-                        : null,
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
+                    IconButton(
+                      tooltip: 'Not now',
+                      onPressed: _activeAction == null
+                          ? () => Navigator.of(context).pop()
+                          : null,
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Flexible(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 22),
-                child: Center(
-                  child: SizedBox(
-                    height: previewHeight,
-                    child: AspectRatio(
-                      aspectRatio: 9 / 16,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(18),
-                        child: FittedBox(
-                          fit: BoxFit.contain,
-                          child: RepaintBoundary(
-                            key: _boundaryKey,
-                            child: FlixieShareCard(
-                              data: widget.data,
-                              posterAccent: _posterAccent,
-                              showNote: _showNote,
+              Flexible(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 22),
+                  child: Center(
+                    child: SizedBox(
+                      height: previewHeight,
+                      child: AspectRatio(
+                        aspectRatio: 9 / 16,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(18),
+                          child: FittedBox(
+                            fit: BoxFit.contain,
+                            child: RepaintBoundary(
+                              key: _boundaryKey,
+                              child: FlixieShareCard(
+                                data: widget.data,
+                                posterAccent: _posterAccent,
+                                showNote: _showNote,
+                              ),
                             ),
                           ),
                         ),
@@ -254,117 +259,118 @@ class _ShareCardSheetState extends State<ShareCardSheet> {
                   ),
                 ),
               ),
-            ),
-            if (widget.data.variant == ShareCardVariant.rating &&
-                widget.data.note != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: FlixieColors.surfaceElevated,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: FlixieColors.primary.withValues(alpha: .28),
-                    ),
-                  ),
-                  child: SwitchListTile.adaptive(
-                    dense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                    title: const Text(
-                      'Show watch note',
-                      style: TextStyle(
-                        color: FlixieColors.textPrimary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+              if (widget.data.variant == ShareCardVariant.rating &&
+                  widget.data.note != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: FlixieColors.surfaceElevated,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: FlixieColors.primary.withValues(alpha: .28),
                       ),
                     ),
-                    value: _showNote,
-                    activeThumbColor: FlixieColors.textPrimary,
-                    activeTrackColor: FlixieColors.primary,
-                    onChanged: _activeAction == null
-                        ? (value) => setState(() {
-                              _showNote = value;
-                              _renderedBytes = null;
-                            })
-                        : null,
+                    child: SwitchListTile.adaptive(
+                      dense: true,
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 12),
+                      title: const Text(
+                        'Show watch note',
+                        style: TextStyle(
+                          color: FlixieColors.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      value: _showNote,
+                      activeThumbColor: FlixieColors.textPrimary,
+                      activeTrackColor: FlixieColors.primary,
+                      onChanged: _activeAction == null
+                          ? (value) => setState(() {
+                                _showNote = value;
+                                _renderedBytes = null;
+                              })
+                          : null,
+                    ),
                   ),
                 ),
-              ),
-            if (_error != null)
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline_rounded,
+                          color: FlixieColors.danger, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(_error!,
+                            style: const TextStyle(
+                                color: FlixieColors.danger, fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
                 child: Row(
                   children: [
-                    const Icon(Icons.error_outline_rounded,
-                        color: FlixieColors.danger, size: 18),
-                    const SizedBox(width: 8),
                     Expanded(
-                      child: Text(_error!,
-                          style: const TextStyle(
-                              color: FlixieColors.danger, fontSize: 12)),
+                      child: Builder(
+                        builder: (buttonContext) => FilledButton.icon(
+                          onPressed: _activeAction == null
+                              ? () => _run(_ExportAction.share, buttonContext)
+                              : null,
+                          icon: _actionIcon(_ExportAction.share,
+                              fallback: Icons.ios_share_rounded),
+                          label: const Text('Share image'),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Builder(
+                        builder: (buttonContext) => OutlinedButton.icon(
+                          onPressed: _activeAction == null
+                              ? () => _run(_ExportAction.save, buttonContext)
+                              : null,
+                          icon: _actionIcon(_ExportAction.save,
+                              fallback: Icons.download_rounded),
+                          label: const Text('Save image'),
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Builder(
-                      builder: (buttonContext) => FilledButton.icon(
-                        onPressed: _activeAction == null
-                            ? () => _run(_ExportAction.share, buttonContext)
-                            : null,
-                        icon: _actionIcon(_ExportAction.share,
-                            fallback: Icons.ios_share_rounded),
-                        label: const Text('Share image'),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Builder(
-                      builder: (buttonContext) => OutlinedButton.icon(
-                        onPressed: _activeAction == null
-                            ? () => _run(_ExportAction.save, buttonContext)
-                            : null,
-                        icon: _actionIcon(_ExportAction.save,
-                            fallback: Icons.download_rounded),
-                        label: const Text('Save image'),
-                      ),
-                    ),
-                  ),
-                ],
+              TextButton(
+                onPressed: _activeAction == null
+                    ? () => Navigator.of(context).pop()
+                    : null,
+                child: const Text('Not now'),
               ),
-            ),
-            TextButton(
-              onPressed: _activeAction == null
-                  ? () => Navigator.of(context).pop()
-                  : null,
-              child: const Text('Not now'),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Builder(
-                builder: (buttonContext) => TextButton.icon(
-                  onPressed: _activeAction == null
-                      ? () => _run(_ExportAction.invite, buttonContext)
-                      : null,
-                  icon: _actionIcon(
-                    _ExportAction.invite,
-                    fallback: Icons.group_add_rounded,
-                  ),
-                  label: const Text('Join me on Flixie'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: FlixieColors.secondary,
-                    textStyle: const TextStyle(fontWeight: FontWeight.w700),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: Builder(
+                  builder: (buttonContext) => TextButton.icon(
+                    onPressed: _activeAction == null
+                        ? () => _run(_ExportAction.invite, buttonContext)
+                        : null,
+                    icon: _actionIcon(
+                      _ExportAction.invite,
+                      fallback: Icons.group_add_rounded,
+                    ),
+                    label: const Text('Join me on Flixie'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: FlixieColors.secondary,
+                      textStyle: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 4),
-          ],
+              const SizedBox(height: 4),
+            ],
+          ),
         ),
       ),
     );

@@ -10,14 +10,20 @@ import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_
 import 'package:flixie_app/features/social/data/chat_service.dart';
 import 'package:flixie_app/features/social/presentation/widgets/chat_bubble.dart';
 import 'package:flixie_app/features/social/presentation/widgets/chat_input.dart';
+import 'package:flixie_app/features/social/presentation/utils/activity_reply_payload.dart';
 import 'package:flixie_app/models/conversation.dart';
 import 'package:flixie_app/models/user.dart';
 import 'package:flixie_app/core/safety/safety_service.dart';
 
 class DirectChatScreen extends StatefulWidget {
-  const DirectChatScreen({super.key, required this.otherUserId});
+  const DirectChatScreen({
+    super.key,
+    required this.otherUserId,
+    this.initialActivityReply,
+  });
 
   final String otherUserId;
+  final ActivityReplyPayload? initialActivityReply;
 
   @override
   State<DirectChatScreen> createState() => _DirectChatScreenState();
@@ -25,16 +31,19 @@ class DirectChatScreen extends StatefulWidget {
 
 class _DirectChatScreenState extends State<DirectChatScreen> {
   final TextEditingController _messageController = TextEditingController();
+  final FocusNode _messageFocusNode = FocusNode();
   String? _conversationId;
   String? _error;
   bool _loading = true;
   bool _sending = false;
   User? _otherUser;
   Map<String, String> _memberUsernames = {};
+  ActivityReplyPayload? _activityReply;
 
   @override
   void initState() {
     super.initState();
+    _activityReply = widget.initialActivityReply;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _initConversation();
@@ -45,6 +54,7 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
   @override
   void dispose() {
     _messageController.dispose();
+    _messageFocusNode.dispose();
     super.dispose();
   }
 
@@ -76,6 +86,9 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
       });
 
       ChatService.markRead(conversation.id, currentUserId).catchError((_) {});
+      if (_activityReply != null) {
+        _messageFocusNode.requestFocus();
+      }
     } catch (e) {
       logger.e('Direct chat init error: $e');
       if (mounted) {
@@ -93,20 +106,28 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (text.isEmpty || conversationId == null || userId == null) return;
 
+    final outgoingText = _activityReply?.withMessage(text) ?? text;
     setState(() => _sending = true);
     _messageController.clear();
     try {
       await ChatService.sendMessage(
         conversationId: conversationId,
         senderId: userId,
-        text: text,
+        text: outgoingText,
       );
+      if (mounted) setState(() => _activityReply = null);
     } catch (e) {
       logger.e('Direct chat send error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to send message')),
-        );
+        if (_messageController.text.isEmpty) {
+          _messageController.text = text;
+          _messageController.selection = TextSelection.collapsed(
+            offset: text.length,
+          );
+        }
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Failed to send message')));
       }
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -209,8 +230,10 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
                 }
                 return ListView.builder(
                   reverse: true,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 0,
+                    vertical: 8,
+                  ),
                   itemCount: messages.length,
                   itemBuilder: (_, index) {
                     final msg = messages[index];
@@ -244,10 +267,85 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
               },
             ),
           ),
+          if (_activityReply != null)
+            _ActivityReplyComposerBanner(
+              payload: _activityReply!,
+              onCancel: () => setState(() => _activityReply = null),
+            ),
           ChatInput(
             controller: _messageController,
+            focusNode: _messageFocusNode,
             sending: _sending,
             onSend: _sendMessage,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActivityReplyComposerBanner extends StatelessWidget {
+  const _ActivityReplyComposerBanner({
+    required this.payload,
+    required this.onCancel,
+  });
+
+  final ActivityReplyPayload payload;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+      padding: const EdgeInsets.fromLTRB(12, 9, 6, 9),
+      decoration: BoxDecoration(
+        color: FlixieColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: FlixieColors.primary.withValues(alpha: .55)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 3,
+            height: 38,
+            decoration: BoxDecoration(
+              color: FlixieColors.primary,
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Replying to @${payload.username}’s ${payload.activityLabel}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: FlixieColors.primaryTint,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  payload.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: FlixieColors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Cancel reply',
+            onPressed: onCancel,
+            icon: const Icon(Icons.close, color: FlixieColors.medium, size: 19),
           ),
         ],
       ),

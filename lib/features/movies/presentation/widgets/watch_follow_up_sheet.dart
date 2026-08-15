@@ -80,7 +80,8 @@ class _WatchFollowUpSheetState extends State<WatchFollowUpSheet> {
             _FollowUpOption(
               icon: Icons.calendar_today_outlined,
               title: 'Add a watch entry',
-              subtitle: 'Save when you watched it, a rating and private notes.',
+              subtitle:
+                  'Save when you watched it, a rating and a personal note.',
               value: _addWatchEntry,
               onChanged: (value) => setState(() => _addWatchEntry = value),
             ),

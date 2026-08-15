@@ -13,8 +13,6 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/watchlist/presentation/controllers/watchlist_actions_controller.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_sheet.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/write_review_sheet.dart';
-import 'package:flixie_app/features/sharing/models/share_card_data.dart';
-import 'package:flixie_app/features/sharing/presentation/share_card_sheet.dart';
 import 'package:flixie_app/core/analytics/detail_source.dart';
 
 const List<String> _kMonths = [
@@ -186,7 +184,7 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
     final auth = context.read<AuthProvider>();
     final userId = auth.dbUser?.id;
     if (userId == null) return;
-    final review = await showModalBottomSheet<Review>(
+    await showModalBottomSheet<Review>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -199,20 +197,6 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
         },
       ),
     );
-    final user = auth.dbUser;
-    if (mounted && review != null && user != null) {
-      promptShareCard(
-        context,
-        ShareCardData.review(
-          mediaType: ShareCardMediaType.movie,
-          mediaId: entry.movieId,
-          title: entry.movie?.title ?? 'Movie',
-          posterPath: entry.movie?.posterPath,
-          user: user,
-          review: review,
-        ),
-      );
-    }
     if (mounted) await _load();
   }
 

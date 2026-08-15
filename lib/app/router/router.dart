@@ -37,6 +37,7 @@ import 'package:flixie_app/features/social/presentation/pages/social_screen.dart
 import 'package:flixie_app/features/social/presentation/pages/friends_activity_screen.dart';
 import 'package:flixie_app/features/social/presentation/pages/group_detail_screen.dart';
 import 'package:flixie_app/features/social/presentation/pages/direct_chat_screen.dart';
+import 'package:flixie_app/features/social/presentation/utils/activity_reply_payload.dart';
 import 'package:flixie_app/features/social/presentation/pages/group_members_screen.dart';
 import 'package:flixie_app/features/authentication/presentation/pages/login_screen.dart';
 import 'package:flixie_app/features/authentication/presentation/pages/signup_screen.dart';
@@ -314,10 +315,8 @@ GoRouter buildRouter(
                 recommendation: state.uri.queryParameters['recSource'] == null
                     ? null
                     : RecommendationAttribution.fromRoute(
-                        contentId: int.tryParse(
-                              state.pathParameters['id'] ?? '',
-                            ) ??
-                            0,
+                        contentId:
+                            int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
                         contentType: 'movie',
                         query: state.uri.queryParameters,
                       ),
@@ -370,10 +369,13 @@ GoRouter buildRouter(
           ),
           GoRoute(
             path: '/chat/:id',
-            pageBuilder: (context, state) => _calmPage(
+            pageBuilder: (context, state) => _pushPage(
               state,
               DirectChatScreen(
                 otherUserId: state.pathParameters['id'] ?? '',
+                initialActivityReply: state.extra is ActivityReplyPayload
+                    ? state.extra as ActivityReplyPayload
+                    : null,
               ),
             ),
           ),
@@ -421,10 +423,8 @@ GoRouter buildRouter(
           ),
           GoRoute(
             path: '/wrapped',
-            pageBuilder: (context, state) => _pushPage(
-              state,
-              const UserWrappedScreen(),
-            ),
+            pageBuilder: (context, state) =>
+                _pushPage(state, const UserWrappedScreen()),
           ),
           GoRoute(
             path: '/wrapped/:userId',
@@ -608,17 +608,25 @@ class _FlixieNavBar extends StatelessWidget {
   static const _destinations = [
     _NavDest(icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Home'),
     _NavDest(
-        icon: Icons.bookmark_border_outlined,
-        activeIcon: Icons.bookmark,
-        label: 'Watchlist'),
+      icon: Icons.bookmark_border_outlined,
+      activeIcon: Icons.bookmark,
+      label: 'Watchlist',
+    ),
     _NavDest(
-        icon: Icons.search_outlined,
-        activeIcon: Icons.search_rounded,
-        label: 'Search'),
+      icon: Icons.search_outlined,
+      activeIcon: Icons.search_rounded,
+      label: 'Search',
+    ),
     _NavDest(
-        icon: Icons.people_outline, activeIcon: Icons.people, label: 'Social'),
+      icon: Icons.people_outline,
+      activeIcon: Icons.people,
+      label: 'Social',
+    ),
     _NavDest(
-        icon: Icons.person_outline, activeIcon: Icons.person, label: 'Profile'),
+      icon: Icons.person_outline,
+      activeIcon: Icons.person,
+      label: 'Profile',
+    ),
   ];
 
   @override
@@ -666,8 +674,11 @@ class _NavDest {
   final IconData icon;
   final IconData activeIcon;
   final String label;
-  const _NavDest(
-      {required this.icon, required this.activeIcon, required this.label});
+  const _NavDest({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+  });
 }
 
 class _NavItem extends StatelessWidget {
@@ -696,8 +707,10 @@ class _NavItem extends StatelessWidget {
             children: [
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 18, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 5,
+                ),
                 decoration: isSelected
                     ? BoxDecoration(
                         color: FlixieColors.primary,

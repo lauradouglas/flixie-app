@@ -7,6 +7,7 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/analytics/detail_source.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/social/presentation/utils/movie_share_payload.dart';
+import 'package:flixie_app/features/social/presentation/utils/activity_reply_payload.dart';
 import 'package:flixie_app/models/profile_avatar.dart';
 
 class ChatBubble extends StatelessWidget {
@@ -37,6 +38,7 @@ class ChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasActivityReply = parseActivityReplyPayload(message) != null;
     return GestureDetector(
       onLongPress: onLongPress,
       child: Padding(
@@ -107,7 +109,8 @@ class ChatBubble extends StatelessWidget {
                 Flexible(
                   child: Container(
                     constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.62,
+                      maxWidth: MediaQuery.of(context).size.width *
+                          (hasActivityReply ? 0.78 : 0.62),
                     ),
                     padding: const EdgeInsets.symmetric(
                         horizontal: 14, vertical: 10),
@@ -147,6 +150,11 @@ class ChatBubble extends StatelessWidget {
   }
 
   Widget _buildMessageBody(BuildContext context) {
+    final activityReply = parseActivityReplyPayload(message);
+    if (activityReply != null) {
+      return _buildActivityReplyCard(context, activityReply);
+    }
+
     final movieShare = parseMovieSharePayload(message);
     if (movieShare != null) {
       return _buildMovieShareCard(context, movieShare);
@@ -198,6 +206,201 @@ class ChatBubble extends StatelessWidget {
                         : FlixieColors.primary,
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActivityReplyCard(
+    BuildContext context,
+    ActivityReplyPayload payload,
+  ) {
+    final textColor = isMe ? Colors.white : FlixieColors.textPrimary;
+    final recommendation = payload.recommended;
+    final actionLabel = payload.activityLabel == 'review'
+        ? 'View review'
+        : payload.link.contains('shows')
+            ? 'Open show'
+            : 'Open movie';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (payload.message.isNotEmpty) ...[
+          Text(
+            payload.message,
+            style: TextStyle(color: textColor, fontSize: 15, height: 1.3),
+          ),
+          const SizedBox(height: 10),
+        ],
+        InkWell(
+          onTap: () => _openLink(context, payload.link),
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: isMe
+                  ? const Color(0xFF5830AE)
+                  : FlixieColors.tabBarBackgroundFocused,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isMe
+                    ? Colors.white.withValues(alpha: .28)
+                    : FlixieColors.primary.withValues(alpha: .42),
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(9),
+                  child: SizedBox(
+                    width: 64,
+                    height: 96,
+                    child: payload.posterUrl.isEmpty
+                        ? Container(
+                            color: FlixieColors.surface,
+                            child: const Icon(
+                              Icons.movie_outlined,
+                              color: FlixieColors.medium,
+                            ),
+                          )
+                        : CachedNetworkImage(
+                            imageUrl: payload.posterUrl,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => Container(
+                              color: FlixieColors.surface,
+                              child: const Icon(
+                                Icons.movie_outlined,
+                                color: FlixieColors.medium,
+                              ),
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 11),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'REPLYING TO @${payload.username.toUpperCase()}’S ${payload.activityLabel.toUpperCase()}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: .72),
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.05,
+                          height: 1.25,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        payload.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          height: 1.12,
+                        ),
+                      ),
+                      if (payload.rating != null || recommendation != null) ...[
+                        const SizedBox(height: 7),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 3,
+                          children: [
+                            if (payload.rating != null)
+                              Text(
+                                '★ ${payload.rating!.toStringAsFixed(payload.rating! % 1 == 0 ? 0 : 1)}/10',
+                                style: const TextStyle(
+                                  color: Color(0xFFFFC84A),
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            if (recommendation != null)
+                              Text(
+                                '${recommendation ? '👍' : '👎'} ${recommendation ? 'Recommends' : 'Doesn’t recommend'}',
+                                style: TextStyle(
+                                  color: recommendation
+                                      ? const Color(0xFF00E6A8)
+                                      : const Color(0xFFFF7E8A),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                      if (payload.reviewTitle?.isNotEmpty == true) ...[
+                        const SizedBox(height: 7),
+                        Text(
+                          payload.reviewTitle!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                      if (payload.reviewBody?.isNotEmpty == true) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          payload.reviewBody!,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: .76),
+                            fontSize: 11.5,
+                            height: 1.25,
+                          ),
+                        ),
+                      ],
+                      if (payload.containsSpoilers) ...[
+                        const SizedBox(height: 7),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4A3417),
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                          child: const Text(
+                            '⚠ CONTAINS SPOILERS',
+                            style: TextStyle(
+                              color: Color(0xFFFFC84A),
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      Text(
+                        '↗  $actionLabel',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -332,6 +535,10 @@ class ChatBubble extends StatelessWidget {
         rawLink.startsWith('flixie:///movies/')) {
       return 'Open movie in Flixie';
     }
+    if (rawLink.startsWith('flixie://shows/') ||
+        rawLink.startsWith('flixie:///shows/')) {
+      return 'Open show in Flixie';
+    }
     return 'Open link';
   }
 
@@ -350,11 +557,28 @@ class ChatBubble extends StatelessWidget {
         );
       }
 
+      if (uri.host == 'shows' && uri.pathSegments.isNotEmpty) {
+        routePath = showDetailPath(
+          uri.pathSegments.first,
+          source: DetailSource.sharedLink,
+        );
+      }
+
       // Legacy format: flixie:///movies/<id>?source=share
       if (routePath == null && uri.path.startsWith('/movies/')) {
         final id = uri.pathSegments.length > 1 ? uri.pathSegments[1] : null;
         if (id != null) {
           routePath = movieDetailPath(
+            id,
+            source: DetailSource.sharedLink,
+          );
+        }
+      }
+
+      if (routePath == null && uri.path.startsWith('/shows/')) {
+        final id = uri.pathSegments.length > 1 ? uri.pathSegments[1] : null;
+        if (id != null) {
+          routePath = showDetailPath(
             id,
             source: DetailSource.sharedLink,
           );

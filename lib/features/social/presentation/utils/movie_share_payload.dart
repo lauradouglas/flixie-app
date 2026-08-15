@@ -1,3 +1,5 @@
+import 'package:flixie_app/features/social/presentation/utils/activity_reply_payload.dart';
+
 class MovieSharePayload {
   const MovieSharePayload({
     required this.title,
@@ -52,6 +54,12 @@ String conversationMessagePreview(String? message) {
 
   final movieShare = parseMovieSharePayload(value);
   if (movieShare != null) return '🎬 Shared ${movieShare.title}';
+
+  final activityReply = parseActivityReplyPayload(value);
+  if (activityReply != null) {
+    if (activityReply.message.isNotEmpty) return activityReply.message;
+    return 'Replied to @${activityReply.username}’s ${activityReply.activityLabel}';
+  }
 
   return value;
 }

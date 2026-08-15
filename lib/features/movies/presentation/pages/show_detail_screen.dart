@@ -102,7 +102,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
 
     final auth = context.read<AuthProvider>();
     final user = auth.dbUser;
-    final region = user?.countryAbbreviation ?? 'GB';
+    final region = user?.watchProviderRegion ?? 'GB';
 
     try {
       final results = await Future.wait([

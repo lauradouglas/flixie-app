@@ -44,7 +44,7 @@ class _GroupRequestProviderSummaryState
 
   Future<void> _load() async {
     final region =
-        context.read<AuthProvider>().dbUser?.countryAbbreviation ?? 'GB';
+        context.read<AuthProvider>().dbUser?.watchProviderRegion ?? 'GB';
     try {
       final available =
           (await MovieService().getMovieWatchProviders(widget.movieId, region))

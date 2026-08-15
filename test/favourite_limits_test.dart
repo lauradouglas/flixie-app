@@ -7,7 +7,7 @@ import 'package:flixie_app/models/user.dart';
 
 void main() {
   test('removed movies are not treated as current favourites', () {
-    final user = User(
+    const user = User(
       id: 'user-1',
       externalId: 'external-1',
       username: 'flixie',
