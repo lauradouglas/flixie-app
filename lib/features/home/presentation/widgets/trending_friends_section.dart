@@ -18,7 +18,7 @@ class FriendsWatchingSection extends StatelessWidget {
     final items = activity
         .where((item) =>
             !item.removed &&
-            item.type == ActivityListType.movieWatched &&
+            (item.type == ActivityListType.movieWatched || item.watchLogged) &&
             item.movieId != null)
         .toList()
       ..sort((left, right) {

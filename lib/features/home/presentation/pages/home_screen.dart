@@ -22,6 +22,7 @@ import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/features/movies/data/show_service.dart';
 import 'package:flixie_app/features/home/data/recommendation_service.dart';
 import 'package:flixie_app/features/social/data/request_service.dart';
+import 'package:flixie_app/features/social/data/watch_plan_visibility_store.dart';
 import 'package:flixie_app/features/home/data/trending_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
@@ -66,7 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final Set<int> _watchlistUpdatesInFlight = <int>{};
   Set<int> _watchlistMovieIds = {};
   int _watchRequestsNeedingResponse = 0;
-  WatchRequest? _upcomingWatchPlan;
+  List<WatchRequest> _watchPlansToShow = const [];
   bool _isLoading = true;
   bool _isLoadingRecommendations = false;
   String? _error;
@@ -80,11 +81,15 @@ class _HomeScreenState extends State<HomeScreen> {
   final PageController _forYouPageController = PageController(
     viewportFraction: 0.88,
   );
+  final PageController _watchPlanPageController = PageController(
+    viewportFraction: 0.92,
+  );
   final ScrollController _homeScrollController = ScrollController();
   final GlobalKey _forYouSectionKey = GlobalKey();
   bool _recommendationVisibilityCheckScheduled = false;
   int _heroPage = 0;
   int _forYouPage = 0;
+  int _watchPlanPage = 0;
   bool _didAttemptSessionRestore = false;
 
   // Preserve the ranking returned by the trending endpoint. Recommendations
@@ -120,6 +125,7 @@ class _HomeScreenState extends State<HomeScreen> {
     TabRefreshController.home.removeListener(_onHomeTabRefresh);
     _heroPageController.dispose();
     _forYouPageController.dispose();
+    _watchPlanPageController.dispose();
     _homeScrollController.dispose();
     super.dispose();
   }
@@ -161,9 +167,10 @@ class _HomeScreenState extends State<HomeScreen> {
     _showMoreFriendActivity = snapshot.showMoreFriendActivity;
     _watchlistMovieIds = Set.of(snapshot.watchlistMovieIds);
     _watchRequestsNeedingResponse = snapshot.watchRequestsNeedingResponse;
-    _upcomingWatchPlan = snapshot.upcomingWatchPlan;
+    _watchPlansToShow = List.of(snapshot.watchPlansToShow);
     _heroPage = snapshot.heroPage;
     _forYouPage = snapshot.forYouPage;
+    _watchPlanPage = snapshot.watchPlanPage;
     _loadedForUserId = userId;
     _isLoading = false;
     _isLoadingRecommendations = false;
@@ -179,6 +186,11 @@ class _HomeScreenState extends State<HomeScreen> {
       if (_forYouPageController.hasClients && _forYouMovies.isNotEmpty) {
         _forYouPageController.jumpToPage(
           _forYouPage.clamp(0, _forYouMovies.length - 1),
+        );
+      }
+      if (_watchPlanPageController.hasClients && _watchPlansToShow.isNotEmpty) {
+        _watchPlanPageController.jumpToPage(
+          _watchPlanPage.clamp(0, _watchPlansToShow.length - 1),
         );
       }
       if (_homeScrollController.hasClients) {
@@ -208,9 +220,10 @@ class _HomeScreenState extends State<HomeScreen> {
       showMoreFriendActivity: _showMoreFriendActivity,
       watchlistMovieIds: Set.of(_watchlistMovieIds),
       watchRequestsNeedingResponse: _watchRequestsNeedingResponse,
-      upcomingWatchPlan: _upcomingWatchPlan,
+      watchPlansToShow: List.of(_watchPlansToShow),
       heroPage: _heroPage,
       forYouPage: _forYouPage,
+      watchPlanPage: _watchPlanPage,
       scrollOffset:
           _homeScrollController.hasClients ? _homeScrollController.offset : 0,
     );
@@ -363,7 +376,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _continueWatchingShows = [];
         _watchlistMovieIds = {};
         _watchRequestsNeedingResponse = 0;
-        _upcomingWatchPlan = null;
+        _watchPlansToShow = const [];
         _isLoadingRecommendations = false;
       });
       return;
@@ -390,6 +403,8 @@ class _HomeScreenState extends State<HomeScreen> {
       ShowService.getContinueWatching(
         user.id,
       ).catchError((_) => <ContinueWatchingShow>[]),
+      WatchPlanVisibilityStore.closedPlanIds(user.id)
+          .catchError((_) => <String>{}),
     ]);
     if (!mounted || _loadedForUserId != user.id) return;
 
@@ -406,7 +421,11 @@ class _HomeScreenState extends State<HomeScreen> {
         watchRequests,
         user.id,
       );
-      _upcomingWatchPlan = _nearestUpcomingWatchPlan(watchRequests);
+      _watchPlansToShow = _watchPlansForHome(
+        watchRequests,
+        user: user,
+        closedPlanIds: results[5] as Set<String>,
+      );
       _continueWatchingShows = results[4] as List<ContinueWatchingShow>;
       _isLoadingRecommendations = false;
     });
@@ -582,9 +601,13 @@ class _HomeScreenState extends State<HomeScreen> {
     }).length;
   }
 
-  WatchRequest? _nearestUpcomingWatchPlan(List<WatchRequest> requests) {
+  List<WatchRequest> _watchPlansForHome(
+    List<WatchRequest> requests, {
+    required models.User user,
+    required Set<String> closedPlanIds,
+  }) {
     final now = DateTime.now();
-    final upcoming = requests.where((request) {
+    final plans = requests.where((request) {
       final scheduledFor = request.scheduledFor;
       final isAgreed =
           request.normalizedScheduleStatus == 'AGREED' || request.isScheduled;
@@ -592,12 +615,33 @@ class _HomeScreenState extends State<HomeScreen> {
           isAgreed &&
           !request.isTerminal &&
           scheduledFor != null &&
-          scheduledFor.isAfter(now);
+          !closedPlanIds.contains(request.id) &&
+          !scheduledFor.isBefore(now.subtract(const Duration(days: 5)));
     }).toList()
       ..sort(
-        (left, right) => left.scheduledFor!.compareTo(right.scheduledFor!),
+        (left, right) {
+          final leftIsDue = !left.scheduledFor!.isAfter(now);
+          final rightIsDue = !right.scheduledFor!.isAfter(now);
+          if (leftIsDue != rightIsDue) return leftIsDue ? -1 : 1;
+          return left.scheduledFor!.compareTo(right.scheduledFor!);
+        },
       );
-    return upcoming.isEmpty ? null : upcoming.first;
+    return plans.take(10).toList(growable: false);
+  }
+
+  bool _hasLoggedWatchForPlan(models.User user, WatchRequest plan) {
+    final movieId = plan.movie?.id ?? plan.movieId;
+    final scheduledFor = plan.scheduledFor;
+    if (movieId == null || scheduledFor == null) return false;
+    final earliestRelevantWatch =
+        scheduledFor.subtract(const Duration(hours: 12));
+    return user.watchedMovies?.any((watch) {
+          if (watch.movieId != movieId || watch.removed == true) return false;
+          final watchedAt = DateTime.tryParse(watch.watchedAt ?? '');
+          return watchedAt != null &&
+              !watchedAt.isBefore(earliestRelevantWatch);
+        }) ??
+        false;
   }
 
   Future<void> _toggleHeroWatchlist(
@@ -775,6 +819,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             onRequests: () => context.push('/watch-requests'),
                           ),
                         ),
+                        _buildUpcomingWatchPlanSection(context, user),
                         if (heroMovies.isNotEmpty) ...[
                           const HomeSectionHeader(title: 'Trending now'),
                           const SizedBox(height: 4),
@@ -790,7 +835,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           _buildPosterRailLoadingState('Friends watching')
                         else
                           FriendsWatchingSection(activity: _friendsActivity),
-                        _buildUpcomingWatchPlanSection(context, user),
                         _buildFriendActivitySection(context),
                         _buildWatchlistSection(context),
                       ],
@@ -1725,8 +1769,8 @@ class _HomeScreenState extends State<HomeScreen> {
     BuildContext context,
     models.User? user,
   ) {
-    final plan = _upcomingWatchPlan;
-    if (_isLoadingRecommendations && plan == null && user != null) {
+    final plans = _watchPlansToShow;
+    if (_isLoadingRecommendations && plans.isEmpty && user != null) {
       return const Padding(
         padding: EdgeInsets.fromLTRB(16, 0, 16, 20),
         child: SkeletonBox(
@@ -1736,11 +1780,52 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
-    if (plan == null || user == null || plan.scheduledFor == null) {
+    if (plans.isEmpty || user == null) {
       return const SizedBox.shrink();
     }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        HomeSectionHeader(
+          title: 'Watch plans',
+          onSeeAll: () => context.push('/watch-requests'),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 112,
+          child: PageView.builder(
+            controller: _watchPlanPageController,
+            itemCount: plans.length,
+            padEnds: false,
+            onPageChanged: (index) => setState(() => _watchPlanPage = index),
+            itemBuilder: (context, index) => Padding(
+              padding: EdgeInsets.only(
+                left: index == 0 ? 16 : 8,
+                right: index == plans.length - 1 ? 16 : 0,
+              ),
+              child: _buildWatchPlanCard(context, user, plans[index]),
+            ),
+          ),
+        ),
+        if (plans.length > 1) ...[
+          const SizedBox(height: 8),
+          _buildWatchPlanDots(plans.length),
+        ],
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  Widget _buildWatchPlanCard(
+    BuildContext context,
+    models.User user,
+    WatchRequest plan,
+  ) {
+    final scheduledFor = plan.scheduledFor!;
+    final isPast = !scheduledFor.isAfter(DateTime.now());
+    final watchAlreadyLogged = isPast && _hasLoggedWatchForPlan(user, plan);
+    final isDue = isPast && !watchAlreadyLogged;
     final other = plan.otherUser(user.id);
-    final posterPath = plan.movie?.posterPath;
     final participants = <WatchRequestUser>[
       ...plan.participants
           .map((participant) => participant.user)
@@ -1754,127 +1839,143 @@ class _HomeScreenState extends State<HomeScreen> {
         })
         .values
         .toList(growable: false);
+    final withLabel = plan.groupName?.trim().isNotEmpty == true
+        ? plan.groupName!.trim()
+        : other?.username.isNotEmpty == true
+            ? other!.username
+            : 'Your friends';
+    final posterPath = plan.movie?.posterPath;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: () => context.push('/watch-requests/${plan.id}'),
-          child: Ink(
-            height: 100,
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: FlixieColors.surfaceElevated.withValues(alpha: 0.72),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: FlixieColors.primary.withValues(alpha: 0.28),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => context.push('/watch-requests/${plan.id}'),
+        child: Ink(
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(
+            color: FlixieColors.surfaceElevated.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(14),
+            border:
+                Border.all(color: FlixieColors.primary.withValues(alpha: 0.28)),
+          ),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(9),
+                child: SizedBox(
+                  width: 62,
+                  height: 96,
+                  child: posterPath != null && posterPath.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl:
+                              'https://image.tmdb.org/t/p/w342$posterPath',
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) => _heroFallback(),
+                        )
+                      : _heroFallback(),
+                ),
               ),
-            ),
-            child: Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(9),
-                  child: SizedBox(
-                    width: 58,
-                    height: 88,
-                    child: posterPath != null && posterPath.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl:
-                                'https://image.tmdb.org/t/p/w342$posterPath',
-                            fit: BoxFit.cover,
-                            errorWidget: (_, __, ___) => _heroFallback(),
-                          )
-                        : _heroFallback(),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Your next watch',
-                        style: TextStyle(
-                          color: FlixieColors.primary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                        ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isDue
+                          ? 'WATCH PLAN · READY TO LOG'
+                          : watchAlreadyLogged
+                              ? 'WATCH PLAN · WATCH LOGGED'
+                              : 'WATCH PLAN',
+                      style: TextStyle(
+                        color: isDue || watchAlreadyLogged
+                            ? FlixieColors.success
+                            : FlixieColors.primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _formatWatchPlanDate(plan.scheduledFor!),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      isDue
+                          ? 'Time to log your watch'
+                          : watchAlreadyLogged
+                              ? 'Watch logged'
+                              : _formatWatchPlanDate(scheduledFor),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        plan.movie?.title ?? plan.groupName ?? 'Watch plan',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      plan.movie?.title ?? 'Watch plan',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
                           color: FlixieColors.medium,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'With $withLabel',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: FlixieColors.light,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700),
+                    ),
+                  ],
                 ),
-                if (participants.isNotEmpty) ...[
-                  const SizedBox(width: 6),
-                  _WatchPlanAvatarStack(participants: participants),
-                ],
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 9,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: FlixieColors.success.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.check_circle_rounded,
-                        color: FlixieColors.success,
-                        size: 15,
-                      ),
-                      SizedBox(width: 4),
-                      Text(
-                        'Confirmed',
-                        style: TextStyle(
-                          color: FlixieColors.success,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 4),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: FlixieColors.light,
-                  size: 22,
-                ),
+              ),
+              if (participants.isNotEmpty) ...[
+                const SizedBox(width: 5),
+                _WatchPlanAvatarStack(participants: participants),
               ],
-            ),
+              const SizedBox(width: 4),
+              Icon(
+                isDue
+                    ? Icons.add_task_rounded
+                    : watchAlreadyLogged
+                        ? Icons.check_circle_rounded
+                        : Icons.chevron_right_rounded,
+                color: isDue || watchAlreadyLogged
+                    ? FlixieColors.success
+                    : FlixieColors.light,
+                size: isDue ? 21 : 24,
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+
+  Widget _buildWatchPlanDots(int count) => Center(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(
+            count,
+            (index) => AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: index == _watchPlanPage ? 16 : 6,
+              height: 6,
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              decoration: BoxDecoration(
+                color: index == _watchPlanPage
+                    ? FlixieColors.primary
+                    : FlixieColors.medium.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+          ),
+        ),
+      );
 
   String _formatWatchPlanDate(DateTime raw) {
     final date = raw.toLocal();
@@ -2342,9 +2443,10 @@ class _HomeSessionSnapshot {
     required this.showMoreFriendActivity,
     required this.watchlistMovieIds,
     required this.watchRequestsNeedingResponse,
-    required this.upcomingWatchPlan,
+    required this.watchPlansToShow,
     required this.heroPage,
     required this.forYouPage,
+    required this.watchPlanPage,
     required this.scrollOffset,
   });
 
@@ -2357,9 +2459,10 @@ class _HomeSessionSnapshot {
   final bool showMoreFriendActivity;
   final Set<int> watchlistMovieIds;
   final int watchRequestsNeedingResponse;
-  final WatchRequest? upcomingWatchPlan;
+  final List<WatchRequest> watchPlansToShow;
   final int heroPage;
   final int forYouPage;
+  final int watchPlanPage;
   final double scrollOffset;
 }
 

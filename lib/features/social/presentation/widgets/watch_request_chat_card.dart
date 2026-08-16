@@ -41,7 +41,7 @@ class WatchRequestChatCard extends StatelessWidget {
     final movieTitle = cachedRequest?.movieTitle ??
         payload?['movieTitle'] as String? ??
         payload?['title'] as String? ??
-        'Watch Request';
+        'Watch Plan';
     final posterPath = cachedRequest?.moviePosterPath ??
         payload?['moviePosterUrl'] as String? ??
         payload?['posterPath'] as String?;
@@ -102,7 +102,7 @@ class WatchRequestChatCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           isMyRequest
-                              ? 'Your watch request'
+                              ? 'Your Watch Plan'
                               : '@${requesterUsername ?? 'Unknown'} wants to watch',
                           style: const TextStyle(
                               color: FlixieColors.primary,

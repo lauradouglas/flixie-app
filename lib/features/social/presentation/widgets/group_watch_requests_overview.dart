@@ -136,7 +136,7 @@ class _GroupWatchRequestsOverviewState
             const Padding(
               padding: EdgeInsets.only(top: 100),
               child: Center(
-                child: Text('No group watch requests here yet',
+                child: Text('No group Watch Plans here yet',
                     style: TextStyle(color: FlixieColors.medium)),
               ),
             )
@@ -290,7 +290,7 @@ class _GroupRequestTile extends StatelessWidget {
                       : Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(request.movieTitle ?? 'Watch request',
+                            Text(request.movieTitle ?? 'Watch Plan',
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
@@ -389,7 +389,7 @@ class _GroupRequestTile extends StatelessWidget {
   Widget _compactContent(VoidCallback open) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(request.movieTitle ?? 'Watch request',
+          Text(request.movieTitle ?? 'Watch Plan',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(

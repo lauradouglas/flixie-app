@@ -1,5 +1,41 @@
 import 'package:flixie_app/models/profile_avatar.dart';
 
+/// The product-facing stage of a [WatchRequest].
+///
+/// Requests remain the storage/API name for backwards compatibility, but the
+/// UI treats them as a watch plan with one clear next step for each person.
+enum WatchPlanStage {
+  needsReply,
+  waitingForReplies,
+  planning,
+  upcoming,
+  past,
+  cancelled,
+  expired,
+}
+
+extension WatchPlanStageCopy on WatchPlanStage {
+  String get label => switch (this) {
+        WatchPlanStage.needsReply => 'Needs reply',
+        WatchPlanStage.waitingForReplies => 'Waiting for replies',
+        WatchPlanStage.planning => 'Planning',
+        WatchPlanStage.upcoming => 'Upcoming',
+        WatchPlanStage.past => 'Past',
+        WatchPlanStage.cancelled => 'Cancelled',
+        WatchPlanStage.expired => 'Expired',
+      };
+
+  String get primaryActionLabel => switch (this) {
+        WatchPlanStage.needsReply => 'Reply',
+        WatchPlanStage.waitingForReplies => 'View plan',
+        WatchPlanStage.planning => 'Continue planning',
+        WatchPlanStage.upcoming => 'View plan',
+        WatchPlanStage.past => 'See ratings',
+        WatchPlanStage.cancelled => 'View plan',
+        WatchPlanStage.expired => 'View plan',
+      };
+}
+
 class WatchRequestUser {
   final String id;
   final String username;
@@ -40,11 +76,13 @@ class WatchRequestMovieDetails {
   final int id;
   final String title;
   final String? posterPath;
+  final int? runtimeMinutes;
 
   const WatchRequestMovieDetails({
     required this.id,
     required this.title,
     this.posterPath,
+    this.runtimeMinutes,
   });
 
   factory WatchRequestMovieDetails.fromJson(Map<String, dynamic> json) {
@@ -52,6 +90,7 @@ class WatchRequestMovieDetails {
       id: _intValue(json['id']) ?? 0,
       title: json['title'] as String? ?? 'Unknown Movie',
       posterPath: json['posterPath'] as String?,
+      runtimeMinutes: _intValue(json['runtime']),
     );
   }
 }
@@ -178,10 +217,12 @@ class WatchConfirmation {
 class WatchRequestState {
   final WatchRequest request;
   final bool needsWatchConfirmation;
+  final bool hasCurrentUserLoggedWatch;
 
   const WatchRequestState({
     required this.request,
     required this.needsWatchConfirmation,
+    required this.hasCurrentUserLoggedWatch,
   });
 
   factory WatchRequestState.fromJson(Map<String, dynamic> json) {
@@ -189,10 +230,14 @@ class WatchRequestState {
       json['request'] as Map<String, dynamic>,
     );
     requestJson['needsWatchConfirmation'] = json['needsWatchConfirmation'];
+    requestJson['hasCurrentUserLoggedWatch'] =
+        json['hasCurrentUserLoggedWatch'];
     return WatchRequestState(
       request: WatchRequest.fromJson(requestJson),
       needsWatchConfirmation:
           _boolValue(json['needsWatchConfirmation']) ?? false,
+      hasCurrentUserLoggedWatch:
+          _boolValue(json['hasCurrentUserLoggedWatch']) ?? false,
     );
   }
 }
@@ -221,6 +266,7 @@ class WatchRequest {
   final List<WatchScheduleProposal> scheduleProposals;
   final List<WatchConfirmation> watchConfirmations;
   final bool? needsWatchConfirmation;
+  final bool? hasCurrentUserLoggedWatch;
   final DateTime? acceptedAt;
   final DateTime? completedAt;
   final DateTime? cancelledAt;
@@ -261,6 +307,7 @@ class WatchRequest {
     this.scheduleProposals = const [],
     this.watchConfirmations = const [],
     this.needsWatchConfirmation,
+    this.hasCurrentUserLoggedWatch,
     this.acceptedAt,
     this.completedAt,
     this.cancelledAt,
@@ -322,6 +369,7 @@ class WatchRequest {
           .map(WatchConfirmation.fromJson)
           .toList(),
       needsWatchConfirmation: _boolValue(json['needsWatchConfirmation']),
+      hasCurrentUserLoggedWatch: _boolValue(json['hasCurrentUserLoggedWatch']),
       acceptedAt: _dateTimeValue(json['acceptedAt']),
       completedAt: _dateTimeValue(json['completedAt']),
       cancelledAt: _dateTimeValue(json['cancelledAt']),
@@ -424,7 +472,7 @@ class WatchRequest {
   bool canCompleteFor(String userId) =>
       canComplete ??
       ((isAccepted || isScheduled) &&
-          hasCurrentUserAccepted == true &&
+          hasCurrentUserAccepted != false &&
           hasCurrentUserCompleted != true);
 
   bool canCancelFor(String userId) =>
@@ -450,6 +498,36 @@ class WatchRequest {
 
   bool canConfirmWatchedFor(String userId) =>
       needsWatchConfirmation == true && !hasCurrentUserConfirmed(userId);
+
+  /// Maps the persisted request and per-person response state to the single
+  /// product state shown in Watch Plans. This deliberately does not mutate
+  /// backend statuses: a pending invite, schedule proposal and due watch all
+  /// need different next actions for different participants.
+  WatchPlanStage planStageFor(String userId, {DateTime? now}) {
+    final currentTime = now ?? DateTime.now();
+    if (isCancelled) return WatchPlanStage.cancelled;
+    if (isExpired) return WatchPlanStage.expired;
+    if (isCompleted || normalizedWatchedStatus == 'WATCHED') {
+      return WatchPlanStage.past;
+    }
+
+    final isIncoming = requesterId != userId &&
+        (recipientId == userId || participantFor(userId) != null);
+    final proposal = latestPendingProposal;
+    if ((isPending && isIncoming) ||
+        (proposal != null && proposal.proposerId != userId)) {
+      return WatchPlanStage.needsReply;
+    }
+    if (isPending || proposal != null) return WatchPlanStage.waitingForReplies;
+
+    if ((normalizedScheduleStatus == 'AGREED' || isScheduled) &&
+        scheduledFor != null) {
+      return scheduledFor!.isAfter(currentTime)
+          ? WatchPlanStage.upcoming
+          : WatchPlanStage.past;
+    }
+    return WatchPlanStage.planning;
+  }
 }
 
 extension on DateTime? {

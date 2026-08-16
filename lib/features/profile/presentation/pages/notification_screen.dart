@@ -338,6 +338,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     notification.watchMediaTitle ??
                     'Watch together',
                 scheduledFor: scheduledFor,
+                runtimeMinutes: state.request.movie?.runtimeMinutes,
                 note: state.request.message,
                 location:
                     state.request.location ?? notification.watchRequestLocation,

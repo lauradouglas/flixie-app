@@ -53,6 +53,9 @@ class ActivityListItem {
   final String? watchedAt;
   final int? watchCount;
   final bool isRewatch;
+
+  /// True when the API merged a same-journey watch into a richer rating.
+  final bool watchLogged;
   final String? notes;
   final Review? reviewData;
   final int activityScore;
@@ -85,6 +88,7 @@ class ActivityListItem {
     this.watchedAt,
     this.watchCount,
     this.isRewatch = false,
+    this.watchLogged = false,
     this.notes,
     this.reviewData,
     this.activityScore = 0,
@@ -112,6 +116,7 @@ class ActivityListItem {
         watchedAt: watchedAt,
         watchCount: watchCount,
         isRewatch: isRewatch,
+        watchLogged: watchLogged,
         notes: notes,
         reviewData: reviewData,
         activityScore: activityScore,
@@ -207,6 +212,7 @@ class ActivityListItem {
       watchedAt: json['watchedAt'] as String?,
       watchCount: parsedWatchCount,
       isRewatch: isRewatch,
+      watchLogged: json['watchLogged'] == true,
       notes: json['notes'] as String?,
       reviewData: reviewData,
       avatar: (user?['avatar'] ?? json['avatar']) == null

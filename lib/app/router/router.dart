@@ -99,7 +99,7 @@ String _screenNameFor(GoRouterState state) {
     '/my-reviews' => 'My Reviews',
     '/stats' => 'Stats',
     '/wrapped' || '/wrapped/:userId' => 'Wrapped',
-    '/watch-requests' => 'Watch Requests',
+    '/watch-requests' => 'Watch Plans',
     '/watch-requests/:requestId' => 'Watch Plan',
     '/settings' => 'Settings',
     '/help-support' => 'Help and Support',

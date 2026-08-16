@@ -148,6 +148,36 @@ void main() {
       expect(request.displayStatusLabel, 'Accepted · scheduling in progress');
     });
 
+    test('maps lifecycle and per-user actions to Watch Plan stages', () {
+      final invitation = WatchRequest.fromJson({
+        'id': 'invite',
+        'requesterId': 'jamie',
+        'recipientId': 'laura',
+        'status': 'PENDING',
+      });
+      final scheduled = WatchRequest.fromJson({
+        'id': 'scheduled',
+        'status': 'SCHEDULED',
+        'scheduleStatus': 'AGREED',
+        'scheduledFor': '2026-08-20T20:00:00.000Z',
+      });
+      final past = WatchRequest.fromJson({
+        'id': 'past',
+        'status': 'COMPLETED',
+        'watchedStatus': 'WATCHED',
+      });
+
+      expect(invitation.planStageFor('laura'), WatchPlanStage.needsReply);
+      expect(
+          invitation.planStageFor('jamie'), WatchPlanStage.waitingForReplies);
+      expect(
+        scheduled.planStageFor('laura', now: DateTime.utc(2026, 8, 15)),
+        WatchPlanStage.upcoming,
+      );
+      expect(past.planStageFor('laura'), WatchPlanStage.past);
+      expect(WatchPlanStage.planning.primaryActionLabel, 'Continue planning');
+    });
+
     test('parses scheduled and completed fields safely', () {
       final scheduled = WatchRequest.fromJson({
         'id': 'wr-2',

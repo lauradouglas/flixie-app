@@ -74,6 +74,8 @@ class RequestService {
     required bool watched,
     int? rating,
     String? reviewText,
+    String? watchedAt,
+    bool? recommended,
   }) async {
     await ApiClient.post(
       '/watch-requests/$watchRequestId/watch-confirmations',
@@ -83,6 +85,8 @@ class RequestService {
         if (watched && rating != null) 'rating': rating,
         if (watched && reviewText != null && reviewText.trim().isNotEmpty)
           'reviewText': reviewText.trim(),
+        if (watched && watchedAt != null) 'watchedAt': watchedAt,
+        if (watched && recommended != null) 'recommended': recommended,
       },
     );
     return getWatchRequestState(watchRequestId: watchRequestId, userId: userId);

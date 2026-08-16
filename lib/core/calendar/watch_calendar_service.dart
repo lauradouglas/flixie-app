@@ -8,6 +8,7 @@ class WatchCalendarService {
   static Future<bool> addScheduledWatch({
     required String title,
     required DateTime scheduledFor,
+    int? runtimeMinutes,
     String? note,
     String? location,
   }) async {
@@ -18,7 +19,9 @@ class WatchCalendarService {
           description: _description(note),
           location: location?.trim() ?? '',
           startDate: scheduledFor.toLocal(),
-          endDate: scheduledFor.toLocal().add(const Duration(hours: 2)),
+          endDate: scheduledFor
+              .toLocal()
+              .add(calendarDurationForRuntime(runtimeMinutes)),
         ),
       );
     } catch (error, stackTrace) {
@@ -29,6 +32,18 @@ class WatchCalendarService {
       );
       return false;
     }
+  }
+
+  /// Movies rarely start exactly on time, so calendar entries round their
+  /// runtime up to the next half hour. This leaves practical time to settle
+  /// in without exaggerating shorter films; unknown runtimes keep the
+  /// established two-hour fallback.
+  static Duration calendarDurationForRuntime(int? runtimeMinutes) {
+    if (runtimeMinutes == null || runtimeMinutes <= 0) {
+      return const Duration(hours: 2);
+    }
+    final roundedMinutes = ((runtimeMinutes + 29) ~/ 30) * 30;
+    return Duration(minutes: roundedMinutes);
   }
 
   static String _description(String? note) {
