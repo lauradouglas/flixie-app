@@ -277,6 +277,17 @@ class _SignupScreenState extends State<SignupScreen> {
       }
     }
 
+    if (!mounted) return;
+    if (_selectedCountry == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select your country to show watch providers.'),
+          backgroundColor: FlixieColors.danger,
+        ),
+      );
+      return;
+    }
+
     if (!_signupStartedLogged) {
       _signupStartedLogged = true;
       unawaited(analytics.signupStarted());
@@ -533,7 +544,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     const SizedBox(height: 14),
                     _CountryPickerField(
                       selected: _selectedCountry,
-                      onTap: _countries.isEmpty ? null : _pickCountry,
+                      onTap: _pickCountry,
                     ),
                     const SizedBox(height: 14),
                     AppTextField(
@@ -679,6 +690,7 @@ class _CountryPickerField extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasValue = selected != null;
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
@@ -690,7 +702,8 @@ class _CountryPickerField extends StatelessWidget {
             color: FlixieColors.tabBarBorder.withValues(alpha: 0.9),
           ),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+        height: 64,
+        padding: const EdgeInsets.symmetric(horizontal: 18),
         child: Row(
           children: [
             const Icon(
@@ -700,20 +713,21 @@ class _CountryPickerField extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                hasValue ? selected!.name : 'Country (optional)',
-                style: TextStyle(
-                  color: hasValue
-                      ? FlixieColors.textPrimary
-                      : FlixieColors.light.withValues(alpha: 0.86),
-                  fontSize: 16,
-                ),
+              child: Row(
+                children: [
+                  Text(
+                    hasValue ? 'Country: ${selected!.name}' : 'Country',
+                    style: TextStyle(
+                      color: hasValue
+                          ? FlixieColors.textPrimary
+                          : FlixieColors.light.withValues(alpha: 0.86),
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const Icon(
-              Icons.expand_more_rounded,
-              color: FlixieColors.medium,
-            ),
+            const Icon(Icons.expand_more_rounded, color: FlixieColors.medium),
           ],
         ),
       ),
@@ -738,11 +752,26 @@ class _CountryPickerSheet extends StatefulWidget {
 class _CountryPickerSheetState extends State<_CountryPickerSheet> {
   final _searchController = TextEditingController();
   late List<Country> _filtered;
+  bool _loadingCountries = false;
 
   @override
   void initState() {
     super.initState();
     _filtered = widget.countries;
+    if (_filtered.isEmpty) _reloadCountries();
+  }
+
+  Future<void> _reloadCountries() async {
+    setState(() => _loadingCountries = true);
+    try {
+      final countries = await ReferenceDataService.getCountries();
+      if (!mounted) return;
+      setState(() => _filtered = countries);
+    } catch (error) {
+      apiLogger.e('Unable to load countries: $error');
+    } finally {
+      if (mounted) setState(() => _loadingCountries = false);
+    }
   }
 
   @override
@@ -766,6 +795,8 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
   Widget build(BuildContext context) {
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
     return Container(
+      height: MediaQuery.sizeOf(context).height * 0.78,
+      clipBehavior: Clip.antiAlias,
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
       decoration: BoxDecoration(
         color: FlixieColors.surface,
@@ -777,7 +808,6 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
       child: SafeArea(
         top: false,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Center(
@@ -834,33 +864,35 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
               ),
             ),
             const SizedBox(height: 10),
-            SizedBox(
-              height: 320,
-              child: ListView.builder(
-                itemCount: _filtered.length,
-                itemBuilder: (context, index) {
-                  final country = _filtered[index];
-                  final isSelected = country.id == widget.selected?.id;
-                  return ListTile(
-                    tileColor: Colors.transparent,
-                    title: Text(
-                      country.name,
-                      style: TextStyle(
-                        color: isSelected
-                            ? FlixieColors.primary
-                            : FlixieColors.textPrimary,
-                        fontWeight:
-                            isSelected ? FontWeight.w700 : FontWeight.normal,
-                      ),
+            Expanded(
+              child: _loadingCountries
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView.builder(
+                      itemCount: _filtered.length,
+                      itemBuilder: (context, index) {
+                        final country = _filtered[index];
+                        final isSelected = country.id == widget.selected?.id;
+                        return ListTile(
+                          tileColor: Colors.transparent,
+                          title: Text(
+                            country.name,
+                            style: TextStyle(
+                              color: isSelected
+                                  ? FlixieColors.primary
+                                  : FlixieColors.textPrimary,
+                              fontWeight: isSelected
+                                  ? FontWeight.w700
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                          trailing: isSelected
+                              ? const Icon(Icons.check_rounded,
+                                  color: FlixieColors.primary)
+                              : null,
+                          onTap: () => Navigator.of(context).pop(country),
+                        );
+                      },
                     ),
-                    trailing: isSelected
-                        ? const Icon(Icons.check_rounded,
-                            color: FlixieColors.primary)
-                        : null,
-                    onTap: () => Navigator.of(context).pop(country),
-                  );
-                },
-              ),
             ),
           ],
         ),

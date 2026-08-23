@@ -50,6 +50,8 @@ class ActivityTile extends StatelessWidget {
       case ActivityListType.watchRequestAccepted:
       case ActivityListType.watchRequest:
         return FlixieColors.tertiary;
+      case ActivityListType.movieListAdded:
+        return FlixieColors.primary;
       case ActivityListType.unknown:
         return FlixieColors.medium;
     }
@@ -101,6 +103,8 @@ class ActivityTile extends StatelessWidget {
       case ActivityListType.watchRequestAccepted:
       case ActivityListType.watchRequestSent:
         return 'Request';
+      case ActivityListType.movieListAdded:
+        return 'List';
       case ActivityListType.unknown:
         return 'Activity';
     }
@@ -146,6 +150,12 @@ class ActivityTile extends StatelessWidget {
       case ActivityListType.watchRequestAccepted:
       case ActivityListType.watchRequestSent:
         return 'shared $title';
+      case ActivityListType.movieListAdded:
+        final extras = (item.listAdditionCount ?? 1) - 1;
+        final list = item.listName ?? 'a list';
+        return extras > 0
+            ? 'added $title and $extras other ${extras == 1 ? 'title' : 'titles'} to $list'
+            : 'added $title to $list';
       case ActivityListType.unknown:
         return 'activity on $title';
     }
@@ -195,6 +205,7 @@ class ActivityTile extends StatelessWidget {
       case ActivityListType.watchRequest:
       case ActivityListType.watchRequestAccepted:
       case ActivityListType.watchRequestSent:
+      case ActivityListType.movieListAdded:
       case ActivityListType.unknown:
         return null;
     }
@@ -276,6 +287,16 @@ class ActivityTile extends StatelessWidget {
       return showDetailPath(item.showId!, source: detailSource);
     }
     return null;
+  }
+
+  void _openList(BuildContext context) {
+    final listId = item.listId;
+    final ownerId = item.listOwnerId;
+    if (listId == null || ownerId == null) return;
+    final name = Uri.encodeComponent(item.listName ?? 'List');
+    context.push(
+      '/movie-lists/$listId?name=$name&owner=$ownerId&isOwner=false&canEdit=false',
+    );
   }
 
   void _replyToActivity(
@@ -538,6 +559,24 @@ class ActivityTile extends StatelessWidget {
                                     color: FlixieColors.light,
                                     fontSize: 12,
                                   ),
+                                ),
+                              ),
+                            ],
+                            if (item.type == ActivityListType.movieListAdded &&
+                                item.listId != null &&
+                                item.listOwnerId != null) ...[
+                              const SizedBox(height: 8),
+                              TextButton.icon(
+                                onPressed: () => _openList(context),
+                                icon: const Icon(
+                                  Icons.playlist_play_rounded,
+                                  size: 16,
+                                ),
+                                label: Text('Open ${item.listName ?? 'list'}'),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: FlixieColors.primaryTint,
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: const Size(0, 28),
                                 ),
                               ),
                             ],

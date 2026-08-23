@@ -17,27 +17,34 @@ import 'package:flixie_app/models/profile_avatar.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/social/presentation/widgets/group_avatar.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
+import 'package:flixie_app/features/authentication/presentation/pages/auth_ui.dart';
+import 'package:flixie_app/features/movies/data/search_service.dart';
+import 'package:flixie_app/models/movie_short.dart';
 
 class MovieWatchRequestSheet extends StatefulWidget {
   const MovieWatchRequestSheet({
     super.key,
     required this.movieId,
     required this.movieTitle,
+    this.moviePoster,
     required this.requesterId,
     required this.friends,
     required this.onSuccess,
     required this.onError,
     this.initialFriendId,
+    this.initialGroupId,
     this.fromMovieMatch = false,
   });
 
   final int? movieId;
   final String? movieTitle;
+  final String? moviePoster;
   final String requesterId;
   final List<Friendship> friends;
   final VoidCallback onSuccess;
   final VoidCallback onError;
   final String? initialFriendId;
+  final String? initialGroupId;
   final bool fromMovieMatch;
 
   @override
@@ -52,6 +59,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
   String? _selectedFriendId;
   String? _selectedGroupId;
   bool _isSending = false;
+  late final List<MovieShort> _movieChoices;
 
   List<Group> _groups = [];
   bool _loadingGroups = false;
@@ -68,7 +76,23 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
   @override
   void initState() {
     super.initState();
+    _movieChoices = widget.movieId == null
+        ? []
+        : [
+            MovieShort(
+              id: widget.movieId!,
+              name: widget.movieTitle ?? 'Movie',
+              poster: widget.moviePoster,
+            ),
+          ];
     _fetchGroups();
+    if (widget.initialGroupId != null) {
+      _isGroupMode = true;
+      _selectedGroupId = widget.initialGroupId;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _selectGroup(widget.initialGroupId!);
+      });
+    }
     if (widget.initialFriendId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -201,7 +225,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
   Future<void> _send() async {
     final canSend =
         _isGroupMode ? _selectedGroupId != null : _selectedFriendId != null;
-    if (!canSend || _isSending) return;
+    if (!canSend || _isSending || _movieChoices.isEmpty) return;
     final analytics = context.read<AnalyticsController>();
     setState(() => _isSending = true);
     try {
@@ -214,7 +238,8 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
           widget.requesterId,
           _messageController.text.trim(),
           'MOVIE',
-          widget.movieId!,
+          _movieChoices.first.id,
+          candidateMovieIds: _movieChoices.map((movie) => movie.id).toList(),
         );
         final conversationId = result?['conversationId'] as String?;
         final watchRequest = result?['watchRequest'] as Map<String, dynamic>?;
@@ -227,6 +252,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
           'requesterId': widget.requesterId,
           'recipientId': _selectedFriendId,
           'movieId': widget.movieId,
+          'candidateMovieIds': _movieChoices.map((movie) => movie.id).toList(),
           'message': _messageController.text.trim(),
           'type': 'MOVIE_WATCH_REQUEST',
         });
@@ -252,6 +278,28 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
       if (mounted) setState(() => _isSending = false);
       widget.onError();
     }
+  }
+
+  Future<void> _addMovieChoice() async {
+    if (_movieChoices.length >= 5) return;
+    final movie = await showModalBottomSheet<MovieShort>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: FlixieColors.surface,
+      builder: (_) => MovieSearchSheet(
+        title: 'Add a movie option',
+        searchMovies: (query) async {
+          final result = await SearchService.search(query, type: 'movie');
+          return result.results
+              .where((item) => item.movie != null)
+              .map((item) => item.movie!)
+              .where((item) =>
+                  !_movieChoices.any((choice) => choice.id == item.id))
+              .toList();
+        },
+      ),
+    );
+    if (movie != null && mounted) setState(() => _movieChoices.add(movie));
   }
 
   @override
@@ -280,7 +328,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
         child: Padding(
           padding: EdgeInsets.fromLTRB(
             24,
-            24,
+            MediaQuery.of(context).padding.top + 16,
             24,
             MediaQuery.of(context).viewInsets.bottom + 32,
           ),
@@ -313,21 +361,13 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                   ),
                 ],
               ),
-              if (widget.movieTitle != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  widget.movieTitle!,
-                  style:
-                      const TextStyle(color: FlixieColors.medium, fontSize: 14),
-                ),
-              ],
               const SizedBox(height: 18),
               // Friend / Group toggle
               Container(
                 decoration: BoxDecoration(
                   color: FlixieColors.surfaceElevated,
                   border: Border.all(color: FlixieColors.tabBarBorder),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: Row(
                   children: [
@@ -392,9 +432,10 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                     style: TextStyle(color: FlixieColors.medium, fontSize: 13),
                   )
                 else
-                  SizedBox(
-                    height: 180,
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 180),
                     child: ListView.separated(
+                      shrinkWrap: true,
                       itemCount: visibleFriends.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 8),
                       itemBuilder: (_, i) {
@@ -435,9 +476,10 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                     style: TextStyle(color: FlixieColors.medium, fontSize: 13),
                   )
                 else
-                  SizedBox(
-                    height: 180,
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 180),
                     child: ListView.separated(
+                      shrinkWrap: true,
                       itemCount: visibleGroups.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 8),
                       itemBuilder: (_, i) {
@@ -471,6 +513,89 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                 groupProviderCounts: _groupProviderCounts,
                 groupMemberCount: _groupMemberCount,
                 loadingGroup: _loadingGroupProviders,
+              ),
+              const SizedBox(height: 14),
+              Text(
+                '${_movieChoices.length} of 5 movie options',
+                style:
+                    const TextStyle(color: FlixieColors.medium, fontSize: 12),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _movieChoices
+                    .map(
+                      (movie) => SizedBox(
+                        width: 76,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: SizedBox(
+                                    width: 76,
+                                    height: 114,
+                                    child: movie.poster == null
+                                        ? Container(
+                                            color: FlixieColors.surfaceElevated,
+                                            child: const Icon(
+                                                Icons.movie_outlined,
+                                                color: FlixieColors.medium),
+                                          )
+                                        : CachedNetworkImage(
+                                            imageUrl: movie.poster!
+                                                    .startsWith('http')
+                                                ? movie.poster!
+                                                : 'https://image.tmdb.org/t/p/w185${movie.poster}',
+                                            fit: BoxFit.cover,
+                                          ),
+                                  ),
+                                ),
+                                if (_movieChoices.length > 1)
+                                  Positioned(
+                                    top: 3,
+                                    right: 3,
+                                    child: InkWell(
+                                      onTap: () => setState(
+                                          () => _movieChoices.remove(movie)),
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(3),
+                                        decoration: const BoxDecoration(
+                                          color: Colors.black54,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(Icons.close_rounded,
+                                            size: 14, color: Colors.white),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              movie.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: FlixieColors.light,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                    .toList(growable: false),
+              ),
+              TextButton.icon(
+                onPressed: _movieChoices.length >= 5 ? null : _addMovieChoice,
+                icon: const Icon(Icons.add_circle_outline_rounded),
+                label: const Text('Add another movie'),
               ),
               const SizedBox(height: 20),
               const Text(
@@ -515,6 +640,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: _isSending ||
+                          _movieChoices.isEmpty ||
                           (_isGroupMode
                               ? _selectedGroupId == null
                               : _selectedFriendId == null)
@@ -543,7 +669,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
   String get _sendButtonLabel {
     if (_isGroupMode) {
       for (final group in _groups) {
-        if (group.id == _selectedGroupId) return 'Invite ${group.name}';
+        if (group.id == _selectedGroupId) return 'Make plan with ${group.name}';
       }
     } else {
       for (final friendship in widget.friends) {
@@ -850,7 +976,7 @@ class _ModeTab extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
             color: selected ? FlixieColors.primary : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(14),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,

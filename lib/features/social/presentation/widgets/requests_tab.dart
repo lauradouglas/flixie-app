@@ -1,9 +1,11 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'package:flixie_app/core/auth/auth_provider.dart';
+import 'package:flixie_app/core/auth/push_notification_service.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/models/group_watch_request.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
@@ -15,7 +17,12 @@ import 'package:flixie_app/features/social/presentation/widgets/request_poster_p
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/movies/data/movie_service.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
+import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'package:flixie_app/models/watch_provider.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_sheet.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/watch_request_sheet.dart';
+import 'package:flixie_app/features/sharing/models/share_card_data.dart';
+import 'package:flixie_app/features/sharing/presentation/share_card_sheet.dart';
 
 class _GroupRequestProviderSummary extends StatefulWidget {
   const _GroupRequestProviderSummary({
@@ -131,6 +138,7 @@ class GroupRequestsTab extends StatefulWidget {
   const GroupRequestsTab({
     super.key,
     required this.groupId,
+    this.groupName,
     this.conversationId,
     this.initialRequests = const [],
     required this.currentUserId,
@@ -140,6 +148,7 @@ class GroupRequestsTab extends StatefulWidget {
   });
 
   final String groupId;
+  final String? groupName;
   final String? conversationId;
   final List<GroupWatchRequest> initialRequests;
   final String currentUserId;
@@ -155,9 +164,46 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
   late List<GroupWatchRequest> _requests;
   bool _loading = false;
   final Map<String, bool> _processing = {};
+  final Map<String, String> _processingResponses = {};
   final Map<String, String> _myResponses = {};
+  final Map<String, Set<String>> _candidateChoiceDrafts = {};
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+
+  Future<void> _makeGroupWatchPlan() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: FlixieColors.surface,
+      builder: (_) => MovieWatchRequestSheet(
+        movieId: null,
+        movieTitle: null,
+        requesterId: widget.currentUserId,
+        friends: const [],
+        initialGroupId: widget.groupId,
+        onSuccess: () {
+          _load();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Watch Plan sent to the group')),
+            );
+          }
+        },
+        onError: () {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Could not create the Watch Plan'),
+                backgroundColor: FlixieColors.danger,
+              ),
+            );
+          }
+        },
+      ),
+    );
+  }
+
   _RequestFilter _filter = _RequestFilter.active;
 
   String get _emptyMessage {
@@ -169,9 +215,9 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
       case _RequestFilter.completed:
         return 'No completed watches yet.';
       case _RequestFilter.byMe:
-        return "You haven't created any requests yet.";
+        return "You haven't created any Watch Plans yet.";
       case _RequestFilter.all:
-        return 'No watch requests yet.';
+        return 'No Watch Plans yet.';
     }
   }
 
@@ -234,20 +280,23 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
   Future<void> _load() async {
     if (mounted && _requests.isEmpty) setState(() => _loading = true);
     try {
-      final List<GroupWatchRequest> requests;
-      final conversationId = widget.conversationId;
-      if (conversationId != null) {
-        requests = await GroupService.getConversationWatchRequests(
-          conversationId,
-          filter: widget.initialRequestId?.isNotEmpty == true
-              ? WatchRequestFilter.all
-              : WatchRequestFilter.active,
-          userId: widget.currentUserId,
-        );
-      } else {
-        requests = await context
-            .read<WatchRequestCache>()
-            .refreshGroup(widget.groupId);
+      // The Postgres group request is the canonical Watch Plan state. The
+      // Firestore conversation mirror only carries enough data for chat
+      // previews, so using it here after opening Chat was replacing rich
+      // plans (candidates, participants, actions) with partial records.
+      final requests =
+          await context.read<WatchRequestCache>().refreshGroup(widget.groupId);
+      for (final request in requests) {
+        final scheduledFor = DateTime.tryParse(request.scheduledFor ?? '');
+        if (scheduledFor != null && scheduledFor.isAfter(DateTime.now())) {
+          PushNotificationService.scheduleWatchPlanReminders(
+            planId: request.databaseRequestId ?? request.id,
+            scheduledFor: scheduledFor.toLocal(),
+            title: request.movieTitle ?? 'Group watch',
+            withName: widget.groupName ?? 'your group',
+            deepLink: '/groups/${widget.groupId}?tab=plans',
+          );
+        }
       }
       if (mounted) {
         final focusedId = widget.initialRequestId;
@@ -366,7 +415,10 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
     // in the request (set when loaded via getConversationWatchRequests).
     final convId = widget.conversationId ?? req.groupId;
 
-    setState(() => _processing[req.id] = true);
+    setState(() {
+      _processing[req.id] = true;
+      _processingResponses[req.id] = status;
+    });
     try {
       final analytics = context.read<AnalyticsController>();
       final decision = WatchResponseDecision.fromString(status);
@@ -410,18 +462,146 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
         );
       }
     } finally {
-      if (mounted) setState(() => _processing.remove(req.id));
+      if (mounted) {
+        setState(() {
+          _processing.remove(req.id);
+          _processingResponses.remove(req.id);
+        });
+      }
     }
   }
 
-  Future<void> _markWatched(GroupWatchRequest req) async {
+  String _groupPlanRequestId(GroupWatchRequest request) =>
+      request.databaseRequestId ?? request.id;
+
+  Set<String> _candidateChoicesFor(GroupWatchRequest request) {
+    return _candidateChoiceDrafts.putIfAbsent(
+      request.id,
+      () => request.candidates
+          .where((candidate) =>
+              candidate.selectedByUserIds.contains(widget.currentUserId))
+          .map((candidate) => candidate.id)
+          .toSet(),
+    );
+  }
+
+  void _replaceGroupPlan(GroupWatchRequest updated) {
+    setState(() {
+      _requests = _requests
+          .map((request) => request.matchesId(updated.id) ? updated : request)
+          .toList(growable: false);
+      _candidateChoiceDrafts.removeWhere(
+          (key, _) => key == updated.id || key == updated.databaseRequestId);
+    });
+  }
+
+  Future<void> _saveGroupCandidateChoices(GroupWatchRequest request) async {
+    final choices = _candidateChoicesFor(request).toList(growable: false);
+    if (choices.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Select at least one movie you would watch'),
+        backgroundColor: FlixieColors.danger,
+      ));
+      return;
+    }
+    setState(() => _processing[request.id] = true);
+    try {
+      final updated = await GroupService.saveWatchPlanChoices(
+        _groupPlanRequestId(request),
+        widget.currentUserId,
+        choices,
+      );
+      if (!mounted) return;
+      _replaceGroupPlan(updated);
+      // Re-read the canonical Postgres plan after saving. This avoids a chat
+      // mirror or a partially populated mutation response reverting the
+      // visible choices on the next frame.
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Movies you’d watch saved'),
+        backgroundColor: FlixieColors.success,
+      ));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(error.toString()),
+        backgroundColor: FlixieColors.danger,
+      ));
+    } finally {
+      if (mounted) setState(() => _processing.remove(request.id));
+    }
+  }
+
+  Future<void> _selectGroupFinalMovie(
+      GroupWatchRequest request, String candidateId) async {
+    setState(() => _processing[request.id] = true);
+    try {
+      final updated = await GroupService.selectWatchPlanMovie(
+        _groupPlanRequestId(request),
+        widget.currentUserId,
+        candidateId,
+      );
+      if (!mounted) return;
+      _replaceGroupPlan(updated);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Final movie chosen'),
+        backgroundColor: FlixieColors.success,
+      ));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(error.toString()),
+        backgroundColor: FlixieColors.danger,
+      ));
+    } finally {
+      if (mounted) setState(() => _processing.remove(request.id));
+    }
+  }
+
+  Future<void> _changeGroupFinalMovie(GroupWatchRequest request) async {
+    setState(() => _processing[request.id] = true);
+    try {
+      final updated = await GroupService.reopenWatchPlanMovieSelection(
+        _groupPlanRequestId(request),
+        widget.currentUserId,
+      );
+      if (!mounted) return;
+      _replaceGroupPlan(updated);
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Choose a new final movie'),
+        backgroundColor: FlixieColors.success,
+      ));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(error.toString()),
+        backgroundColor: FlixieColors.danger,
+      ));
+    } finally {
+      if (mounted) setState(() => _processing.remove(request.id));
+    }
+  }
+
+  Future<void> _markWatched(
+    GroupWatchRequest req, {
+    int? rating,
+    String? reviewText,
+  }) async {
     final userId = widget.currentUserId;
     final convId = widget.conversationId ?? req.groupId;
     final analytics = context.read<AnalyticsController>();
     setState(() => _processing[req.id] = true);
     try {
-      final updated =
-          await GroupService.completeWatchRequest(convId, req.id, userId);
+      final updated = await GroupService.completeWatchRequest(
+        convId,
+        req.id,
+        userId,
+        rating: rating,
+        reviewText: reviewText,
+      );
       if (req.status != WatchRequestStatus.completed &&
           updated.status == WatchRequestStatus.completed) {
         await analytics.watchPlanCompleted(
@@ -455,6 +635,90 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
     }
   }
 
+  Future<void> _logGroupWatch(GroupWatchRequest req) async {
+    int? movieId = req.mediaType?.toLowerCase() == 'movie' ? req.mediaId : null;
+    if (movieId == null) {
+      for (final candidate in req.candidates) {
+        if (candidate.id == req.selectedCandidateId) {
+          movieId = candidate.movieId;
+          break;
+        }
+      }
+    }
+    if (movieId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This plan does not have a movie to log')),
+      );
+      return;
+    }
+
+    var saved = false;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => RewatchLogSheet(
+        showReviewOption: false,
+        onSubmit: ({
+          required watchedAt,
+          required rating,
+          required recommended,
+          required notes,
+        }) async {
+          await UserService.logMovieWatch(
+            widget.currentUserId,
+            LogMovieWatchRequest(
+              movieId: movieId!,
+              watchedAt: watchedAt,
+              rating: rating,
+              recommended: recommended,
+              notes: notes,
+            ),
+          );
+          // Keep the movie's main rating in sync with this watch entry. The
+          // server also performs this update for group-plan completions, but
+          // doing it here keeps older deployments and cached movie screens
+          // consistent immediately.
+          if (rating != null) {
+            try {
+              await context.read<MovieService>().addMovieRating(
+                    movieId!,
+                    widget.currentUserId,
+                    rating.round(),
+                    recommended,
+                  );
+            } catch (error, stackTrace) {
+              logger.w(
+                'Watch entry saved, but its movie rating could not be reconciled.',
+                error: error,
+                stackTrace: stackTrace,
+              );
+            }
+          }
+          await context.read<AnalyticsController>().watchLogged(
+                contentType: 'movie',
+                contentId: movieId!,
+                source: 'group_watch_plan',
+                watchPlanId: req.databaseRequestId ?? req.id,
+                planType: 'group',
+                participantCount: req.analyticsParticipantCount,
+              );
+          saved = true;
+          await _markWatched(
+            req,
+            rating: rating?.round(),
+            reviewText: notes,
+          );
+          await PushNotificationService.cancelWatchPlanReminders(
+            req.databaseRequestId ?? req.id,
+          );
+          if (mounted) context.read<AuthProvider>().markActivityChanged();
+        },
+      ),
+    );
+    if (!mounted || !saved) return;
+  }
+
   Future<void> _scheduleRequest(GroupWatchRequest req,
       {String? initialIso}) async {
     final selected =
@@ -464,6 +728,7 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
       backgroundColor: Colors.transparent,
       builder: (_) => _GroupScheduleWatchSheet(
         initial: DateTime.tryParse(initialIso ?? '')?.toLocal(),
+        initialLocation: req.location,
       ),
     );
     if (!mounted || selected == null) return;
@@ -488,18 +753,53 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
         participantCount: updated.analyticsParticipantCount,
         source: 'group',
       );
+      await PushNotificationService.scheduleWatchPlanReminders(
+        planId: updated.databaseRequestId ?? updated.id,
+        scheduledFor: selected.scheduledFor,
+        title: updated.movieTitle ?? 'Group watch',
+        withName: widget.groupName ?? 'your group',
+        deepLink: '/groups/${widget.groupId}?tab=plans',
+      );
       await _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-                'Watch scheduled for ${_fullDateTime(selected.scheduledFor)}'),
-            backgroundColor: FlixieColors.success,
-            duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 88),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: BorderSide(
+                color: FlixieColors.success.withValues(alpha: .38),
+              ),
+            ),
+            content: Row(
+              children: [
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: FlixieColors.success,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Scheduled for ${_fullDateTime(selected.scheduledFor)}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: FlixieColors.light,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: FlixieColors.surfaceElevated,
+            duration: const Duration(seconds: 5),
             persist: false,
             action: SnackBarAction(
-              label: 'Add to calendar',
-              textColor: FlixieColors.background,
+              label: 'Calendar',
+              textColor: FlixieColors.success,
               onPressed: () => WatchCalendarService.addScheduledWatch(
                 title: req.movieTitle ?? 'Watch together',
                 scheduledFor: selected.scheduledFor,
@@ -515,38 +815,6 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to schedule watch')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _processing.remove(req.id));
-    }
-  }
-
-  Future<void> _unscheduleRequest(GroupWatchRequest req) async {
-    final userId = widget.currentUserId;
-    final convId = widget.conversationId ?? req.groupId;
-    setState(() => _processing[req.id] = true);
-    try {
-      await GroupService.scheduleWatchRequest(
-        convId,
-        req.id,
-        userId: userId,
-        scheduledFor: null,
-      );
-      await _load();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Watch time removed'),
-            backgroundColor: FlixieColors.success,
-          ),
-        );
-      }
-    } catch (e) {
-      logger.e('Unschedule watch request error: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to unschedule watch')),
         );
       }
     } finally {
@@ -626,7 +894,11 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
     if (confirmed != true) return;
     setState(() => _processing[req.id] = true);
     try {
-      await GroupService.deleteWatchRequest(widget.groupId, req.id);
+      await GroupService.deleteWatchRequest(
+        widget.groupId,
+        req.id,
+        widget.currentUserId,
+      );
       await _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -913,20 +1185,34 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
   Widget _buildSummaryStrip() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-      child: Row(
+      child: Column(
         children: [
-          Expanded(
-            child: _summaryTile('Active', _activeCount, FlixieColors.primary),
+          Row(
+            children: [
+              Expanded(
+                child:
+                    _summaryTile('Active', _activeCount, FlixieColors.primary),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _summaryTile(
+                    'Needs reply', _needsResponseCount, FlixieColors.warning),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _summaryTile(
+                    'Watched', _completedCount, FlixieColors.success),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _summaryTile(
-                'Needs reply', _needsResponseCount, FlixieColors.warning),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child:
-                _summaryTile('Watched', _completedCount, FlixieColors.success),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _makeGroupWatchPlan,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Make a Watch Plan'),
+            ),
           ),
         ],
       ),
@@ -1033,8 +1319,9 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
     required String label,
     required IconData icon,
     required Color color,
-    required VoidCallback onPressed,
+    required VoidCallback? onPressed,
     bool filled = false,
+    bool loading = false,
   }) {
     final style = filled
         ? ElevatedButton.styleFrom(
@@ -1056,20 +1343,29 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
                 const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
           );
 
-    final child = Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(icon, size: 16),
-        const SizedBox(width: 7),
-        Flexible(
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
+    final child = loading
+        ? const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Colors.black,
+            ),
+          )
+        : Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16),
+              const SizedBox(width: 7),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          );
 
     if (filled) {
       return ElevatedButton(onPressed: onPressed, style: style, child: child);
@@ -1078,6 +1374,8 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
   }
 
   Widget _responseActions(GroupWatchRequest req) {
+    final processingResponse = _processingResponses[req.id];
+    final isProcessing = processingResponse != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1097,7 +1395,9 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
                 label: 'Decline',
                 icon: Icons.cancel_outlined,
                 color: FlixieColors.danger,
-                onPressed: () => _respond(req, 'DECLINED'),
+                onPressed:
+                    isProcessing ? null : () => _respond(req, 'DECLINED'),
+                loading: processingResponse == 'DECLINED',
               ),
             ),
             const SizedBox(width: 8),
@@ -1106,7 +1406,8 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
                 label: 'Maybe',
                 icon: Icons.help_outline,
                 color: FlixieColors.warning,
-                onPressed: () => _respond(req, 'MAYBE'),
+                onPressed: isProcessing ? null : () => _respond(req, 'MAYBE'),
+                loading: processingResponse == 'MAYBE',
               ),
             ),
             const SizedBox(width: 8),
@@ -1116,8 +1417,10 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
                 label: 'Accept',
                 icon: Icons.check_circle_outline,
                 color: FlixieColors.primary,
-                onPressed: () => _respond(req, 'ACCEPTED'),
+                onPressed:
+                    isProcessing ? null : () => _respond(req, 'ACCEPTED'),
                 filled: true,
+                loading: processingResponse == 'ACCEPTED',
               ),
             ),
           ],
@@ -1130,67 +1433,123 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
     final userId = widget.currentUserId;
     final showScheduling =
         req.canScheduleFor(userId) || _canScheduleAsParticipant(req);
-    final showComplete = req.canCompleteFor(userId);
 
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        if (showScheduling)
-          SizedBox(
-            width: req.status == WatchRequestStatus.scheduled ? 150 : 170,
-            child: _responseButton(
-              label: req.status == WatchRequestStatus.scheduled
-                  ? 'Reschedule'
-                  : 'Schedule',
-              icon: Icons.edit_calendar_outlined,
-              color: FlixieColors.primary,
-              onPressed: () => _scheduleRequest(
-                req,
-                initialIso: req.scheduledFor ?? req.proposedDate,
+    final scheduledFor = DateTime.tryParse(req.scheduledFor ?? '')?.toLocal();
+    final isAfterWatchTime =
+        scheduledFor != null && !scheduledFor.isAfter(DateTime.now());
+    // The creator is an implicit participant in a group plan, but older
+    // plans do not always include an explicit accepted response for them.
+    // They should still be able to log a completed scheduled watch.
+    final canLogWatch = req.canCompleteFor(userId) ||
+        (isAfterWatchTime && req.isActive && req.canCancelFor(userId));
+    if (scheduledFor != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (isAfterWatchTime) ...[
+            const Text(
+              "After you've watched",
+              style: TextStyle(
+                color: FlixieColors.light,
+                fontSize: 17,
+                fontWeight: FontWeight.w900,
               ),
-              filled: req.status != WatchRequestStatus.scheduled,
             ),
+            const SizedBox(height: 4),
+            const Text(
+              'Log this viewing when the group has finished watching.',
+              style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: canLogWatch ? () => _logGroupWatch(req) : null,
+                icon: const Icon(Icons.check_circle_outline_rounded),
+                label: const Text('Log watch'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: FlixieColors.success,
+                  foregroundColor: Colors.black,
+                  disabledBackgroundColor: FlixieColors.success,
+                  disabledForegroundColor: Colors.black,
+                  minimumSize: const Size(0, 48),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+          ],
+          _GroupPlanDetailRow(
+            icon: Icons.event_available_outlined,
+            label: 'Scheduled',
+            value: _fullDateTime(scheduledFor),
           ),
-        if (req.status == WatchRequestStatus.scheduled && showScheduling)
-          SizedBox(
-            width: 170,
-            child: _responseButton(
-              label: 'Add to calendar',
-              icon: Icons.event_available_outlined,
-              color: FlixieColors.secondary,
-              onPressed: () {
-                final scheduledFor = DateTime.tryParse(req.scheduledFor ?? '');
-                if (scheduledFor == null) return;
-                WatchCalendarService.addScheduledWatch(
+          const SizedBox(height: 10),
+          _GroupPlanDetailRow(
+            icon: Icons.location_on_outlined,
+            label: 'Location',
+            value: req.location?.trim().isNotEmpty == true
+                ? req.location!.trim()
+                : 'Not set',
+          ),
+          const SizedBox(height: 16),
+          Row(children: [
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => WatchCalendarService.addScheduledWatch(
                   title: req.movieTitle ?? 'Watch together',
                   scheduledFor: scheduledFor,
                   note: req.message,
                   location: req.location,
-                );
-              },
+                ),
+                child: const Text('Add to calendar'),
+              ),
             ),
-          ),
-        if (req.status == WatchRequestStatus.scheduled && showScheduling)
-          SizedBox(
-            width: 150,
-            child: _responseButton(
-              label: 'Unschedule',
-              icon: Icons.event_busy_outlined,
-              color: FlixieColors.warning,
-              onPressed: () => _unscheduleRequest(req),
+            const SizedBox(width: 9),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: showScheduling
+                    ? () => _scheduleRequest(req, initialIso: req.scheduledFor)
+                    : null,
+                child: const Text('Edit plan'),
+              ),
             ),
-          ),
-        if (showComplete)
-          SizedBox(
-            width: 170,
-            child: _responseButton(
-              label: 'Mark Watched',
-              icon: Icons.check_circle_outline,
-              color: FlixieColors.success,
-              onPressed: () => _markWatched(req),
+          ]),
+          if (req.canCancelFor(userId)) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _cancelRequest(req),
+                icon: const Icon(Icons.visibility_off_outlined, size: 18),
+                label: const Text('Close watch plan'),
+              ),
             ),
+          ],
+        ],
+      );
+    }
+    if (!showScheduling) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Plan the details',
+            style: TextStyle(
+                color: FlixieColors.light,
+                fontSize: 15,
+                fontWeight: FontWeight.w800)),
+        const SizedBox(height: 5),
+        const Text('Choose a time and add a place if you have one.',
+            style: TextStyle(color: FlixieColors.medium, fontSize: 12)),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () =>
+                _scheduleRequest(req, initialIso: req.proposedDate),
+            icon: const Icon(Icons.edit_calendar_outlined),
+            label: const Text('Suggest a time'),
           ),
+        ),
       ],
     );
   }
@@ -1333,11 +1692,63 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
     return req.memberStatuses.any((s) => s.memberId == currentUserId);
   }
 
+  Widget _groupPlanStage(GroupWatchRequest req, bool isMyRequest) {
+    final needsReply = _needsCurrentUserResponse(req);
+    final isScheduled =
+        req.status == WatchRequestStatus.scheduled || req.scheduledFor != null;
+    final isCompleted = req.status == WatchRequestStatus.completed;
+    final label = isCompleted
+        ? 'WATCH PLAN · WATCHED'
+        : isScheduled
+            ? 'WATCH PLAN · UPCOMING'
+            : needsReply
+                ? 'WATCH PLAN · NEEDS REPLY'
+                : req.status == WatchRequestStatus.accepted
+                    ? 'WATCH PLAN · PLANNING'
+                    : isMyRequest
+                        ? 'WATCH PLAN · WAITING FOR REPLIES'
+                        : 'WATCH PLAN · INVITED';
+    final color = isCompleted
+        ? FlixieColors.success
+        : isScheduled
+            ? FlixieColors.secondary
+            : needsReply
+                ? FlixieColors.warning
+                : FlixieColors.primary;
+    return Row(
+      children: [
+        Icon(
+          isCompleted
+              ? Icons.check_circle_outline_rounded
+              : isScheduled
+                  ? Icons.event_available_outlined
+                  : needsReply
+                      ? Icons.mark_email_unread_outlined
+                      : Icons.movie_filter_outlined,
+          size: 16,
+          color: color,
+        ),
+        const SizedBox(width: 7),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              letterSpacing: .6,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildRequestCard(GroupWatchRequest req) {
     final currentUserId = widget.currentUserId;
     final isMyRequest = req.userId == currentUserId;
-    final canDelete = isMyRequest || widget.isAdmin;
-    final canCancelRequest = (isMyRequest || widget.isAdmin) && req.isActive;
+    final canDelete = isMyRequest;
+    final canCancelRequest = isMyRequest && req.isActive;
     final canManage = req.canScheduleFor(currentUserId) ||
         req.canCompleteFor(currentUserId) ||
         _canScheduleAsParticipant(req);
@@ -1349,6 +1760,18 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
     final proposedDate =
         _fullDateTimeString(req.scheduledFor ?? req.proposedDate);
     final isFocused = widget.initialRequestId?.isNotEmpty == true;
+
+    if (isFocused) {
+      return _buildFocusedWatchPlan(
+        req,
+        isMyRequest: isMyRequest,
+        canManage: canManage,
+        isProcessing: isProcessing,
+        myStatus: myStatus,
+        posterUrl: posterUrl,
+        proposedDate: proposedDate,
+      );
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -1371,6 +1794,10 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (isFocused) ...[
+                _groupPlanStage(req, isMyRequest),
+                const SizedBox(height: 14),
+              ],
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1385,7 +1812,7 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
                           children: [
                             Expanded(
                               child: Text(
-                                req.movieTitle ?? 'Watch Request',
+                                req.movieTitle ?? 'Watch Plan',
                                 style: const TextStyle(
                                   color: FlixieColors.light,
                                   fontWeight: FontWeight.w800,
@@ -1401,7 +1828,7 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
                                 isFocused) ...[
                               const SizedBox(width: 6),
                               PopupMenuButton<String>(
-                                tooltip: 'Request actions',
+                                tooltip: 'Watch Plan actions',
                                 enabled: !isProcessing,
                                 color: FlixieColors.surfaceElevated,
                                 onSelected: (value) {
@@ -1415,12 +1842,12 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
                                   if (canCancelRequest)
                                     const PopupMenuItem(
                                       value: 'cancel',
-                                      child: Text('Cancel request'),
+                                      child: Text('Cancel Watch Plan'),
                                     ),
                                   if (canDelete)
                                     const PopupMenuItem(
                                       value: 'delete',
-                                      child: Text('Delete request'),
+                                      child: Text('Delete Watch Plan'),
                                     ),
                                 ],
                                 icon: const Icon(
@@ -1610,6 +2037,764 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
     );
   }
 
+  Widget _buildFocusedWatchPlan(
+    GroupWatchRequest req, {
+    required bool isMyRequest,
+    required bool canManage,
+    required bool isProcessing,
+    required String? myStatus,
+    required String? posterUrl,
+    required String proposedDate,
+  }) {
+    Widget surface({required Widget child}) => Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: FlixieColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: FlixieColors.tabBarBorder),
+          ),
+          child: child,
+        );
+    // A response row is only created for invited members. The person who
+    // created the plan is therefore always a participant and is implicitly
+    // accepted, but must be rendered separately here.
+    final invitees = req.memberStatuses
+        .where((member) => member.memberId != req.userId)
+        .toList(growable: false);
+    final accepted = invitees
+        .where((member) => member.status == 'ACCEPTED')
+        .toList(growable: false);
+    final declined = invitees
+        .where((member) => member.status == 'DECLINED')
+        .toList(growable: false);
+    final needsReply = _needsCurrentUserResponse(req);
+
+    if (req.status == WatchRequestStatus.completed) {
+      return _buildCompletedWatchRecap(
+        req,
+        posterUrl: posterUrl,
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        surface(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _groupPlanStage(req, isMyRequest),
+              const SizedBox(height: 14),
+              if (req.selectedCandidateId == null)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Planning a watch together',
+                      style: TextStyle(
+                        color: FlixieColors.primary,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(children: [
+                      ProfileAvatarView(
+                        avatar: req.requesterAvatar,
+                        fallbackText:
+                            (req.requesterUsername ?? '?')[0].toUpperCase(),
+                        fallbackColor: FlixieColors.primary,
+                        size: 32,
+                      ),
+                      const SizedBox(width: 8),
+                      Text('With ${req.requesterUsername ?? 'the group'}',
+                          style: const TextStyle(
+                              color: FlixieColors.light, fontSize: 14)),
+                    ]),
+                  ],
+                )
+              else
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _poster(posterUrl),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(req.movieTitle ?? 'Watch Plan',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  color: FlixieColors.primary,
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w900)),
+                          const SizedBox(height: 10),
+                          Row(children: [
+                            ProfileAvatarView(
+                              avatar: req.requesterAvatar,
+                              fallbackText: (req.requesterUsername ?? '?')[0]
+                                  .toUpperCase(),
+                              fallbackColor: FlixieColors.primary,
+                              size: 32,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                  'With ${req.requesterUsername ?? 'the group'}',
+                                  style: const TextStyle(
+                                      color: FlixieColors.light, fontSize: 14)),
+                            ),
+                          ]),
+                          if (proposedDate.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            Text(proposedDate,
+                                style: const TextStyle(
+                                    color: FlixieColors.secondary,
+                                    fontWeight: FontWeight.w800)),
+                          ],
+                          if (isMyRequest &&
+                              req.status != WatchRequestStatus.completed) ...[
+                            const SizedBox(height: 6),
+                            TextButton.icon(
+                              onPressed: isProcessing
+                                  ? null
+                                  : () => _changeGroupFinalMovie(req),
+                              icon: const Icon(Icons.edit_outlined, size: 16),
+                              label: const Text('Change movie'),
+                              style: TextButton.styleFrom(
+                                minimumSize: const Size(0, 32),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (needsReply)
+          surface(child: _responseActions(req))
+        else if (canManage)
+          surface(child: _manageActions(req)),
+        if (needsReply || canManage) const SizedBox(height: 12),
+        if (req.status == WatchRequestStatus.completed) ...[
+          surface(
+            child: _buildCompletedWatchSummary(req),
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (req.candidates.isNotEmpty && req.selectedCandidateId == null) ...[
+          surface(child: _buildGroupMovieChoices(req, myStatus)),
+          const SizedBox(height: 12),
+        ],
+        surface(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Participants',
+                style: TextStyle(color: FlixieColors.medium, fontSize: 13)),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                Column(mainAxisSize: MainAxisSize.min, children: [
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: FlixieColors.success,
+                        width: 2.5,
+                      ),
+                    ),
+                    child: ProfileAvatarView(
+                      avatar: req.requesterAvatar,
+                      fallbackText: (req.requesterUsername?.isNotEmpty == true
+                              ? req.requesterUsername![0]
+                              : '?')
+                          .toUpperCase(),
+                      fallbackColor: FlixieColors.primary,
+                      size: 42,
+                      profileBadges: req.requesterProfileBadges,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  SizedBox(
+                    width: 62,
+                    child: Text(
+                      isMyRequest ? 'You' : req.requesterUsername ?? 'Creator',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: FlixieColors.success,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ]),
+                ...invitees.map((member) {
+                  final acceptedMember = member.status == 'ACCEPTED';
+                  final declinedMember = member.status == 'DECLINED';
+                  return Column(mainAxisSize: MainAxisSize.min, children: [
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: declinedMember
+                              ? FlixieColors.danger
+                              : acceptedMember
+                                  ? FlixieColors.success
+                                  : Colors.transparent,
+                          width: 2.5,
+                        ),
+                      ),
+                      child: ProfileAvatarView(
+                        avatar: member.avatar,
+                        fallbackText: (member.username ?? '?')[0].toUpperCase(),
+                        fallbackColor: FlixieColors.primary,
+                        size: 42,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    SizedBox(
+                      width: 62,
+                      child: Text(member.username ?? 'Member',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              color: declinedMember
+                                  ? FlixieColors.danger
+                                  : acceptedMember
+                                      ? FlixieColors.success
+                                      : FlixieColors.medium,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700)),
+                    ),
+                  ]);
+                }),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+                '${accepted.length + 1} accepted · ${invitees.length - accepted.length - declined.length} waiting${declined.isEmpty ? '' : ' · ${declined.length} declined'}',
+                style: const TextStyle(
+                    color: FlixieColors.success,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700)),
+          ]),
+        ),
+        const SizedBox(height: 12),
+        surface(child: _buildGroupPlanActivity(req)),
+      ],
+    );
+  }
+
+  Widget _buildCompletedWatchRecap(
+    GroupWatchRequest req, {
+    required String? posterUrl,
+  }) {
+    final entries = req.memberStatuses
+        .where((member) => member.watchedAt != null)
+        .toList(growable: false);
+    final ratings = entries
+        .where((member) => member.rating != null)
+        .map((member) => member.rating!)
+        .toList(growable: false);
+    final average = ratings.isEmpty
+        ? null
+        : ratings.reduce((total, rating) => total + rating) / ratings.length;
+    final recommends = ratings.where((rating) => rating >= 7).length;
+    final scheduled = _fullDateTimeString(req.scheduledFor ?? req.proposedDate);
+    GroupRequestMemberStatus? myEntry;
+    for (final entry in entries) {
+      if (entry.memberId == widget.currentUserId) {
+        myEntry = entry;
+        break;
+      }
+    }
+
+    Widget card(Widget child, {Color? color}) => Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: color ?? FlixieColors.surface,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: FlixieColors.tabBarBorder),
+          ),
+          child: child,
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        card(Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(children: [
+              Icon(Icons.check_rounded, color: FlixieColors.success, size: 22),
+              SizedBox(width: 8),
+              Text('WATCHED TOGETHER',
+                  style: TextStyle(
+                      color: FlixieColors.success,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.1)),
+            ]),
+            const SizedBox(height: 12),
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              _poster(posterUrl),
+              const SizedBox(width: 18),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(req.movieTitle ?? 'Watch Plan',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: FlixieColors.primary,
+                          fontSize: 24,
+                          height: 1.05,
+                          fontWeight: FontWeight.w800)),
+                  if (scheduled.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text(scheduled,
+                        style: const TextStyle(
+                            color: FlixieColors.light, fontSize: 16)),
+                  ],
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: FlixieColors.primary.withValues(alpha: .16),
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                    child: Text(
+                      '👥 Group watch · ${req.analyticsParticipantCount} people',
+                      style: const TextStyle(
+                          color: FlixieColors.light,
+                          fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ],
+              )),
+            ]),
+          ],
+        )),
+        const SizedBox(height: 16),
+        card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const Expanded(
+              child: Text("Your group's take",
+                  style: TextStyle(
+                      color: FlixieColors.light,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800)),
+            ),
+            Text('✓ ${recommends == entries.length ? 'YOU AGREED' : 'MIXED TAKE'}',
+                style: const TextStyle(
+                    color: FlixieColors.success, fontWeight: FontWeight.w800)),
+          ]),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(child: _recapMetric(
+                average?.toStringAsFixed(1) ?? '—', 'Average rating',
+                FlixieColors.warning)),
+            const SizedBox(width: 12),
+            Expanded(child: _recapMetric(
+                '${recommends} of ${entries.length}', 'Recommend it',
+                FlixieColors.success)),
+          ]),
+        ]), color: FlixieColors.surfaceElevated.withValues(alpha: .72)),
+        const SizedBox(height: 16),
+        Row(children: [
+          const Expanded(child: Text("Everyone's ratings",
+              style: TextStyle(color: FlixieColors.light, fontSize: 20,
+                  fontWeight: FontWeight.w800))),
+          Text('${entries.length} watches logged',
+              style: const TextStyle(color: FlixieColors.medium, fontSize: 14)),
+        ]),
+        const SizedBox(height: 14),
+        ...entries.map((member) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _recapEntry(member, isYou: member.memberId == widget.currentUserId),
+            )),
+        _buildGroupPlanActivity(req),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(child: FilledButton.icon(
+            onPressed: myEntry?.rating == null || req.mediaId == null
+                ? null
+                : () {
+                    final user = context.read<AuthProvider>().dbUser;
+                    if (user == null) return;
+                    promptShareCard(
+                      context,
+                      ShareCardData.rating(
+                        mediaType: req.mediaType?.toLowerCase() == 'show'
+                            ? ShareCardMediaType.show
+                            : ShareCardMediaType.movie,
+                        mediaId: req.mediaId!,
+                        title: req.movieTitle ?? 'Watch Plan',
+                        posterPath: req.moviePosterPath,
+                        user: user,
+                        rating: myEntry!.rating!,
+                        recommended: myEntry.rating! >= 7,
+                        note: myEntry.reviewText,
+                      ),
+                    );
+                  },
+            icon: const Icon(Icons.ios_share_rounded),
+            label: const Text('Share recap'),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, 50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          )),
+          const SizedBox(width: 12),
+          Expanded(child: OutlinedButton.icon(
+            onPressed: () => context.push('/groups/${widget.groupId}?tab=chat'),
+            icon: const Icon(Icons.forum_outlined),
+            label: const Text('Discuss in chat'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(0, 50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          )),
+        ]),
+        const SizedBox(height: 10),
+        Center(child: TextButton.icon(
+          onPressed: _makeGroupWatchPlan,
+          icon: const Icon(Icons.add_rounded),
+          label: const Text('Plan another watch'),
+        )),
+      ],
+    );
+  }
+
+  Widget _buildGroupPlanActivity(GroupWatchRequest req) {
+    final watched = req.memberStatuses.where((member) => member.watchedAt != null).length;
+    final rated = req.memberStatuses.where((member) => member.rating != null).length;
+    final participantCount = req.analyticsParticipantCount;
+    final accepted = req.acceptedCount + 1;
+    final finalised = req.selectedCandidateId != null;
+    final scheduled = (req.scheduledFor ?? req.proposedDate)?.isNotEmpty == true;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text('Plan activity', style: TextStyle(color: FlixieColors.light, fontSize: 16, fontWeight: FontWeight.w800)),
+      const SizedBox(height: 12),
+      _groupActivityRow(Icons.send_rounded, 'Invited', 'Group watch plan created', true),
+      _groupActivityRow(Icons.check_circle_outline_rounded, 'Accepted', '$accepted of $participantCount people accepted', accepted >= participantCount),
+      _groupActivityRow(Icons.bookmark_added_outlined, 'Choices saved', req.candidates.isEmpty ? 'No titles added yet' : '${req.candidates.length} titles considered', req.candidates.isNotEmpty),
+      _groupActivityRow(Icons.movie_filter_outlined, 'Movie finalised', finalised ? '${req.movieTitle ?? 'Movie'} was picked' : 'Pick a movie together', finalised),
+      _groupActivityRow(Icons.calendar_month_outlined, 'Scheduled', scheduled ? _fullDateTimeString(req.scheduledFor ?? req.proposedDate) : 'No time set yet', scheduled),
+      _groupActivityRow(Icons.visibility_outlined, 'Watched', watched > 0 ? '$watched of $participantCount watches logged' : 'Log your watch after the plan', watched > 0),
+      _groupActivityRow(Icons.star_outline_rounded, 'Rated', rated > 0 ? '$rated of $participantCount ratings saved' : 'Ratings will appear here', rated > 0, last: true),
+    ]);
+  }
+
+  Widget _groupActivityRow(IconData icon, String title, String detail, bool complete, {bool last = false}) =>
+      Padding(
+        padding: EdgeInsets.only(bottom: last ? 0 : 8),
+        child: Row(children: [
+        Icon(icon, size: 17, color: complete ? FlixieColors.success : FlixieColors.medium),
+        const SizedBox(width: 8),
+        Expanded(child: Text.rich(TextSpan(children: [
+          TextSpan(text: title, style: TextStyle(color: complete ? FlixieColors.light : FlixieColors.medium, fontSize: 13, fontWeight: FontWeight.w700)),
+          TextSpan(text: ' · $detail', style: const TextStyle(color: FlixieColors.medium, fontSize: 12)),
+        ]), maxLines: 1, overflow: TextOverflow.ellipsis)),
+      ]),
+      );
+
+  Widget _recapMetric(String value, String label, Color color) => Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: FlixieColors.background.withValues(alpha: .7),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: FlixieColors.tabBarBorder),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(value, style: TextStyle(color: color, fontSize: 26,
+              fontWeight: FontWeight.w800)),
+          const SizedBox(height: 3),
+          Text(label, style: const TextStyle(color: FlixieColors.light,
+              fontWeight: FontWeight.w700)),
+        ]),
+      );
+
+  Widget _recapEntry(GroupRequestMemberStatus member, {required bool isYou}) =>
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: FlixieColors.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: FlixieColors.tabBarBorder),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            ProfileAvatarView(
+              avatar: member.avatar,
+              fallbackText: (member.username ?? '?')[0].toUpperCase(),
+              fallbackColor: FlixieColors.primary,
+              size: 48,
+              profileBadges: member.profileBadges,
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+              Text(isYou ? 'You' : member.username ?? 'Member',
+                  style: const TextStyle(color: FlixieColors.light,
+                      fontSize: 17, fontWeight: FontWeight.w700)),
+              const Text('Logged after the plan',
+                  style: TextStyle(color: FlixieColors.medium)),
+            ])),
+            if (member.rating != null)
+              Text('★ ${member.rating}/10', style: const TextStyle(
+                  color: FlixieColors.warning, fontSize: 18,
+                  fontWeight: FontWeight.w800)),
+          ]),
+          if (member.rating != null || (member.reviewText?.isNotEmpty ?? false)) ...[
+            const SizedBox(height: 16),
+            Row(children: [
+              if (member.rating != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: FlixieColors.success),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(member.rating! >= 7 ? '👍 Recommends' : '👎 Would skip',
+                      style: const TextStyle(color: FlixieColors.success,
+                          fontWeight: FontWeight.w800)),
+                ),
+              if (member.reviewText?.isNotEmpty ?? false) ...[
+                const SizedBox(width: 12),
+                Expanded(child: Text('“${member.reviewText}”', maxLines: 2,
+                    overflow: TextOverflow.ellipsis, style: const TextStyle(
+                        color: FlixieColors.light, fontStyle: FontStyle.italic))),
+              ],
+            ]),
+          ],
+        ]),
+      );
+
+  Widget _buildCompletedWatchSummary(GroupWatchRequest req) {
+    final loggedMembers = req.memberStatuses
+        .where((member) => member.watchedAt != null)
+        .toList(growable: false);
+    final ratings = loggedMembers
+        .where((member) => member.rating != null)
+        .map((member) => member.rating!)
+        .toList(growable: false);
+    final average = ratings.isEmpty
+        ? null
+        : ratings.reduce((total, rating) => total + rating) / ratings.length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.celebration_rounded, color: FlixieColors.success),
+            SizedBox(width: 9),
+            Text(
+              'Everyone logged their watch',
+              style: TextStyle(
+                color: FlixieColors.light,
+                fontSize: 17,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 5),
+        Text(
+          '${loggedMembers.length} group members logged this viewing.',
+          style: const TextStyle(color: FlixieColors.medium, fontSize: 12),
+        ),
+        if (average != null) ...[
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              const Icon(Icons.star_rounded, color: FlixieColors.warning),
+              const SizedBox(width: 6),
+              Text(
+                '${average.toStringAsFixed(1)}/10 group rating',
+                style: const TextStyle(
+                  color: FlixieColors.light,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...loggedMembers.where((member) => member.rating != null).map(
+                (member) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    '${member.username ?? 'Member'} · ${member.rating}/10',
+                    style: const TextStyle(
+                      color: FlixieColors.medium,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildGroupMovieChoices(GroupWatchRequest request, String? myStatus) {
+    final isCreator = request.userId == widget.currentUserId;
+    final canChoose = isCreator || myStatus == 'ACCEPTED';
+    final choices = _candidateChoicesFor(request);
+    final everyoneCount = request.analyticsParticipantCount;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          isCreator ? 'Choose the final movie' : 'What could you watch?',
+          style: const TextStyle(
+            color: FlixieColors.light,
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          isCreator
+              ? 'The Watch Plan creator makes the final choice.'
+              : canChoose
+                  ? 'Choose every title you would watch. The creator makes the final choice.'
+                  : 'Accept the invitation first, then choose the movies you would watch.',
+          style: const TextStyle(color: FlixieColors.medium, fontSize: 12),
+        ),
+        const SizedBox(height: 12),
+        LayoutBuilder(
+          builder: (context, constraints) => GridView.count(
+            crossAxisCount: constraints.maxWidth >= 600 ? 2 : 1,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 8,
+            childAspectRatio: constraints.maxWidth >= 600 ? 4.2 : 4.5,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            children: request.candidates.map((candidate) {
+              final selected = choices.contains(candidate.id);
+              final poster = candidate.posterPath == null
+                  ? null
+                  : 'https://image.tmdb.org/t/p/w185${candidate.posterPath}';
+              return InkWell(
+                onTap: !canChoose
+                    ? null
+                    : isCreator
+                        ? () => _selectGroupFinalMovie(request, candidate.id)
+                        : () => setState(() {
+                              if (selected) {
+                                choices.remove(candidate.id);
+                              } else {
+                                choices.add(candidate.id);
+                              }
+                            }),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? FlixieColors.success.withValues(alpha: .1)
+                        : FlixieColors.tabBarBackgroundFocused,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: selected
+                          ? FlixieColors.success
+                          : FlixieColors.tabBarBorder,
+                      width: selected ? 2 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: SizedBox(
+                          width: 46,
+                          height: 68,
+                          child: poster == null
+                              ? const RequestPosterPlaceholder()
+                              : CachedNetworkImage(
+                                  imageUrl: poster, fit: BoxFit.cover),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(candidate.title ?? 'Movie option',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    color: FlixieColors.light,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 15)),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${candidate.selectedByUserIds.length} of $everyoneCount would watch',
+                              style: const TextStyle(
+                                  color: FlixieColors.medium, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (isCreator)
+                        const _FinalMovieChip()
+                      else if (selected)
+                        const Icon(Icons.check_circle,
+                            color: FlixieColors.success, size: 28),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(growable: false),
+          ),
+        ),
+        if (!isCreator && canChoose) ...[
+          const SizedBox(height: 4),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _processing[request.id] == true
+                  ? null
+                  : () => _saveGroupCandidateChoices(request),
+              icon: _processing[request.id] == true
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.checklist_rounded),
+              label: Text(_processing[request.id] == true
+                  ? 'Saving movies…'
+                  : 'Save movies I’d watch'),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -1700,7 +2885,7 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
                           const SizedBox(height: 12),
                           Text(
                             _searchQuery.isNotEmpty
-                                ? 'No requests match.'
+                                ? 'No Watch Plans match.'
                                 : _emptyMessage,
                             style: const TextStyle(color: FlixieColors.medium),
                             textAlign: TextAlign.center,
@@ -1710,6 +2895,7 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
                     ),
                   )
                 : ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
                     itemCount: displayed.length,
                     itemBuilder: (_, i) => _buildRequestCard(displayed[i]),
@@ -1721,10 +2907,54 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
   }
 }
 
+class _GroupPlanDetailRow extends StatelessWidget {
+  const _GroupPlanDetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: FlixieColors.secondary, size: 20),
+        const SizedBox(width: 10),
+        Expanded(
+          child: RichText(
+            text: TextSpan(
+              style: const TextStyle(fontSize: 14),
+              children: [
+                TextSpan(
+                  text: '$label: ',
+                  style: const TextStyle(
+                    color: FlixieColors.light,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                TextSpan(
+                  text: value,
+                  style: const TextStyle(color: FlixieColors.medium),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _GroupScheduleWatchSheet extends StatefulWidget {
-  const _GroupScheduleWatchSheet({this.initial});
+  const _GroupScheduleWatchSheet({this.initial, this.initialLocation});
 
   final DateTime? initial;
+  final String? initialLocation;
 
   @override
   State<_GroupScheduleWatchSheet> createState() =>
@@ -1739,6 +2969,7 @@ class _GroupScheduleWatchSheetState extends State<_GroupScheduleWatchSheet> {
   void initState() {
     super.initState();
     _selected = widget.initial ?? DateTime.now().add(const Duration(hours: 2));
+    _locationController.text = widget.initialLocation?.trim() ?? '';
   }
 
   @override
@@ -1848,11 +3079,11 @@ class _GroupScheduleWatchSheetState extends State<_GroupScheduleWatchSheet> {
   }
 
   Future<void> _pickDate() async {
-    final picked = await showDatePicker(
+    final picked = await showModalBottomSheet<DateTime>(
       context: context,
-      initialDate: _selected,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _GroupScheduleDatePickerSheet(initialDate: _selected),
     );
     if (picked == null) return;
     setState(() {
@@ -1867,9 +3098,12 @@ class _GroupScheduleWatchSheetState extends State<_GroupScheduleWatchSheet> {
   }
 
   Future<void> _pickTime() async {
-    final picked = await showTimePicker(
+    final picked = await showModalBottomSheet<TimeOfDay>(
       context: context,
-      initialTime: TimeOfDay.fromDateTime(_selected),
+      backgroundColor: Colors.transparent,
+      builder: (_) => _GroupScheduleTimePickerSheet(
+        initialTime: TimeOfDay.fromDateTime(_selected),
+      ),
     );
     if (picked == null) return;
     setState(() {
@@ -1902,6 +3136,161 @@ class _GroupScheduleWatchSheetState extends State<_GroupScheduleWatchSheet> {
   }
 }
 
+class _GroupScheduleTimePickerSheet extends StatefulWidget {
+  const _GroupScheduleTimePickerSheet({required this.initialTime});
+
+  final TimeOfDay initialTime;
+
+  @override
+  State<_GroupScheduleTimePickerSheet> createState() =>
+      _GroupScheduleTimePickerSheetState();
+}
+
+class _GroupScheduleTimePickerSheetState
+    extends State<_GroupScheduleTimePickerSheet> {
+  late TimeOfDay _selected = widget.initialTime;
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = DateTime(2020, 1, 1, _selected.hour, _selected.minute);
+    return SafeArea(
+      child: Material(
+        color: FlixieColors.background,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: FlixieColors.medium,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Choose a time',
+                  style: TextStyle(
+                      color: FlixieColors.textPrimary,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900)),
+            ),
+            SizedBox(
+              height: 170,
+              child: CupertinoTheme(
+                data: const CupertinoThemeData(
+                  brightness: Brightness.dark,
+                  primaryColor: FlixieColors.primary,
+                ),
+                child: CupertinoDatePicker(
+                  mode: CupertinoDatePickerMode.time,
+                  initialDateTime: initial,
+                  use24hFormat: false,
+                  onDateTimeChanged: (value) =>
+                      _selected = TimeOfDay.fromDateTime(value),
+                ),
+              ),
+            ),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.pop(context, _selected),
+                child: const Text('Use this time'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+class _GroupScheduleDatePickerSheet extends StatefulWidget {
+  const _GroupScheduleDatePickerSheet({required this.initialDate});
+
+  final DateTime initialDate;
+
+  @override
+  State<_GroupScheduleDatePickerSheet> createState() =>
+      _GroupScheduleDatePickerSheetState();
+}
+
+class _GroupScheduleDatePickerSheetState
+    extends State<_GroupScheduleDatePickerSheet> {
+  late DateTime _selected = DateTime(
+    widget.initialDate.year,
+    widget.initialDate.month,
+    widget.initialDate.day,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final firstDate = DateTime.now();
+    return SafeArea(
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * .74,
+        child: Material(
+          color: FlixieColors.background,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            child: Column(children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: FlixieColors.medium,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Choose a date',
+                    style: TextStyle(
+                        color: FlixieColors.textPrimary,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900)),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: CalendarDatePicker(
+                  initialDate:
+                      _selected.isBefore(firstDate) ? firstDate : _selected,
+                  firstDate: firstDate,
+                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                  onDateChanged: (date) => setState(() => _selected = date),
+                ),
+              ),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(context, _selected),
+                  child: const Text('Use this date'),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _QuickScheduleChip extends StatelessWidget {
   const _QuickScheduleChip({required this.label, required this.onTap});
 
@@ -1916,6 +3305,36 @@ class _QuickScheduleChip extends StatelessWidget {
       backgroundColor: FlixieColors.tabBarBackgroundFocused,
       labelStyle: const TextStyle(color: FlixieColors.light),
       side: BorderSide(color: FlixieColors.primary.withValues(alpha: 0.3)),
+    );
+  }
+}
+
+class _FinalMovieChip extends StatelessWidget {
+  const _FinalMovieChip();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: FlixieColors.primary,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.lock_outline, color: Colors.black, size: 15),
+          SizedBox(width: 5),
+          Text(
+            'Make final',
+            style: TextStyle(
+              color: Colors.black,
+              fontWeight: FontWeight.w800,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

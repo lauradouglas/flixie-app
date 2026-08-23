@@ -205,6 +205,9 @@ class GroupRequestMemberStatus {
   final String memberId;
   final String status;
   final String? response;
+  final String? watchedAt;
+  final int? rating;
+  final String? reviewText;
   final String? username;
   final ProfileAvatar? avatar;
   final List<String> profileBadges;
@@ -213,6 +216,9 @@ class GroupRequestMemberStatus {
     required this.memberId,
     required this.status,
     this.response,
+    this.watchedAt,
+    this.rating,
+    this.reviewText,
     this.username,
     this.avatar,
     this.profileBadges = const [],
@@ -226,6 +232,9 @@ class GroupRequestMemberStatus {
         json['status'] ?? json['decision'] ?? json['response'],
       ),
       response: json['response']?.toString(),
+      watchedAt: json['watchedAt']?.toString(),
+      rating: _intValue(json['rating']),
+      reviewText: json['reviewText']?.toString(),
       username: (responder?['username'] ?? json['username']) as String?,
       avatar: (responder?['avatar'] ?? json['avatar']) == null
           ? null
@@ -236,6 +245,47 @@ class GroupRequestMemberStatus {
                   as List<dynamic>? ??
               const [])
           .map((badge) => badge is Map ? badge['badge'] : badge)
+          .whereType<String>()
+          .toList(),
+    );
+  }
+}
+
+class GroupWatchPlanCandidate {
+  final String id;
+  final int? movieId;
+  final int? showId;
+  final String? title;
+  final String? posterPath;
+  final String? addedByUsername;
+  final List<String> selectedByUserIds;
+
+  const GroupWatchPlanCandidate({
+    required this.id,
+    this.movieId,
+    this.showId,
+    this.title,
+    this.posterPath,
+    this.addedByUsername,
+    this.selectedByUserIds = const [],
+  });
+
+  factory GroupWatchPlanCandidate.fromJson(Map<String, dynamic> json) {
+    final movie = json['movie'] as Map<String, dynamic>?;
+    final show = json['show'] as Map<String, dynamic>?;
+    final addedBy = json['addedBy'] as Map<String, dynamic>?;
+    final choices = json['choices'] as List<dynamic>? ?? const [];
+    return GroupWatchPlanCandidate(
+      id: json['id']?.toString() ?? '',
+      movieId: _intValue(json['movieId'] ?? movie?['id']),
+      showId: _intValue(json['showId'] ?? show?['id']),
+      title: (movie?['title'] ?? show?['title'])?.toString(),
+      posterPath: (movie?['posterPath'] ?? show?['posterPath'])?.toString(),
+      addedByUsername:
+          (addedBy?['username'] ?? addedBy?['firstName'])?.toString(),
+      selectedByUserIds: choices
+          .whereType<Map<String, dynamic>>()
+          .map((choice) => choice['userId']?.toString())
           .whereType<String>()
           .toList(),
     );
@@ -261,6 +311,8 @@ class GroupWatchRequest {
   final List<String> requesterProfileBadges;
   final List<GroupRequestMemberStatus> memberStatuses;
   final List<GroupRequestMessage> messages;
+  final List<GroupWatchPlanCandidate> candidates;
+  final String? selectedCandidateId;
 
   // Lifecycle fields
   final WatchRequestStatus status;
@@ -299,6 +351,8 @@ class GroupWatchRequest {
     this.requesterProfileBadges = const [],
     this.memberStatuses = const [],
     this.messages = const [],
+    this.candidates = const [],
+    this.selectedCandidateId,
     this.status = WatchRequestStatus.open,
     this.proposedDate,
     this.scheduledFor,
@@ -325,6 +379,7 @@ class GroupWatchRequest {
         json['memberStatuses'] as List<dynamic>? ??
         [];
     final messagesRaw = json['messages'] as List<dynamic>? ?? [];
+    final candidatesRaw = json['candidates'] as List<dynamic>? ?? [];
 
     // Movie and requester are nested objects in the API response
     final movie = json['movie'] as Map<String, dynamic>?;
@@ -384,6 +439,11 @@ class GroupWatchRequest {
       messages: messagesRaw
           .map((e) => GroupRequestMessage.fromJson(e as Map<String, dynamic>))
           .toList(),
+      candidates: candidatesRaw
+          .whereType<Map<String, dynamic>>()
+          .map(GroupWatchPlanCandidate.fromJson)
+          .toList(),
+      selectedCandidateId: json['selectedCandidateId']?.toString(),
       status: WatchRequestStatus.fromString(json['status'] as String?),
       proposedDate: json['proposedDate'] as String?,
       scheduledFor: json['scheduledFor'] as String?,
@@ -468,7 +528,7 @@ class GroupWatchRequest {
           _userAccepted(userId));
 
   bool canCancelFor(String userId) =>
-      canCancel ?? (isActive && userId.isNotEmpty);
+      canCancel ?? (isActive && this.userId == userId);
 
   /// A user-facing label for the current status.
   String get statusLabel => status.statusLabel;

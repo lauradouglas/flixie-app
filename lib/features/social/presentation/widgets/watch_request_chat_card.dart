@@ -37,16 +37,22 @@ class WatchRequestChatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final payload = msg.watchRequestPayload;
+    final metadata = payload?['metadata'] as Map<String, dynamic>?;
+    final isDeleted = metadata?['deleted'] == true ||
+        metadata?['status']?.toString().toLowerCase() == 'deleted';
 
     final movieTitle = cachedRequest?.movieTitle ??
         payload?['movieTitle'] as String? ??
+        metadata?['movieTitle'] as String? ??
         payload?['title'] as String? ??
         'Watch Plan';
     final posterPath = cachedRequest?.moviePosterPath ??
         payload?['moviePosterUrl'] as String? ??
+        metadata?['posterPath'] as String? ??
         payload?['posterPath'] as String?;
-    final requestMessage =
-        cachedRequest?.message ?? payload?['message'] as String?;
+    final requestMessage = cachedRequest?.message ??
+        payload?['message'] as String? ??
+        metadata?['message'] as String?;
     final requesterUsername = cachedRequest?.requesterUsername ??
         memberUsernames[msg.senderId] ??
         msg.senderUsername;
@@ -72,6 +78,38 @@ class WatchRequestChatCard extends StatelessWidget {
         ? 'https://image.tmdb.org/t/p/w185$posterPath'
         : null;
     final isMyRequest = msg.senderId == currentUserId;
+
+    if (isDeleted) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: FlixieColors.tabBarBackgroundFocused,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: FlixieColors.medium.withValues(alpha: 0.35),
+            ),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.delete_outline, color: FlixieColors.medium, size: 18),
+              SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  'This Watch Plan was deleted.',
+                  style: TextStyle(
+                    color: FlixieColors.medium,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return GestureDetector(
       onLongPress: onLongPress,
@@ -103,7 +141,7 @@ class WatchRequestChatCard extends StatelessWidget {
                         child: Text(
                           isMyRequest
                               ? 'Your Watch Plan'
-                              : '@${requesterUsername ?? 'Unknown'} wants to watch',
+                              : '@${requesterUsername ?? 'Unknown'} sent you a Watch Plan',
                           style: const TextStyle(
                               color: FlixieColors.primary,
                               fontSize: 11,
@@ -377,7 +415,7 @@ class WatchRequestChatCard extends StatelessWidget {
                       Icon(Icons.chat_bubble_outline,
                           size: 11, color: FlixieColors.medium),
                       SizedBox(width: 4),
-                      Text('View details & reply',
+                      Text('Open Watch Plan',
                           style: TextStyle(
                               color: FlixieColors.medium, fontSize: 11)),
                       Spacer(),

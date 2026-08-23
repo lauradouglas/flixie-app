@@ -21,7 +21,7 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/core/analytics/detail_source.dart';
 
-enum _ListSort { recentlyAdded, title, rating }
+enum _ListSort { recentlyAdded, title, releaseYear, rating, addedBy }
 
 class MovieListDetailScreen extends StatelessWidget {
   const MovieListDetailScreen({
@@ -87,11 +87,13 @@ class _MovieListDetailView extends StatefulWidget {
 
 class _MovieListDetailViewState extends State<_MovieListDetailView> {
   _ListSort _sort = _ListSort.recentlyAdded;
-  bool _denseGrid = false;
+  String? _addedByUserId;
   models.User? _owner;
   MovieListMembership? _membership;
 
   bool get _canEdit => _membership?.canEdit ?? widget.canEdit;
+
+  bool get _isOwner => _membership?.isOwner ?? widget.isOwner;
 
   @override
   void initState() {
@@ -266,98 +268,12 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
         .whereType<FriendshipUser>()
         .where((friend) => !existingIds.contains(friend.id))
         .toList(growable: false);
-    final searchController = TextEditingController();
-    var query = '';
     final selected = await showModalBottomSheet<FriendshipUser>(
       context: context,
       isScrollControlled: true,
       backgroundColor: FlixieColors.surfaceElevated,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) {
-          final normalized = query.trim().toLowerCase();
-          final visible = normalized.isEmpty
-              ? available
-              : available
-                  .where((friend) => [
-                        friend.username,
-                        friend.firstName ?? '',
-                        friend.lastName ?? '',
-                      ].join(' ').toLowerCase().contains(normalized))
-                  .toList(growable: false);
-          return SafeArea(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                16,
-                16,
-                MediaQuery.viewInsetsOf(context).bottom + 20,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Add a friend',
-                    style: TextStyle(
-                      color: FlixieColors.light,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: searchController,
-                    autofocus: true,
-                    onChanged: (value) => setSheetState(() => query = value),
-                    decoration: const InputDecoration(
-                      hintText: 'Search friends',
-                      prefixIcon: Icon(Icons.search_rounded),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  if (visible.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
-                      child: Center(
-                        child: Text(
-                          'No friends available to add.',
-                          style: TextStyle(color: FlixieColors.medium),
-                        ),
-                      ),
-                    )
-                  else
-                    Flexible(
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: visible.length,
-                        itemBuilder: (_, index) {
-                          final friend = visible[index];
-                          return ListTile(
-                            onTap: () => Navigator.pop(sheetContext, friend),
-                            leading: ProfileAvatarView(
-                              avatar: friend.avatar,
-                              fallbackText: friend.username.isEmpty
-                                  ? '?'
-                                  : friend.username[0].toUpperCase(),
-                              fallbackColor: FlixieColors.primary,
-                              size: 38,
-                              profileBadges: friend.profileBadges,
-                            ),
-                            title: Text('@${friend.username}'),
-                            trailing:
-                                const Icon(Icons.add_circle_outline_rounded),
-                          );
-                        },
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+      builder: (_) => _AddListMemberSheet(friends: available),
     );
-    searchController.dispose();
     if (selected == null || !mounted) return;
     try {
       await UserService.addMovieListMember(
@@ -464,7 +380,12 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
     final provider = context.watch<MovieListsProvider>();
     final rawMovies =
         provider.listMovies[widget.listId] ?? const <MovieListMovie>[];
-    final movies = _sortedMovies(rawMovies);
+    final movies = _sortedMovies(
+      rawMovies
+          .where((entry) =>
+              _addedByUserId == null || entry.addedBy?.id == _addedByUserId)
+          .toList(growable: false),
+    );
 
     return Scaffold(
       backgroundColor: FlixieColors.background,
@@ -472,6 +393,12 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
         backgroundColor: FlixieColors.background,
         foregroundColor: FlixieColors.light,
         actions: [
+          if (_canEdit)
+            IconButton(
+              tooltip: 'Add titles',
+              onPressed: _showAddMovieSheet,
+              icon: const Icon(Icons.add_rounded),
+            ),
           PopupMenuButton<String>(
             tooltip: 'List actions',
             color: FlixieColors.tabBarBackgroundFocused,
@@ -530,7 +457,8 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                       listName: widget.listName,
                       owner: _owner,
                       membership: _membership,
-                      isOwner: _canEdit,
+                      canEdit: _canEdit,
+                      isOwner: _isOwner,
                       movieCount: rawMovies.length,
                       posterUrls: _posterUrls(rawMovies),
                       onAddMovies: _showAddMovieSheet,
@@ -553,9 +481,10 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                           .where((entry) => _entryShowId(entry) > 0)
                           .length,
                       onSortChanged: (sort) => setState(() => _sort = sort),
-                      denseGrid: _denseGrid,
-                      onToggleGrid: () =>
-                          setState(() => _denseGrid = !_denseGrid),
+                      contributors: _contributorsFor(rawMovies),
+                      selectedContributorId: _addedByUserId,
+                      onContributorChanged: (id) =>
+                          setState(() => _addedByUserId = id),
                     ),
                   ),
                   if (movies.isEmpty)
@@ -563,7 +492,10 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                       hasScrollBody: false,
                       child: _EmptyListState(
                         isOwner: _canEdit,
-                        message: provider.error ?? 'No items in this list yet.',
+                        message: provider.error ??
+                            (rawMovies.isNotEmpty && _addedByUserId != null
+                                ? 'No titles added by this contributor yet.'
+                                : 'Start building this list.'),
                         onAddMovies: _showAddMovieSheet,
                       ),
                     )
@@ -571,9 +503,13 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                     SliverPadding(
                       padding: const EdgeInsets.fromLTRB(16, 6, 16, 120),
                       sliver: SliverGrid(
-                        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: _denseGrid ? 145 : 190,
-                          childAspectRatio: 0.43,
+                        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 190,
+                          // Each row deliberately reserves enough room for the
+                          // two-line contributor/date attribution. Grid tiles
+                          // share this height, so a longer attribution cannot
+                          // clip one card or make a row look uneven.
+                          childAspectRatio: 0.40,
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 18,
                         ),
@@ -583,6 +519,8 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                             return _MovieListPosterCard(
                               entry: entry,
                               canEdit: _canEdit,
+                              currentUserId:
+                                  context.read<AuthProvider>().dbUser?.id,
                               onOpen: () {
                                 final movieId = _entryMovieId(entry);
                                 if (movieId > 0) {
@@ -628,12 +566,35 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
       case _ListSort.title:
         sorted.sort((a, b) => _entryTitle(a).compareTo(_entryTitle(b)));
         break;
+      case _ListSort.releaseYear:
+        sorted.sort(
+            (a, b) => _entryReleaseYear(b).compareTo(_entryReleaseYear(a)));
+        break;
       case _ListSort.rating:
         sorted.sort(
             (a, b) => (_entryRating(b) ?? -1).compareTo(_entryRating(a) ?? -1));
         break;
+      case _ListSort.addedBy:
+        sorted.sort((a, b) =>
+            (a.addedBy?.username ?? '').compareTo(b.addedBy?.username ?? ''));
+        break;
     }
     return sorted;
+  }
+
+  List<MovieListContributor> _contributorsFor(
+    List<MovieListMovie> movies,
+  ) {
+    final contributors = <String, MovieListContributor>{};
+    for (final entry in movies) {
+      final contributor = entry.addedBy;
+      if (contributor != null && contributor.id.isNotEmpty) {
+        contributors[contributor.id] = contributor;
+      }
+    }
+    final result = contributors.values.toList()
+      ..sort((a, b) => a.username.compareTo(b.username));
+    return result;
   }
 
   List<String> _posterUrls(List<MovieListMovie> movies) {
@@ -658,7 +619,12 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Remove from list?'),
-        content: Text('Remove $title from ${widget.listName}?'),
+        content: Text(
+          entry.addedBy != null &&
+                  entry.addedBy!.id != context.read<AuthProvider>().dbUser?.id
+              ? 'Remove $title, added by @${entry.addedBy!.username}, from ${widget.listName}?'
+              : 'Remove $title from ${widget.listName}?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
@@ -688,6 +654,109 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
           ok
               ? 'Removed from list'
               : (provider.error ?? 'Unable to remove movie'),
+        ),
+      ),
+    );
+  }
+}
+
+class _AddListMemberSheet extends StatefulWidget {
+  const _AddListMemberSheet({required this.friends});
+
+  final List<FriendshipUser> friends;
+
+  @override
+  State<_AddListMemberSheet> createState() => _AddListMemberSheetState();
+}
+
+class _AddListMemberSheetState extends State<_AddListMemberSheet> {
+  final _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final query = _query.trim().toLowerCase();
+    final visible = query.isEmpty
+        ? widget.friends
+        : widget.friends
+            .where((friend) => [
+                  friend.username,
+                  friend.firstName ?? '',
+                  friend.lastName ?? '',
+                ].join(' ').toLowerCase().contains(query))
+            .toList(growable: false);
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          16,
+          16,
+          MediaQuery.viewInsetsOf(context).bottom + 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Add a friend',
+              style: TextStyle(
+                color: FlixieColors.light,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _searchController,
+              autofocus: true,
+              onChanged: (value) => setState(() => _query = value),
+              decoration: const InputDecoration(
+                hintText: 'Search friends',
+                prefixIcon: Icon(Icons.search_rounded),
+              ),
+            ),
+            const SizedBox(height: 10),
+            if (visible.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: Text(
+                    'No friends available to add.',
+                    style: TextStyle(color: FlixieColors.medium),
+                  ),
+                ),
+              )
+            else
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: visible.length,
+                  itemBuilder: (_, index) {
+                    final friend = visible[index];
+                    return ListTile(
+                      onTap: () => Navigator.pop(context, friend),
+                      leading: ProfileAvatarView(
+                        avatar: friend.avatar,
+                        fallbackText: friend.username.isEmpty
+                            ? '?'
+                            : friend.username[0].toUpperCase(),
+                        fallbackColor: FlixieColors.primary,
+                        size: 38,
+                        profileBadges: friend.profileBadges,
+                      ),
+                      title: Text('@${friend.username}'),
+                      trailing: const Icon(Icons.add_circle_outline_rounded),
+                    );
+                  },
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -1066,8 +1135,12 @@ class _ListMembersStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (membership.members.length <= 1) return const SizedBox.shrink();
     final preview = membership.members.take(5).toList(growable: false);
+    final contributorCount = membership.scope == ListScope.group
+        ? membership.members.length
+        : (membership.members.length - 1).clamp(0, membership.members.length);
+    final everyoneCanAdd = membership.scope == ListScope.group ||
+        membership.whoCanAddItems.toLowerCase() == 'everyone';
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: InkWell(
@@ -1125,19 +1198,20 @@ class _ListMembersStrip extends StatelessWidget {
                     Text(
                       membership.scope == 'GROUP'
                           ? '${membership.groupName ?? 'Group'} · ${membership.members.length} members'
-                          : '${membership.members.length} collaborators',
+                          : contributorCount == 0
+                              ? 'Only you can edit this list'
+                              : '$contributorCount contributor${contributorCount == 1 ? '' : 's'}',
                       style: const TextStyle(
                         color: FlixieColors.light,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                     Text(
-                      membership.scope != ListScope.group &&
-                              membership.whoCanAddItems == 'owner'
-                          ? 'Only the owner can add'
-                          : membership.scope == ListScope.group
-                              ? 'Every group member can add'
-                              : 'Everyone can add',
+                      everyoneCanAdd
+                          ? membership.scope == ListScope.group
+                              ? 'Every group member can add titles'
+                              : 'Everyone can add titles'
+                          : 'Only the owner can edit this list',
                       style: const TextStyle(
                         color: FlixieColors.medium,
                         fontSize: 11,
@@ -1163,6 +1237,7 @@ class _ListHeader extends StatelessWidget {
     required this.listName,
     required this.owner,
     required this.membership,
+    required this.canEdit,
     required this.isOwner,
     required this.movieCount,
     required this.posterUrls,
@@ -1172,6 +1247,7 @@ class _ListHeader extends StatelessWidget {
   final String listName;
   final models.User? owner;
   final MovieListMembership? membership;
+  final bool canEdit;
   final bool isOwner;
   final int movieCount;
   final List<String> posterUrls;
@@ -1295,8 +1371,8 @@ class _ListHeader extends StatelessWidget {
                             Flexible(
                               child: Text(
                                 owner == null
-                                    ? 'Loading profile…'
-                                    : '@${owner!.username} · ${_visibilityLabel(membership?.visibility)}',
+                                    ? 'Loading owner…'
+                                    : 'Created by @${owner!.username} · ${_visibilityLabel(membership?.visibility)}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
@@ -1306,12 +1382,24 @@ class _ListHeader extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            if (owner != null) ...[
-                              const SizedBox(width: 4),
-                              const Icon(
-                                Icons.chevron_right_rounded,
-                                color: FlixieColors.medium,
-                                size: 18,
+                            if (isOwner) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: FlixieColors.primary
+                                      .withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Text(
+                                  'Owner',
+                                  style: TextStyle(
+                                    color: FlixieColors.primary,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
                               ),
                             ],
                           ],
@@ -1376,7 +1464,7 @@ class _ListHeader extends StatelessWidget {
                     ),
                   ],
                 ),
-                if (isOwner) ...[
+                if (canEdit) ...[
                   const SizedBox(height: 9),
                   FilledButton.icon(
                     onPressed: onAddMovies,
@@ -1466,16 +1554,18 @@ class _SortToolbar extends StatelessWidget {
     required this.movieCount,
     required this.showCount,
     required this.onSortChanged,
-    required this.denseGrid,
-    required this.onToggleGrid,
+    required this.contributors,
+    required this.selectedContributorId,
+    required this.onContributorChanged,
   });
 
   final _ListSort sort;
   final int movieCount;
   final int showCount;
   final ValueChanged<_ListSort> onSortChanged;
-  final bool denseGrid;
-  final VoidCallback onToggleGrid;
+  final List<MovieListContributor> contributors;
+  final String? selectedContributorId;
+  final ValueChanged<String?> onContributorChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1483,14 +1573,24 @@ class _SortToolbar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Row(
         children: [
-          Text(
-            _mediaCountLabel(movieCount, showCount),
-            style: const TextStyle(
-              color: FlixieColors.medium,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
+          if (sort == _ListSort.recentlyAdded)
+            const Text(
+              'Recently added',
+              style: TextStyle(
+                color: FlixieColors.light,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+              ),
+            )
+          else
+            Text(
+              _mediaCountLabel(movieCount, showCount),
+              style: const TextStyle(
+                color: FlixieColors.medium,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
           const Spacer(),
           PopupMenuButton<_ListSort>(
             tooltip: 'Sort list',
@@ -1507,8 +1607,16 @@ class _SortToolbar extends StatelessWidget {
                 child: Text('Title'),
               ),
               PopupMenuItem(
+                value: _ListSort.releaseYear,
+                child: Text('Release year'),
+              ),
+              PopupMenuItem(
                 value: _ListSort.rating,
                 child: Text('Rating'),
+              ),
+              PopupMenuItem(
+                value: _ListSort.addedBy,
+                child: Text('Added by'),
               ),
             ],
             child: Container(
@@ -1531,15 +1639,83 @@ class _SortToolbar extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          IconButton.outlined(
-            tooltip: denseGrid ? 'Larger cards' : 'Compact grid',
-            onPressed: onToggleGrid,
-            icon: Icon(denseGrid
-                ? Icons.view_module_outlined
-                : Icons.grid_view_rounded),
-            color: FlixieColors.primary,
-          ),
+          if (contributors.isNotEmpty) ...[
+            const SizedBox(width: 8),
+            PopupMenuButton<String>(
+              tooltip: 'Filter by contributor',
+              color: FlixieColors.tabBarBackgroundFocused,
+              onSelected: (value) =>
+                  onContributorChanged(value == '__all__' ? null : value),
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: '__all__',
+                  child: Row(
+                    children: [
+                      Icon(
+                        selectedContributorId == null
+                            ? Icons.check_rounded
+                            : Icons.people_outline_rounded,
+                        color: FlixieColors.primary,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 9),
+                      const Text('Anyone who added titles'),
+                    ],
+                  ),
+                ),
+                const PopupMenuDivider(),
+                ...contributors.map(
+                  (contributor) => PopupMenuItem(
+                    value: contributor.id,
+                    child: Row(
+                      children: [
+                        ProfileAvatarView(
+                          avatar: contributor.avatar,
+                          fallbackText: contributor.username.isEmpty
+                              ? '?'
+                              : contributor.username[0].toUpperCase(),
+                          fallbackColor: FlixieColors.primary,
+                          size: 24,
+                          profileBadges: contributor.profileBadges,
+                        ),
+                        const SizedBox(width: 9),
+                        Expanded(
+                          child: Text(
+                            contributor.id == selectedContributorId
+                                ? '@${contributor.username}  ✓'
+                                : '@${contributor.username}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+              child: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: selectedContributorId == null
+                      ? FlixieColors.tabBarBackgroundFocused
+                      : FlixieColors.primary.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: selectedContributorId == null
+                        ? Colors.white.withValues(alpha: 0.1)
+                        : FlixieColors.primary,
+                  ),
+                ),
+                child: Icon(
+                  Icons.filter_list_rounded,
+                  color: selectedContributorId == null
+                      ? FlixieColors.primary
+                      : FlixieColors.light,
+                  size: 20,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1550,12 +1726,14 @@ class _MovieListPosterCard extends StatelessWidget {
   const _MovieListPosterCard({
     required this.entry,
     required this.canEdit,
+    required this.currentUserId,
     required this.onOpen,
     required this.onRemove,
   });
 
   final MovieListMovie entry;
   final bool canEdit;
+  final String? currentUserId;
   final VoidCallback onOpen;
   final VoidCallback onRemove;
 
@@ -1570,6 +1748,7 @@ class _MovieListPosterCard extends StatelessWidget {
         : null;
     final year = _extractYear(movie?.releaseDate ?? show?.firstAirDate);
     final rating = _entryRating(entry);
+    final isRecent = _isRecentAddition(entry.createdAt);
 
     return Material(
       color: FlixieColors.tabBarBackgroundFocused,
@@ -1704,6 +1883,27 @@ class _MovieListPosterCard extends StatelessWidget {
                         ),
                       ),
                     ),
+                  if (isRecent)
+                    Positioned(
+                      left: 7,
+                      top: 7,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: FlixieColors.primary,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'New',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -1758,27 +1958,43 @@ class _MovieListPosterCard extends StatelessWidget {
                   ),
                   if (entry.addedBy != null) ...[
                     const SizedBox(height: 8),
-                    Row(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        ProfileAvatarView(
-                          avatar: entry.addedBy!.avatar,
-                          fallbackText: entry.addedBy!.username.isEmpty
-                              ? '?'
-                              : entry.addedBy!.username[0].toUpperCase(),
-                          fallbackColor: FlixieColors.primary,
-                          size: 20,
-                          profileBadges: entry.addedBy!.profileBadges,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            '${_addedDateLabel(entry.createdAt)} · @${entry.addedBy!.username}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: FlixieColors.medium,
-                              fontSize: 10.5,
+                        Row(
+                          children: [
+                            ProfileAvatarView(
+                              avatar: entry.addedBy!.avatar,
+                              fallbackText: entry.addedBy!.username.isEmpty
+                                  ? '?'
+                                  : entry.addedBy!.username[0].toUpperCase(),
+                              fallbackColor: FlixieColors.primary,
+                              size: 20,
+                              profileBadges: entry.addedBy!.profileBadges,
                             ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                _addedByUsername(entry, currentUserId),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: FlixieColors.light,
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _addedDateLabel(entry.createdAt),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: FlixieColors.medium,
+                            fontSize: 10,
                           ),
                         ),
                       ],
@@ -1829,7 +2045,7 @@ class _EmptyListState extends StatelessWidget {
               ElevatedButton.icon(
                 onPressed: onAddMovies,
                 icon: const Icon(Icons.search_rounded),
-                label: const Text('Find movies'),
+                label: const Text('Add titles'),
               ),
             ],
           ],
@@ -1847,12 +2063,31 @@ int _entryShowId(MovieListMovie entry) {
   return entry.showId != 0 ? entry.showId : entry.show?.id ?? 0;
 }
 
+int _entryReleaseYear(MovieListMovie entry) =>
+    int.tryParse(
+        _extractYear(entry.movie?.releaseDate ?? entry.show?.firstAirDate) ??
+            '') ??
+    0;
+
 String _entryTitle(MovieListMovie entry) {
   return entry.movie?.title ?? entry.show?.name ?? 'Unknown title';
 }
 
 double? _entryRating(MovieListMovie entry) {
   return entry.movie?.voteAverage ?? entry.show?.voteAverage;
+}
+
+String _addedByUsername(MovieListMovie entry, String? currentUserId) {
+  final byYou = entry.addedBy?.id.isNotEmpty == true &&
+      entry.addedBy!.id == currentUserId;
+  return byYou ? '@you' : '@${entry.addedBy?.username ?? 'someone'}';
+}
+
+bool _isRecentAddition(String? value) {
+  final addedAt = value == null ? null : DateTime.tryParse(value);
+  if (addedAt == null) return false;
+  return DateTime.now().difference(addedAt.toLocal()) <=
+      const Duration(hours: 48);
 }
 
 String _mediaCountLabel(int movieCount, int showCount) {
@@ -1877,7 +2112,9 @@ String _sortLabel(_ListSort sort) {
   return switch (sort) {
     _ListSort.recentlyAdded => 'Recently added',
     _ListSort.title => 'Title',
+    _ListSort.releaseYear => 'Release year',
     _ListSort.rating => 'Rating',
+    _ListSort.addedBy => 'Added by',
   };
 }
 
@@ -1902,6 +2139,13 @@ String _addedDateLabel(String? value) {
   final days = DateTime.now().difference(date).inDays;
   if (days <= 0) return 'Added today';
   if (days == 1) return 'Added yesterday';
-  if (days < 7) return 'Added ${days}d ago';
-  return 'Added ${date.day}/${date.month}/${date.year}';
+  if (days < 7) return 'Added $days days ago';
+  if (days < 14) return 'Added last week';
+  if (days < 30) {
+    final weeks = days ~/ 7;
+    return 'Added $weeks weeks ago';
+  }
+  if (days < 60) return 'Added last month';
+  final months = days ~/ 30;
+  return 'Added $months months ago';
 }

@@ -15,7 +15,7 @@ void main() {
       iconColorId: 1,
       completedSetup: true,
       darkMode: true,
-      favoriteMovies: const [
+      favoriteMovies: [
         FavoriteMovie(
           id: 'favourite-1',
           userId: 'user-1',

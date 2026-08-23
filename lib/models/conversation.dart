@@ -63,6 +63,7 @@ class ChatMessage {
       type: type,
       watchRequestId: (data['watchRequestId'] ??
           (data['metadata'] as Map<String, dynamic>?)?['watchRequestId'] ??
+          (data['metadata'] as Map<String, dynamic>?)?['requestId'] ??
           (data['watchRequest'] as Map<String, dynamic>?)?['id'] ??
           data['pgGroupRequestId'] ??
           data['requestId']) as String?,

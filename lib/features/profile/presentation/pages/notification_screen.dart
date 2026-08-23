@@ -54,17 +54,56 @@ class _NotificationScreenState extends State<NotificationScreen> {
   Future<void> _closeNotification(FlixieNotification notification) async {
     final id = notification.id;
     if (id == null) return;
+    final watchPlanId = notification.linkedRequestId;
+    final isWatchPlan =
+        notification.type == FlixieNotification.movieWatchRequest ||
+            notification.type == FlixieNotification.showWatchRequest;
+
+    // Remove this card before waiting on the network. A poll or pull-to-
+    // refresh can otherwise rebuild the list with an older response while a
+    // Dismissible is still completing its animation, which makes the user
+    // have to swipe the same card again.
+    if (mounted) {
+      setState(() {
+        _dismissingIds.add(id);
+        if (isWatchPlan && watchPlanId != null) {
+          final matchingIds = _notifications
+              .where((item) =>
+                  (item.type == FlixieNotification.movieWatchRequest ||
+                      item.type == FlixieNotification.showWatchRequest) &&
+                  item.linkedRequestId == watchPlanId)
+              .map((item) => item.id)
+              .whereType<String>();
+          _dismissingIds.addAll(matchingIds);
+          _notifications.removeWhere((item) =>
+              (item.type == FlixieNotification.movieWatchRequest ||
+                  item.type == FlixieNotification.showWatchRequest) &&
+              item.linkedRequestId == watchPlanId);
+        } else {
+          _notifications.removeWhere((n) => n.id == id);
+        }
+      });
+      if (isWatchPlan && watchPlanId != null) {
+        context
+            .read<AuthProvider>()
+            .removeCachedWatchPlanNotifications(watchPlanId);
+      } else {
+        context.read<AuthProvider>().removeCachedNotification(id);
+      }
+    }
     try {
       await NotificationService.deleteNotification(id);
       if (mounted) {
-        setState(() {
-          _notifications.removeWhere((n) => n.id == id);
-        });
-        context.read<AuthProvider>().updateCachedNotifications(_notifications);
+        // Keep the just-dismissed id hidden until the server confirms a
+        // refreshed list that no longer contains it.
+        await _load();
       }
     } catch (e) {
       logger.e('[NotificationScreen] close error: $e');
       if (mounted) {
+        setState(() => _dismissingIds.remove(id));
+        await _load();
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Failed to dismiss notification.'),
@@ -76,6 +115,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
   }
 
   List<FlixieNotification> _notifications = [];
+  final Set<String> _dismissingIds = <String>{};
   bool _isLoading = true;
   String? _error;
   _NotificationFilter _filter = _NotificationFilter.all;
@@ -127,7 +167,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
     if (userId == null) return;
     try {
       final fresh = await NotificationService.getNotifications(userId);
-      final visible = visibleNotificationsForUser(fresh, userId);
+      final visible = visibleNotificationsForUser(fresh, userId)
+          .where((notification) =>
+              notification.id == null ||
+              !_dismissingIds.contains(notification.id))
+          .toList();
       if (mounted) {
         setState(() {
           _notifications = visible;
@@ -154,7 +198,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
     }
     try {
       final notifications = await NotificationService.getNotifications(userId);
-      final visible = visibleNotificationsForUser(notifications, userId);
+      final visible = visibleNotificationsForUser(notifications, userId)
+          .where((notification) =>
+              notification.id == null ||
+              !_dismissingIds.contains(notification.id))
+          .toList();
       if (mounted) {
         setState(() {
           _notifications = visible;
@@ -423,29 +471,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
     }
   }
 
-  Future<void> _markAllAsRead(List<FlixieNotification> unread) async {
-    if (unread.isEmpty) return;
-    try {
-      await Future.wait(
-        unread.where((n) => n.id != null).map(
-              (n) => NotificationService.updateNotification(
-                n.id!,
-                read: true,
-              ),
-            ),
-      );
-      await _load();
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to mark all as read.'),
-          backgroundColor: FlixieColors.danger,
-        ),
-      );
-    }
-  }
-
   // ---- Filter helpers -------------------------------------------------------
 
   bool _isRequestType(FlixieNotification n) => n.isRequest;
@@ -453,44 +478,50 @@ class _NotificationScreenState extends State<NotificationScreen> {
   bool _isActivityType(FlixieNotification n) =>
       !n.isRequest && n.type != 'ALERT';
 
+  /// One source of truth for both cards and section headings. This protects
+  /// the headings from a stale refresh during a dismiss animation.
+  List<FlixieNotification> get _visibleNotifications => _notifications
+      .where((notification) =>
+          notification.id == null || !_dismissingIds.contains(notification.id))
+      .toList(growable: false);
+
   List<FlixieNotification> get _filtered {
     switch (_filter) {
       case _NotificationFilter.all:
-        return _notifications;
+        return _visibleNotifications;
       case _NotificationFilter.requests:
-        return _notifications.where(_isRequestType).toList();
+        return _visibleNotifications.where(_isRequestType).toList();
       case _NotificationFilter.activity:
-        return _notifications.where(_isActivityType).toList();
+        return _visibleNotifications.where(_isActivityType).toList();
     }
   }
 
   // ---- Sections for "All" view ----------------------------------------------
 
   /// Pending requests that still need a response.
-  List<FlixieNotification> get _pendingRequests =>
-      _notifications.where((n) => _isRequestType(n) && n.isPending).toList();
+  List<FlixieNotification> get _pendingRequests => _visibleNotifications
+      .where((n) => _isRequestType(n) && n.isPending)
+      .toList();
 
   /// Unread non-request notifications.
-  List<FlixieNotification> get _newNotifications =>
-      _notifications.where((n) => !_isRequestType(n) && !n.isRead).toList();
+  List<FlixieNotification> get _newNotifications => _visibleNotifications
+      .where((n) => !_isRequestType(n) && !n.isRead)
+      .toList();
 
   /// Read non-request notifications + resolved requests.
-  List<FlixieNotification> get _earlierNotifications => _notifications
+  List<FlixieNotification> get _earlierNotifications => _visibleNotifications
       .where((n) =>
           (!_isRequestType(n) && n.isRead) ||
           (_isRequestType(n) && !n.isPending))
       .toList();
 
-  List<FlixieNotification> get _unreadNotifications =>
-      _notifications.where((n) => !n.isRead).toList();
-
   int _countForFilter(_NotificationFilter filter) {
     return switch (filter) {
-      _NotificationFilter.all => _notifications.length,
+      _NotificationFilter.all => _visibleNotifications.length,
       _NotificationFilter.requests =>
-        _notifications.where(_isRequestType).length,
+        _visibleNotifications.where(_isRequestType).length,
       _NotificationFilter.activity =>
-        _notifications.where(_isActivityType).length,
+        _visibleNotifications.where(_isActivityType).length,
     };
   }
 
@@ -541,14 +572,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        actions: [
-          if (_unreadNotifications.isNotEmpty)
-            IconButton(
-              tooltip: 'Mark all as read',
-              onPressed: () => _markAllAsRead(_unreadNotifications),
-              icon: const Icon(Icons.done_all_rounded),
-            ),
-        ],
       ),
       body: RefreshIndicator(
         onRefresh: () => _load(),
@@ -647,14 +670,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
     if (items.isEmpty) {
       return _buildEmptyState();
     }
-    final unreadItems = items.where((n) => !n.isRead).toList();
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
       children: [
-        if (unreadItems.isNotEmpty) ...[
-          _buildInlineUnreadAction(unreadItems),
-          const SizedBox(height: 12),
-        ],
         ..._buildGroupedByDate(items),
       ],
     );
@@ -668,8 +686,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
     if (pending.isEmpty && newItems.isEmpty && earlier.isEmpty) {
       return _buildEmptyState();
     }
-    final unreadItems =
-        [...pending, ...newItems, ...earlier].where((n) => !n.isRead).toList();
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
@@ -684,10 +700,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 child: _buildCard(n),
               )),
           const SizedBox(height: 16),
-        ],
-        if (unreadItems.isNotEmpty) ...[
-          _buildInlineUnreadAction(unreadItems),
-          const SizedBox(height: 14),
         ],
         if (newItems.isNotEmpty) ...[
           _buildSectionHeader('NEW ACTIVITY'),
@@ -725,21 +737,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildInlineUnreadAction(List<FlixieNotification> unread) {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: TextButton.icon(
-        onPressed: () => _markAllAsRead(unread),
-        icon: const Icon(Icons.done_all_rounded, size: 17),
-        label: Text('Mark ${unread.length} read'),
-        style: TextButton.styleFrom(
-          foregroundColor: FlixieColors.primary,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        ),
       ),
     );
   }
@@ -838,6 +835,27 @@ class _NotificationScreenState extends State<NotificationScreen> {
   }
 
   Widget _buildCard(FlixieNotification notification) {
+    final id = notification.id;
+    final card = _buildNotificationCard(notification);
+    if (id == null) return card;
+    return Dismissible(
+      key: ValueKey('notification-$id'),
+      direction: DismissDirection.endToStart,
+      onDismissed: (_) => _closeNotification(notification),
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 22),
+        decoration: BoxDecoration(
+          color: FlixieColors.danger,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Icon(Icons.close_rounded, color: Colors.white),
+      ),
+      child: card,
+    );
+  }
+
+  Widget _buildNotificationCard(FlixieNotification notification) {
     final currentUserId = context.read<AuthProvider>().dbUser?.id;
     if (notification.isRequest) {
       return NotificationRequestCard(

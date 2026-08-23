@@ -92,6 +92,51 @@ class RequestService {
     return getWatchRequestState(watchRequestId: watchRequestId, userId: userId);
   }
 
+  static Future<WatchRequestState> addWatchPlanCandidate({
+    required String watchRequestId,
+    required String userId,
+    int? movieId,
+    int? showId,
+  }) async {
+    await ApiClient.post('/watch-requests/$watchRequestId/candidates', body: {
+      'userId': userId,
+      if (movieId != null) 'movieId': movieId,
+      if (showId != null) 'showId': showId,
+    });
+    return getWatchRequestState(watchRequestId: watchRequestId, userId: userId);
+  }
+
+  static Future<WatchRequestState> submitWatchPlanChoices({
+    required String watchRequestId,
+    required String userId,
+    required List<String> candidateIds,
+  }) async {
+    await ApiClient.put('/watch-requests/$watchRequestId/candidate-choices',
+        body: {'userId': userId, 'candidateIds': candidateIds});
+    return getWatchRequestState(watchRequestId: watchRequestId, userId: userId);
+  }
+
+  static Future<WatchRequestState> selectWatchPlanCandidate({
+    required String watchRequestId,
+    required String userId,
+    required String candidateId,
+  }) async {
+    await ApiClient.post('/watch-requests/$watchRequestId/select-candidate',
+        body: {'userId': userId, 'candidateId': candidateId});
+    return getWatchRequestState(watchRequestId: watchRequestId, userId: userId);
+  }
+
+  static Future<WatchRequestState> reopenWatchPlanMovieChoices({
+    required String watchRequestId,
+    required String userId,
+  }) async {
+    await ApiClient.post(
+      '/watch-requests/$watchRequestId/reopen-candidate-selection',
+      body: {'userId': userId},
+    );
+    return getWatchRequestState(watchRequestId: watchRequestId, userId: userId);
+  }
+
   static Future<WatchRequest> scheduleWatchRequest({
     required String watchRequestId,
     required String userId,
@@ -155,26 +200,19 @@ class RequestService {
   }
 
   static Future<List<WatchRequest>> getWatchRequests(String userId) async {
-    final results = await Future.wait([
-      _getWatchRequestsOfType(userId, 'MOVIE_WATCH_REQUEST'),
-      _getWatchRequestsOfType(userId, 'SHOW_WATCH_REQUEST'),
-    ]);
-    return [...results[0], ...results[1]];
-  }
-
-  static Future<List<WatchRequest>> _getWatchRequestsOfType(
-    String userId,
-    String type,
-  ) async {
     dynamic data;
     try {
-      data = await ApiClient.get('/requests/$userId/type/$type');
+      // Fetch both sides of every request in one call. In particular, a plan
+      // the current person just sent is still PENDING, but must be visible in
+      // their Planning section straight away.
+      data = await ApiClient.get('/requests/$userId/all');
     } on ApiException catch (e) {
       if (e.statusCode == 404) return [];
       rethrow;
     }
     return (data as List<dynamic>)
         .map((e) => WatchRequest.fromJson(e as Map<String, dynamic>))
+        .where((request) => request.isWatchRequest)
         .toList();
   }
 }

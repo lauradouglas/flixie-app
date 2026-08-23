@@ -115,6 +115,7 @@ class AuthProvider extends ChangeNotifier {
   List<MovieShort>? _cachedNowPlaying;
   List<MovieList>? _cachedMovieLists;
   List<FlixieNotification>? _cachedNotifications;
+  final Set<String> _dismissedNotificationIds = <String>{};
   List<WatchRequest>? _cachedWatchRequests;
   bool _isPrefetching = false;
   final Map<int, List<WatchProvider>> _cachedWatchProvidersByMovieId = {};
@@ -189,9 +190,38 @@ class AuthProvider extends ChangeNotifier {
     final visible = userId == null
         ? List<FlixieNotification>.of(notifications)
         : visibleNotificationsForUser(notifications, userId);
-    _cachedNotifications = List.unmodifiable(visible);
-    _syncUnreadNotificationCount(visible.where((item) => !item.isRead).length);
+    final active = visible
+        .where((item) =>
+            item.id == null || !_dismissedNotificationIds.contains(item.id))
+        .toList(growable: false);
+    _cachedNotifications = List.unmodifiable(active);
+    _syncUnreadNotificationCount(active.where((item) => !item.isRead).length);
     notifyListeners();
+  }
+
+  /// Prevents an in-flight prefetch from restoring a card the user has just
+  /// dismissed. The server remains the durable source of truth; this only
+  /// protects the current app session from stale responses.
+  void removeCachedNotification(String notificationId) {
+    _dismissedNotificationIds.add(notificationId);
+    updateCachedNotifications(_cachedNotifications ?? const []);
+  }
+
+  /// Dismisses every notification card belonging to a direct Watch Plan.
+  /// Watch Plans deliberately have a small lifecycle feed, not independent
+  /// alerts, so an older status must not surface after the latest is closed.
+  void removeCachedWatchPlanNotifications(String requestId) {
+    for (final notification
+        in _cachedNotifications ?? const <FlixieNotification>[]) {
+      final isWatchPlan =
+          notification.type == FlixieNotification.movieWatchRequest ||
+              notification.type == FlixieNotification.showWatchRequest;
+      if (isWatchPlan && notification.linkedRequestId == requestId) {
+        final id = notification.id;
+        if (id != null) _dismissedNotificationIds.add(id);
+      }
+    }
+    updateCachedNotifications(_cachedNotifications ?? const []);
   }
 
   void updateCachedWatchRequests(List<WatchRequest> requests) {
@@ -372,6 +402,7 @@ class AuthProvider extends ChangeNotifier {
       _cachedNowPlaying = null;
       _cachedMovieLists = null;
       _cachedNotifications = null;
+      _dismissedNotificationIds.clear();
       _cachedWatchRequests = null;
       _cachedWatchProvidersByMovieId.clear();
       _cachedUserWatchProviderIds = null;
@@ -482,10 +513,18 @@ class AuthProvider extends ChangeNotifier {
     _cachedTrending = snapshot.trending ?? _cachedTrending;
     _cachedNowPlaying = snapshot.nowPlaying ?? _cachedNowPlaying;
     _cachedMovieLists = snapshot.movieLists ?? _cachedMovieLists;
-    _cachedNotifications = snapshot.notifications ?? _cachedNotifications;
+    if (snapshot.notifications != null) {
+      final notifications = snapshot.notifications!
+          .where((item) =>
+              item.id == null || !_dismissedNotificationIds.contains(item.id))
+          .toList(growable: false);
+      _cachedNotifications = List.unmodifiable(notifications);
+    }
     _cachedWatchRequests = snapshot.watchRequests ?? _cachedWatchRequests;
     _syncUnreadNotificationCount(
-      snapshot.unreadNotificationCount ?? _unreadNotificationCount,
+      _cachedNotifications?.where((item) => !item.isRead).length ??
+          snapshot.unreadNotificationCount ??
+          _unreadNotificationCount,
     );
     if (snapshot.watchProvidersByMovieId != null) {
       _cachedWatchProvidersByMovieId.addAll(snapshot.watchProvidersByMovieId!);

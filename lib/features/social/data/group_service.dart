@@ -167,6 +167,7 @@ class GroupService {
     String message,
     String mediaType,
     int mediaId, {
+    List<int>? candidateMovieIds,
     String? proposedDate,
     String? location,
   }) async {
@@ -177,6 +178,8 @@ class GroupService {
         'message': message,
         'mediaType': mediaType,
         'mediaId': mediaId,
+        if (candidateMovieIds != null && candidateMovieIds.isNotEmpty)
+          'candidateMovieIds': candidateMovieIds,
         if (proposedDate != null) 'proposedDate': proposedDate,
         if (location != null && location.isNotEmpty) 'location': location,
       },
@@ -198,6 +201,44 @@ class GroupService {
       '/groups/request/$requestId/response',
       body: {'memberId': memberId, 'response': response, 'status': status},
     );
+  }
+
+  /// Save the movies this member would watch in a group Watch Plan.
+  static Future<GroupWatchRequest> saveWatchPlanChoices(
+    String requestId,
+    String userId,
+    List<String> candidateIds,
+  ) async {
+    final data = await ApiClient.put(
+      '/groups/request/$requestId/candidate-choices',
+      body: {'userId': userId, 'candidateIds': candidateIds},
+    );
+    return GroupWatchRequest.fromJson(data as Map<String, dynamic>);
+  }
+
+  /// Lock the final movie for a group Watch Plan. Creator only.
+  static Future<GroupWatchRequest> selectWatchPlanMovie(
+    String requestId,
+    String userId,
+    String candidateId,
+  ) async {
+    final data = await ApiClient.post(
+      '/groups/request/$requestId/select-candidate',
+      body: {'userId': userId, 'candidateId': candidateId},
+    );
+    return GroupWatchRequest.fromJson(data as Map<String, dynamic>);
+  }
+
+  /// Re-open final movie selection for the Watch Plan creator.
+  static Future<GroupWatchRequest> reopenWatchPlanMovieSelection(
+    String requestId,
+    String userId,
+  ) async {
+    final data = await ApiClient.post(
+      '/groups/request/$requestId/reopen-candidate-selection',
+      body: {'userId': userId},
+    );
+    return GroupWatchRequest.fromJson(data as Map<String, dynamic>);
   }
 
   static Future<GroupRequestMessage> addMessageToRequest(
@@ -294,11 +335,17 @@ class GroupService {
   static Future<GroupWatchRequest> completeWatchRequest(
     String conversationId,
     String requestId,
-    String userId,
-  ) async {
+    String userId, {
+    int? rating,
+    String? reviewText,
+  }) async {
     final data = await ApiClient.patch(
       '/conversations/$conversationId/watch-requests/$requestId/complete',
-      body: {'userId': userId},
+      body: {
+        'userId': userId,
+        if (rating != null) 'rating': rating,
+        if (reviewText != null && reviewText.isNotEmpty) 'reviewText': reviewText,
+      },
     );
     return GroupWatchRequest.fromJson(data as Map<String, dynamic>);
   }
@@ -336,8 +383,14 @@ class GroupService {
   }
 
   static Future<void> deleteWatchRequest(
-      String groupId, String requestId) async {
-    await ApiClient.delete('/groups/$groupId/requests/$requestId');
+    String groupId,
+    String requestId,
+    String userId,
+  ) async {
+    await ApiClient.delete(
+      '/groups/$groupId/requests/$requestId',
+      body: {'userId': userId},
+    );
   }
 
   static Future<List<ActivityListItem>> getGroupActivity(String groupId) async {

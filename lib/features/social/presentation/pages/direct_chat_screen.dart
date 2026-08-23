@@ -238,6 +238,10 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
                   itemBuilder: (_, index) {
                     final msg = messages[index];
                     final isMe = msg.senderId == currentUserId;
+                    // The list is reverse-rendered, so the visually first
+                    // bubble in a sender run is the next item in data order.
+                    final startsSenderRun = index == messages.length - 1 ||
+                        messages[index + 1].senderId != msg.senderId;
                     if (!isMe && SafetyService.isBlocked(msg.senderId)) {
                       return const SizedBox.shrink();
                     }
@@ -258,6 +262,7 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
                       profileBadges: isMe
                           ? const []
                           : (otherUser?.profileBadges ?? const []),
+                      showSenderLabel: !isMe && startsSenderRun,
                       onSenderTap: isMe
                           ? null
                           : () => context.push('/friends/${msg.senderId}'),

@@ -214,6 +214,59 @@ class WatchConfirmation {
   }
 }
 
+class WatchPlanCandidate {
+  final String id;
+  final int? movieId;
+  final int? showId;
+  final String mediaType;
+  final String addedByUserId;
+  final String? addedByUsername;
+  final String? title;
+  final String? posterPath;
+  final String? releaseDate;
+  final List<String> selectedByUserIds;
+
+  const WatchPlanCandidate({
+    required this.id,
+    this.movieId,
+    this.showId,
+    required this.mediaType,
+    required this.addedByUserId,
+    this.addedByUsername,
+    this.title,
+    this.posterPath,
+    this.releaseDate,
+    this.selectedByUserIds = const [],
+  });
+
+  factory WatchPlanCandidate.fromJson(Map<String, dynamic> json) {
+    final movie = json['movie'] as Map<String, dynamic>?;
+    final show = json['show'] as Map<String, dynamic>?;
+    final addedBy = json['addedBy'] as Map<String, dynamic>?;
+    final choices = json['choices'] as List<dynamic>? ?? const [];
+    return WatchPlanCandidate(
+      id: json['id']?.toString() ?? '',
+      movieId: _intValue(json['movieId'] ?? movie?['id']),
+      showId: _intValue(json['showId'] ?? show?['id']),
+      mediaType:
+          json['mediaType']?.toString() ?? (movie != null ? 'movie' : 'show'),
+      addedByUserId: json['addedByUserId']?.toString() ?? '',
+      addedByUsername:
+          (addedBy?['username'] ?? addedBy?['firstName'])?.toString(),
+      title: (movie?['title'] ?? show?['title'])?.toString(),
+      posterPath: (movie?['posterPath'] ?? show?['posterPath'])?.toString(),
+      releaseDate: (movie?['releaseDate'] ?? show?['firstAirDate'])?.toString(),
+      selectedByUserIds: choices
+          .whereType<Map<String, dynamic>>()
+          .map((choice) => choice['userId']?.toString())
+          .whereType<String>()
+          .toList(growable: false),
+    );
+  }
+
+  bool selectedBy(String userId) => selectedByUserIds.contains(userId);
+}
+
 class WatchRequestState {
   final WatchRequest request;
   final bool needsWatchConfirmation;
@@ -265,6 +318,8 @@ class WatchRequest {
   final String? conversationId;
   final List<WatchScheduleProposal> scheduleProposals;
   final List<WatchConfirmation> watchConfirmations;
+  final List<WatchPlanCandidate> candidates;
+  final String? selectedCandidateId;
   final bool? needsWatchConfirmation;
   final bool? hasCurrentUserLoggedWatch;
   final DateTime? acceptedAt;
@@ -306,6 +361,8 @@ class WatchRequest {
     this.conversationId,
     this.scheduleProposals = const [],
     this.watchConfirmations = const [],
+    this.candidates = const [],
+    this.selectedCandidateId,
     this.needsWatchConfirmation,
     this.hasCurrentUserLoggedWatch,
     this.acceptedAt,
@@ -332,6 +389,7 @@ class WatchRequest {
     final participantsRaw = json['participants'] as List<dynamic>? ?? [];
     final proposalsRaw = json['scheduleProposals'] as List<dynamic>? ?? [];
     final confirmationsRaw = json['watchConfirmations'] as List<dynamic>? ?? [];
+    final candidatesRaw = json['candidates'] as List<dynamic>? ?? [];
     final requester = json['requester'] as Map<String, dynamic>?;
     final recipient = json['recipient'] as Map<String, dynamic>?;
     final group = json['group'] as Map<String, dynamic>?;
@@ -368,6 +426,11 @@ class WatchRequest {
           .whereType<Map<String, dynamic>>()
           .map(WatchConfirmation.fromJson)
           .toList(),
+      candidates: candidatesRaw
+          .whereType<Map<String, dynamic>>()
+          .map(WatchPlanCandidate.fromJson)
+          .toList(),
+      selectedCandidateId: json['selectedCandidateId']?.toString(),
       needsWatchConfirmation: _boolValue(json['needsWatchConfirmation']),
       hasCurrentUserLoggedWatch: _boolValue(json['hasCurrentUserLoggedWatch']),
       acceptedAt: _dateTimeValue(json['acceptedAt']),
@@ -476,8 +539,7 @@ class WatchRequest {
           hasCurrentUserCompleted != true);
 
   bool canCancelFor(String userId) =>
-      canCancel ??
-      (!isTerminal && (requesterId == userId || isAccepted || isScheduled));
+      canCancel ?? (!isTerminal && requesterId == userId);
 
   WatchScheduleProposal? get latestPendingProposal {
     final pending = scheduleProposals.where((p) => p.isPending).toList()

@@ -78,9 +78,27 @@ class WatchRequestCache extends ChangeNotifier {
       if (before.id != after.id ||
           before.status != after.status ||
           before.updatedAt != after.updatedAt ||
+          before.scheduledFor != after.scheduledFor ||
+          before.location != after.location ||
+          before.selectedCandidateId != after.selectedCandidateId ||
           before.currentUserResponse != after.currentUserResponse ||
-          before.memberStatuses.length != after.memberStatuses.length) {
+          before.memberStatuses.length != after.memberStatuses.length ||
+          before.candidates.length != after.candidates.length) {
         return false;
+      }
+      for (var candidateIndex = 0;
+          candidateIndex < after.candidates.length;
+          candidateIndex++) {
+        final beforeCandidate = before.candidates[candidateIndex];
+        final afterCandidate = after.candidates[candidateIndex];
+        if (beforeCandidate.id != afterCandidate.id ||
+            beforeCandidate.selectedByUserIds.length !=
+                afterCandidate.selectedByUserIds.length ||
+            !beforeCandidate.selectedByUserIds
+                .toSet()
+                .containsAll(afterCandidate.selectedByUserIds)) {
+          return false;
+        }
       }
       for (var memberIndex = 0;
           memberIndex < after.memberStatuses.length;
@@ -88,7 +106,10 @@ class WatchRequestCache extends ChangeNotifier {
         final beforeMember = before.memberStatuses[memberIndex];
         final afterMember = after.memberStatuses[memberIndex];
         if (beforeMember.memberId != afterMember.memberId ||
-            beforeMember.status != afterMember.status) {
+            beforeMember.status != afterMember.status ||
+            beforeMember.watchedAt != afterMember.watchedAt ||
+            beforeMember.rating != afterMember.rating ||
+            beforeMember.reviewText != afterMember.reviewText) {
           return false;
         }
       }

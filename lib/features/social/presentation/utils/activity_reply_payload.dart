@@ -12,18 +12,23 @@ class ActivityReplyPayload {
     this.reviewTitle,
     this.reviewBody,
     this.containsSpoilers = false,
+    this.listName,
+    this.listLink,
     this.message = '',
   });
 
   factory ActivityReplyPayload.fromActivity(ActivityListItem item) {
     final isReview = item.type == ActivityListType.movieReview ||
         item.type == ActivityListType.showReview;
+    final isListAddition = item.type == ActivityListType.movieListAdded;
     final activityLabel = isReview
         ? 'review'
-        : item.type == ActivityListType.movieRating ||
-                item.type == ActivityListType.showRating
-            ? 'rating'
-            : 'activity';
+        : isListAddition
+            ? 'list addition'
+            : item.type == ActivityListType.movieRating ||
+                    item.type == ActivityListType.showRating
+                ? 'rating'
+                : 'activity';
     final link = item.movieId != null
         ? 'flixie://movies/${item.movieId}'
         : item.showId != null
@@ -46,6 +51,12 @@ class ActivityReplyPayload {
       reviewBody: isReview ? item.reviewData?.body : null,
       containsSpoilers:
           isReview && (item.reviewData?.containsSpoilers ?? false),
+      listName: isListAddition ? item.listName : null,
+      listLink: isListAddition &&
+              item.listId != null &&
+              item.listOwnerId != null
+          ? 'flixie://lists/${item.listId}?owner=${Uri.encodeQueryComponent(item.listOwnerId!)}&name=${Uri.encodeQueryComponent(item.listName ?? 'List')}'
+          : null,
     );
   }
 
@@ -59,6 +70,8 @@ class ActivityReplyPayload {
   final String? reviewTitle;
   final String? reviewBody;
   final bool containsSpoilers;
+  final String? listName;
+  final String? listLink;
   final String message;
 
   bool get isUsable => title.isNotEmpty && link.isNotEmpty;
@@ -79,6 +92,8 @@ class ActivityReplyPayload {
       field('reviewTitle', reviewTitle),
       field('reviewBody', reviewBody),
       field('spoilers', containsSpoilers),
+      field('listName', listName),
+      field('listLink', listLink),
       '[/FLIXIE_ACTIVITY_REPLY]',
     ].join('\n');
   }
@@ -120,6 +135,8 @@ ActivityReplyPayload? parseActivityReplyPayload(String text) {
     reviewTitle: _nonEmpty(values['reviewTitle']),
     reviewBody: _nonEmpty(values['reviewBody']),
     containsSpoilers: values['spoilers'] == 'true',
+    listName: _nonEmpty(values['listName']),
+    listLink: _nonEmpty(values['listLink']),
     message: values['message']?.trim() ?? '',
   );
   return payload.isUsable ? payload : null;

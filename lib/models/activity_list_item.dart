@@ -17,6 +17,7 @@ enum ActivityListType {
   showReview('show-review'),
   watchRequestSent('watch-request-sent'),
   watchRequestAccepted('watch-request-accepted'),
+  movieListAdded('movie-list-added'),
   watchRequest('watch-request'),
   unknown('unknown');
 
@@ -61,6 +62,10 @@ class ActivityListItem {
   final int activityScore;
   final ProfileAvatar? avatar;
   final List<String> profileBadges;
+  final String? listId;
+  final String? listName;
+  final String? listOwnerId;
+  final int? listAdditionCount;
 
   String get timestamp {
     if (watchedAt != null && watchedAt!.isNotEmpty) return watchedAt!;
@@ -94,6 +99,10 @@ class ActivityListItem {
     this.activityScore = 0,
     this.avatar,
     this.profileBadges = const [],
+    this.listId,
+    this.listName,
+    this.listOwnerId,
+    this.listAdditionCount,
   });
 
   ActivityListItem copyWith({ProfileAvatar? avatar}) => ActivityListItem(
@@ -122,6 +131,10 @@ class ActivityListItem {
         activityScore: activityScore,
         avatar: avatar ?? this.avatar,
         profileBadges: profileBadges,
+        listId: listId,
+        listName: listName,
+        listOwnerId: listOwnerId,
+        listAdditionCount: listAdditionCount,
       );
 
   factory ActivityListItem.fromJson(Map<String, dynamic> json) {
@@ -226,6 +239,10 @@ class ActivityListItem {
           .whereType<String>()
           .toList(),
       activityScore: _parseInt(json['activityScore']) ?? 0,
+      listId: json['listId']?.toString(),
+      listName: json['listName']?.toString(),
+      listOwnerId: json['listOwnerId']?.toString(),
+      listAdditionCount: _parseInt(json['listAdditionCount']),
     );
   }
 }

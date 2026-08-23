@@ -249,7 +249,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
   _CreditFilter _creditFilter = _CreditFilter.all;
   _MediaCreditFilter _mediaCreditFilter = _MediaCreditFilter.all;
   _PersonalCreditFilter _personalCreditFilter = _PersonalCreditFilter.all;
-  _CreditSort _creditSort = _CreditSort.popular;
+  _CreditSort _creditSort = _CreditSort.newest;
   bool _showAdvancedCreditFilters = false;
   final TextEditingController _filmographySearchController =
       TextEditingController();
@@ -539,14 +539,28 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
     filtered.sort((a, b) {
       return switch (_creditSort) {
         _CreditSort.popular => b.popularity.compareTo(a.popularity),
-        _CreditSort.newest =>
-          (b.releaseDate ?? '').compareTo(a.releaseDate ?? ''),
+        _CreditSort.newest => _compareNewestReleasedFirst(a, b),
         _CreditSort.oldest =>
           (a.releaseDate ?? '9999').compareTo(b.releaseDate ?? '9999'),
         _CreditSort.rating => b.voteAverage.compareTo(a.voteAverage),
       };
     });
     return filtered;
+  }
+
+  int _compareNewestReleasedFirst(
+    _PersonFilmCredit a,
+    _PersonFilmCredit b,
+  ) {
+    final today = DateUtils.dateOnly(DateTime.now());
+    final aDate = DateTime.tryParse(a.releaseDate ?? '');
+    final bDate = DateTime.tryParse(b.releaseDate ?? '');
+    final aIsFuture = aDate != null && aDate.isAfter(today);
+    final bIsFuture = bDate != null && bDate.isAfter(today);
+
+    // Keep unreleased credits visible, but below titles that are already out.
+    if (aIsFuture != bIsFuture) return aIsFuture ? 1 : -1;
+    return (b.releaseDate ?? '').compareTo(a.releaseDate ?? '');
   }
 
   bool _movieInWatched(int movieId) {
@@ -1605,7 +1619,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
       _creditFilter != _CreditFilter.all,
       _personalCreditFilter != _PersonalCreditFilter.all,
       _filmographyYear != null,
-      _creditSort != _CreditSort.popular,
+      _creditSort != _CreditSort.newest,
     ].where((active) => active).length;
 
     return Column(

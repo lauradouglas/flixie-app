@@ -324,7 +324,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Text('Requests'),
+                              const Text('Watch Plans'),
                               if (_pendingRequestCount > 0) ...[
                                 const SizedBox(width: 6),
                                 Container(
@@ -376,6 +376,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                           ),
                           GroupRequestsTab(
                             groupId: widget.groupId,
+                            groupName: _group?.name,
                             conversationId: _conversationId,
                             initialRequests: _watchRequests,
                             initialRequestId: widget.initialRequestId,

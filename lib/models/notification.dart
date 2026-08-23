@@ -73,6 +73,10 @@ class FlixieNotification {
     return value == null || value.isEmpty ? null : value;
   }
 
+  bool get hasMultipleWatchPlanOptions =>
+      int.tryParse(data?['candidateCount']?.toString() ?? '') != null &&
+      int.parse(data!['candidateCount'].toString()) > 1;
+
   String get receivedAt => notificationReceived ?? createdAt ?? updatedAt ?? '';
 
   Map<String, dynamic>? get _linkOtherUser {

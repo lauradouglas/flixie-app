@@ -1173,6 +1173,24 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               );
               didSubmit = true;
             }
+            // Watch entries support ratings of their own. Make sure a rating
+            // recorded here is also saved as the user's overall movie rating,
+            // which powers the Rate action and the ratings list on their
+            // profile. The API normally performs this sync; this check also
+            // keeps older API deployments in step.
+            if (rating != null) {
+              final overallRating =
+                  await movieService.getUserMovieRating(movieId, userId);
+              if (overallRating.rating != rating.round() ||
+                  overallRating.recommended != recommended) {
+                await movieService.addMovieRating(
+                  movieId,
+                  userId,
+                  rating.round(),
+                  recommended,
+                );
+              }
+            }
             if (entry == null) {
               await analytics.watchLogged(
                 contentType: 'movie',
@@ -3343,6 +3361,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       builder: (_) => MovieWatchRequestSheet(
         movieId: int.tryParse(widget.movieId),
         movieTitle: _movie?.title,
+        moviePoster: _movie?.posterPath,
         requesterId: userId,
         friends: friends,
         fromMovieMatch: widget.fromMovieMatch,
@@ -5399,11 +5418,11 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         ),
         const SizedBox(height: 8),
         SizedBox(
-          height: 232,
+          height: CastCard.heightFor(context),
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: _cast.length > 6 ? 6 : _cast.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            separatorBuilder: (_, __) => const SizedBox(width: 16),
             itemBuilder: (context, i) => CastCard(
               member: _cast[i],
               parentContentId: int.parse(widget.movieId),

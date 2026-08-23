@@ -7,6 +7,8 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:go_router/go_router.dart';
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 
 import 'package:flixie_app/core/auth/firebase_options.dart';
 import 'package:flixie_app/core/auth/notification_deep_link.dart';
@@ -71,6 +73,8 @@ class PushNotificationService {
   static String? _pendingNavigationPath;
   static bool _navigationReady = false;
   static bool _nativeTapBridgeInitialized = false;
+  static bool _localNotificationsReady = false;
+  static bool _timeZonesInitialized = false;
   static String? _lastNavigatedPath;
   static DateTime? _lastNavigatedAt;
 
@@ -94,6 +98,101 @@ class PushNotificationService {
   /// tapped during startup is retained and applied once routing is available.
   static void attachRouter(GoRouter router) {
     _router = router;
+  }
+
+  /// Schedules two device-local nudges for a confirmed watch plan. They are
+  /// deliberately local: no server job is required and each participant gets
+  /// reminders according to their own device clock and permissions.
+  static Future<void> scheduleWatchPlanReminders({
+    required String planId,
+    required DateTime scheduledFor,
+    required String title,
+    required String withName,
+    required String deepLink,
+  }) async {
+    try {
+      if (!_localNotificationsReady) return;
+      if (!_timeZonesInitialized) {
+        tz.initializeTimeZones();
+        _timeZonesInitialized = true;
+      }
+      final reminderId = planId.hashCode & 0x3fffffff;
+      final followUpId = (reminderId + 1) & 0x3fffffff;
+      final morningId = (reminderId + 2) & 0x3fffffff;
+      await _localNotifications.cancel(reminderId);
+      await _localNotifications.cancel(followUpId);
+      await _localNotifications.cancel(morningId);
+
+    final details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        _androidChannel.id,
+        _androidChannel.name,
+        channelDescription: _androidChannel.description,
+        icon: '@mipmap/launcher_icon',
+        importance: Importance.high,
+        priority: Priority.high,
+      ),
+      iOS: DarwinNotificationDetails(),
+    );
+    final now = DateTime.now();
+    final beforeWatch = scheduledFor.subtract(const Duration(hours: 1));
+    final followUp = scheduledFor.add(const Duration(hours: 2));
+    final morningOfWatch = DateTime(
+      scheduledFor.year,
+      scheduledFor.month,
+      scheduledFor.day,
+      9,
+    );
+    if (morningOfWatch.isAfter(now)) {
+      await _localNotifications.zonedSchedule(
+        morningId,
+        'Watch plan today',
+        'Remember you’re seeing $title with $withName today.',
+        tz.TZDateTime.from(morningOfWatch, tz.UTC),
+        details,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        payload: deepLink,
+      );
+    }
+    if (beforeWatch.isAfter(now)) {
+      await _localNotifications.zonedSchedule(
+        reminderId,
+        'Watch starts soon',
+        '$title starts in one hour.',
+        tz.TZDateTime.from(beforeWatch, tz.UTC),
+        details,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        payload: deepLink,
+      );
+    }
+      if (followUp.isAfter(now)) {
+      await _localNotifications.zonedSchedule(
+        followUpId,
+        'Did you watch $title?',
+        'Log your watch and add your rating when you’re ready.',
+        tz.TZDateTime.from(followUp, tz.UTC),
+        details,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        payload: deepLink,
+      );
+      }
+    } catch (error) {
+      logger.w('[Local reminders] Unable to schedule $planId: $error');
+    }
+  }
+
+  static Future<void> cancelWatchPlanReminders(String planId) async {
+    if (!_localNotificationsReady) return;
+    final reminderId = planId.hashCode & 0x3fffffff;
+    await _localNotifications.cancel(reminderId);
+    await _localNotifications.cancel((reminderId + 1) & 0x3fffffff);
+    await _localNotifications.cancel((reminderId + 2) & 0x3fffffff);
   }
 
   /// Captures an FCM notification launch before the widget tree and auth
@@ -325,6 +424,7 @@ class PushNotificationService {
         }
       },
     );
+    _localNotificationsReady = true;
 
     // Firebase's getInitialMessage only covers notifications opened by FCM.
     // Data-only messages are displayed through flutter_local_notifications,

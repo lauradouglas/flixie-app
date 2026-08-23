@@ -992,6 +992,8 @@ class _FriendInsights {
       case ActivityListType.watchRequestAccepted:
       case ActivityListType.watchRequestSent:
         return 'Shared $title';
+      case ActivityListType.movieListAdded:
+        return 'Added $title to ${item.listName ?? 'a list'}';
       case ActivityListType.unknown:
         return 'Recent activity';
     }

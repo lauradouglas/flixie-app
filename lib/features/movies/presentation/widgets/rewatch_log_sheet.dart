@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:flixie_app/core/api/api_client.dart';
 import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 
@@ -237,12 +238,13 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                                   widget.onReviewSelected?.call(_writeReview);
                                   navigator.pop();
                                 }
-                              } catch (_) {
+                              } catch (error) {
                                 if (mounted) {
                                   setState(() {
                                     _saving = false;
-                                    _saveError =
-                                        'Could not save this watch entry. Try again.';
+                                    _saveError = error is ApiException
+                                        ? error.message
+                                        : 'Could not save this watch entry. Try again.';
                                   });
                                 }
                               }

@@ -95,7 +95,7 @@ class GreetingHeader extends StatelessWidget {
               const SizedBox(width: 8),
               _ActionButton(
                 icon: Icons.local_activity_rounded,
-                label: 'Requests',
+                label: 'Plans',
                 onTap: onRequests,
                 badgeCount: requestCount,
               ),
@@ -129,17 +129,49 @@ class _ActionButton extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Badge(
-                  isLabelVisible: badgeCount > 0,
-                  label: Text(badgeCount > 99 ? '99+' : '$badgeCount'),
-                  backgroundColor: FlixieColors.tertiary,
-                  textColor: Colors.black,
-                  child: Icon(icon, color: FlixieColors.primary, size: 18),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                SizedBox(
+                  width: 30,
+                  height: 27,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    alignment: Alignment.center,
+                    children: [
+                      Icon(icon, color: FlixieColors.primary, size: 18),
+                      if (badgeCount > 0)
+                        Positioned(
+                          top: -3,
+                          right: -5,
+                          child: Container(
+                            constraints: const BoxConstraints(
+                              minWidth: 20,
+                              minHeight: 20,
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 5, vertical: 2),
+                            alignment: Alignment.center,
+                            decoration: const BoxDecoration(
+                              color: FlixieColors.tertiary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              badgeCount > 99 ? '99+' : '$badgeCount',
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 11,
+                                height: 1,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 3),
                 Text(
@@ -153,7 +185,8 @@ class _ActionButton extends StatelessWidget {
                     height: 1,
                   ),
                 ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

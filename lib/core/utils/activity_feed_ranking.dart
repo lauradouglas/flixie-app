@@ -27,6 +27,11 @@ int computeActivityFallbackScore(ActivityListItem item) {
     case ActivityListType.showWatchlist:
       baseScore = 40;
       break;
+    case ActivityListType.movieListAdded:
+      // A friend deliberately contributing to a shared list is more useful
+      // than a passive watchlist save, without outranking reviews or ratings.
+      baseScore = 55;
+      break;
     case ActivityListType.watchRequestSent:
     case ActivityListType.watchRequestAccepted:
     case ActivityListType.watchRequest:

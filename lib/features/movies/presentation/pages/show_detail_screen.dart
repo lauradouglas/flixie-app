@@ -1247,19 +1247,22 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
   Widget _buildCastSection(BuildContext context, TvShow show) {
     final cast = _cast.isNotEmpty ? _cast : show.cast;
     if (cast.isEmpty) return const SizedBox.shrink();
+    final castWidth = MediaQuery.sizeOf(context).width >= 700 ? 220.0 : 132.0;
+    final castHeight = (castWidth * 1.5) + 72;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionHeader(context, 'Top Cast'),
         const SizedBox(height: 12),
         SizedBox(
-          height: 188,
+          height: castHeight,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: cast.take(12).length,
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            separatorBuilder: (_, __) => const SizedBox(width: 16),
             itemBuilder: (context, index) => _CastTile(
               credit: cast[index],
+              width: castWidth,
               onTap: cast[index].id <= 0
                   ? null
                   : () => context.push(personDetailPath(
@@ -1403,7 +1406,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                   style: TextStyle(color: FlixieColors.medium),
                 )
               else
-                ...episodes.take(12).map((episode) => Padding(
+                ...episodes.map((episode) => Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: _EpisodeCard(
                         episode: episode,
@@ -3524,9 +3527,10 @@ class _EpisodeInfoChip extends StatelessWidget {
 }
 
 class _CastTile extends StatelessWidget {
-  const _CastTile({required this.credit, this.onTap});
+  const _CastTile({required this.credit, required this.width, this.onTap});
 
   final TvShowCredit credit;
+  final double width;
   final VoidCallback? onTap;
 
   @override
@@ -3534,39 +3538,46 @@ class _CastTile extends StatelessWidget {
     final image = _tmdbImage(credit.profilePath, 'w185');
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(18),
       child: SizedBox(
-        width: 104,
+        width: width,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(18),
               child: SizedBox(
-                width: 104,
-                height: 128,
+                width: width,
+                height: width * 1.5,
                 child: image == null
                     ? const ColoredBox(color: _ShowDetailScreenState._card)
                     : CachedNetworkImage(imageUrl: image, fit: BoxFit.cover),
               ),
             ),
-            const SizedBox(height: 7),
-            Text(
-              credit.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 12),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 36,
+              child: Text(
+                credit.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    height: 1.16),
+              ),
             ),
-            Text(
-              credit.character ?? credit.role ?? '',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  color: _ShowDetailScreenState._textSecondary, fontSize: 11),
-            ),
+            if ((credit.character ?? credit.role ?? '').trim().isNotEmpty) ...[
+              const SizedBox(height: 3),
+              Text(
+                credit.character ?? credit.role ?? '',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    color: _ShowDetailScreenState._textSecondary, fontSize: 13),
+              ),
+            ],
           ],
         ),
       ),

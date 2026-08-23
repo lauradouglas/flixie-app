@@ -20,6 +20,7 @@ class ChatBubble extends StatelessWidget {
     this.avatar,
     this.initials,
     this.profileBadges = const [],
+    this.showSenderLabel = true,
     this.replyTo,
     this.onLongPress,
     this.onSenderTap,
@@ -32,6 +33,7 @@ class ChatBubble extends StatelessWidget {
   final ProfileAvatar? avatar;
   final String? initials;
   final List<String> profileBadges;
+  final bool showSenderLabel;
   final String? replyTo;
   final VoidCallback? onLongPress;
   final VoidCallback? onSenderTap;
@@ -60,7 +62,7 @@ class ChatBubble extends StatelessWidget {
                   ),
                 ),
               ),
-            if (!isMe)
+            if (!isMe && showSenderLabel)
               Padding(
                 padding: const EdgeInsets.only(left: 46, bottom: 4),
                 child: Semantics(
@@ -391,6 +393,47 @@ class ChatBubble extends StatelessWidget {
                           ),
                         ),
                       ],
+                      if (payload.listName?.isNotEmpty == true) ...[
+                        const SizedBox(height: 7),
+                        InkWell(
+                          onTap: payload.listLink == null
+                              ? null
+                              : () => _openLink(context, payload.listLink!),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: .12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.playlist_add_check_rounded,
+                                  color: Colors.white,
+                                  size: 15,
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Added to ${payload.listName}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 8),
                       Text(
                         '↗  $actionLabel',
@@ -562,6 +605,16 @@ class ChatBubble extends StatelessWidget {
           uri.pathSegments.first,
           source: DetailSource.sharedLink,
         );
+      }
+
+      if (uri.host == 'lists' && uri.pathSegments.isNotEmpty) {
+        final listId = uri.pathSegments.first;
+        final owner = uri.queryParameters['owner'];
+        final name = uri.queryParameters['name'] ?? 'List';
+        if (owner != null && owner.isNotEmpty) {
+          routePath =
+              '/movie-lists/$listId?name=${Uri.encodeQueryComponent(name)}&owner=${Uri.encodeQueryComponent(owner)}&isOwner=false&canEdit=false';
+        }
       }
 
       // Legacy format: flixie:///movies/<id>?source=share

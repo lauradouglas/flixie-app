@@ -809,6 +809,8 @@ class GroupChatTabState extends State<GroupChatTab> {
                         _memberUsernames[sid] ??
                         sid.substring(0, sid.length.clamp(0, 6));
                     final member = _membersById[sid];
+                    final startsSenderRun = i == messages.length - 1 ||
+                        messages[i + 1].senderId != sid;
                     return ChatBubble(
                       message: msg.text,
                       senderUsername: username,
@@ -817,6 +819,7 @@ class GroupChatTabState extends State<GroupChatTab> {
                       avatar: member?.avatar,
                       initials: member?.initials,
                       profileBadges: member?.profileBadges ?? const [],
+                      showSenderLabel: !isMe && startsSenderRun,
                       onSenderTap:
                           isMe ? null : () => context.push('/friends/$sid'),
                       replyTo:

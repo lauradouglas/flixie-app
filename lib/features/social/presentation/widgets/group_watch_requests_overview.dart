@@ -142,7 +142,7 @@ class _GroupWatchRequestsOverviewState
             )
           else ...[
             if (_filter == _GroupRequestFilter.active && active.isNotEmpty) ...[
-              const _SectionLabel('ACTIVE REQUESTS'),
+              const _SectionLabel('ACTIVE WATCH PLANS'),
               const SizedBox(height: 10),
               ...active.map((item) => Padding(
                     padding: const EdgeInsets.only(bottom: 12),
@@ -153,7 +153,7 @@ class _GroupWatchRequestsOverviewState
             if (_filter == _GroupRequestFilter.active &&
                 completed.isNotEmpty) ...[
               const SizedBox(height: 18),
-              const _SectionLabel('COMPLETED REQUESTS', muted: true),
+              const _SectionLabel('COMPLETED WATCH PLANS', muted: true),
               const SizedBox(height: 10),
               ...completed.map((item) => Padding(
                     padding: const EdgeInsets.only(bottom: 12),
@@ -179,7 +179,7 @@ class _GroupWatchRequestsOverviewState
               color: FlixieColors.primary, size: 32),
           const SizedBox(height: 10),
           const Text(
-            'Group movie magic happens here.\nRequest a movie, rally the crew, and enjoy together.',
+            'Group movie magic happens here.\nMake a Watch Plan, rally the crew, and enjoy together.',
             textAlign: TextAlign.center,
             style: TextStyle(color: FlixieColors.medium, height: 1.5),
           ),
@@ -372,7 +372,7 @@ class _GroupRequestTile extends StatelessWidget {
                                 label: Text(request.status ==
                                         WatchRequestStatus.scheduled
                                     ? 'View plan'
-                                    : 'View request'),
+                                    : 'View plan'),
                               ),
                             ),
                           ],

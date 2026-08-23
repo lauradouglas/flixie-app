@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:flixie_app/app/router/router.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 
 import 'analytics_consent.dart';
@@ -24,16 +25,34 @@ class _AnalyticsConsentPromptState extends State<AnalyticsConsentPrompt> {
     final consent = context.watch<AnalyticsController>().consent;
     if (consent != AnalyticsConsent.unknown || _promptScheduled) return;
     _promptScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) => _showPrompt());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _schedulePrompt());
+  }
+
+  void _schedulePrompt() {
+    // The router replaces its initial splash route shortly after launch. Give
+    // that transition time to complete so it cannot dismiss this dialog.
+    Future<void>.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) _showPrompt();
+    });
   }
 
   Future<void> _showPrompt() async {
     if (!mounted) return;
     final analytics = context.read<AnalyticsController>();
     if (analytics.consent != AnalyticsConsent.unknown) return;
+    // This widget is installed by MaterialApp.router's builder, which is
+    // above the Navigator. Use the router's context so the dialog has a
+    // Navigator ancestor instead of trying to push from the builder context.
+    final navigatorContext = rootNavigatorKey.currentContext;
+    if (navigatorContext == null) {
+      _promptScheduled = false;
+      _schedulePrompt();
+      return;
+    }
 
     await showDialog<void>(
-      context: context,
+      context: navigatorContext,
+      useRootNavigator: true,
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Share anonymous analytics?'),
@@ -57,34 +76,44 @@ class _AnalyticsConsentPromptState extends State<AnalyticsConsentPrompt> {
             'practices.',
           ),
         ),
-        actionsAlignment: MainAxisAlignment.spaceBetween,
         actions: [
-          SizedBox(
-            width: 142,
-            child: OutlinedButton(
-              onPressed: () async {
-                await analytics.decline();
-                if (dialogContext.mounted) Navigator.pop(dialogContext);
-              },
-              child: const Text('Decline'),
-            ),
-          ),
-          SizedBox(
-            width: 142,
-            child: FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: FlixieColors.primary,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              OutlinedButton(
+                onPressed: () async {
+                  await analytics.decline();
+                  if (dialogContext.mounted) Navigator.pop(dialogContext);
+                },
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                ),
+                child: const Text('Decline', maxLines: 1, softWrap: false),
               ),
-              onPressed: () async {
-                await analytics.allow();
-                if (dialogContext.mounted) Navigator.pop(dialogContext);
-              },
-              child: const Text('Allow analytics'),
-            ),
+              const SizedBox(width: 10),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: FlixieColors.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                ),
+                onPressed: () async {
+                  await analytics.allow();
+                  if (dialogContext.mounted) Navigator.pop(dialogContext);
+                },
+                child:
+                    const Text('Allow analytics', maxLines: 1, softWrap: false),
+              ),
+            ],
           ),
         ],
       ),
     );
+    // A route rebuild can still dismiss a dialog during an unusually slow
+    // startup. Reopen it once the router is stable unless a choice was made.
+    if (mounted && analytics.consent == AnalyticsConsent.unknown) {
+      _promptScheduled = false;
+      _schedulePrompt();
+    }
   }
 
   @override

@@ -271,27 +271,31 @@ class _ShareCardSheetState extends State<ShareCardSheet> {
                         color: FlixieColors.primary.withValues(alpha: .28),
                       ),
                     ),
-                    child: SwitchListTile.adaptive(
-                      dense: true,
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 12),
-                      title: const Text(
-                        'Show watch note',
-                        style: TextStyle(
-                          color: FlixieColors.textPrimary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                    child: Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      child: SwitchListTile.adaptive(
+                        dense: true,
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 12),
+                        title: const Text(
+                          'Show watch note',
+                          style: TextStyle(
+                            color: FlixieColors.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
+                        value: _showNote,
+                        activeThumbColor: FlixieColors.textPrimary,
+                        activeTrackColor: FlixieColors.primary,
+                        onChanged: _activeAction == null
+                            ? (value) => setState(() {
+                                  _showNote = value;
+                                  _renderedBytes = null;
+                                })
+                            : null,
                       ),
-                      value: _showNote,
-                      activeThumbColor: FlixieColors.textPrimary,
-                      activeTrackColor: FlixieColors.primary,
-                      onChanged: _activeAction == null
-                          ? (value) => setState(() {
-                                _showNote = value;
-                                _renderedBytes = null;
-                              })
-                          : null,
                     ),
                   ),
                 ),

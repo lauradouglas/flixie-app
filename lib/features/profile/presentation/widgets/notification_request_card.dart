@@ -51,6 +51,9 @@ class NotificationRequestCard extends StatelessWidget {
       (notification.type == FlixieNotification.groupRequest &&
           notification.groupWatchMovieTitle != null);
 
+  bool get _isEveryoneLogged =>
+      notification.data?['type']?.toString() == 'everyone_rated';
+
   String get _watchRequestPath {
     final groupId = notification.groupInviteGroupId;
     if (notification.type == FlixieNotification.groupRequest &&
@@ -92,6 +95,7 @@ class NotificationRequestCard extends StatelessWidget {
       _isPendingScheduleProposal || _isAgreedSchedule || _isDeclinedSchedule;
 
   String get _requestKind {
+    if (_isEveryoneLogged) return 'Watch summary';
     switch (notification.type) {
       case FlixieNotification.groupInvite:
         return 'Group invite';
@@ -108,6 +112,7 @@ class NotificationRequestCard extends StatelessWidget {
   }
 
   IconData get _typeIcon {
+    if (_isEveryoneLogged) return Icons.groups_rounded;
     switch (notification.type) {
       case FlixieNotification.groupInvite:
       case FlixieNotification.groupRequest:
@@ -122,6 +127,7 @@ class NotificationRequestCard extends StatelessWidget {
   }
 
   Color get _accentColor {
+    if (_isEveryoneLogged) return FlixieColors.success;
     switch (notification.type) {
       case FlixieNotification.groupInvite:
       case FlixieNotification.groupRequest:
@@ -136,6 +142,23 @@ class NotificationRequestCard extends StatelessWidget {
   }
 
   Widget _buildSubtitleWidget(BuildContext context) {
+    if (_isEveryoneLogged) {
+      final title = notification.watchMediaTitle ?? 'this watch';
+      return RichText(
+        text: TextSpan(
+          style: const TextStyle(
+            color: FlixieColors.light,
+            fontSize: 13,
+            height: 1.25,
+          ),
+          children: [
+            const TextSpan(text: 'Everyone logged '),
+            _linkedTitleSpan(context, title),
+            const TextSpan(text: '. View the group summary and ratings.'),
+          ],
+        ),
+      );
+    }
     if (_isResolved && !_showsScheduleFlow) {
       final sender = notification.senderName.isNotEmpty
           ? notification.senderName
@@ -292,6 +315,7 @@ class NotificationRequestCard extends StatelessWidget {
       final title = notification.watchMediaTitle;
       final scheduledFor = notification.watchRequestScheduledFor ??
           _proposalDateWithStatus('ACCEPTED');
+      final location = notification.watchRequestLocation?.trim();
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -312,28 +336,69 @@ class NotificationRequestCard extends StatelessWidget {
             ),
           ),
           if (scheduledFor != null) ...[
-            const SizedBox(height: 7),
-            Row(
-              children: [
-                const Icon(
-                  Icons.event_available_outlined,
-                  size: 14,
-                  color: FlixieColors.secondary,
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: FlixieColors.secondary.withValues(alpha: .10),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: FlixieColors.secondary.withValues(alpha: .38),
                 ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'Scheduled for ${_formatScheduleDate(scheduledFor)}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: FlixieColors.light,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.event_available_outlined,
+                        size: 16,
+                        color: FlixieColors.secondary,
+                      ),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Text(
+                          _formatScheduleDate(scheduledFor),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: FlixieColors.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                  if (location != null && location.isNotEmpty) ...[
+                    const SizedBox(height: 7),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on_outlined,
+                          size: 16,
+                          color: FlixieColors.secondary,
+                        ),
+                        const SizedBox(width: 7),
+                        Expanded(
+                          child: Text(
+                            location,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: FlixieColors.light,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
             ),
           ],
         ],
@@ -343,6 +408,16 @@ class NotificationRequestCard extends StatelessWidget {
     if (notification.type == FlixieNotification.movieWatchRequest ||
         notification.type == FlixieNotification.showWatchRequest) {
       final title = notification.watchMediaTitle;
+      if (notification.hasMultipleWatchPlanOptions) {
+        return const Text(
+          'wants to plan a watch with you',
+          style: TextStyle(
+            color: FlixieColors.light,
+            fontSize: 13,
+            height: 1.25,
+          ),
+        );
+      }
       return RichText(
         text: TextSpan(
           style: const TextStyle(
@@ -519,7 +594,17 @@ class NotificationRequestCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = notification.senderName;
-    final initials = notification.senderInitials ?? '';
+    final headline = _isEveryoneLogged
+        ? 'Everyone logged'
+        : name.isNotEmpty
+            ? name
+            : _requestKind;
+    final groupName = notification.groupWatchGroupName?.trim() ?? '';
+    final initials = _isEveryoneLogged && groupName.isNotEmpty
+        ? groupName
+            .substring(0, groupName.length > 4 ? 4 : groupName.length)
+            .toUpperCase()
+        : notification.senderInitials ?? '';
     final avatarBg = avatarColorFromIconColor(notification.senderIconColor);
     final accent = _accentColor;
     final msg = notification.watchRequestMessage;
@@ -569,12 +654,35 @@ class NotificationRequestCard extends StatelessWidget {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          ProfileAvatarView(
-                            avatar: notification.senderAvatar,
-                            fallbackText: initials.isNotEmpty ? initials : '!',
-                            fallbackColor: avatarBg,
-                            size: 34,
-                          ),
+                          _isEveryoneLogged
+                              ? Container(
+                                  width: 34,
+                                  height: 34,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: avatarBg,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Text(
+                                    initials.isNotEmpty ? initials : 'GROUP',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.clip,
+                                    style: const TextStyle(
+                                      color: FlixieColors.primary,
+                                      fontSize: 10,
+                                      height: 1,
+                                      letterSpacing: .3,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                )
+                              : ProfileAvatarView(
+                                  avatar: notification.senderAvatar,
+                                  fallbackText:
+                                      initials.isNotEmpty ? initials : '!',
+                                  fallbackColor: avatarBg,
+                                  size: 34,
+                                ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Column(
@@ -584,7 +692,7 @@ class NotificationRequestCard extends StatelessWidget {
                                   children: [
                                     Expanded(
                                       child: Text(
-                                        name.isNotEmpty ? name : _requestKind,
+                                        headline,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
@@ -741,9 +849,14 @@ class NotificationRequestCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  icon: const Icon(Icons.visibility_outlined, size: 18),
-                  label: const Text(
-                    'View request',
+                  icon: Icon(
+                    _isEveryoneLogged
+                        ? Icons.insights_outlined
+                        : Icons.visibility_outlined,
+                    size: 18,
+                  ),
+                  label: Text(
+                    _isEveryoneLogged ? 'View watch summary' : 'View request',
                     style: TextStyle(fontWeight: FontWeight.w800),
                   ),
                 ),
