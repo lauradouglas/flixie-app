@@ -19,6 +19,7 @@ import 'package:flixie_app/models/user.dart' as models;
 import 'package:flixie_app/features/watchlist/presentation/controllers/watchlist_actions_controller.dart';
 import 'package:flixie_app/features/social/data/friend_service.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
+import 'package:flixie_app/core/auth/push_notification_service.dart';
 import 'package:flixie_app/features/movies/data/show_service.dart';
 import 'package:flixie_app/features/home/data/recommendation_service.dart';
 import 'package:flixie_app/features/social/data/request_service.dart';
@@ -407,6 +408,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final personalisedForYou = results[1] as List<MovieShort>;
     final watchRequests = results[3] as List<WatchRequest>;
     final groupWatchPlans = results[6] as List<WatchRequest>;
+    unawaited(_syncLocalWatchPlanReminders(
+      [...watchRequests, ...groupWatchPlans],
+      userId: user.id,
+    ));
     context.read<AuthProvider>().updateCachedWatchRequests(watchRequests);
     setState(() {
       _friendsActivity = results[0] as List<ActivityListItem>;
@@ -427,6 +432,31 @@ class _HomeScreenState extends State<HomeScreen> {
       _isLoadingRecommendations = false;
     });
     _scheduleRecommendationVisibilityCheck();
+  }
+
+  Future<void> _syncLocalWatchPlanReminders(
+    List<WatchRequest> plans, {
+    required String userId,
+  }) async {
+    for (final plan in plans) {
+      final scheduledFor = plan.scheduledFor;
+      if (!plan.isWatchRequest || plan.isTerminal || scheduledFor == null ||
+          !scheduledFor.isAfter(DateTime.now())) {
+        continue;
+      }
+      final groupName = plan.groupName?.trim();
+      final isGroupPlan = groupName?.isNotEmpty == true;
+      final otherUser = plan.otherUser(userId);
+      await PushNotificationService.scheduleWatchPlanReminders(
+        planId: plan.id,
+        scheduledFor: scheduledFor,
+        title: plan.movie?.title ?? 'Watch together',
+        withName: isGroupPlan ? groupName! : otherUser?.username ?? 'your friend',
+        deepLink: isGroupPlan && plan.groupId?.isNotEmpty == true
+            ? '/groups/${plan.groupId}?tab=plans'
+            : '/watch-requests/${plan.id}',
+      );
+    }
   }
 
   /// Adapt scheduled group plans to the same homepage card contract used by
@@ -2061,13 +2091,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ? 'Time to log your watch'
                                 : watchAlreadyLogged
                                     ? 'Watch logged'
-                                    : _formatWatchPlanDate(scheduledFor),
-                            maxLines: 1,
+                                    : _watchPlanScheduleHeadline(scheduledFor),
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                              height: 1.15,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -2129,7 +2160,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ? 'Log watch'
                                       : watchAlreadyLogged
                                           ? 'Watch logged'
-                                          : 'Upcoming',
+                                          : _watchPlanScheduleCaption(scheduledFor),
                                   style: TextStyle(
                                     color: isDue || watchAlreadyLogged
                                         ? FlixieColors.success
@@ -2191,6 +2222,37 @@ class _HomeScreenState extends State<HomeScreen> {
     final minute = date.minute.toString().padLeft(2, '0');
     final period = date.hour < 12 ? 'AM' : 'PM';
     return '$dayLabel · $displayHour:$minute $period';
+  }
+
+  String _watchPlanScheduleHeadline(DateTime raw) {
+    final date = raw.toLocal();
+    final now = DateTime.now();
+    final remaining = date.difference(now);
+    if (remaining.inMinutes < 60) {
+      final minutes = remaining.inMinutes.clamp(1, 59);
+      return 'Starts in $minutes min';
+    }
+    if (remaining.inHours < 6) {
+      final hours = remaining.inHours + (remaining.inMinutes % 60 == 0 ? 0 : 1);
+      return 'Scheduled in $hours ${hours == 1 ? 'hour' : 'hours'}';
+    }
+    final today = DateTime(now.year, now.month, now.day);
+    final target = DateTime(date.year, date.month, date.day);
+    final dayOffset = target.difference(today).inDays;
+    if (dayOffset == 0) return 'Scheduled today';
+    if (dayOffset == 1) return 'Scheduled tomorrow';
+    return 'Scheduled ${_formatWatchPlanDate(raw)}';
+  }
+
+  String _watchPlanScheduleCaption(DateTime raw) {
+    final date = raw.toLocal();
+    final now = DateTime.now();
+    final remaining = date.difference(now);
+    if (remaining.inHours < 6) return 'Upcoming';
+    final displayHour = date.hour % 12 == 0 ? 12 : date.hour % 12;
+    final minute = date.minute.toString().padLeft(2, '0');
+    final period = date.hour < 12 ? 'AM' : 'PM';
+    return '$displayHour:$minute $period';
   }
 
   Widget _buildFriendActivitySection(BuildContext context) {

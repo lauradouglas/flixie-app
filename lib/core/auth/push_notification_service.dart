@@ -111,7 +111,15 @@ class PushNotificationService {
     required String deepLink,
   }) async {
     try {
-      if (!_localNotificationsReady) return;
+      // Home can refresh before auth has completed notification setup. Wait
+      // for that in-flight setup instead of silently dropping the reminder.
+      if (!_localNotificationsReady && _initializationFuture != null) {
+        await _initializationFuture;
+      }
+      if (!_localNotificationsReady) {
+        logger.w('[Local reminders] Skipped $planId: notifications are not ready');
+        return;
+      }
       if (!_timeZonesInitialized) {
         tz.initializeTimeZones();
         _timeZonesInitialized = true;
@@ -132,15 +140,20 @@ class PushNotificationService {
         importance: Importance.high,
         priority: Priority.high,
       ),
-      iOS: DarwinNotificationDetails(),
+      iOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
     );
     final now = DateTime.now();
-    final beforeWatch = scheduledFor.subtract(const Duration(hours: 1));
-    final followUp = scheduledFor.add(const Duration(hours: 2));
+    final localScheduledFor = scheduledFor.toLocal();
+    final beforeWatch = localScheduledFor.subtract(const Duration(hours: 1));
+    final followUp = localScheduledFor.add(const Duration(hours: 2));
     final morningOfWatch = DateTime(
-      scheduledFor.year,
-      scheduledFor.month,
-      scheduledFor.day,
+      localScheduledFor.year,
+      localScheduledFor.month,
+      localScheduledFor.day,
       9,
     );
     if (morningOfWatch.isAfter(now)) {
@@ -182,6 +195,12 @@ class PushNotificationService {
         payload: deepLink,
       );
       }
+      final pending = await _localNotifications.pendingNotificationRequests();
+      logger.i(
+        '[Local reminders] Registered $planId '
+        '(morning=${morningOfWatch.isAfter(now)}, oneHour=${beforeWatch.isAfter(now)}, '
+        'followUp=${followUp.isAfter(now)}, pending=${pending.length})',
+      );
     } catch (error) {
       logger.w('[Local reminders] Unable to schedule $planId: $error');
     }
