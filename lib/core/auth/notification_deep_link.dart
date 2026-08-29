@@ -3,6 +3,7 @@ import 'package:flixie_app/core/analytics/detail_source.dart';
 String notificationDeepLinkPath(Map<String, dynamic> data) {
   final route = data['route']?.toString();
   final type = (data['type']?.toString() ?? '').toUpperCase();
+  final category = (data['category']?.toString() ?? '').toUpperCase();
   final groupId = data['groupId']?.toString();
   final friendId = data['friendId']?.toString();
   final senderId = data['senderId']?.toString();
@@ -37,9 +38,12 @@ String notificationDeepLinkPath(Map<String, dynamic> data) {
   // Older lifecycle pushes used an API-style `/conversations/...` route that
   // has never been an app route. Prefer the request's dedicated full-page
   // route whenever the payload identifies a watch request.
-  if (requestId != null && requestId.isNotEmpty) {
-    if (groupId != null && groupId.isNotEmpty) {
-      return '/groups/$groupId?tab=requests&requestId=$requestId';
+  if ((category == 'WATCH_PLAN' || requestId != null) &&
+      requestId != null &&
+      requestId.isNotEmpty) {
+    final targetGroupId = groupId ?? routeGroupId;
+    if (targetGroupId != null && targetGroupId.isNotEmpty) {
+      return '/groups/$targetGroupId?tab=requests&requestId=$requestId';
     }
     return '/watch-requests/$requestId';
   }
@@ -84,6 +88,8 @@ String? _watchRequestId(
   String? route,
   String type,
 ) {
+  final canonical = data['watchPlanId']?.toString();
+  if (canonical != null && canonical.isNotEmpty) return canonical;
   final explicit = data['watchRequestId']?.toString();
   if (explicit != null && explicit.isNotEmpty) return explicit;
 
@@ -102,6 +108,9 @@ String? _watchRequestId(
     'REQUEST_RESCHEDULED',
     'LOCATION_CHANGED',
     'REQUEST_CANCELLED',
+    'MOVIE_SELECTED',
+    'EVERYONE_RATED',
+    'ALL_PARTICIPANTS_LOGGED',
   };
   final requestId = data['requestId']?.toString();
   if (watchTypes.contains(type) && requestId != null && requestId.isNotEmpty) {

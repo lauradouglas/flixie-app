@@ -253,20 +253,24 @@ class GroupRequestMemberStatus {
 
 class GroupWatchPlanCandidate {
   final String id;
+  final String addedByUserId;
   final int? movieId;
   final int? showId;
   final String? title;
   final String? posterPath;
   final String? addedByUsername;
+  final ProfileAvatar? addedByAvatar;
   final List<String> selectedByUserIds;
 
   const GroupWatchPlanCandidate({
     required this.id,
+    required this.addedByUserId,
     this.movieId,
     this.showId,
     this.title,
     this.posterPath,
     this.addedByUsername,
+    this.addedByAvatar,
     this.selectedByUserIds = const [],
   });
 
@@ -277,12 +281,17 @@ class GroupWatchPlanCandidate {
     final choices = json['choices'] as List<dynamic>? ?? const [];
     return GroupWatchPlanCandidate(
       id: json['id']?.toString() ?? '',
+      addedByUserId:
+          json['addedByUserId']?.toString() ?? addedBy?['id']?.toString() ?? '',
       movieId: _intValue(json['movieId'] ?? movie?['id']),
       showId: _intValue(json['showId'] ?? show?['id']),
       title: (movie?['title'] ?? show?['title'])?.toString(),
       posterPath: (movie?['posterPath'] ?? show?['posterPath'])?.toString(),
       addedByUsername:
           (addedBy?['username'] ?? addedBy?['firstName'])?.toString(),
+      addedByAvatar: addedBy?['avatar'] is Map<String, dynamic>
+          ? ProfileAvatar.fromJson(addedBy!['avatar'] as Map<String, dynamic>)
+          : null,
       selectedByUserIds: choices
           .whereType<Map<String, dynamic>>()
           .map((choice) => choice['userId']?.toString())

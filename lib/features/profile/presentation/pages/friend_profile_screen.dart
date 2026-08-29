@@ -554,22 +554,23 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
   }
 
   Future<void> _removeFriend() async {
+    if (!mounted) return;
     final auth = context.read<AuthProvider>();
     final myId = auth.dbUser?.id;
     if (myId == null) return;
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Remove Friend'),
         content:
             Text('Remove ${_user?.username ?? 'this user'} from your friends?'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, false),
+              onPressed: () => Navigator.pop(dialogContext, false),
               child: const Text('Cancel')),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('Remove',
                 style: TextStyle(color: FlixieColors.danger)),
           ),
@@ -577,6 +578,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       ),
     );
     if (confirmed != true) return;
+    if (!mounted) return;
 
     setState(() => _actionLoading = true);
     try {
@@ -730,9 +732,14 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
   Widget _buildFriendshipButton() {
     if (_actionLoading) {
       return const SizedBox(
-        height: 40,
-        width: 40,
-        child: CircularProgressIndicator(strokeWidth: 2),
+        height: 48,
+        child: Center(
+          child: SizedBox(
+            height: 20,
+            width: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
       );
     }
 
@@ -878,10 +885,12 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                     username: user.username,
                   );
                   if (blocked && context.mounted) context.pop();
+                } else if (action == 'remove_friend') {
+                  await _removeFriend();
                 }
               },
-              itemBuilder: (_) => const [
-                PopupMenuItem(
+              itemBuilder: (_) => [
+                const PopupMenuItem(
                   value: 'wrapped',
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
@@ -889,7 +898,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                     title: Text('View Wrapped'),
                   ),
                 ),
-                PopupMenuItem(
+                const PopupMenuItem(
                   value: 'report',
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
@@ -897,7 +906,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                     title: Text('Report user'),
                   ),
                 ),
-                PopupMenuItem(
+                const PopupMenuItem(
                   value: 'block',
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
@@ -906,6 +915,17 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                         style: TextStyle(color: FlixieColors.danger)),
                   ),
                 ),
+                if (_friendshipStatus == _FriendshipStatus.friends)
+                  const PopupMenuItem(
+                    value: 'remove_friend',
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.person_remove_outlined,
+                          color: FlixieColors.danger),
+                      title: Text('Remove friend',
+                          style: TextStyle(color: FlixieColors.danger)),
+                    ),
+                  ),
               ],
             )
           else
@@ -1017,6 +1037,21 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
   }
 
   Widget _profileActions() {
+    if (_actionLoading) {
+      return Container(
+        height: 50,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: FlixieColors.surface.withValues(alpha: .55),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: const SizedBox(
+          height: 20,
+          width: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
     if (_friendshipStatusLoading) {
       return Container(
         height: 50,

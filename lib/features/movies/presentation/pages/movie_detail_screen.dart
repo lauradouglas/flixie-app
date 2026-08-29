@@ -483,6 +483,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   bool _movieImagesLoading = false;
   List<WatchProvider> _watchProviders = [];
   Set<int> _userProviderIds = {};
+  Set<String> _userProviderMatchKeys = {};
   WatchProviderTab _watchProviderTab = WatchProviderTab.stream;
   MovieDetailTab _movieDetailTab = MovieDetailTab.overview;
   CrewMember? _director;
@@ -599,9 +600,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         if (userId != null)
           withStep(
             'GET user watch providers',
-            WatchlistActionsController.instance
-                .getUserWatchProviders(userId)
-                .catchError((_) => <WatchProvider>[]),
+            WatchlistActionsController.instance.getUserWatchProviders(userId),
           )
         else
           Future.value(<WatchProvider>[]),
@@ -646,6 +645,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           final userProviders = results[4] as List<WatchProvider>;
           _userProviderIds =
               userProviders.map((provider) => provider.id).toSet();
+          _userProviderMatchKeys =
+              userProviders.map((provider) => provider.matchKey).toSet();
           _reviews = (loadedMovie.reviews ?? []).toList();
 
           // Check movie status in user's lists
@@ -3368,14 +3369,14 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         onSuccess: () {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Watch invite sent!')),
+              const SnackBar(content: Text('Watch plan sent!')),
             );
           }
         },
         onError: () {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Failed to send invite')),
+              const SnackBar(content: Text('Failed to send watch plan')),
             );
           }
         },
@@ -3564,7 +3565,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               Expanded(
                 child: _statusActionItem(
                   icon: Icons.group_add_outlined,
-                  label: 'Invite',
+                  label: 'Plan',
                   color: FlixieColors.primary,
                   isActive: false,
                   isLoading: false,
@@ -5233,11 +5234,14 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       WatchProviderTab.buy =>
         _watchProviders.where((provider) => provider.isPurchase),
     };
-    return _sortedProviders(_dedupeProviders(matching));
+    return _sortedProviders(
+      _dedupeProviders(matching),
+      prioritiseSavedProviders: tab == WatchProviderTab.stream,
+    );
   }
 
   Widget _buildCompactProviderCard(WatchProvider provider) {
-    final isUserProvider = _userProviderIds.contains(provider.id);
+    final isUserProvider = _isUserProvider(provider);
     final availabilityLabel = switch (_watchProviderTab) {
       WatchProviderTab.stream => isUserProvider ? 'Included' : 'Subscription',
       WatchProviderTab.rent => 'Available to rent',
@@ -5249,15 +5253,15 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
         color: isUserProvider && _watchProviderTab == WatchProviderTab.stream
-            ? FlixieColors.success.withValues(alpha: 0.08)
+            ? FlixieColors.success.withValues(alpha: 0.12)
             : FlixieColors.surface.withValues(alpha: 0.58),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isUserProvider && _watchProviderTab == WatchProviderTab.stream
-              ? FlixieColors.success.withValues(alpha: 0.72)
+              ? FlixieColors.success
               : Colors.white.withValues(alpha: 0.1),
           width: isUserProvider && _watchProviderTab == WatchProviderTab.stream
-              ? 1.4
+              ? 2
               : 1,
         ),
       ),
@@ -5315,6 +5319,15 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               ],
             ),
           ),
+          if (isUserProvider && _watchProviderTab == WatchProviderTab.stream)
+            const Padding(
+              padding: EdgeInsets.only(left: 3),
+              child: Icon(
+                Icons.check_circle_rounded,
+                color: FlixieColors.success,
+                size: 14,
+              ),
+            ),
         ],
       ),
     );
@@ -5361,15 +5374,25 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     return byId.values;
   }
 
-  List<WatchProvider> _sortedProviders(Iterable<WatchProvider> providers) {
+  List<WatchProvider> _sortedProviders(
+    Iterable<WatchProvider> providers, {
+    required bool prioritiseSavedProviders,
+  }) {
     return providers.toList()
       ..sort((a, b) {
-        final aMatches = _userProviderIds.contains(a.id);
-        final bMatches = _userProviderIds.contains(b.id);
+        if (!prioritiseSavedProviders) {
+          return a.displayPriority.compareTo(b.displayPriority);
+        }
+        final aMatches = _isUserProvider(a);
+        final bMatches = _isUserProvider(b);
         if (aMatches != bMatches) return aMatches ? -1 : 1;
         return a.displayPriority.compareTo(b.displayPriority);
       });
   }
+
+  bool _isUserProvider(WatchProvider provider) =>
+      _userProviderIds.contains(provider.id) ||
+      _userProviderMatchKeys.contains(provider.matchKey);
 
   // ---- Top cast ------------------------------------------------------------
 

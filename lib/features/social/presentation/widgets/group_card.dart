@@ -38,7 +38,9 @@ class GroupCard extends StatelessWidget {
       onTap: onTap ?? () => context.push('/groups/${group.id}'),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(14),
+        // Give the final status row the same comfortable clearance as the
+        // top content; it was sitting too close to the card edge on phones.
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 18),
         decoration: BoxDecoration(
           color: FlixieColors.tabBarBackgroundFocused,
           borderRadius: BorderRadius.circular(16),

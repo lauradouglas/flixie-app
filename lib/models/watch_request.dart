@@ -221,6 +221,7 @@ class WatchPlanCandidate {
   final String mediaType;
   final String addedByUserId;
   final String? addedByUsername;
+  final ProfileAvatar? addedByAvatar;
   final String? title;
   final String? posterPath;
   final String? releaseDate;
@@ -233,6 +234,7 @@ class WatchPlanCandidate {
     required this.mediaType,
     required this.addedByUserId,
     this.addedByUsername,
+    this.addedByAvatar,
     this.title,
     this.posterPath,
     this.releaseDate,
@@ -253,6 +255,9 @@ class WatchPlanCandidate {
       addedByUserId: json['addedByUserId']?.toString() ?? '',
       addedByUsername:
           (addedBy?['username'] ?? addedBy?['firstName'])?.toString(),
+      addedByAvatar: addedBy?['avatar'] is Map<String, dynamic>
+          ? ProfileAvatar.fromJson(addedBy!['avatar'] as Map<String, dynamic>)
+          : null,
       title: (movie?['title'] ?? show?['title'])?.toString(),
       posterPath: (movie?['posterPath'] ?? show?['posterPath'])?.toString(),
       releaseDate: (movie?['releaseDate'] ?? show?['firstAirDate'])?.toString(),

@@ -53,6 +53,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
   TvShowFriendSummary? _friendSummary;
   List<ShowList> _myListsContainingShow = [];
   Set<int> _userProviderIds = {};
+  Set<String> _userProviderMatchKeys = {};
   _ShowProviderTab _watchProviderTab = _ShowProviderTab.stream;
   bool _isLoading = true;
   String? _error;
@@ -115,7 +116,6 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         ),
         if (user != null)
           UserService.getUserWatchProviders(user.id)
-              .catchError((_) => <WatchProvider>[])
         else
           Future.value(<WatchProvider>[]),
         if (user != null)
@@ -145,6 +145,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         _cast = credits.cast.isNotEmpty ? credits.cast : show.cast;
         _crew = credits.crew.isNotEmpty ? credits.crew : show.crew;
         _userProviderIds = userProviders.map((provider) => provider.id).toSet();
+        _userProviderMatchKeys =
+            userProviders.map((provider) => provider.matchKey).toSet();
         _userRating = userRating;
         _reviews = reviews;
         _friendSummary = friendSummary ?? show.friendSummary;
@@ -2078,7 +2080,10 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       _ShowProviderTab.buy =>
         _watchProviders.where((provider) => provider.isPurchase),
     };
-    return _sortedProviders(_dedupeProviders(matching));
+    return _sortedProviders(
+      _dedupeProviders(matching),
+      prioritiseSavedProviders: tab == _ShowProviderTab.stream,
+    );
   }
 
   Iterable<WatchProvider> _dedupeProviders(Iterable<WatchProvider> providers) {
@@ -2089,18 +2094,24 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     return byId.values;
   }
 
-  List<WatchProvider> _sortedProviders(Iterable<WatchProvider> providers) {
+  List<WatchProvider> _sortedProviders(
+    Iterable<WatchProvider> providers, {
+    required bool prioritiseSavedProviders,
+  }) {
     return providers.toList()
       ..sort((a, b) {
-        final aMatches = _userProviderIds.contains(a.id);
-        final bMatches = _userProviderIds.contains(b.id);
+        if (!prioritiseSavedProviders) {
+          return a.displayPriority.compareTo(b.displayPriority);
+        }
+        final aMatches = _isUserProvider(a);
+        final bMatches = _isUserProvider(b);
         if (aMatches != bMatches) return aMatches ? -1 : 1;
         return a.displayPriority.compareTo(b.displayPriority);
       });
   }
 
   Widget _buildCompactProviderCard(WatchProvider provider) {
-    final isUserProvider = _userProviderIds.contains(provider.id);
+    final isUserProvider = _isUserProvider(provider);
     final availabilityLabel = switch (_watchProviderTab) {
       _ShowProviderTab.stream => isUserProvider ? 'Included' : 'Subscription',
       _ShowProviderTab.rent => 'Available to rent',
@@ -2112,13 +2123,16 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
         color: isUserProvider && _watchProviderTab == _ShowProviderTab.stream
-            ? FlixieColors.success.withValues(alpha: .08)
+            ? FlixieColors.success.withValues(alpha: .12)
             : FlixieColors.surface.withValues(alpha: .58),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isUserProvider && _watchProviderTab == _ShowProviderTab.stream
-              ? FlixieColors.success.withValues(alpha: .72)
+              ? FlixieColors.success
               : Colors.white.withValues(alpha: .1),
+          width: isUserProvider && _watchProviderTab == _ShowProviderTab.stream
+              ? 2
+              : 1,
         ),
       ),
       child: Row(children: [
@@ -2168,9 +2182,22 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
             ],
           ),
         ),
+        if (isUserProvider && _watchProviderTab == _ShowProviderTab.stream)
+          const Padding(
+            padding: EdgeInsets.only(left: 3),
+            child: Icon(
+              Icons.check_circle_rounded,
+              color: FlixieColors.success,
+              size: 14,
+            ),
+          ),
       ]),
     );
   }
+
+  bool _isUserProvider(WatchProvider provider) =>
+      _userProviderIds.contains(provider.id) ||
+      _userProviderMatchKeys.contains(provider.matchKey);
 
   void _showAllProviderOptions(List<WatchProvider> providers) {
     showModalBottomSheet<void>(

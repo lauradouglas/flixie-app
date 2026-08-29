@@ -298,14 +298,14 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                       tabAlignment: TabAlignment.fill,
                       padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
                       labelPadding: EdgeInsets.zero,
-                      indicator: BoxDecoration(
-                        color: FlixieColors.primary.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: FlixieColors.primary.withValues(alpha: 0.45),
+                      indicator: const UnderlineTabIndicator(
+                        borderSide: BorderSide(
+                          color: FlixieColors.primary,
+                          width: 3,
                         ),
+                        insets: EdgeInsets.symmetric(horizontal: 14),
                       ),
-                      indicatorSize: TabBarIndicatorSize.tab,
+                      indicatorSize: TabBarIndicatorSize.label,
                       dividerColor: Colors.white.withValues(alpha: 0.08),
                       labelColor: FlixieColors.primary,
                       unselectedLabelColor: FlixieColors.medium,
@@ -321,30 +321,33 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                         const Tab(text: 'Chat'),
                         const Tab(text: 'Activity'),
                         Tab(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text('Watch Plans'),
-                              if (_pendingRequestCount > 0) ...[
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: FlixieColors.warning,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Text(
-                                    '$_pendingRequestCount',
-                                    style: const TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('Watch Plans'),
+                                if (_pendingRequestCount > 0) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: FlixieColors.warning,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      '$_pendingRequestCount',
+                                      style: const TextStyle(
+                                        color: Colors.black,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
-                                ),
+                                ],
                               ],
-                            ],
+                            ),
                           ),
                         ),
                         const Tab(text: 'Insights'),

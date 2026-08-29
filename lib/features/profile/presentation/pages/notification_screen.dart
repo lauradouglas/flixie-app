@@ -931,98 +931,99 @@ class _NotificationScheduleProposalSheetState
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Container(
-        decoration: const BoxDecoration(
-          color: FlixieColors.background,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        padding: EdgeInsets.fromLTRB(
-          16,
-          14,
-          16,
-          MediaQuery.of(context).viewInsets.bottom + 16,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Suggest a time',
-              style: TextStyle(
-                color: FlixieColors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _QuickScheduleChip(
-                  label: 'Tonight',
-                  onTap: () => setState(() => _selected = _tonight()),
+      child: Material(
+        color: FlixieColors.background,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            14,
+            16,
+            MediaQuery.of(context).viewInsets.bottom + 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Suggest a time',
+                style: TextStyle(
+                  color: FlixieColors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
                 ),
-                _QuickScheduleChip(
-                  label: 'Tomorrow',
-                  onTap: () => setState(() => _selected = _tomorrow()),
-                ),
-                _QuickScheduleChip(
-                  label: 'This weekend',
-                  onTap: () => setState(() => _selected = _thisWeekend()),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading:
-                  const Icon(Icons.event_outlined, color: FlixieColors.primary),
-              title: const Text('Date',
-                  style: TextStyle(color: FlixieColors.light)),
-              subtitle: Text(
-                '${_selected.day} ${_kMonths[_selected.month - 1]} ${_selected.year}',
-                style: const TextStyle(color: FlixieColors.medium),
               ),
-              onTap: _pickDate,
-            ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.schedule_rounded,
-                  color: FlixieColors.primary),
-              title: const Text('Time',
-                  style: TextStyle(color: FlixieColors.light)),
-              subtitle: Text(
-                TimeOfDay.fromDateTime(_selected).format(context),
-                style: const TextStyle(color: FlixieColors.medium),
-              ),
-              onTap: _pickTime,
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _messageController,
-              maxLines: 2,
-              style: const TextStyle(color: FlixieColors.light),
-              decoration: const InputDecoration(
-                labelText: 'Note (optional)',
-                hintText: 'Add a quick note',
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(
-                  context,
-                  (
-                    proposedFor: _selected,
-                    message: _messageController.text.trim(),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _QuickScheduleChip(
+                    label: 'Tonight',
+                    onTap: () => setState(() => _selected = _tonight()),
                   ),
-                ),
-                child: const Text('Send suggestion'),
+                  _QuickScheduleChip(
+                    label: 'Tomorrow',
+                    onTap: () => setState(() => _selected = _tomorrow()),
+                  ),
+                  _QuickScheduleChip(
+                    label: 'This weekend',
+                    onTap: () => setState(() => _selected = _thisWeekend()),
+                  ),
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.event_outlined,
+                    color: FlixieColors.primary),
+                title: const Text('Date',
+                    style: TextStyle(color: FlixieColors.light)),
+                subtitle: Text(
+                  '${_selected.day} ${_kMonths[_selected.month - 1]} ${_selected.year}',
+                  style: const TextStyle(color: FlixieColors.medium),
+                ),
+                onTap: _pickDate,
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.schedule_rounded,
+                    color: FlixieColors.primary),
+                title: const Text('Time',
+                    style: TextStyle(color: FlixieColors.light)),
+                subtitle: Text(
+                  TimeOfDay.fromDateTime(_selected).format(context),
+                  style: const TextStyle(color: FlixieColors.medium),
+                ),
+                onTap: _pickTime,
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _messageController,
+                maxLines: 2,
+                style: const TextStyle(color: FlixieColors.light),
+                decoration: const InputDecoration(
+                  labelText: 'Note (optional)',
+                  hintText: 'Add a quick note',
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(
+                    context,
+                    (
+                      proposedFor: _selected,
+                      message: _messageController.text.trim(),
+                    ),
+                  ),
+                  child: const Text('Send suggestion'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -26,6 +26,7 @@ import 'package:flixie_app/features/movies/data/search_service.dart';
 import 'package:flixie_app/features/authentication/presentation/pages/auth_ui.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/social/presentation/widgets/group_watch_requests_overview.dart';
+import 'package:flixie_app/features/social/presentation/widgets/watch_plan_candidate_avatar.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/core/analytics/detail_source.dart';
 import 'package:flixie_app/features/sharing/models/share_card_data.dart';
@@ -63,6 +64,7 @@ enum _RequestAction {
   declining,
   scheduling,
   savingMovieChoices,
+  removingCandidate,
   selectingMovie,
   completing,
   deleting,
@@ -92,7 +94,7 @@ class WatchRequestsScreen extends StatefulWidget {
 }
 
 /// Dedicated full-page view for one Watch Plan.
-class WatchRequestDetailScreen extends StatelessWidget {
+class WatchRequestDetailScreen extends StatefulWidget {
   const WatchRequestDetailScreen({
     super.key,
     required this.requestId,
@@ -101,8 +103,62 @@ class WatchRequestDetailScreen extends StatelessWidget {
   final String requestId;
 
   @override
+  State<WatchRequestDetailScreen> createState() =>
+      _WatchRequestDetailScreenState();
+}
+
+class _WatchRequestDetailScreenState extends State<WatchRequestDetailScreen> {
+  var _resolvingGroupPlan = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveGroupPlan();
+  }
+
+  /// Some older notification payloads identify a group plan only by request
+  /// ID. Resolve those before falling back to the direct-plan screen, so a
+  /// tap never strands someone on an empty Watch Plans page.
+  Future<void> _resolveGroupPlan() async {
+    try {
+      final auth = context.read<AuthProvider>();
+      final userId = auth.dbUser?.id;
+      if (userId == null || userId.isEmpty) return;
+
+      // Fetch fresh membership here. A notification can arrive before the
+      // authenticated cache has refreshed after someone joined a group.
+      final groups = await GroupService.getUserGroups(userId);
+
+      for (final group in groups) {
+        final groupId = group.id;
+        if (groupId == null || groupId.isEmpty) continue;
+        final requests = await GroupService.getGroupWatchRequests(groupId);
+        if (requests.any((request) => request.id == widget.requestId)) {
+          if (!mounted) return;
+          context.go(
+              '/groups/$groupId?tab=requests&requestId=${widget.requestId}');
+          return;
+        }
+      }
+    } catch (error) {
+      // A failed lookup must not prevent opening a valid direct watch plan.
+      logger
+          .w('Unable to resolve group watch plan ${widget.requestId}: $error');
+    } finally {
+      if (mounted) {
+        setState(() => _resolvingGroupPlan = false);
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return WatchRequestsScreen(initialRequestId: requestId);
+    if (_resolvingGroupPlan) {
+      return const FlixiePageScaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    return WatchRequestsScreen(initialRequestId: widget.requestId);
   }
 }
 
@@ -1351,6 +1407,8 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
           _toggleCandidateChoice(request, myUserId, candidateId),
       onSaveCandidateChoices: () => _saveCandidateChoices(request, myUserId),
       onAddCandidate: () => _addCandidate(request, myUserId),
+      onRemoveCandidate: (candidateId) =>
+          _removeCandidate(request, myUserId, candidateId),
       onSelectCandidate: (candidateId) =>
           _selectFinalCandidate(request, candidateId),
       onChangeMovie: () => _reopenMovieChoices(request, myUserId),
@@ -1467,6 +1525,37 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
       _candidateChoiceDrafts.remove(request.id);
       _dirtyCandidateChoiceDraftIds.remove(request.id);
       _replaceRequest(state.request);
+    });
+  }
+
+  Future<void> _removeCandidate(
+    WatchRequest request,
+    String userId,
+    String candidateId,
+  ) async {
+    await _withRequestAction(request, _RequestAction.removingCandidate,
+        () async {
+      try {
+        final state = await RequestService.removeWatchPlanCandidate(
+          watchRequestId: request.id,
+          userId: userId,
+          candidateId: candidateId,
+        );
+        _candidateChoiceDrafts.remove(request.id);
+        _dirtyCandidateChoiceDraftIds.remove(request.id);
+        _replaceRequest(state.request);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Movie option removed'),
+          backgroundColor: FlixieColors.success,
+        ));
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Could not remove that movie option.'),
+          backgroundColor: FlixieColors.danger,
+        ));
+      }
     });
   }
 
@@ -1912,7 +2001,7 @@ class _PlanRecipientSheetState extends State<_PlanRecipientSheet> {
                     prefixIcon: const Icon(Icons.search_rounded),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 4),
                 Expanded(
                   child: items.isEmpty
                       ? Center(
@@ -1933,6 +2022,10 @@ class _PlanRecipientSheetState extends State<_PlanRecipientSheet> {
                             if (_showGroups) {
                               final group = groups[index];
                               return ListTile(
+                                minVerticalPadding: 8,
+                                visualDensity: VisualDensity.standard,
+                                contentPadding:
+                                    const EdgeInsets.symmetric(horizontal: 8),
                                 leading: const CircleAvatar(
                                   child: Icon(Icons.groups_2_outlined),
                                 ),
@@ -1950,13 +2043,17 @@ class _PlanRecipientSheetState extends State<_PlanRecipientSheet> {
                             }
                             final friend = friends[index];
                             return ListTile(
+                              minVerticalPadding: 8,
+                              visualDensity: VisualDensity.standard,
+                              contentPadding:
+                                  const EdgeInsets.symmetric(horizontal: 8),
                               leading: ProfileAvatarView(
                                 avatar: friend.avatar,
                                 fallbackText: friend
                                     .displayName.characters.first
                                     .toUpperCase(),
                                 fallbackColor: FlixieColors.primary,
-                                size: 48,
+                                size: 40,
                                 profileBadges: friend.profileBadges,
                               ),
                               title: Text(friend.displayName),
@@ -2045,6 +2142,7 @@ class _WatchRequestCard extends StatelessWidget {
     required this.onToggleCandidateChoice,
     required this.onSaveCandidateChoices,
     required this.onAddCandidate,
+    required this.onRemoveCandidate,
     required this.onSelectCandidate,
     required this.onChangeMovie,
     this.onMovieTap,
@@ -2074,6 +2172,7 @@ class _WatchRequestCard extends StatelessWidget {
   final ValueChanged<String> onToggleCandidateChoice;
   final VoidCallback onSaveCandidateChoices;
   final VoidCallback onAddCandidate;
+  final ValueChanged<String> onRemoveCandidate;
   final ValueChanged<String> onSelectCandidate;
   final VoidCallback onChangeMovie;
   final _RequestAction? busyAction;
@@ -2655,6 +2754,10 @@ class _WatchRequestCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
+          if (_isIncomingInvitation) ...[
+            _PlanSurface(child: _buildInvitationDecisionActions()),
+            const SizedBox(height: 12),
+          ],
           if (_hasPlanningAction) ...[
             _PlanSurface(child: _buildActions(includeWatchConfirmation: false)),
             const SizedBox(height: 12),
@@ -2674,6 +2777,11 @@ class _WatchRequestCard extends StatelessWidget {
                         child: ExpansionTile(
                           tilePadding: EdgeInsets.zero,
                           childrenPadding: EdgeInsets.zero,
+                          // Keep the collapsed row aligned with the 14px
+                          // surface inset instead of adding a tall default
+                          // ListTile rhythm inside this compact summary card.
+                          minTileHeight: 48,
+                          visualDensity: const VisualDensity(vertical: -2),
                           initiallyExpanded: false,
                           leading: const Icon(
                             Icons.movie_filter_outlined,
@@ -2949,14 +3057,16 @@ class _WatchRequestCard extends StatelessWidget {
         .whereType<int>()
         .toList(growable: false);
     final mine = entries.where((entry) => entry.userId == myUserId).firstOrNull;
-    final theirs = entries.where((entry) => entry.userId != myUserId).firstOrNull;
+    final theirs =
+        entries.where((entry) => entry.userId != myUserId).firstOrNull;
     final average = ratings.isEmpty
         ? null
         : ratings.reduce((total, rating) => total + rating) / ratings.length;
     final difference = mine?.rating != null && theirs?.rating != null
         ? (mine!.rating! - theirs!.rating!).abs()
         : null;
-    final scheduled = _effectiveWatchTime == null ? '' : _dateLabel(_effectiveWatchTime!);
+    final scheduled =
+        _effectiveWatchTime == null ? '' : _dateLabel(_effectiveWatchTime!);
 
     Widget surface(Widget child, {bool tinted = false}) => Container(
           width: double.infinity,
@@ -2978,76 +3088,253 @@ class _WatchRequestCard extends StatelessWidget {
           const Row(children: [
             Icon(Icons.check_rounded, color: FlixieColors.success),
             SizedBox(width: 8),
-            Text('WATCHED TOGETHER', style: TextStyle(color: FlixieColors.success,
-                fontWeight: FontWeight.w800, letterSpacing: 1)),
+            Text('WATCHED TOGETHER',
+                style: TextStyle(
+                    color: FlixieColors.success,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1)),
           ]),
           const SizedBox(height: 14),
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            ClipRRect(borderRadius: BorderRadius.circular(18), child: SizedBox(
-              width: 116, height: 174,
-              child: posterUrl == null ? const _PosterPlaceholder() : CachedNetworkImage(imageUrl: posterUrl, fit: BoxFit.cover),
-            )),
+            ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: SizedBox(
+                  width: 116,
+                  height: 174,
+                  child: posterUrl == null
+                      ? const _PosterPlaceholder()
+                      : CachedNetworkImage(
+                          imageUrl: posterUrl, fit: BoxFit.cover),
+                )),
             const SizedBox(width: 18),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(movie?.title ?? 'Watch plan', style: const TextStyle(color: FlixieColors.primary,
-                  fontSize: 25, fontWeight: FontWeight.w800)),
-              if (scheduled.isNotEmpty) ...[const SizedBox(height: 10), Text(scheduled,
-                  style: const TextStyle(color: FlixieColors.light, fontSize: 16))],
-              const SizedBox(height: 18),
-              Container(padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-                decoration: BoxDecoration(color: FlixieColors.primary.withValues(alpha: .16), borderRadius: BorderRadius.circular(20)),
-                child: Text('👤 You + ${other?.username ?? 'friend'}', style: const TextStyle(color: FlixieColors.light, fontWeight: FontWeight.w700))),
-            ])),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(movie?.title ?? 'Watch plan',
+                      style: const TextStyle(
+                          color: FlixieColors.primary,
+                          fontSize: 25,
+                          fontWeight: FontWeight.w800)),
+                  if (scheduled.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Text(scheduled,
+                        style: const TextStyle(
+                            color: FlixieColors.light, fontSize: 16))
+                  ],
+                  const SizedBox(height: 18),
+                  Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 11, vertical: 7),
+                      decoration: BoxDecoration(
+                          color: FlixieColors.primary.withValues(alpha: .16),
+                          borderRadius: BorderRadius.circular(20)),
+                      child: Text('👤 You + ${other?.username ?? 'friend'}',
+                          style: const TextStyle(
+                              color: FlixieColors.light,
+                              fontWeight: FontWeight.w700))),
+                ])),
           ]),
         ])),
         const SizedBox(height: 16),
-        surface(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            const Expanded(child: Text('How you matched', style: TextStyle(color: FlixieColors.light, fontSize: 20, fontWeight: FontWeight.w800))),
-            Text('✓ ${difference == null ? 'RATINGS PENDING' : difference <= 1 ? 'CLOSE MATCH' : 'DIFFERENT TAKES'}', style: const TextStyle(color: FlixieColors.success, fontWeight: FontWeight.w800)),
-          ]),
-          const SizedBox(height: 12),
-          Row(children: [
-            Expanded(child: _friendRatingTile('You', mine?.rating, context.read<AuthProvider>().dbUser?.avatar)),
-            const Padding(padding: EdgeInsets.symmetric(horizontal: 10), child: Text('VS', style: TextStyle(color: FlixieColors.medium, fontWeight: FontWeight.w800))),
-            Expanded(child: _friendRatingTile(other?.username ?? 'Friend', theirs?.rating, other?.avatar)),
-          ]),
-          if (difference != null) ...[const SizedBox(height: 14), Center(child: Text(
-            difference == 0 ? '👍 You both gave it the same rating' : '👍 ${difference == 1 ? 'Only 1 point apart' : '$difference points apart'}',
-            style: const TextStyle(color: FlixieColors.success, fontWeight: FontWeight.w800)))],
-        ]), tinted: true),
+        surface(
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                const Expanded(
+                    child: Text('How you matched',
+                        style: TextStyle(
+                            color: FlixieColors.light,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800))),
+                Text(
+                    '✓ ${difference == null ? 'RATINGS PENDING' : difference <= 1 ? 'CLOSE MATCH' : 'DIFFERENT TAKES'}',
+                    style: const TextStyle(
+                        color: FlixieColors.success,
+                        fontWeight: FontWeight.w800)),
+              ]),
+              const SizedBox(height: 12),
+              Row(children: [
+                Expanded(
+                    child: _friendRatingTile('You', mine?.rating,
+                        context.read<AuthProvider>().dbUser?.avatar)),
+                const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: Text('VS',
+                        style: TextStyle(
+                            color: FlixieColors.medium,
+                            fontWeight: FontWeight.w800))),
+                Expanded(
+                    child: _friendRatingTile(other?.username ?? 'Friend',
+                        theirs?.rating, other?.avatar)),
+              ]),
+              if (difference != null) ...[
+                const SizedBox(height: 14),
+                Center(
+                    child: Text(
+                        difference == 0
+                            ? '👍 You both gave it the same rating'
+                            : '👍 ${difference == 1 ? 'Only 1 point apart' : '$difference points apart'}',
+                        style: const TextStyle(
+                            color: FlixieColors.success,
+                            fontWeight: FontWeight.w800)))
+              ],
+            ]),
+            tinted: true),
         const SizedBox(height: 22),
         const SizedBox(height: 4),
         _buildPlanActivity(),
         const SizedBox(height: 12),
         Row(children: [
-          const Expanded(child: Text('Your takes', style: TextStyle(color: FlixieColors.light, fontSize: 20, fontWeight: FontWeight.w800))),
-          Text('${entries.length} watches logged', style: const TextStyle(color: FlixieColors.medium)),
+          const Expanded(
+              child: Text('Your takes',
+                  style: TextStyle(
+                      color: FlixieColors.light,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800))),
+          Text('${entries.length} watches logged',
+              style: const TextStyle(color: FlixieColors.medium)),
         ]),
         const SizedBox(height: 12),
-        ...entries.map((entry) => Padding(padding: const EdgeInsets.only(bottom: 12), child: _friendRecapEntry(entry, entry.userId == myUserId ? context.read<AuthProvider>().dbUser?.username ?? 'You' : other?.username ?? 'Friend', entry.userId == myUserId ? context.read<AuthProvider>().dbUser?.avatar : other?.avatar))),
+        ...entries.map((entry) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _friendRecapEntry(
+                entry,
+                entry.userId == myUserId
+                    ? context.read<AuthProvider>().dbUser?.username ?? 'You'
+                    : other?.username ?? 'Friend',
+                entry.userId == myUserId
+                    ? context.read<AuthProvider>().dbUser?.avatar
+                    : other?.avatar))),
         Row(children: [
-          Expanded(child: FilledButton.icon(onPressed: other?.id == null ? null : () => context.push('/chat/${other!.id}'), icon: const Icon(Icons.forum_outlined), label: Text('Message ${other?.username ?? 'friend'}'), style: FilledButton.styleFrom(minimumSize: const Size(0, 50), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))))),
+          Expanded(
+              child: FilledButton.icon(
+                  onPressed: other?.id == null
+                      ? null
+                      : () => context.push('/chat/${other!.id}'),
+                  icon: const Icon(Icons.forum_outlined),
+                  label: Text('Message ${other?.username ?? 'friend'}'),
+                  style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 50),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14))))),
           const SizedBox(width: 12),
-          Expanded(child: OutlinedButton.icon(onPressed: mine?.rating == null || movie == null ? null : () => promptShareCard(context, ShareCardData.rating(mediaType: ShareCardMediaType.movie, mediaId: movie.id, title: movie.title, posterPath: movie.posterPath, user: context.read<AuthProvider>().dbUser!, rating: mine!.rating!, note: mine!.reviewText)), icon: const Icon(Icons.ios_share_rounded), label: const Text('Share recap'), style: OutlinedButton.styleFrom(minimumSize: const Size(0, 50), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))))),
+          Expanded(
+              child: OutlinedButton.icon(
+                  onPressed: mine?.rating == null || movie == null
+                      ? null
+                      : () => promptShareCard(
+                          context,
+                          ShareCardData.rating(
+                              mediaType: ShareCardMediaType.movie,
+                              mediaId: movie.id,
+                              title: movie.title,
+                              posterPath: movie.posterPath,
+                              user: context.read<AuthProvider>().dbUser!,
+                              rating: mine!.rating!,
+                              note: mine!.reviewText)),
+                  icon: const Icon(Icons.ios_share_rounded),
+                  label: const Text('Share recap'),
+                  style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 50),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14))))),
         ]),
       ]),
     );
   }
 
-  Widget _friendRatingTile(String name, int? rating, ProfileAvatar? avatar) => Container(
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(color: FlixieColors.background.withValues(alpha: .7), borderRadius: BorderRadius.circular(18), border: Border.all(color: FlixieColors.tabBarBorder)),
-    child: Column(children: [ProfileAvatarView(avatar: avatar, fallbackText: name[0].toUpperCase(), fallbackColor: FlixieColors.primary, size: 46), const SizedBox(height: 8), Text(rating == null ? '—' : '$rating/10', style: const TextStyle(color: FlixieColors.warning, fontSize: 24, fontWeight: FontWeight.w800)), Text(name, style: const TextStyle(color: FlixieColors.medium))]),
-  );
+  Widget _friendRatingTile(String name, int? rating, ProfileAvatar? avatar) =>
+      Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+            color: FlixieColors.background.withValues(alpha: .7),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: FlixieColors.tabBarBorder)),
+        child: Column(children: [
+          ProfileAvatarView(
+              avatar: avatar,
+              fallbackText: name[0].toUpperCase(),
+              fallbackColor: FlixieColors.primary,
+              size: 46),
+          const SizedBox(height: 8),
+          Text(rating == null ? '—' : '$rating/10',
+              style: const TextStyle(
+                  color: FlixieColors.warning,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800)),
+          Text(name, style: const TextStyle(color: FlixieColors.medium))
+        ]),
+      );
 
-  Widget _friendRecapEntry(WatchConfirmation entry, String name, ProfileAvatar? avatar) => Container(
-    padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: FlixieColors.surface, borderRadius: BorderRadius.circular(20), border: Border.all(color: FlixieColors.tabBarBorder)),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [ProfileAvatarView(avatar: avatar, fallbackText: name[0].toUpperCase(), fallbackColor: FlixieColors.primary, size: 48), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(name, style: const TextStyle(color: FlixieColors.light, fontSize: 17, fontWeight: FontWeight.w700)), const Text('Watched together', style: TextStyle(color: FlixieColors.medium))])), if (entry.rating != null) Text('★ ${entry.rating}/10', style: const TextStyle(color: FlixieColors.warning, fontSize: 18, fontWeight: FontWeight.w800))]), if (entry.rating != null || (entry.reviewText?.isNotEmpty ?? false)) ...[const SizedBox(height: 14), Row(children: [if (entry.rating != null) Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(border: Border.all(color: FlixieColors.success), borderRadius: BorderRadius.circular(18)), child: Text(entry.rating! >= 7 ? '👍 Recommends' : '👎 Would skip', style: const TextStyle(color: FlixieColors.success, fontWeight: FontWeight.w700))), if (entry.reviewText?.isNotEmpty ?? false) ...[const SizedBox(width: 12), Expanded(child: Text('“${entry.reviewText}”', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: FlixieColors.light, fontStyle: FontStyle.italic)))]]),]]),
-  );
+  Widget _friendRecapEntry(
+          WatchConfirmation entry, String name, ProfileAvatar? avatar) =>
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+            color: FlixieColors.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: FlixieColors.tabBarBorder)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            ProfileAvatarView(
+                avatar: avatar,
+                fallbackText: name[0].toUpperCase(),
+                fallbackColor: FlixieColors.primary,
+                size: 48),
+            const SizedBox(width: 12),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(name,
+                      style: const TextStyle(
+                          color: FlixieColors.light,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700)),
+                  const Text('Watched together',
+                      style: TextStyle(color: FlixieColors.medium))
+                ])),
+            if (entry.rating != null)
+              Text('★ ${entry.rating}/10',
+                  style: const TextStyle(
+                      color: FlixieColors.warning,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800))
+          ]),
+          if (entry.rating != null ||
+              (entry.reviewText?.isNotEmpty ?? false)) ...[
+            const SizedBox(height: 14),
+            Row(children: [
+              if (entry.rating != null)
+                Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                        border: Border.all(color: FlixieColors.success),
+                        borderRadius: BorderRadius.circular(18)),
+                    child: Text(
+                        entry.rating! >= 7 ? '👍 Recommends' : '👎 Would skip',
+                        style: const TextStyle(
+                            color: FlixieColors.success,
+                            fontWeight: FontWeight.w700))),
+              if (entry.reviewText?.isNotEmpty ?? false) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                    child: Text('“${entry.reviewText}”',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: FlixieColors.light,
+                            fontStyle: FontStyle.italic)))
+              ]
+            ]),
+          ]
+        ]),
+      );
 
   Widget _buildPlanActivity() {
-    final watched = request.watchConfirmations.where((entry) => entry.watched).length;
+    final watched =
+        request.watchConfirmations.where((entry) => entry.watched).length;
     final rated = request.watchConfirmations
         .where((entry) => entry.watched && entry.rating != null)
         .length;
@@ -3057,32 +3344,85 @@ class _WatchRequestCard extends StatelessWidget {
         .where((candidate) => candidate.id == request.selectedCandidateId)
         .firstOrNull
         ?.title;
-    final accepted = request.isAccepted || request.isScheduled ||
-        request.isCompleted || request.normalizedWatchedStatus == 'WATCHED';
+    final accepted = request.isAccepted ||
+        request.isScheduled ||
+        request.isCompleted ||
+        request.normalizedWatchedStatus == 'WATCHED';
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Plan activity', style: TextStyle(color: FlixieColors.light, fontSize: 16, fontWeight: FontWeight.w800)),
+      const Text('Plan activity',
+          style: TextStyle(
+              color: FlixieColors.light,
+              fontSize: 16,
+              fontWeight: FontWeight.w800)),
       const SizedBox(height: 12),
-      _planActivityRow(Icons.send_rounded, 'Invited', 'Watch plan created', true),
-      _planActivityRow(Icons.check_circle_outline_rounded, 'Accepted', accepted ? 'You’re both in' : 'Waiting for a response', accepted),
-      _planActivityRow(Icons.bookmark_added_outlined, 'Choices saved', request.candidates.isNotEmpty ? '${request.candidates.length} titles considered' : 'No titles added yet', request.candidates.isNotEmpty),
-      _planActivityRow(Icons.movie_filter_outlined, 'Movie finalised', finalised ? '${selectedTitle ?? 'Movie'} was picked' : 'Pick a movie together', finalised),
-      _planActivityRow(Icons.calendar_month_outlined, 'Scheduled', scheduled ? _dateLabel(_effectiveWatchTime!) : 'No time set yet', scheduled),
-      _planActivityRow(Icons.visibility_outlined, 'Watched', watched > 0 ? '$watched of 2 watches logged' : 'Log your watch after the plan', watched > 0),
-      _planActivityRow(Icons.star_outline_rounded, 'Rated', rated > 0 ? '$rated of 2 ratings saved' : 'Ratings will appear here', rated > 0, last: true),
+      _planActivityRow(
+          Icons.send_rounded, 'Invited', 'Watch plan created', true),
+      _planActivityRow(Icons.check_circle_outline_rounded, 'Accepted',
+          accepted ? 'You’re both in' : 'Waiting for a response', accepted),
+      _planActivityRow(
+          Icons.bookmark_added_outlined,
+          'Choices saved',
+          request.candidates.isNotEmpty
+              ? '${request.candidates.length} titles considered'
+              : 'No titles added yet',
+          request.candidates.isNotEmpty),
+      _planActivityRow(
+          Icons.movie_filter_outlined,
+          'Movie finalised',
+          finalised
+              ? '${selectedTitle ?? 'Movie'} was picked'
+              : 'Pick a movie together',
+          finalised),
+      _planActivityRow(
+          Icons.calendar_month_outlined,
+          'Scheduled',
+          scheduled ? _dateLabel(_effectiveWatchTime!) : 'No time set yet',
+          scheduled),
+      _planActivityRow(
+          Icons.visibility_outlined,
+          'Watched',
+          watched > 0
+              ? '$watched of 2 watches logged'
+              : 'Log your watch after the plan',
+          watched > 0),
+      _planActivityRow(
+          Icons.star_outline_rounded,
+          'Rated',
+          rated > 0 ? '$rated of 2 ratings saved' : 'Ratings will appear here',
+          rated > 0,
+          last: true),
     ]);
   }
 
-  Widget _planActivityRow(IconData icon, String title, String detail, bool complete, {bool last = false}) =>
+  Widget _planActivityRow(
+          IconData icon, String title, String detail, bool complete,
+          {bool last = false}) =>
       Padding(
         padding: EdgeInsets.only(bottom: last ? 0 : 8),
         child: Row(children: [
-        Icon(icon, size: 17, color: complete ? FlixieColors.success : FlixieColors.medium),
-        const SizedBox(width: 8),
-        Expanded(child: Text.rich(TextSpan(children: [
-          TextSpan(text: title, style: TextStyle(color: complete ? FlixieColors.light : FlixieColors.medium, fontSize: 13, fontWeight: FontWeight.w700)),
-          TextSpan(text: ' · $detail', style: const TextStyle(color: FlixieColors.medium, fontSize: 12)),
-        ]), maxLines: 1, overflow: TextOverflow.ellipsis)),
-      ]),
+          Icon(icon,
+              size: 17,
+              color: complete ? FlixieColors.success : FlixieColors.medium),
+          const SizedBox(width: 8),
+          Expanded(
+              child: Text.rich(
+                  TextSpan(children: [
+                    TextSpan(
+                        text: title,
+                        style: TextStyle(
+                            color: complete
+                                ? FlixieColors.light
+                                : FlixieColors.medium,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700)),
+                    TextSpan(
+                        text: ' · $detail',
+                        style: const TextStyle(
+                            color: FlixieColors.medium, fontSize: 12)),
+                  ]),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis)),
+        ]),
       );
 
   Widget _buildPlanRatingsSummary(BuildContext context) {
@@ -3330,6 +3670,7 @@ class _WatchRequestCard extends StatelessWidget {
     final selectedCandidate = request.selectedCandidateId;
     final acceptedIds = <String>{request.requesterId, request.recipientId};
     final savingMovieChoices = busyAction == _RequestAction.savingMovieChoices;
+    final removingCandidate = busyAction == _RequestAction.removingCandidate;
     final selectingMovie = busyAction == _RequestAction.selectingMovie;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3374,6 +3715,9 @@ class _WatchRequestCard extends StatelessWidget {
             final everyoneMatch = selectedCount == acceptedIds.length;
             final isFinal = candidate.id == selectedCandidate;
             final pickedByMe = candidateChoiceDraft.contains(candidate.id);
+            final canRemove = selectedCandidate == null &&
+                request.candidates.length > 1 &&
+                (organiser || candidate.addedByUserId == myUserId);
             return Padding(
               padding: const EdgeInsets.only(bottom: 9),
               child: Material(
@@ -3445,11 +3789,23 @@ class _WatchRequestCard extends StatelessWidget {
                                 ),
                               ),
                               if (candidate.addedByUsername?.isNotEmpty == true)
-                                Text(
-                                    'Suggested by ${candidate.addedByUsername}',
-                                    style: const TextStyle(
+                                Row(children: [
+                                  WatchPlanCandidateAvatar(
+                                    avatar: candidate.addedByAvatar,
+                                    username: candidate.addedByUsername,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Expanded(
+                                    child: Text(
+                                      'Suggested by ${candidate.addedByUsername}',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
                                         color: FlixieColors.medium,
-                                        fontSize: 11)),
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ),
+                                ]),
                             ],
                           ),
                         ),
@@ -3460,6 +3816,24 @@ class _WatchRequestCard extends StatelessWidget {
                             organiser &&
                             selectedCandidate == null)
                           const SizedBox(width: 10),
+                        if (canRemove)
+                          IconButton(
+                            onPressed: removingCandidate
+                                ? null
+                                : () => onRemoveCandidate(candidate.id),
+                            tooltip: 'Remove movie option',
+                            icon: removingCandidate
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.close_rounded, size: 20),
+                            color: FlixieColors.medium,
+                            visualDensity: VisualDensity.compact,
+                          ),
                         if (organiser && selectedCandidate == null)
                           FilledButton.icon(
                             onPressed: selectingMovie
@@ -3798,62 +4172,22 @@ class _WatchRequestCard extends StatelessWidget {
             style: const TextStyle(color: FlixieColors.medium, fontSize: 12),
           ),
           const SizedBox(height: 12),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final dateButton = OutlinedButton.icon(
-                onPressed: onChooseAcceptanceSchedule,
-                icon: Icon(
-                  acceptanceScheduleDraft == null
-                      ? Icons.calendar_month_outlined
-                      : Icons.edit_calendar_outlined,
-                  size: 17,
-                ),
-                label: Text(
-                  acceptanceScheduleDraft == null
-                      ? 'Add date & time'
-                      : 'Change date & time',
-                ),
-              );
-              final acceptButton = _PrimaryActionButton(
-                label: acceptanceScheduleDraft == null
-                    ? 'Accept invitation'
-                    : 'Accept & suggest time',
-                onPressed: onAccept,
-              );
-              final declineButton = OutlinedButton(
-                onPressed: onDecline,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: FlixieColors.danger,
-                  side: const BorderSide(color: FlixieColors.danger),
-                ),
-                child: const Text('Decline'),
-              );
-
-              // A row avoids a large, unbalanced action stack on tablets;
-              // phones retain full-width controls that are easy to tap.
-              if (constraints.maxWidth >= 600) {
-                return Row(
-                  children: [
-                    dateButton,
-                    const SizedBox(width: 10),
-                    Expanded(child: acceptButton),
-                    const SizedBox(width: 10),
-                    declineButton,
-                  ],
-                );
-              }
-
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Align(alignment: Alignment.centerLeft, child: dateButton),
-                  const SizedBox(height: 10),
-                  acceptButton,
-                  const SizedBox(height: 10),
-                  declineButton,
-                ],
-              );
-            },
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: onChooseAcceptanceSchedule,
+              icon: Icon(
+                acceptanceScheduleDraft == null
+                    ? Icons.calendar_month_outlined
+                    : Icons.edit_calendar_outlined,
+                size: 17,
+              ),
+              label: Text(
+                acceptanceScheduleDraft == null
+                    ? 'Add date & time'
+                    : 'Change date & time',
+              ),
+            ),
           ),
         ],
       );
@@ -4110,6 +4444,36 @@ class _WatchRequestCard extends StatelessWidget {
     }
 
     return const SizedBox.shrink();
+  }
+
+  Widget _buildInvitationDecisionActions() {
+    final acceptLabel = acceptanceScheduleDraft == null
+        ? 'Accept invitation'
+        : 'Accept & suggest time';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Respond to invitation',
+          style: TextStyle(
+            color: FlixieColors.light,
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 10),
+        _PrimaryActionButton(label: acceptLabel, onPressed: onAccept),
+        const SizedBox(height: 8),
+        OutlinedButton(
+          onPressed: onDecline,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: FlixieColors.danger,
+            side: const BorderSide(color: FlixieColors.danger),
+          ),
+          child: const Text('Decline'),
+        ),
+      ],
+    );
   }
 
   String _dateLabel(DateTime? value) {
@@ -5028,25 +5392,22 @@ class _CandidateChoicesSheetState extends State<_CandidateChoicesSheet> {
                       ),
                       child: Row(
                         children: [
-                          if (candidate.posterPath != null)
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(7),
-                              child: CachedNetworkImage(
-                                imageUrl:
-                                    'https://image.tmdb.org/t/p/w185${candidate.posterPath}',
-                                width: 36,
-                                height: 54,
-                                fit: BoxFit.cover,
-                                errorWidget: (_, __, ___) =>
-                                    const _PosterPlaceholder(),
-                              ),
-                            )
-                          else
-                            const SizedBox(
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(7),
+                            child: SizedBox(
                               width: 36,
                               height: 54,
-                              child: _PosterPlaceholder(),
+                              child: candidate.posterPath == null
+                                  ? const _PosterPlaceholder()
+                                  : CachedNetworkImage(
+                                      imageUrl:
+                                          'https://image.tmdb.org/t/p/w185${candidate.posterPath}',
+                                      fit: BoxFit.cover,
+                                      errorWidget: (_, __, ___) =>
+                                          const _PosterPlaceholder(),
+                                    ),
                             ),
+                          ),
                           const SizedBox(width: 11),
                           Expanded(
                             child: Column(
@@ -5058,11 +5419,23 @@ class _CandidateChoicesSheetState extends State<_CandidateChoicesSheet> {
                                         fontWeight: FontWeight.w800)),
                                 if (candidate.addedByUsername?.isNotEmpty ==
                                     true)
-                                  Text(
-                                      'Suggested by ${candidate.addedByUsername}',
-                                      style: const TextStyle(
+                                  Row(children: [
+                                    WatchPlanCandidateAvatar(
+                                      avatar: candidate.addedByAvatar,
+                                      username: candidate.addedByUsername,
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Expanded(
+                                      child: Text(
+                                        'Suggested by ${candidate.addedByUsername}',
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
                                           color: FlixieColors.medium,
-                                          fontSize: 12)),
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ]),
                               ],
                             ),
                           ),

@@ -54,7 +54,7 @@ class VideoCard extends StatelessWidget {
             Stack(
               children: [
                 Container(
-                  height: 152,
+                  height: 146,
                   width: 270,
                   decoration: BoxDecoration(
                     color: FlixieColors.surface,

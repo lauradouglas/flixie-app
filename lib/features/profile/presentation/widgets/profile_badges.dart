@@ -90,6 +90,12 @@ class ProfileBadgePills extends StatelessWidget {
       icon: Icons.local_fire_department_rounded,
       color: Color(0xFFFF8A66),
     ),
+    'OG_GINGER': (
+      label: 'OG Ginger',
+      description: 'First ginger on Flixie.',
+      icon: Icons.local_fire_department_rounded,
+      color: Color(0xFFFF8A66),
+    ),
     'VERIFIED': (
       label: 'Verified',
       description: 'Flixie has verified this account.',
@@ -108,6 +114,12 @@ class ProfileBadgePills extends StatelessWidget {
       icon: Icons.handshake_rounded,
       color: Color(0xFF73D7B4),
     ),
+    'PEACH_USER': (
+      label: 'Peach',
+      description: 'got cheeks',
+      icon: Icons.circle,
+      color: Color(0xFFFFA07A),
+    ),
   };
 
   @override
@@ -115,11 +127,13 @@ class ProfileBadgePills extends StatelessWidget {
     const priority = [
       'FOUNDER',
       'OG_USER',
+      'OG_GINGER',
       'VERIFIED',
       'EARLY_ADOPTER',
       'FOUNDING_FILM_FRIEND',
       'STAFF',
       'PARTNER',
+      'PEACH_USER',
     ];
     final ordered = [
       ...priority.where(badges.contains),
@@ -154,7 +168,9 @@ class ProfileBadgePills extends StatelessWidget {
               (badge) =>
                   badge.id != allVisible.first.id &&
                   (badge.id == 'EARLY_ADOPTER' ||
-                      badge.id == 'FOUNDING_FILM_FRIEND'),
+                      badge.id == 'FOUNDING_FILM_FRIEND' ||
+                      badge.id == 'PEACH_USER' ||
+                      badge.id == 'OG_GINGER'),
             ),
           ]
         : allVisible;
@@ -165,12 +181,16 @@ class ProfileBadgePills extends StatelessWidget {
       runSpacing: 6,
       children: [
         for (final badge in visible)
-          if (badge.id == 'EARLY_ADOPTER' || badge.id == 'FOUNDING_FILM_FRIEND')
+          if (badge.id == 'EARLY_ADOPTER' ||
+              badge.id == 'FOUNDING_FILM_FRIEND' ||
+              badge.id == 'PEACH_USER')
             Tooltip(
               message: badge.label,
               child: InkWell(
                 customBorder: const CircleBorder(),
-                onTap: () => _showBadgeContext(context, badge),
+                onTap: badge.id == 'PEACH_USER'
+                    ? null
+                    : () => _showBadgeContext(context, badge),
                 child: Container(
                   padding: EdgeInsets.all(compact ? 5 : 6),
                   decoration: BoxDecoration(
@@ -179,10 +199,11 @@ class ProfileBadgePills extends StatelessWidget {
                     border:
                         Border.all(color: badge.color.withValues(alpha: .45)),
                   ),
-                  child: Icon(
+                  child: _badgeIcon(
                     badge.icon,
-                    size: compact ? 12 : 14,
-                    color: badge.color,
+                    badge.color,
+                    compact ? 12 : 14,
+                    peach: badge.id == 'PEACH_USER',
                   ),
                 ),
               ),
@@ -204,10 +225,11 @@ class ProfileBadgePills extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
+                    _badgeIcon(
                       badge.icon,
-                      size: compact ? 12 : 14,
-                      color: badge.color,
+                      badge.color,
+                      compact ? 12 : 14,
+                      peach: badge.id == 'PEACH_USER',
                     ),
                     const SizedBox(width: 4),
                     Text(
@@ -257,7 +279,12 @@ class ProfileBadgePills extends StatelessWidget {
                     color: badge.color.withValues(alpha: .45),
                   ),
                 ),
-                child: Icon(badge.icon, color: badge.color, size: 22),
+                child: _badgeIcon(
+                  badge.icon,
+                  badge.color,
+                  22,
+                  peach: badge.id == 'PEACH_USER',
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -289,4 +316,57 @@ class ProfileBadgePills extends StatelessWidget {
       ),
     );
   }
+
+  Widget _badgeIcon(
+    IconData icon,
+    Color color,
+    double size, {
+    bool peach = false,
+  }) =>
+      peach
+          ? CustomPaint(
+              size: Size.square(size),
+              painter: _PeachIconPainter(),
+            )
+          : Icon(icon, color: color, size: size);
+}
+
+class _PeachIconPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final fruit = Paint()..color = const Color(0xFFFFA07A);
+    final highlight = Paint()..color = const Color(0xFFFFC1A8);
+    final leaf = Paint()..color = const Color(0xFF73D7B4);
+    final stem = Paint()
+      ..color = const Color(0xFF9B5B42)
+      ..strokeWidth = size.width * .1
+      ..strokeCap = StrokeCap.round;
+    final unit = size.width;
+
+    canvas.drawCircle(Offset(unit * .38, unit * .62), unit * .29, fruit);
+    canvas.drawCircle(Offset(unit * .62, unit * .62), unit * .29, fruit);
+    canvas.drawCircle(Offset(unit * .5, unit * .38), unit * .23, fruit);
+    canvas.drawCircle(Offset(unit * .37, unit * .53), unit * .08, highlight);
+    canvas.drawLine(
+      Offset(unit * .5, unit * .35),
+      Offset(unit * .55, unit * .16),
+      stem,
+    );
+    canvas.save();
+    canvas.translate(unit * .55, unit * .2);
+    canvas.rotate(-.45);
+    canvas.translate(-unit * .55, -unit * .2);
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(unit * .67, unit * .2),
+        width: unit * .34,
+        height: unit * .16,
+      ),
+      leaf,
+    );
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _PeachIconPainter oldDelegate) => false;
 }

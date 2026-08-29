@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flixie_app/core/analytics/detail_source.dart';
 
 import 'package:flixie_app/models/notification.dart';
+import 'package:flixie_app/models/profile_avatar.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/color_utils.dart';
 
@@ -45,18 +46,19 @@ class NotificationRequestCard extends StatelessWidget {
       notification.linkedRequestId != null &&
       !_showsScheduleFlow;
 
-  bool get _isWatchNotification =>
-      notification.type == FlixieNotification.movieWatchRequest ||
-      notification.type == FlixieNotification.showWatchRequest ||
-      (notification.type == FlixieNotification.groupRequest &&
-          notification.groupWatchMovieTitle != null);
+  bool get _isWatchNotification => notification.isWatchPlanNotification;
 
   bool get _isEveryoneLogged =>
-      notification.data?['type']?.toString() == 'everyone_rated';
+      notification.watchPlanEvent == 'ALL_PARTICIPANTS_LOGGED';
+
+  bool get _isFriendRequest =>
+      notification.type == FlixieNotification.friendRequest;
 
   String get _watchRequestPath {
-    final groupId = notification.groupInviteGroupId;
-    if (notification.type == FlixieNotification.groupRequest &&
+    final groupId = notification.data?['groupId']?.toString() ??
+        notification.groupInviteGroupId;
+    if ((notification.data?['scope']?.toString() == 'GROUP' ||
+            notification.type == FlixieNotification.groupRequest) &&
         groupId != null &&
         groupId.isNotEmpty) {
       return '/groups/$groupId?tab=requests&requestId=${notification.linkedRequestId ?? ''}';
@@ -96,6 +98,20 @@ class NotificationRequestCard extends StatelessWidget {
 
   String get _requestKind {
     if (_isEveryoneLogged) return 'Watch summary';
+    switch (notification.watchPlanEvent) {
+      case 'PLAN_INVITED':
+        return 'Watch plan invitation';
+      case 'SCHEDULE_PROPOSED':
+        return 'Schedule proposal';
+      case 'PLAN_SCHEDULED':
+        return 'Watch plan scheduled';
+      case 'PLAN_RESCHEDULED':
+        return 'Watch plan rescheduled';
+      case 'TITLE_SELECTED':
+        return 'Movie selected';
+      case 'PLAN_CANCELLED':
+        return 'Watch plan cancelled';
+    }
     switch (notification.type) {
       case FlixieNotification.groupInvite:
         return 'Group invite';
@@ -617,6 +633,14 @@ class NotificationRequestCard extends StatelessWidget {
     final posterUrl = posterPath == null
         ? null
         : 'https://image.tmdb.org/t/p/w185$posterPath';
+    final mediaRoute = notification.watchMediaRoute;
+    final profileId = notification.senderId;
+    final canOpenProfile =
+        _isFriendRequest && profileId != null && profileId.isNotEmpty;
+    void openProfile() {
+      if (canOpenProfile) context.push('/friends/$profileId?preview=true');
+    }
+
     final pendingTime = notification.watchRequestProposedFor;
     final pendingLocation = notification.watchRequestLocation?.trim();
 
@@ -645,6 +669,12 @@ class NotificationRequestCard extends StatelessWidget {
                   posterUrl: posterUrl,
                   accent: accent,
                   fallbackIcon: _typeIcon,
+                  avatar: _isFriendRequest ? notification.senderAvatar : null,
+                  avatarFallbackText: initials,
+                  onAvatarTap: canOpenProfile ? openProfile : null,
+                  onMediaTap: !_isFriendRequest && mediaRoute != null
+                      ? () => context.push(mediaRoute)
+                      : null,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -654,36 +684,41 @@ class NotificationRequestCard extends StatelessWidget {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _isEveryoneLogged
-                              ? Container(
-                                  width: 34,
-                                  height: 34,
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    color: avatarBg,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Text(
-                                    initials.isNotEmpty ? initials : 'GROUP',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.clip,
-                                    style: const TextStyle(
-                                      color: FlixieColors.primary,
-                                      fontSize: 10,
-                                      height: 1,
-                                      letterSpacing: .3,
-                                      fontWeight: FontWeight.w800,
+                          if (!_isFriendRequest) ...[
+                            _isEveryoneLogged
+                                ? Container(
+                                    width: 34,
+                                    height: 34,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: avatarBg,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Text(
+                                      initials.isNotEmpty ? initials : 'GROUP',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.clip,
+                                      style: const TextStyle(
+                                        color: FlixieColors.primary,
+                                        fontSize: 10,
+                                        height: 1,
+                                        letterSpacing: .3,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  )
+                                : GestureDetector(
+                                    onTap: canOpenProfile ? openProfile : null,
+                                    child: ProfileAvatarView(
+                                      avatar: notification.senderAvatar,
+                                      fallbackText:
+                                          initials.isNotEmpty ? initials : '!',
+                                      fallbackColor: avatarBg,
+                                      size: 34,
                                     ),
                                   ),
-                                )
-                              : ProfileAvatarView(
-                                  avatar: notification.senderAvatar,
-                                  fallbackText:
-                                      initials.isNotEmpty ? initials : '!',
-                                  fallbackColor: avatarBg,
-                                  size: 34,
-                                ),
-                          const SizedBox(width: 8),
+                            const SizedBox(width: 8),
+                          ],
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -691,14 +726,18 @@ class NotificationRequestCard extends StatelessWidget {
                                 Row(
                                   children: [
                                     Expanded(
-                                      child: Text(
-                                        headline,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: FlixieColors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 14,
+                                      child: GestureDetector(
+                                        onTap:
+                                            canOpenProfile ? openProfile : null,
+                                        child: Text(
+                                          headline,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: FlixieColors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -983,40 +1022,43 @@ class NotificationRequestCard extends StatelessWidget {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  TextButton.icon(
-                    onPressed: onDecline,
-                    style: TextButton.styleFrom(
-                      foregroundColor: FlixieColors.danger,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 8,
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: onAccept,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: FlixieColors.success,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        minimumSize: const Size(0, 42),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
-                    ),
-                    icon: const Icon(Icons.close_rounded, size: 17),
-                    label: const Text(
-                      'Decline',
-                      style: TextStyle(fontWeight: FontWeight.w700),
+                      icon: const Icon(Icons.check_rounded, size: 18),
+                      label: Text(
+                        _isFriendRequest ? 'Accept friend' : 'Accept',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
                     ),
                   ),
-                  const Spacer(),
-                  FilledButton.icon(
-                    onPressed: onAccept,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: FlixieColors.primary,
-                      foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onDecline,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: FlixieColors.danger,
+                        side: const BorderSide(color: FlixieColors.danger),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        minimumSize: const Size(0, 42),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
-                      minimumSize: Size.zero,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                      label: const Text(
+                        'Decline',
+                        style: TextStyle(fontWeight: FontWeight.w700),
                       ),
-                    ),
-                    icon: const Icon(Icons.check_rounded, size: 17),
-                    label: const Text(
-                      'Accept',
-                      style: TextStyle(fontWeight: FontWeight.w800),
                     ),
                   ),
                 ],
@@ -1063,15 +1105,42 @@ class _RequestMediaPreview extends StatelessWidget {
     required this.posterUrl,
     required this.accent,
     required this.fallbackIcon,
+    this.avatar,
+    this.avatarFallbackText,
+    this.onAvatarTap,
+    this.onMediaTap,
   });
 
   final String? posterUrl;
   final Color accent;
   final IconData fallbackIcon;
+  final ProfileAvatar? avatar;
+  final String? avatarFallbackText;
+  final VoidCallback? onAvatarTap;
+  final VoidCallback? onMediaTap;
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
+    if (avatar != null) {
+      final userAvatar = SizedBox(
+        width: 60,
+        height: 64,
+        child: Center(
+          child: ProfileAvatarView(
+            avatar: avatar,
+            fallbackText: avatarFallbackText?.isNotEmpty == true
+                ? avatarFallbackText!
+                : '!',
+            fallbackColor: accent.withValues(alpha: 0.55),
+            size: 56,
+          ),
+        ),
+      );
+      return onAvatarTap == null
+          ? userAvatar
+          : GestureDetector(onTap: onAvatarTap, child: userAvatar);
+    }
+    final mediaPreview = ClipRRect(
       borderRadius: BorderRadius.circular(8),
       child: SizedBox(
         width: 44,
@@ -1091,6 +1160,9 @@ class _RequestMediaPreview extends StatelessWidget {
               ),
       ),
     );
+    return onMediaTap == null
+        ? mediaPreview
+        : GestureDetector(onTap: onMediaTap, child: mediaPreview);
   }
 }
 

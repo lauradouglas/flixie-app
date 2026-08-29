@@ -36,6 +36,7 @@ dependencies:
 
   # Local notifications (foreground FCM display)
   flutter_local_notifications: ^18.0.1
+  flutter_timezone: ^4.1.0
   timezone: ^0.10.1
 
   # Logging

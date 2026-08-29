@@ -59,6 +59,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
   final Map<int, List<WatchProvider>> _showWatchProviders = {};
   final Map<int, bool> _canWatchNowByMovieId = {};
   Set<int> _userWatchProviderIds = {};
+  Set<String> _userWatchProviderMatchKeys = {};
   bool _loadingWatchProviderAvailability = false;
   bool _loadingShowWatchProviderAvailability = false;
   int _watchProviderAvailabilityRequest = 0;
@@ -184,6 +185,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       if (mounted) {
         setState(() {
           _userWatchProviderIds = {};
+          _userWatchProviderMatchKeys = {};
           _movieWatchProviders.clear();
           _canWatchNowByMovieId.clear();
           _loadingWatchProviderAvailability = false;
@@ -216,13 +218,23 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         await authProvider.ensureWatchProviderCache(movieIds: movieIds);
       }
 
+      // The availability feed can occasionally use a newer provider record
+      // than the saved-provider catalogue. Keep names as a fallback for that
+      // case (for example, an updated HBO Max record/logo).
+      final savedProviders = await UserService.getUserWatchProviders(user.id);
+
       if (!mounted || requestId != _watchProviderAvailabilityRequest) return;
 
       final providers = authProvider.cachedWatchProvidersByMovieId;
       final userProviderIds =
           authProvider.cachedUserWatchProviderIds ?? const <int>{};
       setState(() {
-        _userWatchProviderIds = userProviderIds;
+        _userWatchProviderIds = {
+          ...userProviderIds,
+          ...savedProviders.map((provider) => provider.id),
+        };
+        _userWatchProviderMatchKeys =
+            savedProviders.map((provider) => provider.matchKey).toSet();
         _movieWatchProviders
           ..clear()
           ..addEntries(movieIds
@@ -233,8 +245,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
           ..addEntries(_movieWatchProviders.entries.map((entry) => MapEntry(
                 entry.key,
                 entry.value.any((provider) =>
-                    provider.isStreaming &&
-                    userProviderIds.contains(provider.id)),
+                    provider.isStreaming && _isUserProvider(provider)),
               )));
         _loadingWatchProviderAvailability = false;
       });
@@ -278,10 +289,15 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
           }
         }),
       );
+      final savedProviders = await UserService.getUserWatchProviders(user.id);
       if (!mounted) return;
       setState(() {
-        _userWatchProviderIds =
-            authProvider.cachedUserWatchProviderIds ?? const {};
+        _userWatchProviderIds = {
+          ...?authProvider.cachedUserWatchProviderIds,
+          ...savedProviders.map((provider) => provider.id),
+        };
+        _userWatchProviderMatchKeys =
+            savedProviders.map((provider) => provider.matchKey).toSet();
         _showWatchProviders
           ..clear()
           ..addEntries(entries);
@@ -299,8 +315,8 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     if (cached != null) return cached;
 
     final providers = _movieWatchProviders[movieId] ?? const <WatchProvider>[];
-    return providers.any((provider) =>
-        provider.isStreaming && _userWatchProviderIds.contains(provider.id));
+    return providers
+        .any((provider) => provider.isStreaming && _isUserProvider(provider));
   }
 
   void _filterWatchlist() {
@@ -1423,6 +1439,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       isWatched: isWatched,
       availableProviders: providers,
       userWatchProviderIds: _userWatchProviderIds,
+      userWatchProviderMatchKeys: _userWatchProviderMatchKeys,
       canWatchNow: canWatchNow,
       isLoadingProviders: isLoadingProviders,
       recommendations: _recommendationsByMovieId[item.movieId] ?? const [],
@@ -1441,8 +1458,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
   Widget _buildShowWatchlistRow(_WatchlistShowEntry item) {
     final providers = _showWatchProviders[item.showId] ?? const [];
     final canWatchNow = providers.any(
-      (provider) =>
-          provider.isStreaming && _userWatchProviderIds.contains(provider.id),
+      (provider) => provider.isStreaming && _isUserProvider(provider),
     );
     final addedDate = WatchlistMovieRow._formatDate(item.createdAt);
     final posterUrl = item.posterPath == null
@@ -1612,6 +1628,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                         releaseDate: null,
                         providers: providers,
                         userWatchProviderIds: _userWatchProviderIds,
+                        userWatchProviderMatchKeys: _userWatchProviderMatchKeys,
                         canWatchNow: canWatchNow,
                         isLoading: _loadingShowWatchProviderAvailability &&
                             !_showWatchProviders.containsKey(item.showId),
@@ -1676,6 +1693,10 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       );
     }
   }
+
+  bool _isUserProvider(WatchProvider provider) =>
+      _userWatchProviderIds.contains(provider.id) ||
+      _userWatchProviderMatchKeys.contains(provider.matchKey);
 }
 
 class _WatchlistShowEntry {
@@ -2129,6 +2150,7 @@ class WatchlistMovieRow extends StatelessWidget {
   final bool isWatched;
   final List<WatchProvider> availableProviders;
   final Set<int> userWatchProviderIds;
+  final Set<String> userWatchProviderMatchKeys;
   final bool canWatchNow;
   final bool isLoadingProviders;
   final List<FriendRecommendationItem> recommendations;
@@ -2145,6 +2167,7 @@ class WatchlistMovieRow extends StatelessWidget {
     required this.isWatched,
     this.availableProviders = const <WatchProvider>[],
     this.userWatchProviderIds = const <int>{},
+    this.userWatchProviderMatchKeys = const <String>{},
     this.canWatchNow = false,
     this.isLoadingProviders = false,
     this.recommendations = const [],
@@ -2420,6 +2443,7 @@ class WatchlistMovieRow extends StatelessWidget {
                         releaseDate: movie.releaseDate,
                         providers: availableProviders,
                         userWatchProviderIds: userWatchProviderIds,
+                        userWatchProviderMatchKeys: userWatchProviderMatchKeys,
                         canWatchNow: canWatchNow,
                         isLoading: isLoadingProviders,
                       ),
@@ -2575,6 +2599,7 @@ class _WatchProvidersInline extends StatelessWidget {
     required this.releaseDate,
     required this.providers,
     required this.userWatchProviderIds,
+    required this.userWatchProviderMatchKeys,
     required this.canWatchNow,
     required this.isLoading,
   });
@@ -2582,6 +2607,7 @@ class _WatchProvidersInline extends StatelessWidget {
   final String? releaseDate;
   final List<WatchProvider> providers;
   final Set<int> userWatchProviderIds;
+  final Set<String> userWatchProviderMatchKeys;
   final bool canWatchNow;
   final bool isLoading;
 
@@ -2699,8 +2725,8 @@ class _WatchProvidersInline extends StatelessWidget {
     }
 
     final sortedProviders = [...displayProviders]..sort((a, b) {
-        final aMatches = userWatchProviderIds.contains(a.id);
-        final bMatches = userWatchProviderIds.contains(b.id);
+        final aMatches = _isUserProvider(a);
+        final bMatches = _isUserProvider(b);
         if (aMatches == bMatches) {
           return a.displayPriority.compareTo(b.displayPriority);
         }
@@ -2732,7 +2758,7 @@ class _WatchProvidersInline extends StatelessWidget {
           runSpacing: 6,
           children: [
             ...visibleProviders.map((provider) {
-              final isUserProvider = userWatchProviderIds.contains(provider.id);
+              final isUserProvider = _isUserProvider(provider);
               return _WatchProviderLogo(
                 provider: provider,
                 isUserProvider: isUserProvider,
@@ -2764,6 +2790,10 @@ class _WatchProvidersInline extends StatelessWidget {
       ],
     );
   }
+
+  bool _isUserProvider(WatchProvider provider) =>
+      userWatchProviderIds.contains(provider.id) ||
+      userWatchProviderMatchKeys.contains(provider.matchKey);
 }
 
 class _WatchProviderLogo extends StatelessWidget {

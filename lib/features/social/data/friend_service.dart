@@ -20,10 +20,10 @@ class FriendService {
   }
 
   static Future<void> removeFriend(String userId, String friendId) async {
-    await ApiClient.delete(
-      '/friends',
-      body: {'userId': userId, 'friendId': friendId},
-    );
+    // The API deliberately scopes deletion to the authenticated user's
+    // friendship edge. This removes the friendship; it does not block either
+    // person or prevent a future friend request.
+    await ApiClient.delete('/friends/$userId/friend/$friendId');
   }
 
   static Future<void> sendFriendRequest(Map<String, dynamic> body) async {

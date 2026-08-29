@@ -59,7 +59,18 @@ class WatchProvider {
   bool get isPurchase => availabilityTypes.any(
         (type) => type == 'buy' || type == 'purchase' || type == 'purchasable',
       );
+
+  /// TMDB occasionally exposes the same service through a refreshed provider
+  /// record (and therefore a different numeric ID/logo). Use this only as a
+  /// fallback after the exact ID comparison when identifying a user's saved
+  /// service in availability UI.
+  String get matchKey => canonicalWatchProviderName(providerName);
 }
+
+String canonicalWatchProviderName(String value) => value
+    .toLowerCase()
+    .replaceAll('&', 'and')
+    .replaceAll(RegExp(r'[^a-z0-9]'), '');
 
 int? _intValue(dynamic value) {
   if (value == null) return null;

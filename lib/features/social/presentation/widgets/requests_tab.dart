@@ -14,8 +14,12 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/calendar/watch_calendar_service.dart';
 import 'package:flixie_app/features/social/presentation/widgets/request_poster_placeholder.dart';
+import 'package:flixie_app/features/social/presentation/widgets/watch_plan_candidate_avatar.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/movies/data/movie_service.dart';
+import 'package:flixie_app/features/movies/data/search_service.dart';
+import 'package:flixie_app/models/movie_short.dart';
+import 'package:flixie_app/features/authentication/presentation/pages/auth_ui.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'package:flixie_app/models/watch_provider.dart';
@@ -295,6 +299,7 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
             title: request.movieTitle ?? 'Group watch',
             withName: widget.groupName ?? 'your group',
             deepLink: '/groups/${widget.groupId}?tab=plans',
+            scope: 'GROUP',
           );
         }
       }
@@ -485,13 +490,46 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
     );
   }
 
+  SnackBar _successToast(String message) => SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: FlixieColors.surfaceElevated,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_rounded,
+                color: FlixieColors.success, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(message,
+                  style: const TextStyle(
+                      color: FlixieColors.light, fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
+      );
+
   void _replaceGroupPlan(GroupWatchRequest updated) {
     setState(() {
+      // A plan can be keyed by either its chat mirror ID or Postgres request
+      // ID. Clear every matching draft, otherwise a newly added option keeps
+      // the old local selection state and misses its green outline.
+      final matchingIds = _requests
+          .where((request) => request.matchesId(updated.id))
+          .expand((request) => <String>[
+                request.id,
+                if (request.databaseRequestId != null)
+                  request.databaseRequestId!,
+              ])
+          .toSet();
+      matchingIds.add(updated.id);
+      if (updated.databaseRequestId != null) {
+        matchingIds.add(updated.databaseRequestId!);
+      }
       _requests = _requests
           .map((request) => request.matchesId(updated.id) ? updated : request)
           .toList(growable: false);
-      _candidateChoiceDrafts.removeWhere(
-          (key, _) => key == updated.id || key == updated.databaseRequestId);
+      _candidateChoiceDrafts.removeWhere((key, _) => matchingIds.contains(key));
     });
   }
 
@@ -518,10 +556,79 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
       // visible choices on the next frame.
       await _load();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Movies you’d watch saved'),
-        backgroundColor: FlixieColors.success,
+      ScaffoldMessenger.of(context)
+          .showSnackBar(_successToast('Movies you’d watch saved'));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(error.toString()),
+        backgroundColor: FlixieColors.danger,
       ));
+    } finally {
+      if (mounted) setState(() => _processing.remove(request.id));
+    }
+  }
+
+  Future<void> _removeGroupCandidate(
+    GroupWatchRequest request,
+    String candidateId,
+  ) async {
+    setState(() => _processing[request.id] = true);
+    try {
+      final updated = await GroupService.removeWatchPlanCandidate(
+        _groupPlanRequestId(request),
+        widget.currentUserId,
+        candidateId,
+      );
+      if (!mounted) return;
+      _replaceGroupPlan(updated);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(_successToast('Movie option removed'));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(error.toString()),
+        backgroundColor: FlixieColors.danger,
+      ));
+    } finally {
+      if (mounted) setState(() => _processing.remove(request.id));
+    }
+  }
+
+  Future<void> _addGroupCandidate(GroupWatchRequest request) async {
+    if (request.candidates.length >= 5) return;
+    final movie = await showModalBottomSheet<MovieShort>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: FlixieColors.surface,
+      builder: (_) => MovieSearchSheet(
+        title: 'Add another option',
+        searchMovies: (query) async {
+          final search = await SearchService.search(query, type: 'movie');
+          final existingMovieIds = request.candidates
+              .map((candidate) => candidate.movieId)
+              .whereType<int>()
+              .toSet();
+          return search.results
+              .where((item) => item.movie != null)
+              .map((item) => item.movie!)
+              .where((item) => !existingMovieIds.contains(item.id))
+              .toList(growable: false);
+        },
+      ),
+    );
+    if (!mounted || movie == null) return;
+    setState(() => _processing[request.id] = true);
+    try {
+      final updated = await GroupService.addWatchPlanCandidate(
+        _groupPlanRequestId(request),
+        widget.currentUserId,
+        movie.id,
+      );
+      if (!mounted) return;
+      _replaceGroupPlan(updated);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(_successToast('Movie option added'));
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -544,10 +651,8 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
       );
       if (!mounted) return;
       _replaceGroupPlan(updated);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Final movie chosen'),
-        backgroundColor: FlixieColors.success,
-      ));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(_successToast('Final movie chosen'));
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -570,10 +675,8 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
       _replaceGroupPlan(updated);
       await _load();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Choose a new final movie'),
-        backgroundColor: FlixieColors.success,
-      ));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(_successToast('Choose a new final movie'));
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -711,6 +814,7 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
           );
           await PushNotificationService.cancelWatchPlanReminders(
             req.databaseRequestId ?? req.id,
+            scope: 'GROUP',
           );
           if (mounted) context.read<AuthProvider>().markActivityChanged();
         },
@@ -759,6 +863,7 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
         title: updated.movieTitle ?? 'Group watch',
         withName: widget.groupName ?? 'your group',
         deepLink: '/groups/${widget.groupId}?tab=plans',
+        scope: 'GROUP',
       );
       await _load();
       if (mounted) {
@@ -2198,8 +2303,14 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
         surface(
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Participants',
-                style: TextStyle(color: FlixieColors.medium, fontSize: 13)),
+            const Text(
+              'Participants',
+              style: TextStyle(
+                color: FlixieColors.light,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
             const SizedBox(height: 10),
             Wrap(
               spacing: 10,
@@ -2346,14 +2457,16 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
               Text('WATCHED TOGETHER',
                   style: TextStyle(
                       color: FlixieColors.success,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.1)),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1)),
             ]),
             const SizedBox(height: 12),
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               _poster(posterUrl),
               const SizedBox(width: 18),
-              Expanded(child: Column(
+              Expanded(
+                  child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(req.movieTitle ?? 'Watch Plan',
@@ -2361,19 +2474,19 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           color: FlixieColors.primary,
-                          fontSize: 24,
-                          height: 1.05,
-                          fontWeight: FontWeight.w800)),
+                          fontSize: 21,
+                          height: 1.1,
+                          fontWeight: FontWeight.w700)),
                   if (scheduled.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     Text(scheduled,
                         style: const TextStyle(
-                            color: FlixieColors.light, fontSize: 16)),
+                            color: FlixieColors.light, fontSize: 15)),
                   ],
                   const SizedBox(height: 20),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       color: FlixieColors.primary.withValues(alpha: .16),
                       borderRadius: BorderRadius.circular(22),
@@ -2382,7 +2495,8 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
                       '👥 Group watch · ${req.analyticsParticipantCount} people',
                       style: const TextStyle(
                           color: FlixieColors.light,
-                          fontWeight: FontWeight.w800),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700),
                     ),
                   ),
                 ],
@@ -2391,47 +2505,57 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
           ],
         )),
         const SizedBox(height: 16),
-        card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            const Expanded(
-              child: Text("Your group's take",
-                  style: TextStyle(
-                      color: FlixieColors.light,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800)),
-            ),
-            Text('✓ ${recommends == entries.length ? 'YOU AGREED' : 'MIXED TAKE'}',
-                style: const TextStyle(
-                    color: FlixieColors.success, fontWeight: FontWeight.w800)),
-          ]),
-          const SizedBox(height: 12),
-          Row(children: [
-            Expanded(child: _recapMetric(
-                average?.toStringAsFixed(1) ?? '—', 'Average rating',
-                FlixieColors.warning)),
-            const SizedBox(width: 12),
-            Expanded(child: _recapMetric(
-                '${recommends} of ${entries.length}', 'Recommend it',
-                FlixieColors.success)),
-          ]),
-        ]), color: FlixieColors.surfaceElevated.withValues(alpha: .72)),
+        card(
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                const Expanded(
+                  child: Text("Your group's take",
+                      style: TextStyle(
+                          color: FlixieColors.light,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700)),
+                ),
+                Text(
+                    '✓ ${recommends == entries.length ? 'YOU AGREED' : 'MIXED TAKE'}',
+                    style: const TextStyle(
+                        color: FlixieColors.success,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700)),
+              ]),
+              const SizedBox(height: 12),
+              Row(children: [
+                Expanded(
+                    child: _recapMetric(average?.toStringAsFixed(1) ?? '—',
+                        'Average rating', FlixieColors.warning)),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: _recapMetric('${recommends} of ${entries.length}',
+                        'Recommend it', FlixieColors.success)),
+              ]),
+            ]),
+            color: FlixieColors.surfaceElevated.withValues(alpha: .72)),
         const SizedBox(height: 16),
         Row(children: [
-          const Expanded(child: Text("Everyone's ratings",
-              style: TextStyle(color: FlixieColors.light, fontSize: 20,
-                  fontWeight: FontWeight.w800))),
+          const Expanded(
+              child: Text("Everyone's ratings",
+                  style: TextStyle(
+                      color: FlixieColors.light,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700))),
           Text('${entries.length} watches logged',
               style: const TextStyle(color: FlixieColors.medium, fontSize: 14)),
         ]),
         const SizedBox(height: 14),
         ...entries.map((member) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: _recapEntry(member, isYou: member.memberId == widget.currentUserId),
+              child: _recapEntry(member,
+                  isYou: member.memberId == widget.currentUserId),
             )),
         _buildGroupPlanActivity(req),
         const SizedBox(height: 8),
         Row(children: [
-          Expanded(child: FilledButton.icon(
+          Expanded(
+              child: FilledButton.icon(
             onPressed: myEntry?.rating == null || req.mediaId == null
                 ? null
                 : () {
@@ -2463,7 +2587,8 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
             ),
           )),
           const SizedBox(width: 12),
-          Expanded(child: OutlinedButton.icon(
+          Expanded(
+              child: OutlinedButton.icon(
             onPressed: () => context.push('/groups/${widget.groupId}?tab=chat'),
             icon: const Icon(Icons.forum_outlined),
             label: const Text('Discuss in chat'),
@@ -2476,7 +2601,8 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
           )),
         ]),
         const SizedBox(height: 10),
-        Center(child: TextButton.icon(
+        Center(
+            child: TextButton.icon(
           onPressed: _makeGroupWatchPlan,
           icon: const Icon(Icons.add_rounded),
           label: const Text('Plan another watch'),
@@ -2486,36 +2612,97 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
   }
 
   Widget _buildGroupPlanActivity(GroupWatchRequest req) {
-    final watched = req.memberStatuses.where((member) => member.watchedAt != null).length;
-    final rated = req.memberStatuses.where((member) => member.rating != null).length;
+    final watched =
+        req.memberStatuses.where((member) => member.watchedAt != null).length;
+    final rated =
+        req.memberStatuses.where((member) => member.rating != null).length;
     final participantCount = req.analyticsParticipantCount;
     final accepted = req.acceptedCount + 1;
     final finalised = req.selectedCandidateId != null;
-    final scheduled = (req.scheduledFor ?? req.proposedDate)?.isNotEmpty == true;
+    final scheduled =
+        (req.scheduledFor ?? req.proposedDate)?.isNotEmpty == true;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Plan activity', style: TextStyle(color: FlixieColors.light, fontSize: 16, fontWeight: FontWeight.w800)),
+      const Text('Plan activity',
+          style: TextStyle(
+              color: FlixieColors.light,
+              fontSize: 16,
+              fontWeight: FontWeight.w800)),
       const SizedBox(height: 12),
-      _groupActivityRow(Icons.send_rounded, 'Invited', 'Group watch plan created', true),
-      _groupActivityRow(Icons.check_circle_outline_rounded, 'Accepted', '$accepted of $participantCount people accepted', accepted >= participantCount),
-      _groupActivityRow(Icons.bookmark_added_outlined, 'Choices saved', req.candidates.isEmpty ? 'No titles added yet' : '${req.candidates.length} titles considered', req.candidates.isNotEmpty),
-      _groupActivityRow(Icons.movie_filter_outlined, 'Movie finalised', finalised ? '${req.movieTitle ?? 'Movie'} was picked' : 'Pick a movie together', finalised),
-      _groupActivityRow(Icons.calendar_month_outlined, 'Scheduled', scheduled ? _fullDateTimeString(req.scheduledFor ?? req.proposedDate) : 'No time set yet', scheduled),
-      _groupActivityRow(Icons.visibility_outlined, 'Watched', watched > 0 ? '$watched of $participantCount watches logged' : 'Log your watch after the plan', watched > 0),
-      _groupActivityRow(Icons.star_outline_rounded, 'Rated', rated > 0 ? '$rated of $participantCount ratings saved' : 'Ratings will appear here', rated > 0, last: true),
+      _groupActivityRow(
+          Icons.send_rounded, 'Invited', 'Group watch plan created', true),
+      _groupActivityRow(
+          Icons.check_circle_outline_rounded,
+          'Accepted',
+          '$accepted of $participantCount people accepted',
+          accepted >= participantCount),
+      _groupActivityRow(
+          Icons.bookmark_added_outlined,
+          'Choices saved',
+          req.candidates.isEmpty
+              ? 'No titles added yet'
+              : '${req.candidates.length} titles considered',
+          req.candidates.isNotEmpty),
+      _groupActivityRow(
+          Icons.movie_filter_outlined,
+          'Movie finalised',
+          finalised
+              ? '${req.movieTitle ?? 'Movie'} was picked'
+              : 'Pick a movie together',
+          finalised),
+      _groupActivityRow(
+          Icons.calendar_month_outlined,
+          'Scheduled',
+          scheduled
+              ? _fullDateTimeString(req.scheduledFor ?? req.proposedDate)
+              : 'No time set yet',
+          scheduled),
+      _groupActivityRow(
+          Icons.visibility_outlined,
+          'Watched',
+          watched > 0
+              ? '$watched of $participantCount watches logged'
+              : 'Log your watch after the plan',
+          watched > 0),
+      _groupActivityRow(
+          Icons.star_outline_rounded,
+          'Rated',
+          rated > 0
+              ? '$rated of $participantCount ratings saved'
+              : 'Ratings will appear here',
+          rated > 0,
+          last: true),
     ]);
   }
 
-  Widget _groupActivityRow(IconData icon, String title, String detail, bool complete, {bool last = false}) =>
+  Widget _groupActivityRow(
+          IconData icon, String title, String detail, bool complete,
+          {bool last = false}) =>
       Padding(
         padding: EdgeInsets.only(bottom: last ? 0 : 8),
         child: Row(children: [
-        Icon(icon, size: 17, color: complete ? FlixieColors.success : FlixieColors.medium),
-        const SizedBox(width: 8),
-        Expanded(child: Text.rich(TextSpan(children: [
-          TextSpan(text: title, style: TextStyle(color: complete ? FlixieColors.light : FlixieColors.medium, fontSize: 13, fontWeight: FontWeight.w700)),
-          TextSpan(text: ' · $detail', style: const TextStyle(color: FlixieColors.medium, fontSize: 12)),
-        ]), maxLines: 1, overflow: TextOverflow.ellipsis)),
-      ]),
+          Icon(icon,
+              size: 17,
+              color: complete ? FlixieColors.success : FlixieColors.medium),
+          const SizedBox(width: 8),
+          Expanded(
+              child: Text.rich(
+                  TextSpan(children: [
+                    TextSpan(
+                        text: title,
+                        style: TextStyle(
+                            color: complete
+                                ? FlixieColors.light
+                                : FlixieColors.medium,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700)),
+                    TextSpan(
+                        text: ' · $detail',
+                        style: const TextStyle(
+                            color: FlixieColors.medium, fontSize: 12)),
+                  ]),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis)),
+        ]),
       );
 
   Widget _recapMetric(String value, String label, Color color) => Container(
@@ -2526,11 +2713,15 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
           border: Border.all(color: FlixieColors.tabBarBorder),
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(value, style: TextStyle(color: color, fontSize: 26,
-              fontWeight: FontWeight.w800)),
+          Text(value,
+              style: TextStyle(
+                  color: color, fontSize: 22, fontWeight: FontWeight.w700)),
           const SizedBox(height: 3),
-          Text(label, style: const TextStyle(color: FlixieColors.light,
-              fontWeight: FontWeight.w700)),
+          Text(label,
+              style: const TextStyle(
+                  color: FlixieColors.light,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600)),
         ]),
       );
 
@@ -2548,42 +2739,57 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
               avatar: member.avatar,
               fallbackText: (member.username ?? '?')[0].toUpperCase(),
               fallbackColor: FlixieColors.primary,
-              size: 48,
+              size: 42,
               profileBadges: member.profileBadges,
             ),
             const SizedBox(width: 12),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-              Text(isYou ? 'You' : member.username ?? 'Member',
-                  style: const TextStyle(color: FlixieColors.light,
-                      fontSize: 17, fontWeight: FontWeight.w700)),
-              const Text('Logged after the plan',
-                  style: TextStyle(color: FlixieColors.medium)),
-            ])),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(isYou ? 'You' : member.username ?? 'Member',
+                      style: const TextStyle(
+                          color: FlixieColors.light,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600)),
+                  const Text('Logged after the plan',
+                      style: TextStyle(color: FlixieColors.medium)),
+                ])),
             if (member.rating != null)
-              Text('★ ${member.rating}/10', style: const TextStyle(
-                  color: FlixieColors.warning, fontSize: 18,
-                  fontWeight: FontWeight.w800)),
+              Text('★ ${member.rating}/10',
+                  style: const TextStyle(
+                      color: FlixieColors.warning,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700)),
           ]),
-          if (member.rating != null || (member.reviewText?.isNotEmpty ?? false)) ...[
+          if (member.rating != null ||
+              (member.reviewText?.isNotEmpty ?? false)) ...[
             const SizedBox(height: 16),
             Row(children: [
               if (member.rating != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
                   decoration: BoxDecoration(
                     border: Border.all(color: FlixieColors.success),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(member.rating! >= 7 ? '👍 Recommends' : '👎 Would skip',
-                      style: const TextStyle(color: FlixieColors.success,
-                          fontWeight: FontWeight.w800)),
+                  child: Text(
+                      member.rating! >= 7 ? '👍 Recommends' : '👎 Would skip',
+                      style: const TextStyle(
+                          color: FlixieColors.success,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700)),
                 ),
               if (member.reviewText?.isNotEmpty ?? false) ...[
                 const SizedBox(width: 12),
-                Expanded(child: Text('“${member.reviewText}”', maxLines: 2,
-                    overflow: TextOverflow.ellipsis, style: const TextStyle(
-                        color: FlixieColors.light, fontStyle: FontStyle.italic))),
+                Expanded(
+                    child: Text('“${member.reviewText}”',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: FlixieColors.light,
+                            fontStyle: FontStyle.italic))),
               ],
             ]),
           ],
@@ -2685,90 +2891,129 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
         ),
         const SizedBox(height: 12),
         LayoutBuilder(
-          builder: (context, constraints) => GridView.count(
-            crossAxisCount: constraints.maxWidth >= 600 ? 2 : 1,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 8,
-            childAspectRatio: constraints.maxWidth >= 600 ? 4.2 : 4.5,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            children: request.candidates.map((candidate) {
-              final selected = choices.contains(candidate.id);
-              final poster = candidate.posterPath == null
-                  ? null
-                  : 'https://image.tmdb.org/t/p/w185${candidate.posterPath}';
-              return InkWell(
-                onTap: !canChoose
+          builder: (context, constraints) {
+            final twoColumns = constraints.maxWidth >= 600;
+            final cardWidth = twoColumns
+                ? (constraints.maxWidth - 10) / 2
+                : constraints.maxWidth;
+            return Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              children: request.candidates.map((candidate) {
+                final selected = choices.contains(candidate.id);
+                final canRemove = request.selectedCandidateId == null &&
+                    request.candidates.length > 1 &&
+                    (isCreator ||
+                        candidate.addedByUserId == widget.currentUserId);
+                final poster = candidate.posterPath == null
                     ? null
-                    : isCreator
-                        ? () => _selectGroupFinalMovie(request, candidate.id)
-                        : () => setState(() {
-                              if (selected) {
-                                choices.remove(candidate.id);
-                              } else {
-                                choices.add(candidate.id);
-                              }
-                            }),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? FlixieColors.success.withValues(alpha: .1)
-                        : FlixieColors.tabBarBackgroundFocused,
+                    : 'https://image.tmdb.org/t/p/w185${candidate.posterPath}';
+                return SizedBox(
+                  width: cardWidth,
+                  child: InkWell(
+                    onTap: !canChoose
+                        ? null
+                        : isCreator
+                            ? () =>
+                                _selectGroupFinalMovie(request, candidate.id)
+                            : () => setState(() {
+                                  if (selected) {
+                                    choices.remove(candidate.id);
+                                  } else {
+                                    choices.add(candidate.id);
+                                  }
+                                }),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: selected
-                          ? FlixieColors.success
-                          : FlixieColors.tabBarBorder,
-                      width: selected ? 2 : 1,
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? FlixieColors.success.withValues(alpha: .1)
+                            : FlixieColors.tabBarBackgroundFocused,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: selected
+                              ? FlixieColors.success
+                              : FlixieColors.tabBarBorder,
+                          width: selected ? 2 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: SizedBox(
+                              width: 46,
+                              height: 68,
+                              child: poster == null
+                                  ? const RequestPosterPlaceholder()
+                                  : CachedNetworkImage(
+                                      imageUrl: poster, fit: BoxFit.cover),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(candidate.title ?? 'Movie option',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        color: FlixieColors.light,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 15)),
+                                const SizedBox(height: 4),
+                                Row(children: [
+                                  WatchPlanCandidateAvatar(
+                                    avatar: candidate.addedByAvatar,
+                                    username: candidate.addedByUsername,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Expanded(
+                                    child: Text(
+                                      'Added by @${candidate.addedByUsername ?? 'a member'}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          color: FlixieColors.medium,
+                                          fontSize: 12),
+                                    ),
+                                  ),
+                                ]),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${candidate.selectedByUserIds.length} of $everyoneCount would watch',
+                                  style: const TextStyle(
+                                      color: FlixieColors.medium, fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (isCreator)
+                            const _FinalMovieChip()
+                          else if (selected)
+                            const Icon(Icons.check_circle,
+                                color: FlixieColors.success, size: 28),
+                          if (canRemove)
+                            IconButton(
+                              onPressed: _processing[request.id] == true
+                                  ? null
+                                  : () => _removeGroupCandidate(
+                                      request, candidate.id),
+                              tooltip: 'Remove movie option',
+                              icon: const Icon(Icons.close_rounded, size: 19),
+                              color: FlixieColors.medium,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                        ],
+                      ),
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: SizedBox(
-                          width: 46,
-                          height: 68,
-                          child: poster == null
-                              ? const RequestPosterPlaceholder()
-                              : CachedNetworkImage(
-                                  imageUrl: poster, fit: BoxFit.cover),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(candidate.title ?? 'Movie option',
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    color: FlixieColors.light,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 15)),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${candidate.selectedByUserIds.length} of $everyoneCount would watch',
-                              style: const TextStyle(
-                                  color: FlixieColors.medium, fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (isCreator)
-                        const _FinalMovieChip()
-                      else if (selected)
-                        const Icon(Icons.check_circle,
-                            color: FlixieColors.success, size: 28),
-                    ],
-                  ),
-                ),
-              );
-            }).toList(growable: false),
-          ),
+                );
+              }).toList(growable: false),
+            );
+          },
         ),
         if (!isCreator && canChoose) ...[
           const SizedBox(height: 4),
@@ -2791,6 +3036,24 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
             ),
           ),
         ],
+        if (request.selectedCandidateId == null &&
+            canChoose &&
+            request.candidates.length < 5)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _processing[request.id] == true
+                  ? null
+                  : () => _addGroupCandidate(request),
+              icon: const Icon(Icons.add_circle_outline_rounded),
+              label: const Text('Add another option'),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(0, 36),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -2975,98 +3238,99 @@ class _GroupScheduleWatchSheetState extends State<_GroupScheduleWatchSheet> {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Container(
-        decoration: const BoxDecoration(
-          color: FlixieColors.background,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        padding: EdgeInsets.fromLTRB(
-          16,
-          14,
-          16,
-          MediaQuery.of(context).viewInsets.bottom + 16,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Schedule watch',
-              style: TextStyle(
-                color: FlixieColors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _QuickScheduleChip(
-                  label: 'Tonight',
-                  onTap: () => setState(() => _selected = _tonight()),
+      child: Material(
+        color: FlixieColors.background,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            14,
+            16,
+            MediaQuery.of(context).viewInsets.bottom + 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Schedule watch',
+                style: TextStyle(
+                  color: FlixieColors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
                 ),
-                _QuickScheduleChip(
-                  label: 'Tomorrow',
-                  onTap: () => setState(() => _selected = _tomorrow()),
-                ),
-                _QuickScheduleChip(
-                  label: 'This weekend',
-                  onTap: () => setState(() => _selected = _thisWeekend()),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading:
-                  const Icon(Icons.event_outlined, color: FlixieColors.primary),
-              title: const Text('Date',
-                  style: TextStyle(color: FlixieColors.light)),
-              subtitle: Text(
-                '${_selected.day} ${_kRequestMonths[_selected.month - 1]} ${_selected.year}',
-                style: const TextStyle(color: FlixieColors.medium),
               ),
-              onTap: _pickDate,
-            ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.schedule_rounded,
-                  color: FlixieColors.primary),
-              title: const Text('Time',
-                  style: TextStyle(color: FlixieColors.light)),
-              subtitle: Text(
-                TimeOfDay.fromDateTime(_selected).format(context),
-                style: const TextStyle(color: FlixieColors.medium),
-              ),
-              onTap: _pickTime,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _locationController,
-              style: const TextStyle(color: FlixieColors.light),
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.location_on_outlined),
-                labelText: 'Location (optional)',
-                hintText: 'e.g. My place or local cinema',
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(
-                  context,
-                  (
-                    scheduledFor: _selected,
-                    location: _locationController.text.trim(),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _QuickScheduleChip(
+                    label: 'Tonight',
+                    onTap: () => setState(() => _selected = _tonight()),
                   ),
-                ),
-                child: const Text('Confirm schedule'),
+                  _QuickScheduleChip(
+                    label: 'Tomorrow',
+                    onTap: () => setState(() => _selected = _tomorrow()),
+                  ),
+                  _QuickScheduleChip(
+                    label: 'This weekend',
+                    onTap: () => setState(() => _selected = _thisWeekend()),
+                  ),
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.event_outlined,
+                    color: FlixieColors.primary),
+                title: const Text('Date',
+                    style: TextStyle(color: FlixieColors.light)),
+                subtitle: Text(
+                  '${_selected.day} ${_kRequestMonths[_selected.month - 1]} ${_selected.year}',
+                  style: const TextStyle(color: FlixieColors.medium),
+                ),
+                onTap: _pickDate,
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.schedule_rounded,
+                    color: FlixieColors.primary),
+                title: const Text('Time',
+                    style: TextStyle(color: FlixieColors.light)),
+                subtitle: Text(
+                  TimeOfDay.fromDateTime(_selected).format(context),
+                  style: const TextStyle(color: FlixieColors.medium),
+                ),
+                onTap: _pickTime,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _locationController,
+                style: const TextStyle(color: FlixieColors.light),
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.location_on_outlined),
+                  labelText: 'Location (optional)',
+                  hintText: 'e.g. My place or local cinema',
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(
+                    context,
+                    (
+                      scheduledFor: _selected,
+                      location: _locationController.text.trim(),
+                    ),
+                  ),
+                  child: const Text('Confirm schedule'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

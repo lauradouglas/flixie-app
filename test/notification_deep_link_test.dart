@@ -89,6 +89,30 @@ void main() {
     );
   });
 
+  test('saved group movie choices open the focused Watch Plan', () {
+    expect(
+      notificationDeepLinkPath({
+        'category': 'WATCH_PLAN',
+        'event': 'CHOICES_SAVED',
+        'groupId': 'group-123',
+        'watchPlanId': 'plan-456',
+      }),
+      '/groups/group-123?tab=requests&requestId=plan-456',
+    );
+  });
+
+  test('group Watch Plan route still opens when groupId is absent from data',
+      () {
+    expect(
+      notificationDeepLinkPath({
+        'category': 'WATCH_PLAN',
+        'watchPlanId': 'plan-456',
+        'route': '/groups/group-123?tab=requests&requestId=plan-456',
+      }),
+      '/groups/group-123?tab=requests&requestId=plan-456',
+    );
+  });
+
   test('friend request id is not mistaken for a watch request', () {
     expect(
       notificationDeepLinkPath({

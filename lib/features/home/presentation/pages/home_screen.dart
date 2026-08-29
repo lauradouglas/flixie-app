@@ -440,7 +440,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }) async {
     for (final plan in plans) {
       final scheduledFor = plan.scheduledFor;
-      if (!plan.isWatchRequest || plan.isTerminal || scheduledFor == null ||
+      if (!plan.isWatchRequest ||
+          plan.isTerminal ||
+          scheduledFor == null ||
           !scheduledFor.isAfter(DateTime.now())) {
         continue;
       }
@@ -451,10 +453,12 @@ class _HomeScreenState extends State<HomeScreen> {
         planId: plan.id,
         scheduledFor: scheduledFor,
         title: plan.movie?.title ?? 'Watch together',
-        withName: isGroupPlan ? groupName! : otherUser?.username ?? 'your friend',
+        withName:
+            isGroupPlan ? groupName! : otherUser?.username ?? 'your friend',
         deepLink: isGroupPlan && plan.groupId?.isNotEmpty == true
             ? '/groups/${plan.groupId}?tab=plans'
             : '/watch-requests/${plan.id}',
+        scope: isGroupPlan ? 'GROUP' : 'DIRECT',
       );
     }
   }
@@ -729,24 +733,58 @@ class _HomeScreenState extends State<HomeScreen> {
       final scheduledFor = request.scheduledFor;
       final isAgreed =
           request.normalizedScheduleStatus == 'AGREED' || request.isScheduled;
+      final needsReply = _watchPlanNeedsResponse(request, user.id);
       return request.isWatchRequest &&
-          isAgreed &&
           !request.isTerminal &&
-          scheduledFor != null &&
           !closedPlanIds.contains(request.id) &&
           !_hasLoggedWatchForPlan(user, request) &&
           !_isPlanFullyRated(request) &&
-          !scheduledFor.isBefore(now.subtract(const Duration(days: 5)));
+          (needsReply ||
+              (isAgreed &&
+                  scheduledFor != null &&
+                  !scheduledFor
+                      .isBefore(now.subtract(const Duration(days: 5)))));
     }).toList()
       ..sort(
         (left, right) {
-          final leftIsDue = !left.scheduledFor!.isAfter(now);
-          final rightIsDue = !right.scheduledFor!.isAfter(now);
-          if (leftIsDue != rightIsDue) return leftIsDue ? -1 : 1;
-          return left.scheduledFor!.compareTo(right.scheduledFor!);
+          final leftRank = _homeWatchPlanRank(left, user.id, now);
+          final rightRank = _homeWatchPlanRank(right, user.id, now);
+          if (leftRank != rightRank) return leftRank.compareTo(rightRank);
+
+          final leftTime = left.scheduledFor;
+          final rightTime = right.scheduledFor;
+          if (leftRank == 2) {
+            // Put the most recently missed log prompt first.
+            return (rightTime ?? now).compareTo(leftTime ?? now);
+          }
+          final leftFallback = DateTime.tryParse(left.createdAt ?? '') ?? now;
+          final rightFallback = DateTime.tryParse(right.createdAt ?? '') ?? now;
+          return (leftTime ?? leftFallback)
+              .compareTo(rightTime ?? rightFallback);
         },
       );
     return plans.take(10).toList(growable: false);
+  }
+
+  bool _watchPlanNeedsResponse(WatchRequest request, String userId) {
+    if (request.isPending && request.requesterId != userId) return true;
+    final proposal = request.latestPendingProposal;
+    return request.normalizedScheduleStatus == 'PROPOSED' &&
+        proposal != null &&
+        proposal.proposerId != userId;
+  }
+
+  int _homeWatchPlanRank(WatchRequest request, String userId, DateTime now) {
+    final scheduledFor = request.scheduledFor?.toLocal();
+    if (scheduledFor != null && scheduledFor.isAfter(now)) {
+      final isToday = scheduledFor.year == now.year &&
+          scheduledFor.month == now.month &&
+          scheduledFor.day == now.day;
+      if (isToday) return 0;
+    }
+    if (_watchPlanNeedsResponse(request, userId)) return 1;
+    if (scheduledFor != null && !scheduledFor.isAfter(now)) return 2;
+    return 3;
   }
 
   bool _isPlanFullyRated(WatchRequest plan) {
@@ -1965,8 +2003,10 @@ class _HomeScreenState extends State<HomeScreen> {
     models.User user,
     WatchRequest plan,
   ) {
-    final scheduledFor = plan.scheduledFor!;
-    final isPast = !scheduledFor.isAfter(DateTime.now());
+    final scheduledFor = plan.scheduledFor;
+    final needsReply = _watchPlanNeedsResponse(plan, user.id);
+    final isPast =
+        scheduledFor != null && !scheduledFor.isAfter(DateTime.now());
     final watchAlreadyLogged = isPast && _hasLoggedWatchForPlan(user, plan);
     final isDue = isPast && !watchAlreadyLogged;
     final other = plan.otherUser(user.id);
@@ -2087,11 +2127,16 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            isDue
-                                ? 'Time to log your watch'
-                                : watchAlreadyLogged
-                                    ? 'Watch logged'
-                                    : _watchPlanScheduleHeadline(scheduledFor),
+                            needsReply
+                                ? 'Your reply is needed'
+                                : isDue
+                                    ? 'Time to log your watch'
+                                    : watchAlreadyLogged
+                                        ? 'Watch logged'
+                                        : scheduledFor == null
+                                            ? 'Plan being arranged'
+                                            : _watchPlanScheduleHeadline(
+                                                scheduledFor),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -2156,13 +2201,20 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                 const SizedBox(width: 5),
                                 Text(
-                                  isDue
-                                      ? 'Log watch'
-                                      : watchAlreadyLogged
-                                          ? 'Watch logged'
-                                          : _watchPlanScheduleCaption(scheduledFor),
+                                  needsReply
+                                      ? 'Reply now'
+                                      : isDue
+                                          ? 'Log watch'
+                                          : watchAlreadyLogged
+                                              ? 'Watch logged'
+                                              : scheduledFor == null
+                                                  ? 'Planning'
+                                                  : _watchPlanScheduleCaption(
+                                                      scheduledFor),
                                   style: TextStyle(
-                                    color: isDue || watchAlreadyLogged
+                                    color: needsReply ||
+                                            isDue ||
+                                            watchAlreadyLogged
                                         ? FlixieColors.success
                                         : FlixieColors.primary,
                                     fontSize: 12,

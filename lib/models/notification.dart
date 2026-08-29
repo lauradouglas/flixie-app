@@ -21,6 +21,10 @@ class FlixieNotification {
   final String userId;
   final String type;
   final String? action;
+
+  /// Immutable lifecycle event for a notification.  Unlike [action], this
+  /// describes what happened to the Watch Plan rather than a response state.
+  final String? event;
   final String message;
   final bool? read;
   final bool? closed;
@@ -42,6 +46,7 @@ class FlixieNotification {
     required this.userId,
     required this.type,
     this.action,
+    this.event,
     required this.message,
     this.read,
     this.closed,
@@ -67,6 +72,63 @@ class FlixieNotification {
   bool get isPending => action == actionReceived;
 
   bool get isRead => read ?? false;
+
+  String? get category => data?['category']?.toString();
+
+  /// Canonical Watch Plan event, with a compatibility bridge for notifications
+  /// persisted before `event` was returned by the API.
+  String? get watchPlanEvent {
+    final raw =
+        event ?? data?['event']?.toString() ?? data?['type']?.toString();
+    if (raw == null || raw.isEmpty) return null;
+    return switch (raw.toUpperCase()) {
+      'NEW_WATCH_REQUEST' => 'PLAN_INVITED',
+      'REQUEST_ACCEPTED' => 'PLAN_ACCEPTED',
+      'REQUEST_DECLINED' => 'PLAN_DECLINED',
+      'DATETIME_PROPOSED' => 'SCHEDULE_PROPOSED',
+      'DATETIME_ACCEPTED' => 'SCHEDULE_ACCEPTED',
+      'DATETIME_DECLINED' => 'SCHEDULE_DECLINED',
+      'REQUEST_SCHEDULED' => 'PLAN_SCHEDULED',
+      'REQUEST_RESCHEDULED' => 'PLAN_RESCHEDULED',
+      'LOCATION_CHANGED' => 'LOCATION_UPDATED',
+      'REQUEST_CANCELLED' => 'PLAN_CANCELLED',
+      'MOVIE_SELECTED' => 'TITLE_SELECTED',
+      'EVERYONE_RATED' => 'ALL_PARTICIPANTS_LOGGED',
+      final value => value,
+    };
+  }
+
+  bool get isWatchPlanNotification {
+    const watchPlanEvents = {
+      'PLAN_INVITED',
+      'PLAN_ACCEPTED',
+      'PLAN_DECLINED',
+      'CANDIDATE_ADDED',
+      'CANDIDATE_REMOVED',
+      'CHOICES_SUBMITTED',
+      'CHOICES_SAVED',
+      'CHOICES_COMPLETE',
+      'TITLE_SELECTED',
+      'TITLE_SELECTION_REOPENED',
+      'SCHEDULE_PROPOSED',
+      'SCHEDULE_ACCEPTED',
+      'SCHEDULE_DECLINED',
+      'PLAN_SCHEDULED',
+      'PLAN_RESCHEDULED',
+      'LOCATION_UPDATED',
+      'PLAN_CANCELLED',
+      'PLAN_DUE_SOON',
+      'PLAN_READY_TO_LOG',
+      'PARTICIPANT_LOGGED',
+      'ALL_PARTICIPANTS_LOGGED',
+      'RECAP_UPDATED',
+    };
+    return category == 'WATCH_PLAN' ||
+        watchPlanEvents.contains(watchPlanEvent) ||
+        type == movieWatchRequest ||
+        type == showWatchRequest ||
+        type == groupRequest;
+  }
 
   String? get route {
     final value = data?['route']?.toString();
@@ -99,6 +161,16 @@ class FlixieNotification {
     return u['username'] as String? ?? '';
   }
 
+  String? get senderId {
+    final linkedId = _linkOtherUser?['id']?.toString();
+    if (linkedId != null && linkedId.isNotEmpty) return linkedId;
+    final directId = senderUser?['id']?.toString();
+    if (directId != null && directId.isNotEmpty) return directId;
+    final payloadId =
+        data?['senderId']?.toString() ?? data?['actorId']?.toString();
+    return payloadId == null || payloadId.isEmpty ? null : payloadId;
+  }
+
   String? get senderInitials {
     final u = _linkOtherUser;
     if (u == null) return null;
@@ -119,6 +191,8 @@ class FlixieNotification {
   /// The movie/show title embedded in a watch request link, if present.
   /// The poster path for the movie/show embedded in any request link.
   String? get watchMediaPosterPath {
+    final payloadPoster = data?['posterPath']?.toString();
+    if (payloadPoster != null && payloadPoster.isNotEmpty) return payloadPoster;
     final l = link;
     if (l == null) return null;
     final request =
@@ -131,6 +205,8 @@ class FlixieNotification {
   }
 
   String? get watchMediaTitle {
+    final payloadTitle = data?['mediaTitle']?.toString();
+    if (payloadTitle != null && payloadTitle.isNotEmpty) return payloadTitle;
     final l = link;
     if (l == null) return null;
     final request =
@@ -208,6 +284,26 @@ class FlixieNotification {
     return null;
   }
 
+  /// Detail route for the media represented by this notification. Payload
+  /// values are preferred so an older linked plan can still open its title.
+  String? get watchMediaRoute {
+    int? asInt(Object? value) => value is int
+        ? value
+        : value is String
+            ? int.tryParse(value)
+            : null;
+    final request =
+        (link?['request'] ?? link?['groupRequest']) as Map<String, dynamic>?;
+    final movieId = asInt(data?['movieId']) ??
+        asInt(request?['movieId']) ??
+        asInt((request?['movie'] as Map<String, dynamic>?)?['id']);
+    if (movieId != null) return '/movies/$movieId?source=notification';
+    final showId = asInt(data?['showId']) ??
+        asInt(request?['showId']) ??
+        asInt((request?['show'] as Map<String, dynamic>?)?['id']);
+    return showId == null ? null : '/shows/$showId?source=notification';
+  }
+
   /// The movie title embedded in a group watch request link.
   String? get groupWatchMovieTitle {
     final l = link;
@@ -237,6 +333,8 @@ class FlixieNotification {
 
   /// The group name embedded in a group watch request link.
   String? get groupWatchGroupName {
+    final payloadName = data?['groupName']?.toString();
+    if (payloadName != null && payloadName.isNotEmpty) return payloadName;
     final l = link;
     if (l == null) return null;
     final gr = l['groupRequest'] as Map<String, dynamic>?;
@@ -258,6 +356,8 @@ class FlixieNotification {
 
   /// The group id embedded in a GROUP_INVITE notification link.
   String? get groupInviteGroupId {
+    final payloadId = data?['groupId']?.toString();
+    if (payloadId != null && payloadId.isNotEmpty) return payloadId;
     final l = link;
     if (l == null) return linkId;
     final req = (l['groupRequest'] ?? l['request']) as Map<String, dynamic>?;
@@ -290,6 +390,10 @@ class FlixieNotification {
 
   /// The ID of the embedded request object (used to update it on accept/decline).
   String? get linkedRequestId {
+    final payloadPlanId = data?['watchPlanId']?.toString() ??
+        data?['watchRequestId']?.toString() ??
+        data?['requestId']?.toString();
+    if (payloadPlanId != null && payloadPlanId.isNotEmpty) return payloadPlanId;
     final l = link;
     if (l == null) return relatedId;
     final request =
@@ -303,6 +407,8 @@ class FlixieNotification {
       userId: json['userId'] as String,
       type: json['type'] as String,
       action: json['action'] as String?,
+      event: json['event'] as String? ??
+          (json['data'] as Map<String, dynamic>?)?['event']?.toString(),
       message: json['message'] as String? ?? '',
       read: json['read'] as bool? ?? json['isRead'] as bool?,
       closed: json['closed'] as bool?,
@@ -324,6 +430,7 @@ class FlixieNotification {
     String? userId,
     String? type,
     String? action,
+    String? event,
     String? message,
     bool? read,
     bool? closed,
@@ -341,6 +448,7 @@ class FlixieNotification {
       userId: userId ?? this.userId,
       type: type ?? this.type,
       action: action ?? this.action,
+      event: event ?? this.event,
       message: message ?? this.message,
       read: read ?? this.read,
       closed: closed ?? this.closed,

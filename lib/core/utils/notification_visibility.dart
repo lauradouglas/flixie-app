@@ -34,6 +34,14 @@ int visibleUnreadNotificationCount(
         .length;
 
 String? _watchLifecycleKey(FlixieNotification notification) {
+  final event = notification.watchPlanEvent;
+  if (notification.isWatchPlanNotification && event != null) {
+    final requestId = notification.linkedRequestId;
+    if (requestId == null || requestId.isEmpty) return null;
+    final proposalId = notification.data?['scheduleProposalId']?.toString() ??
+        notification.data?['proposedFor']?.toString();
+    return 'WATCH_PLAN:$requestId:$event:${proposalId ?? ''}';
+  }
   if (notification.type == FlixieNotification.groupRequest &&
       notification.action == FlixieNotification.actionSent) {
     final requestId = notification.linkedRequestId;
@@ -54,6 +62,7 @@ String? _watchLifecycleKey(FlixieNotification notification) {
 }
 
 String? _scheduleKey(FlixieNotification notification) {
+  if (notification.watchPlanEvent != null) return null;
   if (notification.type != FlixieNotification.movieWatchRequest &&
       notification.type != FlixieNotification.showWatchRequest) {
     return null;

@@ -19,7 +19,12 @@ import 'package:flixie_app/features/social/presentation/widgets/group_avatar.dar
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/features/authentication/presentation/pages/auth_ui.dart';
 import 'package:flixie_app/features/movies/data/search_service.dart';
+import 'package:flixie_app/features/movies/utils/group_provider_match.dart';
 import 'package:flixie_app/models/movie_short.dart';
+
+enum _WatchContext { home, cinema, undecided }
+
+enum _ScheduleMode { dateOnly, dateAndTime, suggestDates }
 
 class MovieWatchRequestSheet extends StatefulWidget {
   const MovieWatchRequestSheet({
@@ -59,6 +64,10 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
   String? _selectedFriendId;
   String? _selectedGroupId;
   bool _isSending = false;
+  _WatchContext _watchContext = _WatchContext.home;
+  _ScheduleMode _scheduleMode = _ScheduleMode.dateAndTime;
+  DateTime? _selectedDate;
+  TimeOfDay? _selectedTime;
   late final List<MovieShort> _movieChoices;
 
   List<Group> _groups = [];
@@ -67,9 +76,13 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
   bool _loadingFriendProviders = false;
   bool _providerLoadStarted = false;
   List<WatchProvider> _streamingProviders = [];
+  final Map<int, List<WatchProvider>> _streamingProvidersByMovieId = {};
+  final Set<int> _loadingProviderMovieIds = {};
+  int? _selectedMovieId;
   Set<int> _myProviderIds = {};
   Set<int> _friendProviderIds = {};
   Map<int, int> _groupProviderCounts = {};
+  Map<String, int> _groupProviderNameCounts = {};
   int _groupMemberCount = 0;
   bool _loadingGroupProviders = false;
 
@@ -85,6 +98,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
               poster: widget.moviePoster,
             ),
           ];
+    _selectedMovieId = widget.movieId;
     _fetchGroups();
     if (widget.initialGroupId != null) {
       _isGroupMode = true;
@@ -136,6 +150,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
         _streamingProviders = {
           for (final provider in available) provider.id: provider,
         }.values.toList();
+        _streamingProvidersByMovieId[movieId] = _streamingProviders;
         _myProviderIds = results[1].map((provider) => provider.id).toSet();
         _loadingProviders = false;
       });
@@ -166,10 +181,40 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
     }
   }
 
+  Future<void> _selectMovieChoice(MovieShort movie) async {
+    setState(() => _selectedMovieId = movie.id);
+    if (_streamingProvidersByMovieId.containsKey(movie.id) ||
+        _loadingProviderMovieIds.contains(movie.id)) {
+      return;
+    }
+    _loadingProviderMovieIds.add(movie.id);
+    try {
+      final region =
+          context.read<AuthProvider>().dbUser?.watchProviderRegion ?? 'GB';
+      final providers =
+          await MovieService().getMovieWatchProviders(movie.id, region);
+      if (!mounted) return;
+      setState(() {
+        _streamingProvidersByMovieId[movie.id] = {
+          for (final provider
+              in providers.where((provider) => provider.isStreaming))
+            provider.id: provider,
+        }.values.toList()
+          ..sort((a, b) => a.displayPriority.compareTo(b.displayPriority));
+      });
+    } catch (error) {
+      logger.w('Unable to load providers for ${movie.name}: $error');
+    } finally {
+      _loadingProviderMovieIds.remove(movie.id);
+      if (mounted) setState(() {});
+    }
+  }
+
   Future<void> _selectGroup(String groupId) async {
     setState(() {
       _selectedGroupId = groupId;
       _groupProviderCounts = {};
+      _groupProviderNameCounts = {};
       _groupMemberCount = 0;
       _loadingGroupProviders = true;
     });
@@ -177,22 +222,30 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
       final members = (await GroupService.getGroupMembers(groupId))
           .where((member) => member.isAccepted)
           .toList();
-      final providerLists = await Future.wait(
-        members.map(
-          (member) => UserService.getUserWatchProviders(member.memberId)
-              .catchError((_) => <WatchProvider>[]),
+      final providerLists = await Future.wait(members.map((member) async {
+        try {
+          return await UserService.getUserWatchProviders(member.memberId);
+        } catch (error) {
+          logger.w(
+            'Unable to load watch providers for group member '
+            '${member.memberId}: $error',
+          );
+          return <WatchProvider>[];
+        }
+      }));
+      if (!mounted || _selectedGroupId != groupId) return;
+      final counts = countGroupProviderMatches(
+        providerLists
+            .map((providers) => providers.map((provider) => provider.id)),
+      );
+      final nameCounts = countGroupProviderMatches(
+        providerLists.map(
+          (providers) => providers.map((provider) => provider.matchKey),
         ),
       );
-      if (!mounted || _selectedGroupId != groupId) return;
-      final counts = <int, int>{};
-      for (final providers in providerLists) {
-        for (final providerId
-            in providers.map((provider) => provider.id).toSet()) {
-          counts[providerId] = (counts[providerId] ?? 0) + 1;
-        }
-      }
       setState(() {
         _groupProviderCounts = counts;
+        _groupProviderNameCounts = nameCounts;
         _groupMemberCount = members.length;
         _loadingGroupProviders = false;
       });
@@ -215,6 +268,18 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
     }
   }
 
+  bool _isMovieAvailableToEveryone(MovieShort movie) {
+    if (!_isGroupMode || _selectedGroupId == null || _groupMemberCount == 0) {
+      return false;
+    }
+    return (_streamingProvidersByMovieId[movie.id] ?? const <WatchProvider>[])
+        .any((provider) =>
+            (_groupProviderCounts[provider.id] ??
+                _groupProviderNameCounts[provider.matchKey] ??
+                0) ==
+            _groupMemberCount);
+  }
+
   @override
   void dispose() {
     _messageController.dispose();
@@ -225,7 +290,9 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
   Future<void> _send() async {
     final canSend =
         _isGroupMode ? _selectedGroupId != null : _selectedFriendId != null;
-    if (!canSend || _isSending || _movieChoices.isEmpty) return;
+    if (!canSend || _isSending || _movieChoices.isEmpty || !_hasValidSchedule) {
+      return;
+    }
     final analytics = context.read<AnalyticsController>();
     setState(() => _isSending = true);
     try {
@@ -240,6 +307,8 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
           'MOVIE',
           _movieChoices.first.id,
           candidateMovieIds: _movieChoices.map((movie) => movie.id).toList(),
+          proposedDate: _proposedDate?.toIso8601String(),
+          location: _locationLabel,
         );
         final conversationId = result?['conversationId'] as String?;
         final watchRequest = result?['watchRequest'] as Map<String, dynamic>?;
@@ -255,6 +324,9 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
           'candidateMovieIds': _movieChoices.map((movie) => movie.id).toList(),
           'message': _messageController.text.trim(),
           'type': 'MOVIE_WATCH_REQUEST',
+          if (_proposedDate != null)
+            'proposedDate': _proposedDate!.toIso8601String(),
+          if (_locationLabel != null) 'location': _locationLabel,
         });
         final request = result?['request'] as Map<String, dynamic>?;
         watchPlanId = request?['id']?.toString();
@@ -299,7 +371,65 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
         },
       ),
     );
-    if (movie != null && mounted) setState(() => _movieChoices.add(movie));
+    if (movie != null && mounted) {
+      setState(() => _movieChoices.add(movie));
+      _selectMovieChoice(movie);
+    }
+  }
+
+  void _removeMovieChoice(MovieShort movie) {
+    if (_movieChoices.length <= 1) return;
+    setState(() {
+      _movieChoices.remove(movie);
+      if (_selectedMovieId == movie.id) {
+        _selectedMovieId = _movieChoices.first.id;
+      }
+    });
+  }
+
+  bool get _hasValidSchedule {
+    if (_selectedDate == null) return false;
+    if (_scheduleMode == _ScheduleMode.dateAndTime && _selectedTime == null) {
+      return false;
+    }
+    final proposed = _proposedDate;
+    return proposed == null || !proposed.isBefore(DateTime.now());
+  }
+
+  DateTime? get _proposedDate {
+    final date = _selectedDate;
+    if (date == null) return null;
+    if (_scheduleMode != _ScheduleMode.dateAndTime) return date;
+    final time = _selectedTime;
+    if (time == null) return null;
+    return DateTime(date.year, date.month, date.day, time.hour, time.minute);
+  }
+
+  String? get _locationLabel => switch (_watchContext) {
+        _WatchContext.home => 'At home',
+        _WatchContext.cinema => 'Cinema',
+        _WatchContext.undecided => null,
+      };
+
+  Future<void> _pickDate() async {
+    final today = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate == null || _selectedDate!.isBefore(today)
+          ? today
+          : _selectedDate!,
+      firstDate: DateTime(today.year, today.month, today.day),
+      lastDate: DateTime(today.year + 3),
+    );
+    if (picked != null && mounted) setState(() => _selectedDate = picked);
+  }
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _selectedTime ?? TimeOfDay.now(),
+    );
+    if (picked != null && mounted) setState(() => _selectedTime = picked);
   }
 
   @override
@@ -350,8 +480,24 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text('Invite to Watch',
-                        style: Theme.of(context).textTheme.titleLarge),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Plan to watch',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Plan a watch together around this movie',
+                          style: TextStyle(
+                            color: FlixieColors.medium,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   IconButton(
                     tooltip: 'Close',
@@ -428,7 +574,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                 const SizedBox(height: 10),
                 if (!hasFriends)
                   const Text(
-                    'Add some friends to invite them to watch',
+                    'Add some friends to plan a watch together',
                     style: TextStyle(color: FlixieColors.medium, fontSize: 13),
                   )
                 else
@@ -481,7 +627,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                     child: ListView.separated(
                       shrinkWrap: true,
                       itemCount: visibleGroups.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      separatorBuilder: (_, __) => const SizedBox(height: 6),
                       itemBuilder: (_, i) {
                         final group = visibleGroups[i];
                         final isSelected = _selectedGroupId == group.id;
@@ -501,7 +647,12 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
               ],
               const SizedBox(height: 16),
               _WatchRequestProviders(
-                providers: _streamingProviders,
+                providers: _streamingProvidersByMovieId[_selectedMovieId] ??
+                    _streamingProviders,
+                movieTitle: _movieChoices
+                    .where((movie) => movie.id == _selectedMovieId)
+                    .map((movie) => movie.name)
+                    .firstOrNull,
                 myProviderIds: _myProviderIds,
                 friendProviderIds: _friendProviderIds,
                 friendName: _selectedFriendName,
@@ -511,6 +662,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                 groupMode: _isGroupMode,
                 groupSelected: _selectedGroupId != null,
                 groupProviderCounts: _groupProviderCounts,
+                groupProviderNameCounts: _groupProviderNameCounts,
                 groupMemberCount: _groupMemberCount,
                 loadingGroup: _loadingGroupProviders,
               ),
@@ -531,49 +683,71 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Stack(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: SizedBox(
-                                    width: 76,
-                                    height: 114,
-                                    child: movie.poster == null
-                                        ? Container(
-                                            color: FlixieColors.surfaceElevated,
-                                            child: const Icon(
-                                                Icons.movie_outlined,
-                                                color: FlixieColors.medium),
-                                          )
-                                        : CachedNetworkImage(
-                                            imageUrl: movie.poster!
-                                                    .startsWith('http')
-                                                ? movie.poster!
-                                                : 'https://image.tmdb.org/t/p/w185${movie.poster}',
-                                            fit: BoxFit.cover,
-                                          ),
-                                  ),
-                                ),
-                                if (_movieChoices.length > 1)
-                                  Positioned(
-                                    top: 3,
-                                    right: 3,
-                                    child: InkWell(
-                                      onTap: () => setState(
-                                          () => _movieChoices.remove(movie)),
-                                      borderRadius: BorderRadius.circular(20),
-                                      child: Container(
-                                        padding: const EdgeInsets.all(3),
-                                        decoration: const BoxDecoration(
-                                          color: Colors.black54,
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(Icons.close_rounded,
-                                            size: 14, color: Colors.white),
+                            InkWell(
+                              onTap: () => _selectMovieChoice(movie),
+                              borderRadius: BorderRadius.circular(9),
+                              child: Stack(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(9),
+                                      border: Border.all(
+                                        color:
+                                            _isMovieAvailableToEveryone(movie)
+                                                ? FlixieColors.success
+                                                : movie.id == _selectedMovieId
+                                                    ? FlixieColors.primary
+                                                    : Colors.transparent,
+                                        width:
+                                            _isMovieAvailableToEveryone(movie)
+                                                ? 2
+                                                : 1,
+                                      ),
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: SizedBox(
+                                        width: 76,
+                                        height: 114,
+                                        child: movie.poster == null
+                                            ? Container(
+                                                color: FlixieColors
+                                                    .surfaceElevated,
+                                                child: const Icon(
+                                                    Icons.movie_outlined,
+                                                    color: FlixieColors.medium),
+                                              )
+                                            : CachedNetworkImage(
+                                                imageUrl: movie.poster!
+                                                        .startsWith('http')
+                                                    ? movie.poster!
+                                                    : 'https://image.tmdb.org/t/p/w185${movie.poster}',
+                                                fit: BoxFit.cover,
+                                              ),
                                       ),
                                     ),
                                   ),
-                              ],
+                                  if (_movieChoices.length > 1)
+                                    Positioned(
+                                      top: 3,
+                                      right: 3,
+                                      child: InkWell(
+                                        onTap: () => _removeMovieChoice(movie),
+                                        borderRadius: BorderRadius.circular(20),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(3),
+                                          decoration: const BoxDecoration(
+                                            color: Colors.black54,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(Icons.close_rounded,
+                                              size: 14, color: Colors.white),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ),
                             const SizedBox(height: 4),
                             Text(
@@ -667,19 +841,10 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
   }
 
   String get _sendButtonLabel {
-    if (_isGroupMode) {
-      for (final group in _groups) {
-        if (group.id == _selectedGroupId) return 'Make plan with ${group.name}';
-      }
-    } else {
-      for (final friendship in widget.friends) {
-        final friend = friendship.friendUser;
-        if (friend?.id == _selectedFriendId) {
-          return 'Invite ${friend!.displayName}';
-        }
-      }
+    if (_isGroupMode ? _selectedGroupId != null : _selectedFriendId != null) {
+      return 'Send watch plan';
     }
-    return 'Select someone to invite';
+    return 'Choose who\'s watching';
   }
 
   String? get _selectedFriendName {
@@ -694,6 +859,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
 class _WatchRequestProviders extends StatelessWidget {
   const _WatchRequestProviders({
     required this.providers,
+    this.movieTitle,
     required this.myProviderIds,
     required this.friendProviderIds,
     required this.friendName,
@@ -703,11 +869,13 @@ class _WatchRequestProviders extends StatelessWidget {
     required this.groupMode,
     required this.groupSelected,
     required this.groupProviderCounts,
+    required this.groupProviderNameCounts,
     required this.groupMemberCount,
     required this.loadingGroup,
   });
 
   final List<WatchProvider> providers;
+  final String? movieTitle;
   final Set<int> myProviderIds;
   final Set<int> friendProviderIds;
   final String? friendName;
@@ -717,6 +885,7 @@ class _WatchRequestProviders extends StatelessWidget {
   final bool groupMode;
   final bool groupSelected;
   final Map<int, int> groupProviderCounts;
+  final Map<String, int> groupProviderNameCounts;
   final int groupMemberCount;
   final bool loadingGroup;
 
@@ -765,9 +934,13 @@ class _WatchRequestProviders extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'WHERE TO WATCH',
-            style: TextStyle(
+          Text(
+            movieTitle == null
+                ? 'WHERE TO WATCH'
+                : 'WHERE TO WATCH · $movieTitle',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
               color: FlixieColors.medium,
               fontSize: 10,
               fontWeight: FontWeight.w700,
@@ -785,6 +958,11 @@ class _WatchRequestProviders extends StatelessWidget {
                   youHaveIt: myProviderIds.contains(provider.id),
                   friendHasIt: friendProviderIds.contains(provider.id),
                   compareFriend: showFriendMatch && !loadingFriend,
+                  groupMatchCount: groupMode && groupSelected
+                      ? _groupMatchCount(provider)
+                      : 0,
+                  groupMemberCount:
+                      groupMode && groupSelected ? groupMemberCount : 0,
                 ),
             ],
           ),
@@ -838,17 +1016,14 @@ class _WatchRequestProviders extends StatelessWidget {
     );
   }
 
-  bool get _hasGroupMatch => providers.any(
-        (provider) =>
-            groupMemberCount > 0 &&
-            groupProviderCounts[provider.id] == groupMemberCount,
-      );
+  bool get _hasGroupMatch => providers
+      .any((provider) => _groupMatchCount(provider) == groupMemberCount);
 
   String get _groupSummary {
     if (groupMemberCount == 0) return 'No eligible group members found.';
     final everyone = providers
         .where(
-          (provider) => groupProviderCounts[provider.id] == groupMemberCount,
+          (provider) => _groupMatchCount(provider) == groupMemberCount,
         )
         .map((provider) => provider.providerName)
         .toList();
@@ -856,15 +1031,19 @@ class _WatchRequestProviders extends StatelessWidget {
       return 'Everyone can stream it on ${everyone.join(', ')}.';
     }
     final best = [...providers]..sort(
-        (a, b) => (groupProviderCounts[b.id] ?? 0)
-            .compareTo(groupProviderCounts[a.id] ?? 0),
+        (a, b) => _groupMatchCount(b).compareTo(_groupMatchCount(a)),
       );
     final provider = best.first;
-    final count = groupProviderCounts[provider.id] ?? 0;
+    final count = _groupMatchCount(provider);
     return count == 0
         ? 'No group members have a matching streaming service.'
         : '$count of $groupMemberCount members have ${provider.providerName}.';
   }
+
+  int _groupMatchCount(WatchProvider provider) =>
+      groupProviderCounts[provider.id] ??
+      groupProviderNameCounts[provider.matchKey] ??
+      0;
 }
 
 class _ProviderPanel extends StatelessWidget {
@@ -891,22 +1070,33 @@ class _ProviderMatchLogo extends StatelessWidget {
     required this.youHaveIt,
     required this.friendHasIt,
     required this.compareFriend,
+    this.groupMatchCount = 0,
+    this.groupMemberCount = 0,
   });
 
   final WatchProvider provider;
   final bool youHaveIt;
   final bool friendHasIt;
   final bool compareFriend;
+  final int groupMatchCount;
+  final int groupMemberCount;
 
   @override
   Widget build(BuildContext context) {
-    final shared = compareFriend && youHaveIt && friendHasIt;
+    final friendShared = compareFriend && youHaveIt && friendHasIt;
+    final groupShared =
+        groupMemberCount > 0 && groupMatchCount == groupMemberCount;
+    final highlighted = friendShared || groupShared;
     return Tooltip(
-      message: shared
-          ? 'You both have ${provider.providerName}'
-          : youHaveIt
-              ? 'You have ${provider.providerName}'
-              : provider.providerName,
+      message: groupShared
+          ? 'Everyone in the group has ${provider.providerName}'
+          : groupMemberCount > 0 && groupMatchCount > 0
+              ? '$groupMatchCount of $groupMemberCount group members have ${provider.providerName}'
+              : friendShared
+                  ? 'You both have ${provider.providerName}'
+                  : youHaveIt
+                      ? 'You have ${provider.providerName}'
+                      : provider.providerName,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -917,12 +1107,12 @@ class _ProviderMatchLogo extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: shared
+                color: highlighted
                     ? FlixieColors.success
                     : youHaveIt
                         ? FlixieColors.primary
                         : FlixieColors.tabBarBorder,
-                width: shared ? 2 : 1,
+                width: highlighted ? 2 : 1,
               ),
             ),
             child: ClipRRect(
@@ -937,7 +1127,7 @@ class _ProviderMatchLogo extends StatelessWidget {
               ),
             ),
           ),
-          if (shared)
+          if (highlighted)
             const Positioned(
               right: -4,
               top: -4,
@@ -1031,7 +1221,7 @@ class _RecipientOptionTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
-          height: 54,
+          height: 50,
           padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
             color: selected

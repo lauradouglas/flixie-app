@@ -216,6 +216,32 @@ class GroupService {
     return GroupWatchRequest.fromJson(data as Map<String, dynamic>);
   }
 
+  /// Add a movie option to an accepted group Watch Plan.
+  static Future<GroupWatchRequest> addWatchPlanCandidate(
+    String requestId,
+    String userId,
+    int movieId,
+  ) async {
+    final data = await ApiClient.post(
+      '/groups/request/$requestId/candidates',
+      body: {'userId': userId, 'movieId': movieId},
+    );
+    return GroupWatchRequest.fromJson(data as Map<String, dynamic>);
+  }
+
+  /// Remove a suggested title from a group Watch Plan.
+  static Future<GroupWatchRequest> removeWatchPlanCandidate(
+    String requestId,
+    String userId,
+    String candidateId,
+  ) async {
+    final data = await ApiClient.delete(
+      '/groups/request/$requestId/candidates/$candidateId',
+      body: {'userId': userId},
+    );
+    return GroupWatchRequest.fromJson(data as Map<String, dynamic>);
+  }
+
   /// Lock the final movie for a group Watch Plan. Creator only.
   static Future<GroupWatchRequest> selectWatchPlanMovie(
     String requestId,
@@ -344,7 +370,8 @@ class GroupService {
       body: {
         'userId': userId,
         if (rating != null) 'rating': rating,
-        if (reviewText != null && reviewText.isNotEmpty) 'reviewText': reviewText,
+        if (reviewText != null && reviewText.isNotEmpty)
+          'reviewText': reviewText,
       },
     );
     return GroupWatchRequest.fromJson(data as Map<String, dynamic>);

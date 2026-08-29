@@ -106,6 +106,18 @@ class RequestService {
     return getWatchRequestState(watchRequestId: watchRequestId, userId: userId);
   }
 
+  static Future<WatchRequestState> removeWatchPlanCandidate({
+    required String watchRequestId,
+    required String userId,
+    required String candidateId,
+  }) async {
+    await ApiClient.delete(
+      '/watch-requests/$watchRequestId/candidates/$candidateId',
+      body: {'userId': userId},
+    );
+    return getWatchRequestState(watchRequestId: watchRequestId, userId: userId);
+  }
+
   static Future<WatchRequestState> submitWatchPlanChoices({
     required String watchRequestId,
     required String userId,
