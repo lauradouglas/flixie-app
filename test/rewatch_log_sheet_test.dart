@@ -5,7 +5,7 @@ import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_shee
 void main() {
   testWidgets('watch entry can continue into the review journey',
       (tester) async {
-    await tester.binding.setSurfaceSize(const Size(800, 900));
+    await tester.binding.setSurfaceSize(const Size(800, 1400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     var submitted = false;
     var reviewSelected = false;
