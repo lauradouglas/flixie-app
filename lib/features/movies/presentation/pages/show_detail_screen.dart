@@ -2695,7 +2695,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
               _showFriendMetric(summary.ratedCount, 'rated'),
               _showFriendMetric(summary.recommendedCount, 'recommend'),
               _showFriendMetric(summary.watchlistCount, 'watchlist'),
-              _showFriendMetric(summary.favouriteCount, 'favourited'),
+              _showFriendMetric(summary.favouriteCount, 'favourite'),
             ],
           ),
         ),

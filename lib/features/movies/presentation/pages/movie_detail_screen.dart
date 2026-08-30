@@ -895,66 +895,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     }
   }
 
-  Future<void> _toggleWatched() async {
-    final authProvider = context.read<AuthProvider>();
-    final user = authProvider.dbUser;
-    final movieId = int.tryParse(widget.movieId);
-
-    if (user == null || movieId == null) return;
-
-    if (!_isWatched) {
-      setState(() => _currentlyUpdating = ListUpdateType.watched);
-      try {
-        final committed = await _showLogWatchSheet();
-        if (!mounted) return;
-        setState(() {
-          if (committed) _isWatched = true;
-          _currentlyUpdating = null;
-        });
-        if (committed) HapticFeedback.lightImpact();
-      } catch (e) {
-        logger.e('Error marking movie watched: $e');
-        if (mounted) {
-          setState(() => _currentlyUpdating = null);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to mark as watched')),
-          );
-        }
-      }
-      return;
-    }
-
-    setState(() => _currentlyUpdating = ListUpdateType.watched);
-
-    try {
-      await WatchlistActionsController.instance
-          .removeFromWatched(user.id, movieId);
-
-      // Successfully updated on server, toggle UI state and update user list
-      if (mounted) {
-        HapticFeedback.lightImpact();
-        setState(() {
-          _isWatched = !_isWatched;
-          _currentlyUpdating = null;
-        });
-
-        // _isWatched is now false (was toggled above); remove from local list
-        final updatedWatched = (user.watchedMovies ?? [])
-            .where((item) => item.movieId != movieId)
-            .toList();
-        authProvider.updateUserList(watchedMovies: updatedWatched);
-      }
-    } catch (e) {
-      logger.e('Error toggling watched: $e');
-      if (mounted) {
-        setState(() => _currentlyUpdating = null);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update watched list: $e')),
-        );
-      }
-    }
-  }
-
   Future<void> _toggleFavorite() async {
     final authProvider = context.read<AuthProvider>();
     final analytics = context.read<AnalyticsController>();
@@ -1423,49 +1363,55 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         ),
       );
     }
-    return Scaffold(
-      backgroundColor: FlixieColors.background,
-      body: RefreshIndicator(
-        color: FlixieColors.primary,
-        onRefresh: _refresh,
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverToBoxAdapter(
-              child: _buildMovieIntro(context, movie),
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: _MovieDetailHeroTokens.pageHorizontalPadding),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(
-                        height: _MovieDetailHeroTokens.heroToWatchSectionGap),
-                    _buildActionButtons(),
-                    const SizedBox(height: 18),
-                    _buildWhereToWatchSection(context),
-                    const SizedBox(height: 12),
-                    _buildFriendSummarySection(context),
-                    const SizedBox(height: 14),
-                    _buildMovieDetailTabs(),
-                    const SizedBox(height: 18),
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 220),
-                      switchInCurve: Curves.easeOut,
-                      switchOutCurve: Curves.easeIn,
-                      child: KeyedSubtree(
-                        key: ValueKey(_movieDetailTab),
-                        child: _buildSelectedMovieTab(context, movie),
+    // This dense, poster-led page has fixed visual proportions. Respecting a
+    // large device text scale here causes titles and CTAs to crowd each other
+    // out, so use the designed type scale for the page instead.
+    return MediaQuery(
+      data: MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
+      child: Scaffold(
+        backgroundColor: FlixieColors.background,
+        body: RefreshIndicator(
+          color: FlixieColors.primary,
+          onRefresh: _refresh,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(
+                child: _buildMovieIntro(context, movie),
+              ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: _MovieDetailHeroTokens.pageHorizontalPadding),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(
+                          height: _MovieDetailHeroTokens.heroToWatchSectionGap),
+                      _buildActionButtons(),
+                      const SizedBox(height: 18),
+                      _buildWhereToWatchSection(context),
+                      const SizedBox(height: 12),
+                      _buildFriendSummarySection(context),
+                      const SizedBox(height: 14),
+                      _buildMovieDetailTabs(),
+                      const SizedBox(height: 18),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 220),
+                        switchInCurve: Curves.easeOut,
+                        switchOutCurve: Curves.easeIn,
+                        child: KeyedSubtree(
+                          key: ValueKey(_movieDetailTab),
+                          child: _buildSelectedMovieTab(context, movie),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 110),
-                  ],
+                      const SizedBox(height: 110),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -3395,122 +3341,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   // ---- CTA buttons ---------------------------------------------------------
 
   Widget _buildActionButtons() {
-    final primaryIsLoading = _currentlyUpdating == ListUpdateType.watched;
-    final hasWatchEntries = _watchCount > 0;
-    final primaryIcon =
-        hasWatchEntries ? Icons.replay_rounded : Icons.video_call_outlined;
-    final primaryLabel =
-        hasWatchEntries ? 'Log another watch' : 'Log first watch';
-    final VoidCallback primaryAction = hasWatchEntries || _isWatched
-        ? () => _showLogWatchSheet()
-        : _toggleWatched;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: hasWatchEntries
-                      ? FlixieColors.success.withValues(alpha: 0.9)
-                      : FlixieColors.primary.withValues(alpha: 0.11),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  hasWatchEntries
-                      ? Icons.check_rounded
-                      : Icons.slow_motion_video_rounded,
-                  color: hasWatchEntries
-                      ? FlixieColors.background
-                      : FlixieColors.primary,
-                  size: 25,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      hasWatchEntries
-                          ? 'Watched ${_watchCount == 1 ? 'once' : '$_watchCount times'}'
-                          : 'Not watched yet',
-                      style: const TextStyle(
-                        color: FlixieColors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        height: 1.1,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      hasWatchEntries && _lastWatchedLabel() != null
-                          ? 'Last watched ${_lastWatchedLabel()}'
-                          : 'Log your first watch to start your history',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: FlixieColors.light,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w500,
-                        height: 1.1,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              ElevatedButton.icon(
-                onPressed:
-                    _currentlyUpdating != null ? null : () => primaryAction(),
-                icon: primaryIsLoading
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(primaryIcon, size: 20),
-                label: Text(primaryLabel),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: FlixieColors.primary,
-                  foregroundColor: Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(11),
-                  ),
-                  textStyle: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 4),
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              'Rate and review each watch separately',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: FlixieColors.medium,
-                fontSize: 8.5,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ),
+        _buildWatchEntryStatusRow(),
         const SizedBox(height: 12),
         Divider(
           height: 1,
@@ -3522,21 +3356,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 2),
           child: Row(
             children: [
-              Expanded(
-                child: _statusActionItem(
-                  icon: _userRating != null
-                      ? Icons.star_rounded
-                      : Icons.star_outline_rounded,
-                  label: 'Rate',
-                  badge: _userRating != null ? '${_userRating!}/10' : null,
-                  color: FlixieColors.tertiary,
-                  isActive: _userRating != null,
-                  isLoading: _isRatingLoading,
-                  onTap: _currentlyUpdating != null || _isRatingLoading
-                      ? null
-                      : _showRatingSheet,
-                ),
-              ),
               Expanded(
                 child: _statusActionItem(
                   icon: _inWatchlist ? Icons.bookmark : Icons.bookmark_outline,
@@ -3589,30 +3408,202 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     );
   }
 
-  String? _lastWatchedLabel() {
-    if (_movieWatchHistory.isEmpty) return null;
-    final dates = _movieWatchHistory
-        .map((entry) => DateTime.tryParse(entry.watchedAt ?? ''))
-        .whereType<DateTime>()
-        .toList()
-      ..sort((a, b) => b.compareTo(a));
-    if (dates.isEmpty) return null;
-    const months = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
-    final date = dates.first.toLocal();
-    return '${date.day} ${months[date.month - 1]} ${date.year}';
+  /// The movie header always shows one watch-entry component. Its evidence and
+  /// CTA change with the latest entry, rather than mixing a movie-level rating
+  /// with a separate watch-history action.
+  Widget _buildWatchEntryStatusRow() {
+    final entries = [..._movieWatchHistory]..sort((a, b) {
+        final left = DateTime.tryParse(a.watchedAt ?? '') ?? DateTime(0);
+        final right = DateTime.tryParse(b.watchedAt ?? '') ?? DateTime(0);
+        return right.compareTo(left);
+      });
+    final latest = entries.isEmpty ? null : entries.first;
+    final previousRated =
+        entries.skip(1).where((entry) => entry.rating != null).firstOrNull;
+    final latestRated = latest?.rating != null;
+    final watchedCount =
+        entries.isNotEmpty ? entries.length : (_isWatched ? 1 : 0);
+    final isRewatch = watchedCount > 1;
+    final hasAnyRating = entries.any((entry) => entry.rating != null);
+    final canInteract = _currentlyUpdating == null;
+
+    final title = watchedCount == 0
+        ? 'Not watched yet'
+        : watchedCount == 1
+            ? 'Watched once'
+            : 'Watched $watchedCount times';
+    final icon = watchedCount == 0
+        ? Icons.play_arrow_rounded
+        : isRewatch
+            ? Icons.replay_rounded
+            : Icons.check_rounded;
+    const iconColor = FlixieColors.success;
+    final iconBackground = watchedCount == 0
+        ? FlixieColors.primary.withValues(alpha: .18)
+        : FlixieColors.success.withValues(alpha: .12);
+
+    final dateText = latest?.watchedAt == null
+        ? (watchedCount == 0
+            ? 'Start your watch history'
+            : 'Watch date not saved')
+        : _formatWatchDate(latest!.watchedAt);
+    final ratingText = latestRated
+        ? '${isRewatch ? 'Latest · ' : ''}$dateText  ★ ${latest!.rating!.toStringAsFixed(0)}/10${latest.recommended == true ? '  👍' : latest.recommended == false ? '  👎' : ''}'
+        : watchedCount == 0
+            ? 'Start your watch history'
+            : isRewatch
+                ? 'Latest · $dateText  Not rated'
+                : '$dateText  Not rated';
+
+    void openHistory() =>
+        setState(() => _movieDetailTab = MovieDetailTab.activity);
+    void logAgain() => _showLogWatchSheet();
+    void rateLatest() => _showLogWatchSheet(entry: latest);
+
+    final needsRating = watchedCount > 0 && !latestRated;
+    final primaryLabel = watchedCount == 0
+        ? 'Log first watch'
+        : needsRating
+            ? (isRewatch ? 'Rate latest' : 'Add rating')
+            : 'Log again';
+    final primaryAction =
+        watchedCount == 0 || latestRated ? logAgain : rateLatest;
+    final primaryButton = FilledButton(
+      onPressed: canInteract ? primaryAction : null,
+      style: FilledButton.styleFrom(
+        minimumSize: const Size(0, 40),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+      ),
+      child: Text(primaryLabel),
+    );
+
+    final latestRating = latest?.rating;
+    final previousRating = previousRated?.rating;
+    final previousComparison = isRewatch &&
+            latestRating != null &&
+            previousRating != null
+        ? '${previousRating.toStringAsFixed(0)}/10 → ${latestRating.toStringAsFixed(0)}/10'
+        : null;
+    final delta = previousComparison == null
+        ? null
+        : latestRating!.round() - previousRating!.round();
+
+    return Material(
+      color: FlixieColors.surface,
+      borderRadius: BorderRadius.circular(22),
+      child: InkWell(
+        onTap: watchedCount == 0 ? null : openHistory,
+        borderRadius: BorderRadius.circular(22),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: FlixieColors.tabBarBorder),
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final stackAction = constraints.maxWidth < 326;
+              final details = Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: const TextStyle(
+                          color: FlixieColors.light,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 5),
+                  Text(
+                    ratingText,
+                    maxLines: 2,
+                    style: TextStyle(
+                      color: latestRated
+                          ? FlixieColors.warning
+                          : FlixieColors.medium,
+                      fontSize: latestRated ? 13 : 11,
+                      fontWeight:
+                          latestRated ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                  ),
+                ],
+              );
+              final leading = Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                    color: iconBackground, shape: BoxShape.circle),
+                child: Icon(icon, color: iconColor, size: 24),
+              );
+              final action = needsRating && !isRewatch
+                  ? Row(mainAxisSize: MainAxisSize.min, children: [
+                      OutlinedButton(
+                        onPressed: canInteract ? rateLatest : null,
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 40),
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          textStyle: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                        child: const Text('Add rating'),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton.filled(
+                        tooltip: 'Log again',
+                        onPressed: canInteract ? logAgain : null,
+                        icon: const Icon(Icons.replay_rounded),
+                      ),
+                    ])
+                  : primaryButton;
+
+              return Column(mainAxisSize: MainAxisSize.min, children: [
+                Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                  leading,
+                  const SizedBox(width: 10),
+                  Expanded(child: details),
+                  if (!stackAction) ...[const SizedBox(width: 8), action],
+                ]),
+                if (stackAction) ...[
+                  const SizedBox(height: 14),
+                  Align(alignment: Alignment.centerRight, child: action),
+                ],
+                if (isRewatch &&
+                    (previousComparison != null || !hasAnyRating)) ...[
+                  const SizedBox(height: 14),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.only(left: 12),
+                    decoration: const BoxDecoration(
+                      border: Border(
+                          left: BorderSide(
+                              color: FlixieColors.primary, width: 2)),
+                    ),
+                    child: Row(children: [
+                      Expanded(
+                        child: Text(
+                          previousComparison == null
+                              ? 'Previous watches · No ratings yet'
+                              : 'Previous rating',
+                          style: const TextStyle(
+                              color: FlixieColors.medium, fontSize: 13),
+                        ),
+                      ),
+                      if (previousComparison != null)
+                        Text(
+                          '$previousComparison${delta == null || delta == 0 ? '' : delta > 0 ? '  ↑$delta' : '  ↓${delta.abs()}'}',
+                          style: const TextStyle(
+                              color: FlixieColors.warning,
+                              fontWeight: FontWeight.w600),
+                        ),
+                    ]),
+                  ),
+                ],
+              ]);
+            },
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _statusActionItem({
@@ -4010,7 +4001,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               _friendStat(rated, 'rated'),
               _friendStat(recommended, 'recommend'),
               _friendStat(watchlisted, 'watchlist'),
-              _friendStat(favourited, 'favourited'),
+              _friendStat(favourited, 'favourite'),
             ],
           ),
         ),
@@ -4558,7 +4549,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                           _friendStat(ratedCount, 'rated'),
                           _friendStat(recommendCount, 'recommend'),
                           _friendStat(watchlistCount, 'watchlist'),
-                          _friendStat(favouritedCount, 'favourited'),
+                          _friendStat(favouritedCount, 'favourite'),
                         ],
                       ),
                     ),
