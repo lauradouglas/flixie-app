@@ -1355,7 +1355,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
       color: FlixieColors.primary,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         children: children,
       ),
     );

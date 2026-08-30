@@ -58,42 +58,46 @@ class AuthPrefetchCoordinator {
     List<WatchRequest>? watchRequests;
 
     await Future.wait([
-      _profileLookupController
-          .getUserActivity(userId)
-          .then((v) => activity = v, onError: (_) {}),
-      _friendActionsController
-          .getFriends(userId)
-          .then((v) => friends = v, onError: (_) {}),
-      _friendActionsController
-          .getFriendsActivityLists(userId)
-          .then((v) => friendsActivity = v, onError: (_) {}),
-      GroupService.getUserGroups(userId)
-          .then((v) => groups = v, onError: (_) {}),
-      RequestService.getWatchRequests(userId)
-          .then((v) => watchRequests = v, onError: (_) {}),
-      _profileLookupController
-          .getUserMovieRatings(userId)
-          .then((v) => ratings = v, onError: (_) {}),
-      _profileLookupController
-          .getUserMovieReviews(userId)
-          .then((v) => reviews = v, onError: (_) {}),
-      TrendingService.getTrendingMovies()
-          .then((v) => trending = v, onError: (_) {}),
-      _movieService
-          .getNowPlayingMovies(region: region)
-          .then((v) => nowPlaying = v, onError: (_) {}),
-      UserService.getMovieLists(userId)
-          .then((v) => movieLists = v, onError: (_) {}),
+      _profileLookupController.getUserActivity(userId).then<void>((v) {
+        activity = v;
+      }, onError: (_, __) {}),
+      _friendActionsController.getFriends(userId).then<void>((v) {
+        friends = v;
+      }, onError: (_, __) {}),
+      _friendActionsController.getFriendsActivityLists(userId).then<void>((v) {
+        friendsActivity = v;
+      }, onError: (_, __) {}),
+      GroupService.getUserGroups(userId).then<void>((v) {
+        groups = v;
+      }, onError: (_, __) {}),
+      RequestService.getWatchRequests(userId).then<void>((v) {
+        watchRequests = v;
+      }, onError: (_, __) {}),
+      _profileLookupController.getUserMovieRatings(userId).then<void>((v) {
+        ratings = v;
+      }, onError: (_, __) {}),
+      _profileLookupController.getUserMovieReviews(userId).then<void>((v) {
+        reviews = v;
+      }, onError: (_, __) {}),
+      TrendingService.getTrendingMovies().then<void>((v) {
+        trending = v;
+      }, onError: (_, __) {}),
+      _movieService.getNowPlayingMovies(region: region).then<void>((v) {
+        nowPlaying = v;
+      }, onError: (_, __) {}),
+      UserService.getMovieLists(userId).then<void>((v) {
+        movieLists = v;
+      }, onError: (_, __) {}),
       NotificationService.getNotifications(userId).then((value) {
         final visible = visibleNotificationsForUser(value, userId);
         notifications = visible;
         unreadNotificationCount = visible.where((item) => !item.isRead).length;
-      }, onError: (_) {}),
+      }, onError: (_, __) {}),
       fetchWatchProviders(userId, watchlistMovieIds, region: region).then(
           (value) {
         watchProvidersByMovieId = value.providersByMovieId;
         userWatchProviderIds = value.userProviderIds;
-      }, onError: (_) {}),
+      }, onError: (_, __) {}),
     ]).timeout(const Duration(seconds: 10), onTimeout: () => []);
 
     logger.i('[AuthPrefetchCoordinator] Prefetch complete for $userId');

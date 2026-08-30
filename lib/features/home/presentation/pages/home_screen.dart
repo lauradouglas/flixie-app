@@ -72,6 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Set<int> _watchlistMovieIds = {};
   int _watchRequestsNeedingResponse = 0;
   List<WatchRequest> _watchPlansToShow = const [];
+  bool _isLoadingWatchPlans = false;
   bool _isLoading = true;
   bool _isLoadingRecommendations = false;
   String? _error;
@@ -171,6 +172,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _watchlistMovieIds = Set.of(snapshot.watchlistMovieIds);
     _watchRequestsNeedingResponse = snapshot.watchRequestsNeedingResponse;
     _watchPlansToShow = List.of(snapshot.watchPlansToShow);
+    _isLoadingWatchPlans = false;
     _heroPage = snapshot.heroPage;
     _forYouPage = snapshot.forYouPage;
     _loadedForUserId = userId;
@@ -248,6 +250,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _loadedForUserId = user?.id;
 
+    // These are the two sections visible at the top of Home. Start them
+    // together while the launch treatment is on screen; all other content is
+    // deliberately deferred until the shell is usable.
+    final initialWatchPlansLoad = _preloadInitialWatchPlans(user);
     final secondaryLoad = _loadSecondaryContent(
       user,
       refreshRecommendations: refreshRecommendations,
@@ -261,30 +267,24 @@ class _HomeScreenState extends State<HomeScreen> {
           ? Future.value(cachedTrending)
           : TrendingService.getTrendingMovies(refresh: refreshRecommendations);
       final trendingMovies = await trendingFuture;
+      await initialWatchPlansLoad;
 
-      // The branded boot screen is the loading state. Do not reveal Home and
-      // immediately replace sections with more loaders.
-      if (showFullLoading || refreshRecommendations) {
-        await secondaryLoad;
-      } else {
-        unawaited(secondaryLoad);
-      }
       if (!mounted) return;
 
-      if (showFullLoading) {
-        await _precacheInitialHomeImages(trendingMovies);
-        if (user != null) {
-          await _loadHeroFriendInteractions(trendingMovies, user.id);
-        }
-      }
+      // Trending is enough to make Home immediately useful. The remaining
+      // sections load in place, rather than holding the whole app on launch.
       if (context.mounted) {
         setState(() {
           _featuredMovies = trendingMovies;
           _isLoading = false;
         });
-        if (user != null && !showFullLoading) {
-          unawaited(_loadHeroFriendInteractions(trendingMovies, user.id));
-        }
+      }
+      unawaited(secondaryLoad.catchError((error) {
+        logger.w('[HomeScreen] secondary load error: $error');
+      }));
+      unawaited(_precacheInitialHomeImages(trendingMovies));
+      if (user != null) {
+        unawaited(_loadHeroFriendInteractions(trendingMovies, user.id));
       }
     } catch (e) {
       logger.e('[HomeScreen] load error: $e');
@@ -393,45 +393,63 @@ class _HomeScreenState extends State<HomeScreen> {
       _watchlistActions
           .getUserWatchlist(user.id)
           .catchError((_) => <WatchlistMovie>[]),
-      RequestService.getWatchRequests(
-        user.id,
-      ).catchError((_) => <WatchRequest>[]),
       ShowService.getContinueWatching(
         user.id,
       ).catchError((_) => <ContinueWatchingShow>[]),
-      WatchPlanVisibilityStore.closedPlanIds(user.id)
-          .catchError((_) => <String>{}),
-      _loadGroupWatchPlansForHome(),
     ]);
     if (!mounted || _loadedForUserId != user.id) return;
 
     final personalisedForYou = results[1] as List<MovieShort>;
-    final watchRequests = results[3] as List<WatchRequest>;
-    final groupWatchPlans = results[6] as List<WatchRequest>;
-    unawaited(_syncLocalWatchPlanReminders(
-      [...watchRequests, ...groupWatchPlans],
-      userId: user.id,
-    ));
-    context.read<AuthProvider>().updateCachedWatchRequests(watchRequests);
     setState(() {
       _friendsActivity = results[0] as List<ActivityListItem>;
       _forYouMovies = personalisedForYou.take(20).toList();
       _watchlistMovieIds = (results[2] as List<WatchlistMovie>)
           .map((item) => item.movieId)
           .toSet();
-      _watchRequestsNeedingResponse = _countWatchRequestsNeedingResponse(
-        watchRequests,
-        user.id,
-      );
-      _watchPlansToShow = _watchPlansForHome(
-        [...watchRequests, ...groupWatchPlans],
-        user: user,
-        closedPlanIds: results[5] as Set<String>,
-      );
-      _continueWatchingShows = results[4] as List<ContinueWatchingShow>;
+      _continueWatchingShows = results[3] as List<ContinueWatchingShow>;
       _isLoadingRecommendations = false;
     });
     _scheduleRecommendationVisibilityCheck();
+  }
+
+  Future<void> _preloadInitialWatchPlans(models.User? user) async {
+    if (user == null) {
+      _isLoadingWatchPlans = false;
+      return;
+    }
+    if (mounted) setState(() => _isLoadingWatchPlans = true);
+
+    final directPlans = RequestService.getWatchRequests(user.id)
+        .catchError((_) => <WatchRequest>[]);
+    final closedPlanIds = WatchPlanVisibilityStore.closedPlanIds(user.id)
+        .catchError((_) => <String>{});
+    final groupPlans = _loadGroupWatchPlansForHome();
+
+    final results = await Future.wait<dynamic>([
+      directPlans,
+      closedPlanIds,
+      groupPlans,
+    ]).timeout(
+      const Duration(seconds: 4),
+      onTimeout: () => const [<WatchRequest>[], <String>{}, <WatchRequest>[]],
+    );
+    if (!mounted || _loadedForUserId != user.id) return;
+
+    final watchRequests = results[0] as List<WatchRequest>;
+    final groupWatchPlans = results[2] as List<WatchRequest>;
+    final allPlans = [...watchRequests, ...groupWatchPlans];
+    unawaited(_syncLocalWatchPlanReminders(allPlans, userId: user.id));
+    context.read<AuthProvider>().updateCachedWatchRequests(watchRequests);
+    setState(() {
+      _watchRequestsNeedingResponse =
+          _countWatchRequestsNeedingResponse(watchRequests, user.id);
+      _watchPlansToShow = _watchPlansForHome(
+        allPlans,
+        user: user,
+        closedPlanIds: results[1] as Set<String>,
+      );
+      _isLoadingWatchPlans = false;
+    });
   }
 
   Future<void> _syncLocalWatchPlanReminders(
@@ -1943,7 +1961,7 @@ class _HomeScreenState extends State<HomeScreen> {
     models.User? user,
   ) {
     final plans = _watchPlansToShow;
-    if (_isLoadingRecommendations && plans.isEmpty && user != null) {
+    if (_isLoadingWatchPlans && plans.isEmpty && user != null) {
       return const Padding(
         padding: EdgeInsets.fromLTRB(16, 0, 16, 20),
         child: SkeletonBox(

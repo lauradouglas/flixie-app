@@ -189,7 +189,7 @@ class _GroupWatchRequestsOverviewState
               },
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 4),
           if (content.isEmpty)
             const Padding(
               padding: EdgeInsets.only(top: 100),

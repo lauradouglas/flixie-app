@@ -296,6 +296,9 @@ class AuthProvider extends ChangeNotifier {
   DateTime? _lastResumeRefreshAt;
   Future<void>? _resumeRefreshFuture;
   static const Duration _resumeRefreshThrottle = Duration(minutes: 2);
+  static const Duration _initialTokenTimeout = Duration(seconds: 8);
+  static const Duration _cachedTokenTimeout = Duration(seconds: 2);
+  static const Duration _initialProfileTimeout = Duration(seconds: 10);
 
   Future<void> _onAuthStateChanged(firebase_auth.User? user) async {
     // During sign-up the flow is managed directly in signUp(); skip here.
@@ -337,7 +340,8 @@ class AuthProvider extends ChangeNotifier {
       // Try a forced refresh first; on network failure fall back to the cached
       // token so the app stays authenticated on a flaky connection.
       try {
-        final idToken = await user.getIdToken(true);
+        final idToken =
+            await user.getIdToken(true).timeout(_initialTokenTimeout);
         if (idToken != null) {
           logger.d('Got Firebase ID token (fresh), setting in ApiClient');
           ApiClient.setToken(idToken);
@@ -347,7 +351,8 @@ class AuthProvider extends ChangeNotifier {
       } catch (e) {
         logger.w('Failed to get fresh ID token: $e - trying cached token');
         try {
-          final cachedToken = await user.getIdToken(false);
+          final cachedToken =
+              await user.getIdToken(false).timeout(_cachedTokenTimeout);
           if (cachedToken != null) {
             logger.d('Got Firebase ID token (cached), setting in ApiClient');
             ApiClient.setToken(cachedToken);
@@ -363,7 +368,8 @@ class AuthProvider extends ChangeNotifier {
       // THEN: Fetch the database user using Firebase UID as externalId
       logger.d('Fetching database user with externalId: ${user.uid}');
       try {
-        _dbUser = await _profileLoader(user.uid);
+        _dbUser =
+            await _profileLoader(user.uid).timeout(_initialProfileTimeout);
         logger.i(
             'Database user fetched: ${_dbUser?.username} (id: ${_dbUser?.id})');
         logger.d('Email: ${_dbUser?.email}');
