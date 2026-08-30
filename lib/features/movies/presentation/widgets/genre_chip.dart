@@ -23,8 +23,8 @@ class GenreChip extends StatelessWidget {
         vertical: compact ? 4 : 6,
       ),
       decoration: BoxDecoration(
-        color: chipColor.withValues(alpha: 0.15),
-        border: Border.all(color: chipColor.withValues(alpha: 0.5)),
+        color: chipColor.withValues(alpha: 0.10),
+        border: Border.all(color: chipColor.withValues(alpha: 0.82)),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(

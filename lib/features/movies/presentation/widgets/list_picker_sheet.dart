@@ -174,7 +174,7 @@ class _ListPickerSheetState extends State<ListPickerSheet> {
     return SafeArea(
       top: true,
       child: Container(
-        height: MediaQuery.sizeOf(context).height * 0.9,
+        height: MediaQuery.sizeOf(context).height * 0.72,
         decoration: const BoxDecoration(
           color: FlixieColors.background,
           borderRadius: BorderRadius.vertical(top: Radius.circular(28)),

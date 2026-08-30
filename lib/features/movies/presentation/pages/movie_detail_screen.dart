@@ -400,7 +400,7 @@ enum MovieDetailTab { overview, reviews, activity, details }
 class _MovieDetailHeroTokens {
   const _MovieDetailHeroTokens._();
 
-  static const double pageHorizontalPadding = 16;
+  static const double pageHorizontalPadding = 8;
   static const double heroToWatchSectionGap = 14;
   static const double heroControlsTopInset = 2;
   static const double heroSurfaceTopPadding = 0;
@@ -448,11 +448,6 @@ class _MovieDetailHeroTokens {
   static const double metadataRegular = 15;
   static const double metadataAlpha = 0.92;
   static const double metadataLineHeight = 1.1;
-
-  static const double directorLabelCompact = 12;
-  static const double directorLabelRegular = 13;
-  static const double directorNameCompact = 13;
-  static const double directorNameRegular = 15;
 
   static const double taglineCompact = 14;
   static const double taglineRegular = 16;
@@ -522,7 +517,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       .withValues(alpha: _MovieDetailHeroTokens.navButtonShadowAlpha);
   bool _heroControlMinimal = false;
   static const List<Color> _kGenreChipColors = [
-    FlixieColors.primary,
+    Color(0xFF9B6CFF),
     FlixieColors.secondary,
     FlixieColors.tertiary,
     FlixieColors.warning,
@@ -1659,49 +1654,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                                 : _MovieDetailHeroTokens.textBlockGapRegular,
                           ),
                           _buildHeroMetadataRow(movie, compact: compact),
-                          if (_director != null) ...[
-                            SizedBox(
-                              height: compact
-                                  ? _MovieDetailHeroTokens.textBlockGapCompact
-                                  : _MovieDetailHeroTokens.textBlockGapRegular,
-                            ),
-                            Wrap(
-                              children: [
-                                Text(
-                                  'Directed by ',
-                                  style: TextStyle(
-                                    color: FlixieColors.medium,
-                                    fontSize: compact
-                                        ? _MovieDetailHeroTokens
-                                            .directorLabelCompact
-                                        : _MovieDetailHeroTokens
-                                            .directorLabelRegular,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                GestureDetector(
-                                  onTap: () => context.push(personDetailPath(
-                                    _director!.id,
-                                    source: DetailSource.personCredits,
-                                    parentContentId: movie.id,
-                                    parentContentType: 'movie',
-                                  )),
-                                  child: Text(
-                                    _director!.name,
-                                    style: TextStyle(
-                                      color: FlixieColors.primary,
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: compact
-                                          ? _MovieDetailHeroTokens
-                                              .directorNameCompact
-                                          : _MovieDetailHeroTokens
-                                              .directorNameRegular,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
                           if ((movie.tagline ?? '').isNotEmpty) ...[
                             SizedBox(
                               height: compact
@@ -1924,35 +1876,14 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             video.key.trim().isNotEmpty)
         .firstOrNull;
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _heroTextAction(
-          icon: Icons.ios_share_rounded,
-          label: 'Share',
-          iconColor: const Color(0xFF5CC8FF),
-          compact: compact,
-          onTap: () => _showShareMovieSheet(movie),
-        ),
-        if (trailer != null) ...[
-          const SizedBox(width: 10),
-          Container(
-            width: 1,
-            height: compact
-                ? _MovieDetailHeroTokens.textActionIconCompact
-                : _MovieDetailHeroTokens.textActionIconRegular,
-            color: FlixieColors.light.withValues(alpha: 0.24),
-          ),
-          const SizedBox(width: 10),
-          _heroTextAction(
-            icon: Icons.play_circle_outline_rounded,
-            label: 'Watch trailer',
-            iconColor: FlixieColors.danger,
-            compact: compact,
-            onTap: () => _openTrailer(trailer.youtubeUrl),
-          ),
-        ],
-      ],
+    if (trailer == null) return const SizedBox.shrink();
+
+    return _heroTextAction(
+      icon: Icons.play_circle_outline_rounded,
+      label: 'Watch trailer',
+      iconColor: FlixieColors.danger,
+      compact: compact,
+      onTap: () => _openTrailer(trailer.youtubeUrl),
     );
   }
 
@@ -3291,6 +3222,38 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             ],
           ),
         ),
+        if (_director != null) ...[
+          const SizedBox(height: 10),
+          GestureDetector(
+            onTap: () => context.push(personDetailPath(
+              _director!.id,
+              source: DetailSource.personCredits,
+              parentContentId: movie.id,
+              parentContentType: 'movie',
+            )),
+            child: RichText(
+              text: TextSpan(
+                style: const TextStyle(fontSize: 12.5),
+                children: [
+                  const TextSpan(
+                    text: 'Directed by ',
+                    style: TextStyle(
+                      color: FlixieColors.medium,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  TextSpan(
+                    text: _director!.name,
+                    style: const TextStyle(
+                      color: FlixieColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -3345,15 +3308,15 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _buildWatchEntryStatusRow(),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         Divider(
           height: 1,
           thickness: 1,
           color: Colors.white.withValues(alpha: 0.12),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 6),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2),
+          padding: EdgeInsets.zero,
           child: Row(
             children: [
               Expanded(
@@ -3399,6 +3362,18 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   onTap: _currentlyUpdating != null
                       ? null
                       : _showWatchRequestSheet,
+                ),
+              ),
+              Expanded(
+                child: _statusActionItem(
+                  icon: Icons.ios_share_rounded,
+                  label: 'Share',
+                  color: const Color(0xFF5CC8FF),
+                  isActive: true,
+                  isLoading: false,
+                  onTap: _movie == null
+                      ? null
+                      : () => _showShareMovieSheet(_movie!),
                 ),
               ),
             ],
@@ -3447,13 +3422,25 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             ? 'Start your watch history'
             : 'Watch date not saved')
         : _formatWatchDate(latest!.watchedAt);
-    final ratingText = latestRated
-        ? '${isRewatch ? 'Latest · ' : ''}$dateText  ★ ${latest!.rating!.toStringAsFixed(0)}/10${latest.recommended == true ? '  👍' : latest.recommended == false ? '  👎' : ''}'
+    final watchDetailText = latestRated
+        ? '${isRewatch ? 'Latest · ' : ''}$dateText'
         : watchedCount == 0
             ? 'Start your watch history'
             : isRewatch
                 ? 'Latest · $dateText  Not rated'
                 : '$dateText  Not rated';
+    final ratingText =
+        latestRated ? '★ ${latest!.rating!.toStringAsFixed(0)}/10' : null;
+    final recommendationLabel = latest?.recommended == true
+        ? 'Recommended'
+        : latest?.recommended == false
+            ? 'Wouldn’t recommend'
+            : null;
+    final recommendationIcon = latest?.recommended == true
+        ? '👍'
+        : latest?.recommended == false
+            ? '👎'
+            : null;
 
     void openHistory() =>
         setState(() => _movieDetailTab = MovieDetailTab.activity);
@@ -3490,17 +3477,11 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         : latestRating!.round() - previousRating!.round();
 
     return Material(
-      color: FlixieColors.surface,
-      borderRadius: BorderRadius.circular(22),
+      color: Colors.transparent,
       child: InkWell(
         onTap: watchedCount == 0 ? null : openHistory,
-        borderRadius: BorderRadius.circular(22),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: FlixieColors.tabBarBorder),
-          ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
           child: LayoutBuilder(
             builder: (context, constraints) {
               final stackAction = constraints.maxWidth < 326;
@@ -3513,17 +3494,55 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                           color: FlixieColors.light,
                           fontSize: 14,
                           fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 5),
+                  if (ratingText != null) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          ratingText,
+                          style: const TextStyle(
+                            color: FlixieColors.warning,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (recommendationLabel != null) ...[
+                          const SizedBox(width: 7),
+                          const Text(
+                            '·',
+                            style: TextStyle(
+                              color: FlixieColors.medium,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(width: 7),
+                          Text(
+                            recommendationLabel,
+                            style: const TextStyle(
+                              color: FlixieColors.medium,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            recommendationIcon!,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 3),
                   Text(
-                    ratingText,
-                    maxLines: 2,
-                    style: TextStyle(
-                      color: latestRated
-                          ? FlixieColors.warning
-                          : FlixieColors.medium,
-                      fontSize: latestRated ? 13 : 11,
-                      fontWeight:
-                          latestRated ? FontWeight.w600 : FontWeight.w400,
+                    watchDetailText,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: FlixieColors.medium,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
@@ -3615,7 +3634,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     required bool isLoading,
     required VoidCallback? onTap,
   }) {
-    final iconColor = isActive ? color : FlixieColors.medium;
+    final iconColor = color;
 
     return Tooltip(
       message: label,
@@ -3626,7 +3645,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -3656,7 +3675,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: isActive ? color : FlixieColors.light,
+                      color: color,
                       fontSize: 10,
                       fontWeight: FontWeight.w500,
                       height: 1.05,
@@ -4245,7 +4264,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           _buildTrailersSection(context, movie),
           _buildImagesSection(context, movie),
           _buildMoreLikeThisSection(context),
-          _buildDirectorLink(context),
         ]),
       MovieDetailTab.reviews => _tabContent([
           _buildUserReviewsSection(context),
@@ -5658,52 +5676,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildDirectorLink(BuildContext context) {
-    final director = _director;
-    if (director == null) return const SizedBox.shrink();
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => context.push(personDetailPath(
-          director.id,
-          source: DetailSource.personCredits,
-          parentContentId: int.tryParse(widget.movieId),
-          parentContentType: 'movie',
-        )),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 13),
-          decoration: BoxDecoration(
-            border: Border(
-              top: BorderSide(color: Colors.white.withValues(alpha: 0.09)),
-              bottom: BorderSide(color: Colors.white.withValues(alpha: 0.09)),
-            ),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.movie_filter_outlined,
-                  color: FlixieColors.primary, size: 23),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  'Directed by ${director.name}',
-                  style: const TextStyle(
-                    color: FlixieColors.light,
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              const Icon(Icons.chevron_right,
-                  color: FlixieColors.light, size: 22),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
