@@ -848,7 +848,7 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
       Navigator.pop(context);
       messenger.showSnackBar(const SnackBar(
         content: Text('Profile updated'),
-        backgroundColor: FlixieColors.success,
+        backgroundColor: FlixieColors.surfaceElevated,
       ));
     } on ApiException catch (error) {
       if (!mounted) return;

@@ -24,7 +24,7 @@ import 'package:flixie_app/models/movie_short.dart';
 
 enum _WatchContext { home, cinema, undecided }
 
-enum _ScheduleMode { dateOnly, dateAndTime, suggestDates }
+enum _ScheduleMode { dateOnly, dateAndTime, decideLater }
 
 class MovieWatchRequestSheet extends StatefulWidget {
   const MovieWatchRequestSheet({
@@ -268,18 +268,6 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
     }
   }
 
-  bool _isMovieAvailableToEveryone(MovieShort movie) {
-    if (!_isGroupMode || _selectedGroupId == null || _groupMemberCount == 0) {
-      return false;
-    }
-    return (_streamingProvidersByMovieId[movie.id] ?? const <WatchProvider>[])
-        .any((provider) =>
-            (_groupProviderCounts[provider.id] ??
-                _groupProviderNameCounts[provider.matchKey] ??
-                0) ==
-            _groupMemberCount);
-  }
-
   @override
   void dispose() {
     _messageController.dispose();
@@ -388,6 +376,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
   }
 
   bool get _hasValidSchedule {
+    if (_scheduleMode == _ScheduleMode.decideLater) return true;
     if (_selectedDate == null) return false;
     if (_scheduleMode == _ScheduleMode.dateAndTime && _selectedTime == null) {
       return false;
@@ -397,6 +386,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
   }
 
   DateTime? get _proposedDate {
+    if (_scheduleMode == _ScheduleMode.decideLater) return null;
     final date = _selectedDate;
     if (date == null) return null;
     if (_scheduleMode != _ScheduleMode.dateAndTime) return date;
@@ -434,6 +424,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final sheetHeight = MediaQuery.sizeOf(context).height * .92;
     final query = _recipientSearch.toLowerCase();
     final visibleFriends = widget.friends.where((item) {
       final friend = item.friendUser;
@@ -454,386 +445,433 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
         color: FlixieColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            24,
-            MediaQuery.of(context).padding.top + 16,
-            24,
-            MediaQuery.of(context).viewInsets.bottom + 32,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: FlixieColors.primary.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.movie_creation_outlined,
-                        color: FlixieColors.primary, size: 21),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Plan to watch',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 2),
-                        const Text(
-                          'Plan a watch together around this movie',
-                          style: TextStyle(
-                            color: FlixieColors.medium,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Close',
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded,
-                        color: FlixieColors.medium),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              // Friend / Group toggle
-              Container(
-                decoration: BoxDecoration(
-                  color: FlixieColors.surfaceElevated,
-                  border: Border.all(color: FlixieColors.tabBarBorder),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Row(
+      child: SizedBox(
+        height: sheetHeight,
+        child: SingleChildScrollView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              24,
+              16,
+              24,
+              MediaQuery.viewInsetsOf(context).bottom + 32,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    _ModeTab(
-                      label: 'A Friend',
-                      icon: Icons.person_outline_rounded,
-                      selected: !_isGroupMode,
-                      onTap: () => setState(() {
-                        _isGroupMode = false;
-                        _selectedGroupId = null;
-                      }),
+                    Container(
+                      width: 78,
+                      height: 78,
+                      decoration: BoxDecoration(
+                        color: FlixieColors.primary.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(22),
+                      ),
+                      child: const Icon(Icons.add_rounded,
+                          color: FlixieColors.primary, size: 38),
                     ),
-                    _ModeTab(
-                      label: 'A Group',
-                      icon: Icons.groups_2_outlined,
-                      selected: _isGroupMode,
-                      onTap: () => setState(() {
-                        _isGroupMode = true;
-                        _selectedFriendId = null;
-                      }),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Create watch plan',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            'Start with the people, place or date',
+                            style: TextStyle(
+                              color: FlixieColors.medium,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Close',
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close_rounded,
+                          color: FlixieColors.medium),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 16),
-              if ((_isGroupMode ? hasGroups : hasFriends)) ...[
-                TextField(
-                  controller: _recipientSearchController,
-                  onChanged: (value) =>
-                      setState(() => _recipientSearch = value.trim()),
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.search),
-                    hintText:
-                        _isGroupMode ? 'Search your groups' : 'Search friends',
-                    suffixIcon: _recipientSearch.isEmpty
-                        ? null
-                        : IconButton(
-                            onPressed: () {
-                              _recipientSearchController.clear();
-                              setState(() => _recipientSearch = '');
-                            },
-                            icon: const Icon(Icons.close_rounded),
-                          ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-              if (!_isGroupMode) ...[
-                const Text(
-                  'SELECT A FRIEND',
-                  style: TextStyle(
-                    color: FlixieColors.medium,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1.1,
-                  ),
-                ),
+                const SizedBox(height: 18),
+                const _PlanStepHeading(number: '1', title: 'Who’s watching?'),
                 const SizedBox(height: 10),
-                if (!hasFriends)
-                  const Text(
-                    'Add some friends to plan a watch together',
-                    style: TextStyle(color: FlixieColors.medium, fontSize: 13),
-                  )
-                else
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 180),
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: visibleFriends.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
-                      itemBuilder: (_, i) {
-                        final friend = visibleFriends[i].friendUser;
-                        if (friend == null) return const SizedBox.shrink();
-                        final isSelected = _selectedFriendId == friend.id;
-                        return _RecipientOptionTile(
-                          title: friend.displayName,
-                          avatar: friend.avatar,
-                          avatarColor:
-                              avatarColorFromIconColor(friend.iconColor),
-                          selected: isSelected,
-                          onTap: () => _selectFriend(friend.id),
-                        );
-                      },
-                    ),
+                // Friend / Group toggle
+                Container(
+                  decoration: BoxDecoration(
+                    color: FlixieColors.surfaceElevated,
+                    border: Border.all(color: FlixieColors.tabBarBorder),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-              ] else ...[
-                const Text(
-                  'SELECT A GROUP',
-                  style: TextStyle(
-                    color: FlixieColors.medium,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1.1,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                if (_loadingGroups)
-                  const SizedBox(
-                    height: 44,
-                    child: Center(
-                        child: CircularProgressIndicator(strokeWidth: 2)),
-                  )
-                else if (!hasGroups)
-                  const Text(
-                    "You're not in any groups yet",
-                    style: TextStyle(color: FlixieColors.medium, fontSize: 13),
-                  )
-                else
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 180),
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: visibleGroups.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 6),
-                      itemBuilder: (_, i) {
-                        final group = visibleGroups[i];
-                        final isSelected = _selectedGroupId == group.id;
-                        return _RecipientOptionTile(
-                          title: group.name,
-                          subtitle: group.abbreviation?.isNotEmpty == true
-                              ? group.abbreviation
-                              : null,
-                          selected: isSelected,
-                          group: true,
-                          groupModel: group,
-                          onTap: () => _selectGroup(group.id!),
-                        );
-                      },
-                    ),
-                  ),
-              ],
-              const SizedBox(height: 16),
-              _WatchRequestProviders(
-                providers: _streamingProvidersByMovieId[_selectedMovieId] ??
-                    _streamingProviders,
-                movieTitle: _movieChoices
-                    .where((movie) => movie.id == _selectedMovieId)
-                    .map((movie) => movie.name)
-                    .firstOrNull,
-                myProviderIds: _myProviderIds,
-                friendProviderIds: _friendProviderIds,
-                friendName: _selectedFriendName,
-                loading: _loadingProviders,
-                loadingFriend: _loadingFriendProviders,
-                showFriendMatch: !_isGroupMode && _selectedFriendId != null,
-                groupMode: _isGroupMode,
-                groupSelected: _selectedGroupId != null,
-                groupProviderCounts: _groupProviderCounts,
-                groupProviderNameCounts: _groupProviderNameCounts,
-                groupMemberCount: _groupMemberCount,
-                loadingGroup: _loadingGroupProviders,
-              ),
-              const SizedBox(height: 14),
-              Text(
-                '${_movieChoices.length} of 5 movie options',
-                style:
-                    const TextStyle(color: FlixieColors.medium, fontSize: 12),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _movieChoices
-                    .map(
-                      (movie) => SizedBox(
-                        width: 76,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            InkWell(
-                              onTap: () => _selectMovieChoice(movie),
-                              borderRadius: BorderRadius.circular(9),
-                              child: Stack(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(2),
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(9),
-                                      border: Border.all(
-                                        color:
-                                            _isMovieAvailableToEveryone(movie)
-                                                ? FlixieColors.success
-                                                : movie.id == _selectedMovieId
-                                                    ? FlixieColors.primary
-                                                    : Colors.transparent,
-                                        width:
-                                            _isMovieAvailableToEveryone(movie)
-                                                ? 2
-                                                : 1,
-                                      ),
-                                    ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(6),
-                                      child: SizedBox(
-                                        width: 76,
-                                        height: 114,
-                                        child: movie.poster == null
-                                            ? Container(
-                                                color: FlixieColors
-                                                    .surfaceElevated,
-                                                child: const Icon(
-                                                    Icons.movie_outlined,
-                                                    color: FlixieColors.medium),
-                                              )
-                                            : CachedNetworkImage(
-                                                imageUrl: movie.poster!
-                                                        .startsWith('http')
-                                                    ? movie.poster!
-                                                    : 'https://image.tmdb.org/t/p/w185${movie.poster}',
-                                                fit: BoxFit.cover,
-                                              ),
-                                      ),
-                                    ),
-                                  ),
-                                  if (_movieChoices.length > 1)
-                                    Positioned(
-                                      top: 3,
-                                      right: 3,
-                                      child: InkWell(
-                                        onTap: () => _removeMovieChoice(movie),
-                                        borderRadius: BorderRadius.circular(20),
-                                        child: Container(
-                                          padding: const EdgeInsets.all(3),
-                                          decoration: const BoxDecoration(
-                                            color: Colors.black54,
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Icon(Icons.close_rounded,
-                                              size: 14, color: Colors.white),
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              movie.name,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: FlixieColors.light,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _ModeTab(
+                          label: 'A Friend',
+                          icon: Icons.person_outline_rounded,
+                          selected: !_isGroupMode,
+                          onTap: () => setState(() {
+                            _isGroupMode = false;
+                            _selectedGroupId = null;
+                          }),
                         ),
                       ),
+                      Expanded(
+                        child: _ModeTab(
+                          label: 'A Group',
+                          icon: Icons.groups_2_outlined,
+                          selected: _isGroupMode,
+                          onTap: () => setState(() {
+                            _isGroupMode = true;
+                            _selectedFriendId = null;
+                          }),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                if ((_isGroupMode ? hasGroups : hasFriends)) ...[
+                  TextField(
+                    controller: _recipientSearchController,
+                    onChanged: (value) =>
+                        setState(() => _recipientSearch = value.trim()),
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.search),
+                      hintText: _isGroupMode
+                          ? 'Search your groups'
+                          : 'Search friends',
+                      suffixIcon: _recipientSearch.isEmpty
+                          ? null
+                          : IconButton(
+                              onPressed: () {
+                                _recipientSearchController.clear();
+                                setState(() => _recipientSearch = '');
+                              },
+                              icon: const Icon(Icons.close_rounded),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                if (!_isGroupMode) ...[
+                  const Text(
+                    'SELECT A FRIEND',
+                    style: TextStyle(
+                      color: FlixieColors.medium,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  if (!hasFriends)
+                    const Text(
+                      'Add some friends to plan a watch together',
+                      style:
+                          TextStyle(color: FlixieColors.medium, fontSize: 13),
                     )
-                    .toList(growable: false),
-              ),
-              TextButton.icon(
-                onPressed: _movieChoices.length >= 5 ? null : _addMovieChoice,
-                icon: const Icon(Icons.add_circle_outline_rounded),
-                label: const Text('Add another movie'),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'MESSAGE (OPTIONAL)',
-                style: TextStyle(
-                  color: FlixieColors.medium,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 1.1,
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _messageController,
-                minLines: 1,
-                maxLines: 2,
-                style: const TextStyle(color: FlixieColors.light),
-                decoration: InputDecoration(
-                  hintText: 'e.g. Want to watch this together?',
-                  hintStyle:
-                      const TextStyle(color: FlixieColors.medium, fontSize: 13),
-                  filled: true,
-                  fillColor: FlixieColors.surfaceElevated,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide:
-                        const BorderSide(color: FlixieColors.tabBarBorder),
+                  else
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 180),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: visibleFriends.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (_, i) {
+                          final friend = visibleFriends[i].friendUser;
+                          if (friend == null) return const SizedBox.shrink();
+                          final isSelected = _selectedFriendId == friend.id;
+                          return _RecipientOptionTile(
+                            title: friend.displayName,
+                            avatar: friend.avatar,
+                            avatarColor:
+                                avatarColorFromIconColor(friend.iconColor),
+                            selected: isSelected,
+                            onTap: () => _selectFriend(friend.id),
+                          );
+                        },
+                      ),
+                    ),
+                ] else ...[
+                  const Text(
+                    'SELECT A GROUP',
+                    style: TextStyle(
+                      color: FlixieColors.medium,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.1,
+                    ),
                   ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide:
-                        const BorderSide(color: FlixieColors.tabBarBorder),
+                  const SizedBox(height: 10),
+                  if (_loadingGroups)
+                    const SizedBox(
+                      height: 44,
+                      child: Center(
+                          child: CircularProgressIndicator(strokeWidth: 2)),
+                    )
+                  else if (!hasGroups)
+                    const Text(
+                      "You're not in any groups yet",
+                      style:
+                          TextStyle(color: FlixieColors.medium, fontSize: 13),
+                    )
+                  else
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 180),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: visibleGroups.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 6),
+                        itemBuilder: (_, i) {
+                          final group = visibleGroups[i];
+                          final isSelected = _selectedGroupId == group.id;
+                          return _RecipientOptionTile(
+                            title: group.name,
+                            subtitle: group.abbreviation?.isNotEmpty == true
+                                ? group.abbreviation
+                                : null,
+                            selected: isSelected,
+                            group: true,
+                            groupModel: group,
+                            onTap: () => _selectGroup(group.id!),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+                const SizedBox(height: 16),
+                const _PlanStepHeading(number: '2', title: 'Where?'),
+                const SizedBox(height: 10),
+                Row(children: [
+                  for (final contextOption in _WatchContext.values)
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          right:
+                              contextOption == _WatchContext.undecided ? 0 : 8,
+                        ),
+                        child: _ModeTab(
+                          label: switch (contextOption) {
+                            _WatchContext.home => 'At home',
+                            _WatchContext.cinema => 'Cinema',
+                            _WatchContext.undecided => 'Decide later',
+                          },
+                          icon: switch (contextOption) {
+                            _WatchContext.home => Icons.home_outlined,
+                            _WatchContext.cinema => Icons.theaters_outlined,
+                            _WatchContext.undecided => Icons.more_horiz_rounded,
+                          },
+                          selected: _watchContext == contextOption,
+                          onTap: () =>
+                              setState(() => _watchContext = contextOption),
+                        ),
+                      ),
+                    ),
+                ]),
+                const SizedBox(height: 12),
+                if (_watchContext == _WatchContext.home)
+                  _WatchRequestProviders(
+                    providers: _streamingProvidersByMovieId[_selectedMovieId] ??
+                        _streamingProviders,
+                    movieTitle: _movieChoices
+                        .where((movie) => movie.id == _selectedMovieId)
+                        .map((movie) => movie.name)
+                        .firstOrNull,
+                    myProviderIds: _myProviderIds,
+                    friendProviderIds: _friendProviderIds,
+                    friendName: _selectedFriendName,
+                    loading: _loadingProviders,
+                    loadingFriend: _loadingFriendProviders,
+                    showFriendMatch: !_isGroupMode && _selectedFriendId != null,
+                    groupMode: _isGroupMode,
+                    groupSelected: _selectedGroupId != null,
+                    groupProviderCounts: _groupProviderCounts,
+                    groupProviderNameCounts: _groupProviderNameCounts,
+                    groupMemberCount: _groupMemberCount,
+                    loadingGroup: _loadingGroupProviders,
+                  )
+                else
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                        color: FlixieColors.primary.withValues(alpha: .12),
+                        borderRadius: BorderRadius.circular(12)),
+                    child: Text(
+                      _watchContext == _WatchContext.cinema
+                          ? 'Cinema plan - streaming providers won’t be checked.'
+                          : 'You can decide where to watch together later.',
+                      style: const TextStyle(
+                          color: FlixieColors.secondary, fontSize: 13),
+                    ),
                   ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: FlixieColors.primary),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isSending ||
-                          _movieChoices.isEmpty ||
-                          (_isGroupMode
-                              ? _selectedGroupId == null
-                              : _selectedFriendId == null)
-                      ? null
-                      : _send,
-                  child: _isSending
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.black),
+                const SizedBox(height: 14),
+                const _PlanStepHeading(
+                    number: '3', title: 'When?', trailing: 'CAN CHANGE LATER'),
+                const SizedBox(height: 10),
+                LayoutBuilder(builder: (context, constraints) {
+                  final narrow = constraints.maxWidth < 360;
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final mode in _ScheduleMode.values)
+                        SizedBox(
+                          width: narrow
+                              ? (constraints.maxWidth - 8) / 2
+                              : (constraints.maxWidth - 16) / 3,
+                          child: _ModeTab(
+                            label: switch (mode) {
+                              _ScheduleMode.dateOnly => 'Date only',
+                              _ScheduleMode.dateAndTime => 'Date & time',
+                              _ScheduleMode.decideLater => 'Decide later'
+                            },
+                            icon: mode == _ScheduleMode.decideLater
+                                ? Icons.more_horiz_rounded
+                                : Icons.calendar_today_outlined,
+                            selected: _scheduleMode == mode,
+                            onTap: () => setState(() => _scheduleMode = mode),
                           ),
-                        )
-                      : Text(_sendButtonLabel),
+                        ),
+                    ],
+                  );
+                }),
+                if (_scheduleMode != _ScheduleMode.decideLater) ...[
+                  const SizedBox(height: 8),
+                  Row(children: [
+                    Expanded(
+                        child: _SchedulePicker(
+                            label: 'DATE',
+                            value: _selectedDate == null
+                                ? 'Choose date'
+                                : MaterialLocalizations.of(context)
+                                    .formatMediumDate(_selectedDate!),
+                            onTap: _pickDate)),
+                    if (_scheduleMode == _ScheduleMode.dateAndTime) ...[
+                      const SizedBox(width: 10),
+                      Expanded(
+                          child: _SchedulePicker(
+                              label: 'TIME',
+                              value: _selectedTime == null
+                                  ? 'Choose time'
+                                  : _selectedTime!.format(context),
+                              onTap: _pickTime)),
+                    ],
+                  ]),
+                ],
+                const SizedBox(height: 16),
+                const _PlanStepHeading(
+                  number: '4',
+                  title: 'Movie options',
+                  trailing: 'ADD UP TO 5',
                 ),
-              ),
-            ],
+                const SizedBox(height: 10),
+                if (_movieChoices.isEmpty)
+                  _MovieOptionsEmptyCard(onTap: _addMovieChoice)
+                else
+                  _SelectedPlanTitle(
+                    choices: _movieChoices,
+                    selectedMovieId: _selectedMovieId,
+                    onSelect: _selectMovieChoice,
+                    onRemove: _removeMovieChoice,
+                    onAddOption:
+                        _movieChoices.length >= 5 ? null : _addMovieChoice,
+                  ),
+                const SizedBox(height: 22),
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Message',
+                      style: TextStyle(
+                        color: FlixieColors.light,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      'OPTIONAL',
+                      style: TextStyle(
+                        color: FlixieColors.medium,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _messageController,
+                  minLines: 1,
+                  maxLines: 2,
+                  style: const TextStyle(color: FlixieColors.light),
+                  decoration: InputDecoration(
+                    hintText: 'e.g. Want to watch this together?',
+                    hintStyle: const TextStyle(
+                        color: FlixieColors.medium, fontSize: 13),
+                    filled: true,
+                    fillColor: FlixieColors.surfaceElevated,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide:
+                          const BorderSide(color: FlixieColors.tabBarBorder),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide:
+                          const BorderSide(color: FlixieColors.tabBarBorder),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: FlixieColors.primary),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isSending ||
+                            _movieChoices.isEmpty ||
+                            (_isGroupMode
+                                ? _selectedGroupId == null
+                                : _selectedFriendId == null) ||
+                            !_hasValidSchedule
+                        ? null
+                        : _send,
+                    child: _isSending
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.black),
+                            ),
+                          )
+                        : Text(_sendButtonLabel),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Center(
+                  child: Text(
+                    'The plan stays in Planning until a movie and time are agreed.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -854,6 +892,262 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
     }
     return null;
   }
+}
+
+class _PlanStepHeading extends StatelessWidget {
+  const _PlanStepHeading(
+      {required this.number, required this.title, this.trailing});
+  final String number;
+  final String title;
+  final String? trailing;
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, constraints) {
+          final titleWidget = Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: FlixieColors.light, fontWeight: FontWeight.w900),
+          );
+          final numberWidget = CircleAvatar(
+            radius: 18,
+            backgroundColor: FlixieColors.primary,
+            child: Text(number,
+                style: const TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.w800)),
+          );
+          final trailingWidget = trailing == null
+              ? null
+              : Text(trailing!,
+                  style: const TextStyle(
+                      color: FlixieColors.medium,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: .5));
+          if (trailingWidget == null || constraints.maxWidth < 390) {
+            return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    numberWidget,
+                    const SizedBox(width: 10),
+                    titleWidget
+                  ]),
+                  if (trailingWidget != null) ...[
+                    const SizedBox(height: 5),
+                    trailingWidget,
+                  ],
+                ]);
+          }
+          return Row(children: [
+            numberWidget,
+            const SizedBox(width: 10),
+            titleWidget,
+            const Spacer(),
+            trailingWidget,
+          ]);
+        },
+      );
+}
+
+class _SchedulePicker extends StatelessWidget {
+  const _SchedulePicker(
+      {required this.label, required this.value, required this.onTap});
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+              border: Border.all(color: FlixieColors.tabBarBorder),
+              borderRadius: BorderRadius.circular(14)),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label,
+                style: const TextStyle(
+                    color: FlixieColors.medium,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1)),
+            const SizedBox(height: 6),
+            Text(value,
+                style: const TextStyle(
+                    color: FlixieColors.light,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600)),
+          ]),
+        ),
+      );
+}
+
+class _MovieOptionsEmptyCard extends StatelessWidget {
+  const _MovieOptionsEmptyCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            border: Border.all(color: FlixieColors.tabBarBorder),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(children: [
+            Container(
+              width: 92,
+              height: 132,
+              decoration: BoxDecoration(
+                color: FlixieColors.primary.withValues(alpha: .12),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(Icons.add_rounded,
+                  color: FlixieColors.primary, size: 36),
+            ),
+            const SizedBox(width: 20),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Add films to vote on',
+                      style: TextStyle(
+                          color: FlixieColors.light,
+                          fontSize: 19,
+                          fontWeight: FontWeight.w700)),
+                  SizedBox(height: 8),
+                  Text('Everyone can add options.',
+                      style:
+                          TextStyle(color: FlixieColors.medium, fontSize: 13)),
+                  SizedBox(height: 14),
+                  Text('Browse cinema releases',
+                      style: TextStyle(
+                          color: FlixieColors.primary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800)),
+                ],
+              ),
+            ),
+          ]),
+        ),
+      );
+}
+
+class _SelectedPlanTitle extends StatelessWidget {
+  const _SelectedPlanTitle(
+      {required this.choices,
+      required this.selectedMovieId,
+      required this.onSelect,
+      required this.onRemove,
+      required this.onAddOption});
+  final List<MovieShort> choices;
+  final int? selectedMovieId;
+  final ValueChanged<MovieShort> onSelect;
+  final ValueChanged<MovieShort> onRemove;
+  final VoidCallback? onAddOption;
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+            border: Border.all(color: FlixieColors.tabBarBorder),
+            borderRadius: BorderRadius.circular(18)),
+        child: SizedBox(
+          height: 128,
+          child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: choices.length + (onAddOption == null ? 0 : 1),
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                if (index == choices.length) {
+                  return SizedBox(
+                    width: 56,
+                    child: Center(
+                      child: Tooltip(
+                        message: 'Add another movie option',
+                        child: InkWell(
+                          onTap: onAddOption,
+                          customBorder: const CircleBorder(),
+                          child: Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color:
+                                  FlixieColors.primary.withValues(alpha: .14),
+                              border: Border.all(color: FlixieColors.primary),
+                            ),
+                            child: const Icon(Icons.add_rounded,
+                                color: FlixieColors.primary),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                final choice = choices[index];
+                return SizedBox(
+                    width: 76,
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                              child: InkWell(
+                                  onTap: () => onSelect(choice),
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Stack(children: [
+                                    Positioned.fill(
+                                        child: ClipRRect(
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            child: choice.poster == null
+                                                ? const ColoredBox(
+                                                    color: FlixieColors
+                                                        .surfaceElevated)
+                                                : CachedNetworkImage(
+                                                    imageUrl: choice.poster!
+                                                            .startsWith('http')
+                                                        ? choice.poster!
+                                                        : 'https://image.tmdb.org/t/p/w185${choice.poster}',
+                                                    fit: BoxFit.cover))),
+                                    if (choice.id == selectedMovieId)
+                                      const Positioned(
+                                          left: 4,
+                                          bottom: 4,
+                                          child: Icon(Icons.check_circle,
+                                              color: FlixieColors.success,
+                                              size: 18)),
+                                    if (choices.length > 1)
+                                      Positioned(
+                                          right: 3,
+                                          top: 3,
+                                          child: InkWell(
+                                              onTap: () => onRemove(choice),
+                                              child: const CircleAvatar(
+                                                  radius: 11,
+                                                  backgroundColor:
+                                                      Colors.black54,
+                                                  child: Icon(
+                                                      Icons.close_rounded,
+                                                      size: 14,
+                                                      color: Colors.white)))),
+                                  ]))),
+                          const SizedBox(height: 4),
+                          Text(choice.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  color: FlixieColors.light,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700)),
+                        ]));
+              }),
+        ),
+      );
 }
 
 class _WatchRequestProviders extends StatelessWidget {
@@ -1158,33 +1452,30 @@ class _ModeTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: selected ? FlixieColors.primary : Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon,
-                  size: 17,
-                  color: selected ? Colors.black : FlixieColors.medium),
-              const SizedBox(width: 7),
-              Text(
-                label,
-                style: TextStyle(
-                  color: selected ? Colors.black : FlixieColors.medium,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                ),
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? FlixieColors.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon,
+                size: 17, color: selected ? Colors.black : FlixieColors.medium),
+            const SizedBox(width: 7),
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? Colors.black : FlixieColors.medium,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

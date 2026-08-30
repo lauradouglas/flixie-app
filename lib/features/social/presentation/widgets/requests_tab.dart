@@ -21,7 +21,6 @@ import 'package:flixie_app/features/movies/data/search_service.dart';
 import 'package:flixie_app/models/movie_short.dart';
 import 'package:flixie_app/features/authentication/presentation/pages/auth_ui.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
-import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'package:flixie_app/models/watch_provider.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_sheet.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/watch_request_sheet.dart';
@@ -691,7 +690,9 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
   Future<void> _markWatched(
     GroupWatchRequest req, {
     int? rating,
+    bool? recommended,
     String? reviewText,
+    String? watchedAt,
   }) async {
     final userId = widget.currentUserId;
     final convId = widget.conversationId ?? req.groupId;
@@ -703,7 +704,9 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
         req.id,
         userId,
         rating: rating,
+        recommended: recommended,
         reviewText: reviewText,
+        watchedAt: watchedAt,
       );
       if (req.status != WatchRequestStatus.completed &&
           updated.status == WatchRequestStatus.completed) {
@@ -722,7 +725,7 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
           SnackBar(
             content: Text(
                 '"${req.movieTitle ?? 'Watch request'}" marked as watched!'),
-            backgroundColor: FlixieColors.success,
+            backgroundColor: FlixieColors.surfaceElevated,
           ),
         );
       }
@@ -768,36 +771,9 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
           required recommended,
           required notes,
         }) async {
-          await UserService.logMovieWatch(
-            widget.currentUserId,
-            LogMovieWatchRequest(
-              movieId: movieId!,
-              watchedAt: watchedAt,
-              rating: rating,
-              recommended: recommended,
-              notes: notes,
-            ),
-          );
-          // Keep the movie's main rating in sync with this watch entry. The
-          // server also performs this update for group-plan completions, but
-          // doing it here keeps older deployments and cached movie screens
-          // consistent immediately.
-          if (rating != null) {
-            try {
-              await context.read<MovieService>().addMovieRating(
-                    movieId!,
-                    widget.currentUserId,
-                    rating.round(),
-                    recommended,
-                  );
-            } catch (error, stackTrace) {
-              logger.w(
-                'Watch entry saved, but its movie rating could not be reconciled.',
-                error: error,
-                stackTrace: stackTrace,
-              );
-            }
-          }
+          // The group completion endpoint creates the same MovieWatchEntry
+          // used everywhere else in the app. Keeping this as one write avoids
+          // duplicate entries and preserves the explicit recommendation.
           await context.read<AnalyticsController>().watchLogged(
                 contentType: 'movie',
                 contentId: movieId!,
@@ -810,7 +786,9 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
           await _markWatched(
             req,
             rating: rating?.round(),
+            recommended: recommended,
             reviewText: notes,
+            watchedAt: watchedAt,
           );
           await PushNotificationService.cancelWatchPlanReminders(
             req.databaseRequestId ?? req.id,
@@ -1010,7 +988,7 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
           SnackBar(
             content: Text(
                 'Watch request for "${req.movieTitle ?? 'this movie'}" removed'),
-            backgroundColor: FlixieColors.success,
+            backgroundColor: FlixieColors.surfaceElevated,
           ),
         );
       }
@@ -1370,12 +1348,12 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
             .firstOrNull;
   }
 
-  Widget _poster(String? posterUrl) {
+  Widget _poster(String? posterUrl, {bool fillHeight = false}) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(10),
       child: SizedBox(
         width: 82,
-        height: 123,
+        height: fillHeight ? double.infinity : 123,
         child: posterUrl != null
             ? CachedNetworkImage(
                 imageUrl: posterUrl,
@@ -1895,7 +1873,9 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
                   '/groups/${widget.groupId}?tab=requests&requestId=${req.id}',
                 ),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          // Let the poster run flush to the top and bottom card edges. The
+          // content keeps its breathing room on the right.
+          padding: const EdgeInsets.fromLTRB(0, 0, 12, 0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1903,161 +1883,163 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
                 _groupPlanStage(req, isMyRequest),
                 const SizedBox(height: 14),
               ],
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _poster(posterUrl),
-                  const SizedBox(width: 13),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                req.movieTitle ?? 'Watch Plan',
-                                style: const TextStyle(
-                                  color: FlixieColors.light,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 17,
-                                  height: 1.12,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                textScaler: TextScaler.noScaling,
-                              ),
-                            ),
-                            if ((canDelete || canCancelRequest) &&
-                                isFocused) ...[
-                              const SizedBox(width: 6),
-                              PopupMenuButton<String>(
-                                tooltip: 'Watch Plan actions',
-                                enabled: !isProcessing,
-                                color: FlixieColors.surfaceElevated,
-                                onSelected: (value) {
-                                  if (value == 'cancel') {
-                                    _cancelRequest(req);
-                                  } else if (value == 'delete') {
-                                    _delete(req);
-                                  }
-                                },
-                                itemBuilder: (_) => [
-                                  if (canCancelRequest)
-                                    const PopupMenuItem(
-                                      value: 'cancel',
-                                      child: Text('Cancel Watch Plan'),
-                                    ),
-                                  if (canDelete)
-                                    const PopupMenuItem(
-                                      value: 'delete',
-                                      child: Text('Delete Watch Plan'),
-                                    ),
-                                ],
-                                icon: const Icon(
-                                  Icons.more_horiz_rounded,
-                                  color: FlixieColors.medium,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 7),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            ProfileAvatarView(
-                              avatar: req.requesterAvatar,
-                              fallbackText:
-                                  (req.requesterUsername?.isNotEmpty == true
-                                          ? req.requesterUsername![0]
-                                          : '?')
-                                      .toUpperCase(),
-                              fallbackColor: FlixieColors.primary,
-                              size: 24,
-                              profileBadges: req.requesterProfileBadges,
-                            ),
-                            const SizedBox(width: 7),
-                            Flexible(
-                              child: Text(
-                                isMyRequest
-                                    ? 'You invited the group'
-                                    : '@${req.requesterUsername ?? 'Member'}',
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: FlixieColors.light,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 7),
-                            _statusPill(req.status),
-                            if (_formatDate(req.createdAt).isNotEmpty)
-                              Flexible(
-                                child: Text(
-                                  ' · ${_formatDate(req.createdAt)}',
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: FlixieColors.medium,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        if (proposedDate.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              const Icon(Icons.event_outlined,
-                                  size: 15, color: FlixieColors.medium),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  req.scheduledFor != null
-                                      ? 'Scheduled for $proposedDate'
-                                      : 'Proposed for $proposedDate',
-                                  style: const TextStyle(
-                                    color: FlixieColors.medium,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                        if (req.location?.trim().isNotEmpty == true) ...[
-                          const SizedBox(height: 8),
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _poster(posterUrl, fillHeight: true),
+                    const SizedBox(width: 13),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(
-                                Icons.location_on_outlined,
-                                size: 15,
-                                color: FlixieColors.secondary,
-                              ),
-                              const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
-                                  req.location!.trim(),
+                                  req.movieTitle ?? 'Watch Plan',
+                                  style: const TextStyle(
+                                    color: FlixieColors.light,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 17,
+                                    height: 1.12,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  textScaler: TextScaler.noScaling,
+                                ),
+                              ),
+                              if ((canDelete || canCancelRequest) &&
+                                  isFocused) ...[
+                                const SizedBox(width: 6),
+                                PopupMenuButton<String>(
+                                  tooltip: 'Watch Plan actions',
+                                  enabled: !isProcessing,
+                                  color: FlixieColors.surfaceElevated,
+                                  onSelected: (value) {
+                                    if (value == 'cancel') {
+                                      _cancelRequest(req);
+                                    } else if (value == 'delete') {
+                                      _delete(req);
+                                    }
+                                  },
+                                  itemBuilder: (_) => [
+                                    if (canCancelRequest)
+                                      const PopupMenuItem(
+                                        value: 'cancel',
+                                        child: Text('Cancel Watch Plan'),
+                                      ),
+                                    if (canDelete)
+                                      const PopupMenuItem(
+                                        value: 'delete',
+                                        child: Text('Delete Watch Plan'),
+                                      ),
+                                  ],
+                                  icon: const Icon(
+                                    Icons.more_horiz_rounded,
+                                    color: FlixieColors.medium,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 7),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              ProfileAvatarView(
+                                avatar: req.requesterAvatar,
+                                fallbackText:
+                                    (req.requesterUsername?.isNotEmpty == true
+                                            ? req.requesterUsername![0]
+                                            : '?')
+                                        .toUpperCase(),
+                                fallbackColor: FlixieColors.primary,
+                                size: 24,
+                                profileBadges: req.requesterProfileBadges,
+                              ),
+                              const SizedBox(width: 7),
+                              Flexible(
+                                child: Text(
+                                  isMyRequest
+                                      ? 'You invited the group'
+                                      : '@${req.requesterUsername ?? 'Member'}',
+                                  overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                     color: FlixieColors.light,
                                     fontSize: 12,
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ),
+                              const SizedBox(width: 7),
+                              _statusPill(req.status),
+                              if (_formatDate(req.createdAt).isNotEmpty)
+                                Flexible(
+                                  child: Text(
+                                    ' · ${_formatDate(req.createdAt)}',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: FlixieColors.medium,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ),
                             ],
                           ),
+                          if (proposedDate.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                const Icon(Icons.event_outlined,
+                                    size: 15, color: FlixieColors.medium),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    req.scheduledFor != null
+                                        ? 'Scheduled for $proposedDate'
+                                        : 'Proposed for $proposedDate',
+                                    style: const TextStyle(
+                                      color: FlixieColors.medium,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                          if (req.location?.trim().isNotEmpty == true) ...[
+                            const SizedBox(height: 8),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(
+                                  Icons.location_on_outlined,
+                                  size: 15,
+                                  color: FlixieColors.secondary,
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    req.location!.trim(),
+                                    style: const TextStyle(
+                                      color: FlixieColors.light,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               if (req.message != null && req.message!.isNotEmpty) ...[
                 const SizedBox(height: 12),
@@ -2179,6 +2161,15 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
       return _buildCompletedWatchRecap(
         req,
         posterUrl: posterUrl,
+      );
+    }
+
+    final scheduledAt = DateTime.tryParse(req.scheduledFor ?? '')?.toLocal();
+    if (scheduledAt != null && !scheduledAt.isAfter(DateTime.now())) {
+      return _buildGroupPostWatchLifecycle(
+        req,
+        posterUrl: posterUrl,
+        scheduledAt: scheduledAt,
       );
     }
 
@@ -2410,6 +2401,150 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
     );
   }
 
+  Widget _buildGroupPostWatchLifecycle(
+    GroupWatchRequest req, {
+    required String? posterUrl,
+    required DateTime scheduledAt,
+  }) {
+    final watchedMembers = req.memberStatuses
+        .where((member) => member.watchedAt != null)
+        .toList(growable: false);
+    final hasLogged =
+        watchedMembers.any((member) => member.memberId == widget.currentUserId);
+    final totalParticipants = req.analyticsParticipantCount;
+    final memberWord = watchedMembers.length == 1 ? 'member' : 'members';
+    final statusText = hasLogged
+        ? '${watchedMembers.length} of $totalParticipants logged'
+        : watchedMembers.isEmpty
+            ? 'No watches logged yet'
+            : '${watchedMembers.length} $memberWord has logged';
+
+    Widget surface(Widget child) => Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: FlixieColors.surface,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: FlixieColors.tabBarBorder),
+          ),
+          child: child,
+        );
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      surface(Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: SizedBox(
+            width: 82,
+            height: 123,
+            child: posterUrl == null
+                ? const ColoredBox(
+                    color: FlixieColors.surfaceElevated,
+                    child: Icon(Icons.movie_outlined),
+                  )
+                : CachedNetworkImage(imageUrl: posterUrl, fit: BoxFit.cover),
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('DID THE PLAN HAPPEN?',
+                style: TextStyle(
+                    color: FlixieColors.secondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.1)),
+            const SizedBox(height: 7),
+            Text(req.movieTitle ?? 'Watch Plan',
+                style: const TextStyle(
+                    color: FlixieColors.primary,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800)),
+            const SizedBox(height: 8),
+            Text(_fullDateTime(scheduledAt),
+                style:
+                    const TextStyle(color: FlixieColors.light, fontSize: 14)),
+            const SizedBox(height: 10),
+            Text(widget.groupName ?? 'Group watch',
+                style:
+                    const TextStyle(color: FlixieColors.medium, fontSize: 14)),
+          ]),
+        ),
+      ])),
+      const SizedBox(height: 12),
+      surface(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(hasLogged ? 'Watch logged' : 'Did you watch it?',
+            style: const TextStyle(
+                color: FlixieColors.light,
+                fontSize: 21,
+                fontWeight: FontWeight.w800)),
+        const SizedBox(height: 7),
+        Text(
+          hasLogged
+              ? 'Your watch is saved. We’ll reveal the group recap once everyone has logged.'
+              : 'Log your own viewing. Everyone responds separately.',
+          style: const TextStyle(color: FlixieColors.medium, height: 1.4),
+        ),
+        if (!hasLogged) ...[
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => _logGroupWatch(req),
+              icon: const Icon(Icons.check_rounded),
+              label: const Text('Log your watch'),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+            TextButton(
+              onPressed: () => _cancelRequest(req),
+              child: const Text('Not this time'),
+            ),
+            TextButton(
+              onPressed: () =>
+                  _scheduleRequest(req, initialIso: req.scheduledFor),
+              child: const Text('Reschedule'),
+            ),
+          ]),
+        ],
+      ])),
+      const SizedBox(height: 12),
+      surface(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('WATCH STATUS · ${watchedMembers.length} OF $totalParticipants',
+            style: const TextStyle(
+                color: FlixieColors.medium,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1)),
+        const Divider(height: 22, color: FlixieColors.tabBarBorder),
+        Text(statusText,
+            style: const TextStyle(color: FlixieColors.light, fontSize: 14)),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: req.memberStatuses.map((member) {
+            final logged = member.watchedAt != null;
+            return Row(mainAxisSize: MainAxisSize.min, children: [
+              ProfileAvatarView(
+                avatar: member.avatar,
+                fallbackText: (member.username ?? '?')[0].toUpperCase(),
+                fallbackColor: FlixieColors.primary,
+                size: 36,
+              ),
+              const SizedBox(width: 6),
+              Icon(logged ? Icons.check_circle_rounded : Icons.schedule_rounded,
+                  color: logged ? FlixieColors.success : FlixieColors.medium,
+                  size: 18),
+            ]);
+          }).toList(),
+        ),
+      ])),
+    ]);
+  }
+
   Widget _buildCompletedWatchRecap(
     GroupWatchRequest req, {
     required String? posterUrl,
@@ -2525,11 +2660,11 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
               const SizedBox(height: 12),
               Row(children: [
                 Expanded(
-                    child: _recapMetric(average?.toStringAsFixed(1) ?? '—',
+                    child: _recapMetric(average?.toStringAsFixed(1) ?? '-',
                         'Average rating', FlixieColors.warning)),
                 const SizedBox(width: 12),
                 Expanded(
-                    child: _recapMetric('${recommends} of ${entries.length}',
+                    child: _recapMetric('$recommends of ${entries.length}',
                         'Recommend it', FlixieColors.success)),
               ]),
             ]),
@@ -2551,11 +2686,22 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
               child: _recapEntry(member,
                   isYou: member.memberId == widget.currentUserId),
             )),
-        _buildGroupPlanActivity(req),
-        const SizedBox(height: 8),
         Row(children: [
           Expanded(
               child: FilledButton.icon(
+            onPressed: () => context.push('/groups/${widget.groupId}?tab=chat'),
+            icon: const Icon(Icons.forum_outlined),
+            label: const Text('Open group chat'),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, 50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          )),
+          const SizedBox(width: 12),
+          Expanded(
+              child: OutlinedButton.icon(
             onPressed: myEntry?.rating == null || req.mediaId == null
                 ? null
                 : () {
@@ -2579,19 +2725,6 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
                   },
             icon: const Icon(Icons.ios_share_rounded),
             label: const Text('Share recap'),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size(0, 50),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-          )),
-          const SizedBox(width: 12),
-          Expanded(
-              child: OutlinedButton.icon(
-            onPressed: () => context.push('/groups/${widget.groupId}?tab=chat'),
-            icon: const Icon(Icons.forum_outlined),
-            label: const Text('Discuss in chat'),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(0, 50),
               shape: RoundedRectangleBorder(
@@ -2600,13 +2733,6 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
             ),
           )),
         ]),
-        const SizedBox(height: 10),
-        Center(
-            child: TextButton.icon(
-          onPressed: _makeGroupWatchPlan,
-          icon: const Icon(Icons.add_rounded),
-          label: const Text('Plan another watch'),
-        )),
       ],
     );
   }

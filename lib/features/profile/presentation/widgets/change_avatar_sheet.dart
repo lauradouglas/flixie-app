@@ -55,7 +55,7 @@ class _ChangeAvatarSheetState extends State<ChangeAvatarSheet> {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Profile avatar updated'),
-        backgroundColor: FlixieColors.success,
+        backgroundColor: FlixieColors.surfaceElevated,
       ));
     } catch (_) {
       if (mounted) setState(() => _error = 'Unable to update avatar.');

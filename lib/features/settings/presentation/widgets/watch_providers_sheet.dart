@@ -112,7 +112,7 @@ class _WatchProvidersSheetState extends State<WatchProvidersSheet> {
       messenger.showSnackBar(
         const SnackBar(
           content: Text('Watch providers updated'),
-          backgroundColor: FlixieColors.success,
+          backgroundColor: FlixieColors.surfaceElevated,
         ),
       );
     } catch (_) {

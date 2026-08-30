@@ -1877,26 +1877,31 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     final year = _formatHeroReleaseDate(movie.releaseDate);
     final runtime = _formatRuntime(movie.runtime);
     final rating = _contentRating(movie);
-    final meta =
-        [year, runtime, rating].where((s) => s.isNotEmpty).join('  •  ');
+    final metadata =
+        [year, runtime, rating].where((item) => item.isNotEmpty).toList();
 
-    if (meta.isEmpty) {
+    if (metadata.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    return Text(
-      meta,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: TextStyle(
-        color: FlixieColors.light
-            .withValues(alpha: _MovieDetailHeroTokens.metadataAlpha),
-        fontSize: compact
-            ? _MovieDetailHeroTokens.metadataCompact
-            : _MovieDetailHeroTokens.metadataRegular,
-        fontWeight: FontWeight.w700,
-        height: _MovieDetailHeroTokens.metadataLineHeight,
-      ),
+    final style = TextStyle(
+      color: FlixieColors.light
+          .withValues(alpha: _MovieDetailHeroTokens.metadataAlpha),
+      fontSize: compact
+          ? _MovieDetailHeroTokens.metadataCompact
+          : _MovieDetailHeroTokens.metadataRegular,
+      fontWeight: FontWeight.w700,
+      height: _MovieDetailHeroTokens.metadataLineHeight,
+    );
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      children: [
+        for (var index = 0; index < metadata.length; index++) ...[
+          if (index > 0) Text('•', style: style),
+          Text(metadata[index], style: style),
+        ],
+      ],
     );
   }
 
@@ -3356,6 +3361,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useRootNavigator: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),

@@ -54,7 +54,7 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Password updated successfully.'),
-        backgroundColor: FlixieColors.success,
+        backgroundColor: FlixieColors.surfaceElevated,
       ),
     );
   }

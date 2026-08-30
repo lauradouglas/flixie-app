@@ -363,15 +363,19 @@ class GroupService {
     String requestId,
     String userId, {
     int? rating,
+    bool? recommended,
     String? reviewText,
+    String? watchedAt,
   }) async {
     final data = await ApiClient.patch(
       '/conversations/$conversationId/watch-requests/$requestId/complete',
       body: {
         'userId': userId,
         if (rating != null) 'rating': rating,
+        if (recommended != null) 'recommended': recommended,
         if (reviewText != null && reviewText.isNotEmpty)
           'reviewText': reviewText,
+        if (watchedAt != null) 'watchedAt': watchedAt,
       },
     );
     return GroupWatchRequest.fromJson(data as Map<String, dynamic>);

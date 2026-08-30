@@ -288,6 +288,17 @@ class AppTheme {
         circularTrackColor: FlixieColors.tabBarBorder,
       ),
 
+      // Toasts must remain readable against every supplied background colour.
+      snackBarTheme: const SnackBarThemeData(
+        backgroundColor: FlixieColors.surfaceElevated,
+        contentTextStyle: TextStyle(
+          color: FlixieColors.white,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+        actionTextColor: FlixieColors.primary,
+      ),
+
       // Divider
       dividerTheme: const DividerThemeData(
         color: FlixieColors.tabBarBorder,

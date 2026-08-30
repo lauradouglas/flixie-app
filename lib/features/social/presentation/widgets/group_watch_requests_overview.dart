@@ -9,7 +9,7 @@ import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/models/group.dart';
 import 'package:flixie_app/models/group_watch_request.dart';
 
-enum _GroupRequestFilter { active, needsReply, scheduled, completed }
+enum _GroupRequestFilter { active, completed }
 
 class GroupWatchRequestsOverview extends StatefulWidget {
   const GroupWatchRequestsOverview({super.key, required this.groups});
@@ -70,11 +70,6 @@ class _GroupWatchRequestsOverviewState
   bool _matches(GroupWatchRequest request, _GroupRequestFilter filter) {
     return switch (filter) {
       _GroupRequestFilter.active => request.isActive,
-      _GroupRequestFilter.needsReply =>
-        request.isActive && request.currentUserResponse == null,
-      _GroupRequestFilter.scheduled =>
-        request.status == WatchRequestStatus.scheduled ||
-            request.scheduledFor != null,
       _GroupRequestFilter.completed =>
         request.status == WatchRequestStatus.completed,
     };
@@ -87,12 +82,65 @@ class _GroupWatchRequestsOverviewState
   Widget build(BuildContext context) {
     if (_loading) return const GroupWatchRequestsSkeleton();
     final active = _items.where((item) => item.request.isActive).toList();
-    final completed = _items
-        .where((item) => item.request.status == WatchRequestStatus.completed)
+    final visible =
+        _items.where((item) => _matches(item.request, _filter)).toList();
+    final needsReply = active
+        .where((item) => item.request.currentUserResponse == null)
         .toList();
-    final visible = _filter == _GroupRequestFilter.active
-        ? [...active, ...completed]
-        : _items.where((item) => _matches(item.request, _filter)).toList();
+    final upcoming = active.where((item) {
+      final scheduledFor = DateTime.tryParse(item.request.scheduledFor ?? '');
+      return scheduledFor != null && scheduledFor.isAfter(DateTime.now());
+    }).toList();
+    final readyToWrapUp = active.where((item) {
+      final scheduledFor = DateTime.tryParse(item.request.scheduledFor ?? '');
+      return scheduledFor != null && !scheduledFor.isAfter(DateTime.now());
+    }).toList();
+    final planning = active
+        .where((item) =>
+            !needsReply.contains(item) &&
+            !upcoming.contains(item) &&
+            !readyToWrapUp.contains(item))
+        .toList();
+
+    final content = <Widget>[];
+    void addSection(
+      String title,
+      String subtitle,
+      List<({Group group, GroupWatchRequest request})> items,
+    ) {
+      if (items.isEmpty) return;
+      if (content.isNotEmpty) content.add(const SizedBox(height: 22));
+      content.add(_GroupSectionHeader(
+        title: title,
+        subtitle: subtitle,
+        count: items.length,
+      ));
+      content.add(const SizedBox(height: 10));
+      for (final item in items) {
+        content.add(Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: _GroupRequestTile(group: item.group, request: item.request),
+        ));
+      }
+    }
+
+    if (_filter == _GroupRequestFilter.active) {
+      addSection('Needs reply', 'Plans waiting for your response', needsReply);
+      addSection('Upcoming', 'Your agreed Watch Plans', upcoming);
+      addSection(
+        'Ready to wrap up',
+        'The planned time has passed',
+        readyToWrapUp,
+      );
+      addSection('Planning', 'Invites waiting or being arranged', planning);
+    } else {
+      for (final item in visible) {
+        content.add(Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: _GroupRequestTile(group: item.group, request: item.request),
+        ));
+      }
+    }
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -102,37 +150,47 @@ class _GroupWatchRequestsOverviewState
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         children: [
           SizedBox(
-            height: 48,
-            child: ListView(
+            height: 58,
+            child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              children: _GroupRequestFilter.values
-                  .map((filter) => Padding(
-                        padding:
-                            const EdgeInsets.only(right: 8, top: 4, bottom: 4),
-                        child: ChoiceChip(
-                          selected: _filter == filter,
-                          onSelected: (_) => setState(() => _filter = filter),
-                          label: Text('${_label(filter)} ${_count(filter)}'),
-                          selectedColor: FlixieColors.primary,
-                          backgroundColor: FlixieColors.tabBarBackgroundFocused,
-                          side: BorderSide(
-                            color: FlixieColors.primary.withValues(
-                              alpha: _filter == filter ? 1 : .3,
-                            ),
-                          ),
-                          labelStyle: TextStyle(
-                            color: _filter == filter
-                                ? Colors.white
-                                : FlixieColors.medium,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ))
-                  .toList(),
+              itemCount: _GroupRequestFilter.values.length,
+              itemBuilder: (_, index) {
+                final filter = _GroupRequestFilter.values[index];
+                final selected = _filter == filter;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8, top: 4, bottom: 4),
+                  child: ChoiceChip(
+                    label: Text(
+                      filter == _GroupRequestFilter.active
+                          ? 'Active · ${_count(_GroupRequestFilter.active)}'
+                          : 'Past · ${_count(_GroupRequestFilter.completed)}',
+                    ),
+                    selected: selected,
+                    onSelected: (_) => setState(() => _filter = filter),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                    labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+                    padding: EdgeInsets.zero,
+                    selectedColor: FlixieColors.primary.withValues(alpha: .22),
+                    backgroundColor: FlixieColors.tabBarBackgroundFocused,
+                    side: BorderSide(
+                      color: FlixieColors.primary
+                          .withValues(alpha: selected ? 1 : .3),
+                    ),
+                    labelStyle: TextStyle(
+                      color: selected ? Colors.white : FlixieColors.medium,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
-          const SizedBox(height: 20),
-          if (visible.isEmpty)
+          const SizedBox(height: 12),
+          if (content.isEmpty)
             const Padding(
               padding: EdgeInsets.only(top: 100),
               child: Center(
@@ -140,76 +198,67 @@ class _GroupWatchRequestsOverviewState
                     style: TextStyle(color: FlixieColors.medium)),
               ),
             )
-          else ...[
-            if (_filter == _GroupRequestFilter.active && active.isNotEmpty) ...[
-              const _SectionLabel('ACTIVE WATCH PLANS'),
-              const SizedBox(height: 10),
-              ...active.map((item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _GroupRequestTile(
-                        group: item.group, request: item.request),
-                  )),
-            ],
-            if (_filter == _GroupRequestFilter.active &&
-                completed.isNotEmpty) ...[
-              const SizedBox(height: 18),
-              const _SectionLabel('COMPLETED WATCH PLANS', muted: true),
-              const SizedBox(height: 10),
-              ...completed.map((item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _GroupRequestTile(
-                      group: item.group,
-                      request: item.request,
-                      compact: true,
-                    ),
-                  )),
-            ],
-            if (_filter != _GroupRequestFilter.active)
-              ...visible.map((item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _GroupRequestTile(
-                      group: item.group,
-                      request: item.request,
-                      compact: _filter == _GroupRequestFilter.completed,
-                    ),
-                  )),
-          ],
-          const SizedBox(height: 54),
-          const Icon(Icons.movie_filter_outlined,
-              color: FlixieColors.primary, size: 32),
-          const SizedBox(height: 10),
-          const Text(
-            'Group movie magic happens here.\nMake a Watch Plan, rally the crew, and enjoy together.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: FlixieColors.medium, height: 1.5),
-          ),
+          else
+            ...content,
         ],
       ),
     );
   }
-
-  String _label(_GroupRequestFilter filter) => switch (filter) {
-        _GroupRequestFilter.active => 'Active',
-        _GroupRequestFilter.needsReply => 'Needs reply',
-        _GroupRequestFilter.scheduled => 'Scheduled',
-        _GroupRequestFilter.completed => 'Completed',
-      };
 }
 
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.label, {this.muted = false});
-  final String label;
-  final bool muted;
+class _GroupSectionHeader extends StatelessWidget {
+  const _GroupSectionHeader({
+    required this.title,
+    required this.subtitle,
+    required this.count,
+  });
+
+  final String title;
+  final String subtitle;
+  final int count;
 
   @override
-  Widget build(BuildContext context) => Text(
-        label,
-        style: TextStyle(
-          color: muted ? FlixieColors.medium : FlixieColors.primary,
-          fontWeight: FontWeight.w900,
-          fontSize: 13,
-          letterSpacing: 1.1,
-        ),
+  Widget build(BuildContext context) => Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: FlixieColors.light,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: FlixieColors.medium,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+            decoration: BoxDecoration(
+              color: FlixieColors.primary.withValues(alpha: .14),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              '$count',
+              style: const TextStyle(
+                color: FlixieColors.primary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
       );
 }
 
@@ -217,12 +266,10 @@ class _GroupRequestTile extends StatelessWidget {
   const _GroupRequestTile({
     required this.group,
     required this.request,
-    this.compact = false,
   });
 
   final Group group;
   final GroupWatchRequest request;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -245,28 +292,49 @@ class _GroupRequestTile extends StatelessWidget {
     final waiting =
         (group.memberCount ?? request.responseCount) - acceptedCount;
 
+    final completed = request.status == WatchRequestStatus.completed;
+    final scheduled = request.status == WatchRequestStatus.scheduled ||
+        request.scheduledFor != null;
+    final needsReply = request.isActive && request.currentUserResponse == null;
+    final label = completed
+        ? 'WATCHED TOGETHER'
+        : needsReply
+            ? 'NEEDS REPLY'
+            : scheduled
+                ? 'SCHEDULED'
+                : 'PLANNING TOGETHER';
+    final actionLabel = completed ? 'View recap' : 'View plan';
+    final scheduleText = completed
+        ? 'Watched'
+        : request.scheduledFor == null
+            ? 'Time to be agreed'
+            : _scheduledLabel(request.scheduledFor!);
+    final contextText = completed
+        ? '$acceptedCount members watched'
+        : '$acceptedCount accepted · ${waiting.clamp(0, 999)} waiting';
+
     return Material(
       color: FlixieColors.tabBarBackgroundFocused,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(22),
       child: InkWell(
         onTap: open,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(22),
         child: Container(
-          height: compact ? 142 : 250,
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: FlixieColors.primary.withValues(alpha: .3),
-            ),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: FlixieColors.tabBarBorder),
           ),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius:
-                    const BorderRadius.horizontal(left: Radius.circular(15)),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final stackedFooter = constraints.maxWidth < 350;
+              final posterWidth = stackedFooter ? 82.0 : 72.0;
+              final posterHeight = posterWidth * 1.5;
+              final poster = ClipRRect(
+                borderRadius: BorderRadius.circular(14),
                 child: SizedBox(
-                  width: compact ? 98 : 132,
-                  height: double.infinity,
+                  width: posterWidth,
+                  height: posterHeight,
                   child: posterUrl == null
                       ? const ColoredBox(
                           color: FlixieColors.surface,
@@ -281,158 +349,131 @@ class _GroupRequestTile extends StatelessWidget {
                           ),
                         ),
                 ),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: compact
-                      ? _compactContent(open)
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(request.movieTitle ?? 'Watch Plan',
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: FlixieColors.light,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w900,
-                                )),
-                            const SizedBox(height: 8),
-                            Row(children: [
-                              ProfileAvatarView(
-                                avatar: request.requesterAvatar,
-                                fallbackText:
-                                    _initial(request.requesterUsername),
-                                fallbackColor: FlixieColors.primary,
-                                size: 30,
-                              ),
-                              const SizedBox(width: 7),
-                              Expanded(
-                                child: Text(
-                                  '@${request.requesterUsername ?? 'member'} created this',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                      color: FlixieColors.medium, fontSize: 12),
-                                ),
-                              ),
-                            ]),
-                            if (request.scheduledFor != null) ...[
-                              const SizedBox(height: 9),
-                              _StatusLine(request: request),
-                            ],
-                            const Spacer(),
-                            const Divider(color: FlixieColors.tabBarBorder),
-                            Row(children: [
-                              SizedBox(
-                                width: 76,
-                                height: 30,
-                                child: Stack(
-                                  clipBehavior: Clip.none,
-                                  children: accepted
-                                      .take(3)
-                                      .toList()
-                                      .asMap()
-                                      .entries
-                                      .map((entry) {
-                                    final member = entry.value;
-                                    return Positioned(
-                                      left: entry.key * 22,
-                                      child: ExcludeSemantics(
-                                        child: ProfileAvatarView(
-                                          avatar: member.avatar,
-                                          fallbackText:
-                                              _initial(member.username),
-                                          fallbackColor: FlixieColors.primary,
-                                          size: 30,
-                                        ),
-                                      ),
-                                    );
-                                  }).toList(),
-                                ),
-                              ),
-                              Expanded(
-                                child: Text(
-                                  '$acceptedCount accepted · ${waiting.clamp(0, 999)} waiting',
-                                  style: const TextStyle(
-                                      color: FlixieColors.success,
-                                      fontSize: 11),
-                                ),
-                              ),
-                            ]),
-                            const SizedBox(height: 8),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 40,
-                              child: OutlinedButton.icon(
-                                onPressed: open,
-                                icon: const Icon(Icons.visibility_outlined,
-                                    size: 16),
-                                label: Text(request.status ==
-                                        WatchRequestStatus.scheduled
-                                    ? 'View plan'
-                                    : 'View plan'),
-                              ),
-                            ),
-                          ],
-                        ),
+              );
+              final details = Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    maxLines: 2,
+                    style: TextStyle(
+                      color: completed
+                          ? FlixieColors.success
+                          : FlixieColors.secondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    request.movieTitle ?? 'Watch Plan',
+                    style: const TextStyle(
+                      color: FlixieColors.light,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(children: [
+                    const Icon(Icons.event_outlined,
+                        color: FlixieColors.medium, size: 18),
+                    const SizedBox(width: 7),
+                    Expanded(
+                      child: Text(
+                        scheduleText,
+                        maxLines: 2,
+                        style: const TextStyle(
+                            color: FlixieColors.light, fontSize: 14),
+                      ),
+                    ),
+                  ]),
+                ],
+              );
+              final participant = Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ProfileAvatarView(
+                    avatar: request.requesterAvatar,
+                    fallbackText: _initial(request.requesterUsername),
+                    fallbackColor: FlixieColors.primary,
+                    size: 32,
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      '${group.name} · $contextText',
+                      maxLines: 2,
+                      style: const TextStyle(
+                          color: FlixieColors.light, fontSize: 14),
+                    ),
+                  ),
+                ],
+              );
+              final action = FilledButton(
+                onPressed: open,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 40),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
                 ),
-              ),
-            ],
+                child: Text(actionLabel),
+              );
+
+              if (stackedFooter) {
+                return Column(mainAxisSize: MainAxisSize.min, children: [
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    poster,
+                    const SizedBox(width: 14),
+                    Expanded(child: details),
+                  ]),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Divider(color: FlixieColors.tabBarBorder),
+                  ),
+                  Row(children: [
+                    Expanded(child: participant),
+                    const SizedBox(width: 12),
+                    action,
+                  ]),
+                ]);
+              }
+
+              return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    poster,
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          details,
+                          const SizedBox(height: 12),
+                          participant
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      height: posterHeight,
+                      child: Align(
+                          alignment: Alignment.bottomRight, child: action),
+                    ),
+                  ]);
+            },
           ),
         ),
       ),
     );
   }
-
-  Widget _compactContent(VoidCallback open) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(request.movieTitle ?? 'Watch Plan',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  color: FlixieColors.light,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800)),
-          const SizedBox(height: 9),
-          const Row(children: [
-            Icon(Icons.event_available_outlined,
-                color: FlixieColors.medium, size: 16),
-            SizedBox(width: 6),
-            Text('Watched', style: TextStyle(color: FlixieColors.medium)),
-          ]),
-          const Spacer(),
-          Align(
-            alignment: Alignment.centerRight,
-            child: OutlinedButton(onPressed: open, child: const Text('View')),
-          ),
-        ],
-      );
 }
 
-class _StatusLine extends StatelessWidget {
-  const _StatusLine({required this.request});
-  final GroupWatchRequest request;
-
-  @override
-  Widget build(BuildContext context) {
-    final date = DateTime.tryParse(request.scheduledFor ?? '')?.toLocal();
-    final text = date == null
-        ? 'Scheduled'
-        : '${date.day}/${date.month} · ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
-    return Row(children: [
-      const Icon(Icons.event_available_outlined,
-          color: FlixieColors.success, size: 17),
-      const SizedBox(width: 6),
-      Expanded(
-        child: Text(text,
-            style: const TextStyle(
-                color: FlixieColors.success, fontWeight: FontWeight.w700)),
-      ),
-    ]);
-  }
+String _scheduledLabel(String value) {
+  final date = DateTime.tryParse(value)?.toLocal();
+  if (date == null) return 'Scheduled';
+  return '${date.day}/${date.month} · ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
 }
 
 String _initial(String? value) {

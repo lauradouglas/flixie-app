@@ -310,7 +310,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   ? 'Request accepted successfully.'
                   : 'Request declined successfully.',
             ),
-            backgroundColor: FlixieColors.success,
+            backgroundColor: FlixieColors.surfaceElevated,
           ),
         );
       }
@@ -375,7 +375,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Watch time agreed'),
-            backgroundColor: FlixieColors.success,
+            backgroundColor: FlixieColors.surfaceElevated,
             duration: const Duration(seconds: 4),
             persist: false,
             action: SnackBarAction(
@@ -401,7 +401,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
           content: Text(
             decision == 'accepted' ? 'Watch time agreed' : 'Time declined',
           ),
-          backgroundColor: FlixieColors.success,
+          backgroundColor: FlixieColors.surfaceElevated,
         ),
       );
     } catch (e) {
@@ -452,7 +452,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Suggested a new time'),
-          backgroundColor: FlixieColors.success,
+          backgroundColor: FlixieColors.surfaceElevated,
         ),
       );
     } catch (e) {

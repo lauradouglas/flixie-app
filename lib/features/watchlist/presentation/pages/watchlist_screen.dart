@@ -480,7 +480,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('${selected.name} added to watchlist'),
-            backgroundColor: FlixieColors.success,
+            backgroundColor: FlixieColors.surfaceElevated,
           ),
         );
       }
@@ -634,7 +634,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('${item.movie?.title ?? "Movie"} marked as watched'),
-            backgroundColor: FlixieColors.success,
+            backgroundColor: FlixieColors.surfaceElevated,
           ),
         );
       }
@@ -732,7 +732,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
               SnackBar(
                 content: Text(
                     '${item.movie?.title ?? "Movie"} added to watched list'),
-                backgroundColor: FlixieColors.success,
+                backgroundColor: FlixieColors.surfaceElevated,
               ),
             );
           }
@@ -809,7 +809,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
           content: Text(
             '${watchedItems.length} watched ${watchedItems.length == 1 ? 'movie' : 'movies'} removed from your watchlist',
           ),
-          backgroundColor: FlixieColors.success,
+          backgroundColor: FlixieColors.surfaceElevated,
         ),
       );
     } catch (e) {
@@ -875,7 +875,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
           SnackBar(
             content:
                 Text('${item.movie?.title ?? "Movie"} added to favourites'),
-            backgroundColor: FlixieColors.success,
+            backgroundColor: FlixieColors.surfaceElevated,
           ),
         );
       }

@@ -71,7 +71,7 @@ class _FavoriteGenresSheetState extends State<FavoriteGenresSheet> {
       messenger.showSnackBar(
         const SnackBar(
           content: Text('Favourite genres updated.'),
-          backgroundColor: FlixieColors.success,
+          backgroundColor: FlixieColors.surfaceElevated,
         ),
       );
     } catch (_) {
