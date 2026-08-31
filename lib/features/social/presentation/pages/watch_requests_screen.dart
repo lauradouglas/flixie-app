@@ -1,5 +1,4 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -7,7 +6,6 @@ import 'package:provider/provider.dart';
 import 'package:flixie_app/models/watch_request.dart';
 import 'package:flixie_app/models/profile_avatar.dart';
 import 'package:flixie_app/models/group.dart';
-import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/models/movie_short.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/core/auth/push_notification_service.dart';
@@ -32,6 +30,12 @@ import 'package:flixie_app/core/analytics/detail_source.dart';
 import 'package:flixie_app/features/sharing/models/share_card_data.dart';
 import 'package:flixie_app/features/sharing/presentation/share_card_sheet.dart';
 import 'package:flixie_app/core/navigation/tab_refresh_controller.dart';
+import 'package:flixie_app/features/watch_plans/presentation/utils/watch_plan_display_state.dart';
+import 'package:flixie_app/features/watch_plans/presentation/utils/watch_plan_formatters.dart';
+import 'package:flixie_app/features/watch_plans/presentation/utils/watch_plan_section_builder.dart';
+import 'package:flixie_app/features/watch_plans/presentation/sheets/watch_plan_candidate_choices_sheet.dart';
+import 'package:flixie_app/features/watch_plans/presentation/sheets/watch_plan_location_sheet.dart';
+import 'package:flixie_app/features/watch_plans/presentation/sheets/watch_plan_schedule_sheet.dart';
 
 const List<String> _kMonths = [
   'Jan',
@@ -48,17 +52,6 @@ const List<String> _kMonths = [
   'Dec',
 ];
 
-enum _StatusFilter {
-  active,
-  needsResponse,
-  planning,
-  scheduled,
-  completed,
-  declined,
-  cancelled,
-  expired,
-}
-
 enum _RequestAction {
   accepting,
   maybe,
@@ -72,8 +65,6 @@ enum _RequestAction {
 }
 
 enum _RequestAudience { friends, groups }
-
-enum _PostWatchState { nobodyLogged, waitingForMe, waitingForOthers, recap }
 
 class _AcceptanceScheduleDraft {
   const _AcceptanceScheduleDraft({
@@ -172,7 +163,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
   List<WatchRequest> _filtered = [];
   bool _loading = true;
   String? _error;
-  _StatusFilter _statusFilter = _StatusFilter.active;
+  WatchPlanFilter _statusFilter = WatchPlanFilter.active;
   final Map<String, _RequestAction> _busyActions = {};
   List<Group> _groups = [];
   bool _loadingGroups = true;
@@ -393,82 +384,23 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     });
   }
 
-  bool _matchesStatusFilter(WatchRequest request) {
-    return _matchesFilter(request, _statusFilter);
-  }
+  bool _matchesStatusFilter(WatchRequest request) =>
+      _matchesFilter(request, _statusFilter);
 
-  bool _matchesFilter(WatchRequest request, _StatusFilter filter) {
-    switch (filter) {
-      case _StatusFilter.active:
-        return _isActiveRequest(request);
-      case _StatusFilter.needsResponse:
-        final myUserId = context.read<AuthProvider>().dbUser?.id ?? '';
-        return _isActiveRequest(request) && _needsAttention(request, myUserId);
-      case _StatusFilter.planning:
-        return _isActiveRequest(request) &&
-            (request.isAccepted || request.isScheduled) &&
-            request.normalizedScheduleStatus != 'AGREED' &&
-            !_isPostWatchDue(request);
-      case _StatusFilter.scheduled:
-        return _isActiveRequest(request) && _isUpcoming(request);
-      case _StatusFilter.completed:
-        return _isCompletedRequest(request) || _isPostWatchDue(request);
-      case _StatusFilter.declined:
-        return _isDeclinedRequest(request);
-      case _StatusFilter.cancelled:
-        return _isCancelledRequest(request);
-      case _StatusFilter.expired:
-        return request.isExpired;
-    }
-  }
-
-  bool _isCompletedRequest(WatchRequest request) =>
-      request.isCompleted || request.normalizedWatchedStatus == 'WATCHED';
-
-  bool _isPostWatchDue(WatchRequest request) {
-    final time = request.scheduledFor ?? request.proposedDate;
-    return !_isCompletedRequest(request) &&
-        !request.isCancelled &&
-        !request.isExpired &&
-        time != null &&
-        !time.isAfter(DateTime.now());
-  }
-
-  bool _isDeclinedRequest(WatchRequest request) => request.isDeclined;
-
-  // A cancelled time proposal is still an active accepted request that can be
-  // replanned. Only the request's own terminal status belongs in Cancelled.
-  bool _isCancelledRequest(WatchRequest request) => request.isCancelled;
-
-  bool _isActiveRequest(WatchRequest request) =>
-      !_isCompletedRequest(request) &&
-      !_isDeclinedRequest(request) &&
-      !_isCancelledRequest(request) &&
-      !request.isExpired;
+  bool _matchesFilter(WatchRequest request, WatchPlanFilter filter) =>
+      WatchPlanDisplayState.matchesFilter(
+        request,
+        filter,
+        context.read<AuthProvider>().dbUser?.id ?? '',
+      );
 
   DateTime _parseDate(String? iso) =>
       DateTime.tryParse(iso ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
 
-  String _formatDate(String? iso) {
-    final dt = DateTime.tryParse(iso ?? '');
-    if (dt == null) return '';
-    return '${dt.day} ${_kMonths[dt.month - 1]} ${dt.year}';
-  }
+  String _formatDate(String? iso) => formatWatchPlanDate(iso);
 
-  String _formatFriendlyDateTime(DateTime? value) {
-    if (value == null) return '';
-    final local = value.toLocal();
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final date = DateTime(local.year, local.month, local.day);
-    final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
-    final minute = local.minute.toString().padLeft(2, '0');
-    final suffix = local.hour >= 12 ? 'pm' : 'am';
-    final time = '$hour:$minute$suffix';
-    if (date == today) return 'Today at $time';
-    if (date == today.add(const Duration(days: 1))) return 'Tomorrow at $time';
-    return '${local.day} ${_kMonths[local.month - 1]}, $time';
-  }
+  String _formatFriendlyDateTime(DateTime? value) =>
+      formatWatchPlanDateTime(value);
 
   void _replaceRequest(WatchRequest updated) {
     setState(() {
@@ -674,7 +606,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
       useRootNavigator: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _ScheduleProposalSheet(
+      builder: (_) => WatchPlanScheduleSheet(
         initial: initial,
         initialLocation: initialLocation,
       ),
@@ -728,7 +660,9 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
       useRootNavigator: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _LocationEditorSheet(initialLocation: request.location),
+      builder: (_) => WatchPlanLocationSheet(
+        initialLocation: request.location,
+      ),
     );
     if (!mounted || location == null || location.isEmpty) return;
 
@@ -1203,7 +1137,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
   }
 
   Widget _buildFriendFilters() {
-    const filters = [_StatusFilter.active, _StatusFilter.completed];
+    const filters = [WatchPlanFilter.active, WatchPlanFilter.completed];
     return Column(
       children: [
         if (_showSearch)
@@ -1236,13 +1170,13 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: ChoiceChip(
-                  label: Text(filter == _StatusFilter.active
-                      ? 'Active · ${_countFor(_StatusFilter.active)}'
-                      : 'Past · ${_countFor(_StatusFilter.completed)}'),
+                  label: Text(filter == WatchPlanFilter.active
+                      ? 'Active · ${_countFor(WatchPlanFilter.active)}'
+                      : 'Past · ${_countFor(WatchPlanFilter.completed)}'),
                   selected: selected,
                   onSelected: (_) {
                     setState(() => _statusFilter =
-                        selected ? _StatusFilter.active : filter);
+                        selected ? WatchPlanFilter.active : filter);
                     _applyFilter();
                   },
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -1275,7 +1209,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
   Widget _buildRequestsList(bool isFocused) {
     final myUserId = context.read<AuthProvider>().dbUser?.id ?? '';
     if (isFocused ||
-        _statusFilter != _StatusFilter.active ||
+        _statusFilter != WatchPlanFilter.active ||
         _searchController.text.trim().isNotEmpty) {
       return RefreshIndicator(
         onRefresh: _load,
@@ -1290,23 +1224,10 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
       );
     }
 
-    final needsAttention = _filtered
-        .where((request) => _needsAttention(request, myUserId))
-        .toList();
-    final upcoming = _filtered
-        .where((request) =>
-            !needsAttention.contains(request) && _isUpcoming(request))
-        .toList();
-    final planning = _filtered
-        .where((request) =>
-            !needsAttention.contains(request) &&
-            !upcoming.contains(request) &&
-            !_isPostWatchDue(request))
-        .toList();
-    final postWatch = _filtered
-        .where((request) =>
-            !needsAttention.contains(request) && _isPostWatchDue(request))
-        .toList();
+    final sections = WatchPlanSectionBuilder.friendSections(
+      _filtered,
+      myUserId,
+    );
 
     final children = <Widget>[];
     void addSection(String title, String subtitle, List<WatchRequest> items) {
@@ -1327,14 +1248,15 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     addSection(
       'Needs reply',
       'Plans waiting for your response',
-      needsAttention,
+      sections.needsReply,
     );
-    addSection('Upcoming', 'Your agreed watch plans', upcoming);
-    addSection('Ready to wrap up', 'The planned time has passed', postWatch);
+    addSection('Upcoming', 'Your agreed watch plans', sections.upcoming);
+    addSection('Ready to wrap up', 'The planned time has passed',
+        sections.readyToWrapUp);
     addSection(
       'Scheduling in progress',
       'Invites waiting or being arranged',
-      planning,
+      sections.planning,
     );
 
     return RefreshIndicator(
@@ -1347,20 +1269,6 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
       ),
     );
   }
-
-  bool _needsAttention(WatchRequest request, String myUserId) {
-    final isIncoming = request.requesterId != myUserId &&
-        (request.recipientId == myUserId ||
-            request.participantFor(myUserId) != null);
-    final proposal = request.latestPendingProposal;
-    return (request.isPending && isIncoming) ||
-        (proposal != null && proposal.proposerId != myUserId);
-  }
-
-  bool _isUpcoming(WatchRequest request) =>
-      request.normalizedScheduleStatus == 'AGREED' &&
-      request.scheduledFor != null &&
-      request.scheduledFor!.isAfter(DateTime.now());
 
   Widget _buildRequestCard(
     WatchRequest request,
@@ -1498,7 +1406,10 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
       useRootNavigator: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _CandidateChoicesSheet(request: request, userId: userId),
+      builder: (_) => WatchPlanCandidateChoicesSheet(
+        request: request,
+        userId: userId,
+      ),
     );
     if (!mounted || selected == null) return;
     setState(() {
@@ -1702,28 +1613,28 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     });
   }
 
-  String _filterLabel(_StatusFilter f) {
+  String _filterLabel(WatchPlanFilter f) {
     switch (f) {
-      case _StatusFilter.active:
+      case WatchPlanFilter.active:
         return 'Active';
-      case _StatusFilter.needsResponse:
-        return 'Needs reply ${_countFor(_StatusFilter.needsResponse)}';
-      case _StatusFilter.planning:
+      case WatchPlanFilter.needsResponse:
+        return 'Needs reply ${_countFor(WatchPlanFilter.needsResponse)}';
+      case WatchPlanFilter.planning:
         return 'Planning';
-      case _StatusFilter.scheduled:
-        return 'Upcoming ${_countFor(_StatusFilter.scheduled)}';
-      case _StatusFilter.completed:
+      case WatchPlanFilter.scheduled:
+        return 'Upcoming ${_countFor(WatchPlanFilter.scheduled)}';
+      case WatchPlanFilter.completed:
         return 'Past';
-      case _StatusFilter.declined:
+      case WatchPlanFilter.declined:
         return 'Declined';
-      case _StatusFilter.cancelled:
+      case WatchPlanFilter.cancelled:
         return 'Cancelled';
-      case _StatusFilter.expired:
+      case WatchPlanFilter.expired:
         return 'Expired';
     }
   }
 
-  int _countFor(_StatusFilter filter) {
+  int _countFor(WatchPlanFilter filter) {
     return _all.where((request) => _matchesFilter(request, filter)).length;
   }
 
@@ -1753,7 +1664,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
           const SizedBox(height: 16),
           Text(
             _searchController.text.isNotEmpty ||
-                    _statusFilter != _StatusFilter.active
+                    _statusFilter != WatchPlanFilter.active
                 ? 'No Watch Plans match'
                 : 'No Watch Plans yet',
             style: const TextStyle(color: FlixieColors.medium, fontSize: 16),
@@ -1897,241 +1808,6 @@ class _RequestListSectionHeader extends StatelessWidget {
         ),
       ],
     );
-  }
-}
-
-class _PlanRecipient {
-  const _PlanRecipient({
-    required this.id,
-    required this.name,
-    required this.isGroup,
-  });
-
-  final String id;
-  final String name;
-  final bool isGroup;
-}
-
-class _PlanRecipientSheet extends StatefulWidget {
-  const _PlanRecipientSheet({required this.friends, required this.groups});
-
-  final List<Friendship> friends;
-  final List<Group> groups;
-
-  @override
-  State<_PlanRecipientSheet> createState() => _PlanRecipientSheetState();
-}
-
-class _PlanRecipientSheetState extends State<_PlanRecipientSheet> {
-  final _searchController = TextEditingController();
-  bool _showGroups = false;
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final query = _searchController.text.trim().toLowerCase();
-    final friends = widget.friends
-        .map((friendship) => friendship.friendUser)
-        .whereType<FriendshipUser>()
-        .where((friend) =>
-            query.isEmpty || friend.displayName.toLowerCase().contains(query))
-        .toList(growable: false);
-    final groups = widget.groups
-        .where((group) =>
-            group.id != null &&
-            (query.isEmpty || group.name.toLowerCase().contains(query)))
-        .toList(growable: false);
-    final items = _showGroups ? groups : friends;
-
-    return SafeArea(
-      child: Material(
-        color: FlixieColors.background,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        clipBehavior: Clip.antiAlias,
-        child: SizedBox(
-          height: MediaQuery.sizeOf(context).height * .72,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: FlixieColors.medium,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                const Text(
-                  'Who are you watching with?',
-                  style: TextStyle(
-                    color: FlixieColors.textPrimary,
-                    fontSize: 21,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Choose a friend or group first. You can pick the movie next.',
-                  style: TextStyle(color: FlixieColors.medium),
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _RecipientTypeButton(
-                        label: 'Friends',
-                        icon: Icons.person_outline_rounded,
-                        selected: !_showGroups,
-                        onTap: () => setState(() => _showGroups = false),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _RecipientTypeButton(
-                        label: 'Groups',
-                        icon: Icons.groups_2_outlined,
-                        selected: _showGroups,
-                        onTap: () => setState(() => _showGroups = true),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _searchController,
-                  autofocus: true,
-                  onChanged: (_) => setState(() {}),
-                  decoration: InputDecoration(
-                    hintText: _showGroups ? 'Search groups' : 'Search friends',
-                    prefixIcon: const Icon(Icons.search_rounded),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Expanded(
-                  child: items.isEmpty
-                      ? Center(
-                          child: Text(
-                            _showGroups
-                                ? 'No groups found'
-                                : 'No friends found',
-                            style: const TextStyle(color: FlixieColors.medium),
-                          ),
-                        )
-                      : ListView.separated(
-                          itemCount: items.length,
-                          separatorBuilder: (_, __) => const Divider(
-                            color: FlixieColors.tabBarBorder,
-                            height: 1,
-                          ),
-                          itemBuilder: (context, index) {
-                            if (_showGroups) {
-                              final group = groups[index];
-                              return ListTile(
-                                minVerticalPadding: 8,
-                                visualDensity: VisualDensity.standard,
-                                contentPadding:
-                                    const EdgeInsets.symmetric(horizontal: 8),
-                                leading: const CircleAvatar(
-                                  child: Icon(Icons.groups_2_outlined),
-                                ),
-                                title: Text(group.name),
-                                trailing: const Icon(Icons.chevron_right),
-                                onTap: () => Navigator.pop(
-                                  context,
-                                  _PlanRecipient(
-                                    id: group.id!,
-                                    name: group.name,
-                                    isGroup: true,
-                                  ),
-                                ),
-                              );
-                            }
-                            final friend = friends[index];
-                            return ListTile(
-                              minVerticalPadding: 8,
-                              visualDensity: VisualDensity.standard,
-                              contentPadding:
-                                  const EdgeInsets.symmetric(horizontal: 8),
-                              leading: ProfileAvatarView(
-                                avatar: friend.avatar,
-                                fallbackText: friend
-                                    .displayName.characters.first
-                                    .toUpperCase(),
-                                fallbackColor: FlixieColors.primary,
-                                size: 40,
-                                profileBadges: friend.profileBadges,
-                              ),
-                              title: Text(friend.displayName),
-                              trailing: const Icon(Icons.chevron_right),
-                              onTap: () => Navigator.pop(
-                                context,
-                                _PlanRecipient(
-                                  id: friend.id,
-                                  name: friend.displayName,
-                                  isGroup: false,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RecipientTypeButton extends StatelessWidget {
-  const _RecipientTypeButton({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return selected
-        ? FilledButton.icon(
-            onPressed: onTap,
-            icon: Icon(icon, size: 18),
-            label: Text(label),
-            style: FilledButton.styleFrom(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-          )
-        : OutlinedButton.icon(
-            onPressed: onTap,
-            icon: Icon(icon, size: 18),
-            label: Text(label),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: FlixieColors.light,
-              side: const BorderSide(color: FlixieColors.tabBarBorder),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-          );
   }
 }
 
@@ -3511,15 +3187,8 @@ class _WatchRequestCard extends StatelessWidget {
     final otherEntry =
         entries.where((entry) => entry.userId != myUserId).firstOrNull;
     final myResolved = mine != null;
-    final otherResolved = otherEntry != null;
-    final state = request.isCompleted || (myResolved && otherResolved)
-        ? _PostWatchState.recap
-        : myResolved
-            ? _PostWatchState.waitingForOthers
-            : otherResolved
-                ? _PostWatchState.waitingForMe
-                : _PostWatchState.nobodyLogged;
-    if (state == _PostWatchState.recap) {
+    final state = WatchPlanDisplayState.postWatchState(request, myUserId);
+    if (state == FriendPostWatchState.recap) {
       return _buildCompletedFriendRecap(context,
           other: other, movie: movie, posterUrl: posterUrl);
     }
@@ -3528,20 +3197,20 @@ class _WatchRequestCard extends StatelessWidget {
         : _dateLabel(_effectiveWatchTime!);
     final title = movie?.title ?? request.movie?.title ?? 'Watch plan';
     final heading = switch (state) {
-      _PostWatchState.nobodyLogged => 'Did the plan happen?',
-      _PostWatchState.waitingForMe => 'Your turn',
-      _PostWatchState.waitingForOthers =>
+      FriendPostWatchState.nobodyLogged => 'Did the plan happen?',
+      FriendPostWatchState.waitingForMe => 'Your turn',
+      FriendPostWatchState.waitingForOthers =>
         'Waiting for ${other?.username ?? 'your friend'}',
-      _PostWatchState.recap => 'Watch recap',
+      FriendPostWatchState.recap => 'Watch recap',
     };
     final copy = switch (state) {
-      _PostWatchState.nobodyLogged =>
+      FriendPostWatchState.nobodyLogged =>
         'Log your viewing to add your rating and recommendation. Everyone responds separately.',
-      _PostWatchState.waitingForMe =>
+      FriendPostWatchState.waitingForMe =>
         '${other?.username ?? 'Your friend'} logged their watch. Add yours to unlock the shared recap and compare ratings.',
-      _PostWatchState.waitingForOthers =>
+      FriendPostWatchState.waitingForOthers =>
         'Your watch is logged. Their rating stays hidden until they add their own take.',
-      _PostWatchState.recap => '',
+      FriendPostWatchState.recap => '',
     };
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 6, 0, 28),
@@ -3563,9 +3232,9 @@ class _WatchRequestCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                 Text(
-                    state == _PostWatchState.waitingForMe
+                    state == FriendPostWatchState.waitingForMe
                         ? '${other?.username ?? 'Friend'} LOGGED THEIRS'
-                        : state == _PostWatchState.waitingForOthers
+                        : state == FriendPostWatchState.waitingForOthers
                             ? 'YOUR WATCH IS LOGGED'
                             : 'DID YOU WATCH IT?',
                     style: const TextStyle(
@@ -3622,7 +3291,7 @@ class _WatchRequestCard extends StatelessWidget {
                 child: FilledButton.icon(
                     onPressed: onConfirmWatched,
                     icon: const Icon(Icons.check_rounded),
-                    label: Text(state == _PostWatchState.waitingForMe
+                    label: Text(state == FriendPostWatchState.waitingForMe
                         ? 'Log your watch'
                         : 'Log watch'))),
             const SizedBox(height: 6),
@@ -3639,7 +3308,7 @@ class _WatchRequestCard extends StatelessWidget {
         const SizedBox(height: 12),
         _PlanSurface(
             child: _buildPostWatchStatus(context, other, mine, otherEntry)),
-        if (state == _PostWatchState.waitingForMe) ...[
+        if (state == FriendPostWatchState.waitingForMe) ...[
           const SizedBox(height: 12),
           _PlanSurface(
               child: const Text(
@@ -5168,8 +4837,13 @@ class _WatchRequestCard extends StatelessWidget {
     final local = value.toLocal();
     if (value.isUtc && value.hour == 12 && value.minute == 0) {
       const weekdays = [
-        'Monday', 'Tuesday', 'Wednesday', 'Thursday',
-        'Friday', 'Saturday', 'Sunday',
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
+        'Sunday',
       ];
       return 'Watch on ${weekdays[local.weekday - 1]}';
     }
@@ -5292,7 +4966,7 @@ class _ScheduleConfirmationCard extends StatelessWidget {
                         color: FlixieColors.textPrimary,
                         fontWeight: FontWeight.w700)),
                 const SizedBox(height: 3),
-                    Text(isDateOnly ? 'Time to be decided' : time,
+                Text(isDateOnly ? 'Time to be decided' : time,
                     style: const TextStyle(
                         color: FlixieColors.light, fontSize: 13)),
               ])),
@@ -5305,7 +4979,8 @@ class _ScheduleConfirmationCard extends StatelessWidget {
           child: FilledButton.icon(
             onPressed: onConfirm,
             icon: const Icon(Icons.check_rounded, size: 18),
-            label: Text(isDateOnly ? 'Confirm watch day' : 'Confirm date & time'),
+            label:
+                Text(isDateOnly ? 'Confirm watch day' : 'Confirm date & time'),
           ),
         ),
       if (!awaitingOtherPerson) const SizedBox(height: 6),
@@ -5739,1073 +5414,6 @@ class _IconTextAction extends StatelessWidget {
   }
 }
 
-enum _WatchLocationKind { home, cinema, later }
-
-class _LocationEditorSheet extends StatefulWidget {
-  const _LocationEditorSheet({this.initialLocation});
-  final String? initialLocation;
-
-  @override
-  State<_LocationEditorSheet> createState() => _LocationEditorSheetState();
-}
-
-class _LocationEditorSheetState extends State<_LocationEditorSheet> {
-  late final TextEditingController _locationController;
-  late _WatchLocationKind _kind;
-
-  @override
-  void initState() {
-    super.initState();
-    _locationController =
-        TextEditingController(text: widget.initialLocation ?? '');
-    _kind = widget.initialLocation?.trim().isNotEmpty == true
-        ? _WatchLocationKind.cinema
-        : _WatchLocationKind.later;
-  }
-
-  @override
-  void dispose() {
-    _locationController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => SizedBox(
-        height: MediaQuery.sizeOf(context).height * .84,
-        child: Material(
-          color: FlixieColors.background,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          child: MediaQuery(
-            data: MediaQuery.of(context)
-                .copyWith(textScaler: TextScaler.noScaling),
-            child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                  24, 14, 24, 20 + MediaQuery.viewInsetsOf(context).bottom),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                        child: Container(
-                            width: 54,
-                            height: 6,
-                            decoration: BoxDecoration(
-                                color: FlixieColors.medium,
-                                borderRadius: BorderRadius.circular(8)))),
-                    const SizedBox(height: 24),
-                    Row(children: [
-                      const Expanded(
-                          child: Text('Where are you watching?',
-                              style: TextStyle(
-                                  color: FlixieColors.textPrimary,
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.w800))),
-                      IconButton(
-                          onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.close_rounded,
-                              color: FlixieColors.light, size: 28)),
-                    ]),
-                    const SizedBox(height: 8),
-                    const Text(
-                        'Choose the kind of plan first. A specific place is optional.',
-                        style:
-                            TextStyle(color: FlixieColors.light, fontSize: 13)),
-                    const SizedBox(height: 24),
-                    _LocationKindOption(
-                        kind: _WatchLocationKind.home,
-                        selected: _kind,
-                        icon: Icons.home_outlined,
-                        title: 'At home',
-                        subtitle: 'Check shared streaming providers',
-                        onTap: () =>
-                            setState(() => _kind = _WatchLocationKind.home)),
-                    const SizedBox(height: 10),
-                    _LocationKindOption(
-                        kind: _WatchLocationKind.cinema,
-                        selected: _kind,
-                        icon: Icons.theaters_outlined,
-                        title: 'Cinema',
-                        subtitle: 'Streaming providers don’t matter',
-                        onTap: () =>
-                            setState(() => _kind = _WatchLocationKind.cinema)),
-                    const SizedBox(height: 10),
-                    _LocationKindOption(
-                        kind: _WatchLocationKind.later,
-                        selected: _kind,
-                        icon: Icons.more_horiz_rounded,
-                        title: 'Decide later',
-                        subtitle: 'Keep the plan flexible',
-                        onTap: () =>
-                            setState(() => _kind = _WatchLocationKind.later)),
-                    const SizedBox(height: 24),
-                    Row(children: [
-                      Text(
-                          _kind == _WatchLocationKind.cinema
-                              ? 'Cinema'
-                              : _kind == _WatchLocationKind.home
-                                  ? 'At home'
-                                  : 'Location',
-                          style: const TextStyle(
-                              color: FlixieColors.textPrimary,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800)),
-                      const Spacer(),
-                      const Text('OPTIONAL',
-                          style: TextStyle(
-                              color: FlixieColors.medium,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800))
-                    ]),
-                    const SizedBox(height: 12),
-                    TextField(
-                        controller: _locationController,
-                        style: const TextStyle(
-                            color: FlixieColors.textPrimary, fontSize: 15),
-                        decoration: InputDecoration(
-                            filled: true,
-                            fillColor: FlixieColors.surfaceElevated,
-                            hintText: _kind == _WatchLocationKind.cinema
-                                ? 'e.g. ODEON Belfast'
-                                : 'e.g. My place',
-                            hintStyle:
-                                const TextStyle(color: FlixieColors.medium),
-                            suffixIcon: const Icon(Icons.edit_outlined,
-                                color: FlixieColors.primary),
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(18),
-                                borderSide: BorderSide.none))),
-                    if (_kind == _WatchLocationKind.cinema) ...[
-                      const SizedBox(height: 14),
-                      Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                              color:
-                                  FlixieColors.secondary.withValues(alpha: .14),
-                              borderRadius: BorderRadius.circular(16)),
-                          child: const Text(
-                              'Streaming-provider matching is switched off for this plan.',
-                              style: TextStyle(
-                                  color: FlixieColors.secondary, fontSize: 12)))
-                    ],
-                    const SizedBox(height: 20),
-                    Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                            color: FlixieColors.surfaceElevated,
-                            borderRadius: BorderRadius.circular(16)),
-                        child: const Text(
-                            'Everyone in this plan will be notified that the location changed.',
-                            style: TextStyle(
-                                color: FlixieColors.light, fontSize: 11))),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                        width: double.infinity,
-                        height: 52,
-                        child: FilledButton(
-                            onPressed: () => Navigator.pop(
-                                context, _locationController.text.trim()),
-                            child: const Text('Save location',
-                                style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w800)))),
-                  ]),
-            ),
-          ),
-        ),
-      );
-}
-
-class _LocationKindOption extends StatelessWidget {
-  const _LocationKindOption(
-      {required this.kind,
-      required this.selected,
-      required this.icon,
-      required this.title,
-      required this.subtitle,
-      required this.onTap});
-  final _WatchLocationKind kind;
-  final _WatchLocationKind selected;
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) {
-    final isSelected = kind == selected;
-    return InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-                border: Border.all(
-                    color: isSelected
-                        ? FlixieColors.primary
-                        : FlixieColors.tabBarBorder,
-                    width: isSelected ? 2 : 1),
-                borderRadius: BorderRadius.circular(18)),
-            child: Row(children: [
-              Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                      color: FlixieColors.surfaceElevated,
-                      borderRadius: BorderRadius.circular(14)),
-                  child: Icon(icon, color: FlixieColors.primary)),
-              const SizedBox(width: 14),
-              Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    Text(title,
-                        style: const TextStyle(
-                            color: FlixieColors.textPrimary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 4),
-                    Text(subtitle,
-                        style: const TextStyle(
-                            color: FlixieColors.light, fontSize: 12))
-                  ])),
-              Icon(
-                  isSelected
-                      ? Icons.check_circle_rounded
-                      : Icons.circle_outlined,
-                  color:
-                      isSelected ? FlixieColors.primary : FlixieColors.medium)
-            ])));
-  }
-}
-
-class _ScheduleProposalSheet extends StatefulWidget {
-  const _ScheduleProposalSheet({this.initial, this.initialLocation});
-
-  final DateTime? initial;
-  final String? initialLocation;
-
-  @override
-  State<_ScheduleProposalSheet> createState() => _ScheduleProposalSheetState();
-}
-
-class _ScheduleProposalSheetState extends State<_ScheduleProposalSheet> {
-  late DateTime _selected;
-  late _ScheduleEntryMode _mode;
-  bool _leaveTimeUndecided = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _selected = widget.initial?.toLocal() ??
-        DateTime.now().add(const Duration(hours: 2));
-    _mode = _ScheduleEntryMode.dateAndTime;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final height = MediaQuery.sizeOf(context).height;
-    return SizedBox(
-      height: height * .88,
-      child: Material(
-        color: FlixieColors.background,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        clipBehavior: Clip.antiAlias,
-        child: MediaQuery(
-          // The controls use fixed, compact sizes so a large system text scale
-          // cannot cause touch labels to overflow their cards.
-          data:
-              MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 14, 24, 20),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Center(
-                  child: Container(
-                      width: 54,
-                      height: 6,
-                      decoration: BoxDecoration(
-                          color: FlixieColors.medium,
-                          borderRadius: BorderRadius.circular(10)))),
-              const SizedBox(height: 24),
-              Row(children: [
-                const Expanded(
-                    child: Text('Date & time',
-                        style: TextStyle(
-                            color: FlixieColors.textPrimary,
-                            fontSize: 26,
-                            fontWeight: FontWeight.w800))),
-                IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded,
-                        color: FlixieColors.light, size: 28)),
-              ]),
-              const SizedBox(height: 8),
-              const Text(
-                  'Set when this plan should happen. You can change it again later.',
-                  style: TextStyle(color: FlixieColors.light, fontSize: 13)),
-              const SizedBox(height: 24),
-              _ScheduleModeSelector(
-                  mode: _mode,
-                  onChanged: (mode) => setState(() {
-                        _mode = mode;
-                        if (mode == _ScheduleEntryMode.dateOnly) {
-                          _leaveTimeUndecided = true;
-                        }
-                      })),
-              const SizedBox(height: 24),
-              const Text('Quick pick',
-                  style: TextStyle(
-                      color: FlixieColors.textPrimary,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800)),
-              const SizedBox(height: 12),
-              Row(children: [
-                for (final quickPick in <({String label, DateTime value})>[
-                  (label: 'Tonight', value: _tonight()),
-                  (label: 'Tomorrow', value: _tomorrow()),
-                  (label: 'Weekend', value: _thisWeekend()),
-                ])
-                  Expanded(
-                      child: Padding(
-                          padding: EdgeInsets.only(
-                              right: quickPick.label == 'Weekend' ? 0 : 8),
-                          child: _QuickScheduleButton(
-                              label: quickPick.label,
-                              onTap: () => setState(
-                                  () => _selected = quickPick.value)))),
-              ]),
-              const SizedBox(height: 20),
-              _ScheduleDetailCard(
-                  icon: Icons.calendar_month_outlined,
-                  label: 'DATE',
-                  value: MaterialLocalizations.of(context)
-                      .formatFullDate(_selected),
-                  onTap: _pickDate),
-              if (_mode == _ScheduleEntryMode.dateAndTime) ...[
-                const SizedBox(height: 10),
-                _ScheduleDetailCard(
-                    icon: Icons.access_time_rounded,
-                    label: 'TIME',
-                    value: TimeOfDay.fromDateTime(_selected).format(context),
-                    onTap: _pickTime),
-                const SizedBox(height: 10),
-                Row(children: [
-                  Switch(
-                      value: _leaveTimeUndecided,
-                      onChanged: (value) =>
-                          setState(() => _leaveTimeUndecided = value)),
-                  const SizedBox(width: 10),
-                  const Text('Leave the time undecided',
-                      style:
-                          TextStyle(color: FlixieColors.light, fontSize: 13)),
-                ]),
-              ],
-              const SizedBox(height: 18),
-              Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                      color: FlixieColors.surfaceElevated,
-                      borderRadius: BorderRadius.circular(18)),
-                  child: const Text(
-                      'Everyone in this plan will be notified that the schedule changed.',
-                      style:
-                          TextStyle(color: FlixieColors.light, fontSize: 11))),
-              const SizedBox(height: 20),
-              SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: FilledButton(
-                      onPressed: _save,
-                      child: const Text('Save schedule',
-                          style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w800)))),
-            ]),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _save() => Navigator.pop(context, (
-        proposedFor: _selected,
-        message: _leaveTimeUndecided || _mode == _ScheduleEntryMode.dateOnly
-            ? 'Time to be decided'
-            : null,
-        location: widget.initialLocation?.trim(),
-      ));
-
-  Future<void> _pickDate() async {
-    final picked = await showModalBottomSheet<DateTime>(
-      context: context,
-      isScrollControlled: true,
-      useRootNavigator: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _ScheduleDatePickerSheet(initialDate: _selected),
-    );
-    if (picked == null) return;
-    setState(() {
-      _selected = DateTime(
-        picked.year,
-        picked.month,
-        picked.day,
-        _selected.hour,
-        _selected.minute,
-      );
-    });
-  }
-
-  Future<void> _pickTime() async {
-    final picked = await showModalBottomSheet<TimeOfDay>(
-      context: context,
-      useRootNavigator: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _ScheduleTimePickerSheet(
-        initialTime: TimeOfDay.fromDateTime(_selected),
-      ),
-    );
-    if (picked == null) return;
-    setState(() {
-      _selected = DateTime(
-        _selected.year,
-        _selected.month,
-        _selected.day,
-        picked.hour,
-        picked.minute,
-      );
-    });
-  }
-
-  DateTime _tonight() {
-    final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day, 20);
-  }
-
-  DateTime _tomorrow() {
-    final tomorrow = DateTime.now().add(const Duration(days: 1));
-    return DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 19, 30);
-  }
-
-  DateTime _thisWeekend() {
-    final now = DateTime.now();
-    final daysUntilSaturday = (DateTime.saturday - now.weekday) % 7;
-    final saturday =
-        now.add(Duration(days: daysUntilSaturday == 0 ? 7 : daysUntilSaturday));
-    return DateTime(saturday.year, saturday.month, saturday.day, 20);
-  }
-}
-
-enum _ScheduleEntryMode { dateOnly, dateAndTime }
-
-class _ScheduleModeSelector extends StatelessWidget {
-  const _ScheduleModeSelector({required this.mode, required this.onChanged});
-
-  final _ScheduleEntryMode mode;
-  final ValueChanged<_ScheduleEntryMode> onChanged;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          border: Border.all(color: FlixieColors.tabBarBorder),
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Row(children: [
-          _modeButton('Date only', _ScheduleEntryMode.dateOnly),
-          _modeButton('Date & time', _ScheduleEntryMode.dateAndTime),
-        ]),
-      );
-
-  Widget _modeButton(String label, _ScheduleEntryMode value) {
-    final selected = mode == value;
-    return Expanded(
-      child: Semantics(
-        selected: selected,
-        button: true,
-        child: InkWell(
-          onTap: () => onChanged(value),
-          borderRadius: BorderRadius.circular(14),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            padding: const EdgeInsets.symmetric(vertical: 13),
-            decoration: BoxDecoration(
-              color: selected ? FlixieColors.primary : Colors.transparent,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Text(label,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: selected ? FlixieColors.white : FlixieColors.light,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                )),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _QuickScheduleButton extends StatelessWidget {
-  const _QuickScheduleButton({required this.label, required this.onTap});
-
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => OutlinedButton(
-        onPressed: onTap,
-        style: OutlinedButton.styleFrom(
-          minimumSize: const Size.fromHeight(58),
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-          foregroundColor: FlixieColors.light,
-          side: const BorderSide(color: FlixieColors.tabBarBorder),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
-        child: Text(label,
-            maxLines: 1,
-            softWrap: false,
-            overflow: TextOverflow.fade,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-      );
-}
-
-class _ScheduleDetailCard extends StatelessWidget {
-  const _ScheduleDetailCard({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(18),
-          child: Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              border: Border.all(color: FlixieColors.tabBarBorder),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Row(children: [
-              Container(
-                width: 54,
-                height: 54,
-                decoration: BoxDecoration(
-                  color: FlixieColors.surfaceElevated,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: FlixieColors.primary, size: 24),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    Text(label,
-                        style: const TextStyle(
-                            color: FlixieColors.medium,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.4)),
-                    const SizedBox(height: 5),
-                    Text(value,
-                        style: const TextStyle(
-                            color: FlixieColors.textPrimary,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600)),
-                  ])),
-              const Text('Change',
-                  style: TextStyle(
-                      color: FlixieColors.primary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800)),
-            ]),
-          ),
-        ),
-      );
-}
-
-class _ScheduleTimePickerSheet extends StatefulWidget {
-  const _ScheduleTimePickerSheet({required this.initialTime});
-
-  final TimeOfDay initialTime;
-
-  @override
-  State<_ScheduleTimePickerSheet> createState() =>
-      _ScheduleTimePickerSheetState();
-}
-
-class _ScheduleTimePickerSheetState extends State<_ScheduleTimePickerSheet> {
-  late TimeOfDay _selected = widget.initialTime;
-
-  @override
-  Widget build(BuildContext context) {
-    final initialDateTime = DateTime(
-      2020,
-      1,
-      1,
-      _selected.hour,
-      _selected.minute,
-    );
-    return SafeArea(
-      child: Material(
-        color: FlixieColors.background,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: FlixieColors.medium,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-              const SizedBox(height: 18),
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Choose a time',
-                  style: TextStyle(
-                    color: FlixieColors.textPrimary,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 170,
-                child: CupertinoTheme(
-                  data: const CupertinoThemeData(
-                    brightness: Brightness.dark,
-                    primaryColor: FlixieColors.primary,
-                  ),
-                  child: CupertinoDatePicker(
-                    mode: CupertinoDatePickerMode.time,
-                    initialDateTime: initialDateTime,
-                    use24hFormat: false,
-                    onDateTimeChanged: (value) {
-                      _selected = TimeOfDay.fromDateTime(value);
-                    },
-                  ),
-                ),
-              ),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () => Navigator.pop(context, _selected),
-                  child: const Text('Use this time'),
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ScheduleDatePickerSheet extends StatefulWidget {
-  const _ScheduleDatePickerSheet({required this.initialDate});
-
-  final DateTime initialDate;
-
-  @override
-  State<_ScheduleDatePickerSheet> createState() =>
-      _ScheduleDatePickerSheetState();
-}
-
-class _ScheduleDatePickerSheetState extends State<_ScheduleDatePickerSheet> {
-  late DateTime _selected = DateTime(
-    widget.initialDate.year,
-    widget.initialDate.month,
-    widget.initialDate.day,
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    final firstDate = DateTime.now();
-    return SafeArea(
-      child: SizedBox(
-        height: MediaQuery.sizeOf(context).height * .74,
-        child: Material(
-          color: FlixieColors.background,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          clipBehavior: Clip.antiAlias,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-            child: Column(
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: FlixieColors.medium,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Choose a date',
-                    style: TextStyle(
-                      color: FlixieColors.textPrimary,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: CalendarDatePicker(
-                    initialDate:
-                        _selected.isBefore(firstDate) ? firstDate : _selected,
-                    firstDate: firstDate,
-                    lastDate: DateTime.now().add(const Duration(days: 365)),
-                    onDateChanged: (date) => setState(() => _selected = date),
-                  ),
-                ),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: () => Navigator.pop(context, _selected),
-                    child: const Text('Use this date'),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _CandidateChoicesSheet extends StatefulWidget {
-  const _CandidateChoicesSheet({required this.request, required this.userId});
-
-  final WatchRequest request;
-  final String userId;
-
-  @override
-  State<_CandidateChoicesSheet> createState() => _CandidateChoicesSheetState();
-}
-
-class _CandidateChoicesSheetState extends State<_CandidateChoicesSheet> {
-  late final Set<String> _selected = widget.request.candidates
-      .where((candidate) => candidate.selectedBy(widget.userId))
-      .map((candidate) => candidate.id)
-      .toSet();
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Container(
-        decoration: const BoxDecoration(
-          color: FlixieColors.background,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: FlixieColors.medium,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            const Text('Which would you be happy to watch?',
-                style: TextStyle(
-                    color: FlixieColors.textPrimary,
-                    fontSize: 19,
-                    fontWeight: FontWeight.w900)),
-            const SizedBox(height: 5),
-            const Text(
-                'Select every option that works for you. Choose at least one to continue.',
-                style: TextStyle(color: FlixieColors.medium, fontSize: 13)),
-            const SizedBox(height: 12),
-            ...widget.request.candidates.map((candidate) {
-              final isSelected = _selected.contains(candidate.id);
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 9),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: () => setState(() {
-                      if (!_selected.add(candidate.id)) {
-                        _selected.remove(candidate.id);
-                      }
-                    }),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 160),
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? FlixieColors.success.withValues(alpha: 0.12)
-                            : FlixieColors.surface,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: isSelected
-                              ? FlixieColors.success
-                              : FlixieColors.tabBarBorder,
-                          width: isSelected ? 2 : 1,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(7),
-                            child: SizedBox(
-                              width: 36,
-                              height: 54,
-                              child: candidate.posterPath == null
-                                  ? const _PosterPlaceholder()
-                                  : CachedNetworkImage(
-                                      imageUrl:
-                                          'https://image.tmdb.org/t/p/w185${candidate.posterPath}',
-                                      fit: BoxFit.cover,
-                                      errorWidget: (_, __, ___) =>
-                                          const _PosterPlaceholder(),
-                                    ),
-                            ),
-                          ),
-                          const SizedBox(width: 11),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(candidate.title ?? 'Untitled',
-                                    style: const TextStyle(
-                                        color: FlixieColors.light,
-                                        fontWeight: FontWeight.w800)),
-                                if (candidate.addedByUsername?.isNotEmpty ==
-                                    true)
-                                  Row(children: [
-                                    WatchPlanCandidateAvatar(
-                                      avatar: candidate.addedByAvatar,
-                                      username: candidate.addedByUsername,
-                                    ),
-                                    const SizedBox(width: 5),
-                                    Expanded(
-                                      child: Text(
-                                        'Suggested by ${candidate.addedByUsername}',
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: FlixieColors.medium,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ),
-                                  ]),
-                              ],
-                            ),
-                          ),
-                          AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 160),
-                            child: Icon(
-                              isSelected
-                                  ? Icons.check_circle_rounded
-                                  : Icons.add_circle_outline_rounded,
-                              key: ValueKey(isSelected),
-                              color: isSelected
-                                  ? FlixieColors.success
-                                  : FlixieColors.medium,
-                              size: 28,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
-            if (_selected.isEmpty)
-              const Padding(
-                padding: EdgeInsets.only(bottom: 8),
-                child: Text('Select at least one movie to save your choices.',
-                    style: TextStyle(
-                        color: FlixieColors.danger,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700)),
-              ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: _selected.isEmpty
-                    ? null
-                    : () => Navigator.pop(context, _selected.toList()),
-                child: const Text('Save choices'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _WatchConfirmationSheet extends StatefulWidget {
-  const _WatchConfirmationSheet({required this.request});
-
-  final WatchRequest request;
-
-  @override
-  State<_WatchConfirmationSheet> createState() =>
-      _WatchConfirmationSheetState();
-}
-
-class _WatchConfirmationSheetState extends State<_WatchConfirmationSheet> {
-  bool _watched = true;
-
-  @override
-  Widget build(BuildContext context) {
-    final posterPath = widget.request.movie?.posterPath;
-    final posterUrl = posterPath == null
-        ? null
-        : 'https://image.tmdb.org/t/p/w185$posterPath';
-    return SafeArea(
-      child: Container(
-        decoration: const BoxDecoration(
-          color: FlixieColors.background,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        padding: EdgeInsets.fromLTRB(
-          16,
-          14,
-          16,
-          MediaQuery.of(context).viewInsets.bottom + 16,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: SizedBox(
-                      width: 56,
-                      height: 84,
-                      child: posterUrl == null
-                          ? const _PosterPlaceholder()
-                          : CachedNetworkImage(
-                              imageUrl: posterUrl,
-                              fit: BoxFit.cover,
-                              errorWidget: (_, __, ___) =>
-                                  const _PosterPlaceholder(),
-                            ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      widget.request.movie?.title ?? 'This movie',
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: FlixieColors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              SegmentedButton<bool>(
-                segments: const [
-                  ButtonSegment(
-                    value: true,
-                    icon: Icon(Icons.check_circle_outline),
-                    label: Text('Watched'),
-                  ),
-                  ButtonSegment(
-                    value: false,
-                    icon: Icon(Icons.cancel_outlined),
-                    label: Text("Didn't watch"),
-                  ),
-                ],
-                selected: {_watched},
-                onSelectionChanged: (values) {
-                  setState(() => _watched = values.first);
-                },
-              ),
-              const SizedBox(height: 18),
-              if (_watched) ...[
-                const Text(
-                  'After confirming, you can add a watch entry or write a review.',
-                  style: TextStyle(
-                    color: FlixieColors.medium,
-                    fontSize: 13,
-                    height: 1.35,
-                  ),
-                ),
-              ] else
-                const Text(
-                  'No rating or review needed.',
-                  style: TextStyle(color: FlixieColors.medium, fontSize: 13),
-                ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(
-                    context,
-                    (
-                      watched: _watched,
-                      rating: null,
-                      reviewText: null,
-                    ),
-                  ),
-                  child: const Text('Submit confirmation'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 // ---------------------------------------------------------------------------
 // Placeholder
 // ---------------------------------------------------------------------------
