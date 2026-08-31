@@ -31,6 +31,7 @@ import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/core/analytics/detail_source.dart';
 import 'package:flixie_app/features/sharing/models/share_card_data.dart';
 import 'package:flixie_app/features/sharing/presentation/share_card_sheet.dart';
+import 'package:flixie_app/core/navigation/tab_refresh_controller.dart';
 
 const List<String> _kMonths = [
   'Jan',
@@ -475,6 +476,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     });
     context.read<AuthProvider>().updateCachedWatchRequests(_all);
     _applyFilter();
+    TabRefreshController.requestHomeRefresh();
   }
 
   Future<void> _refreshRequestState(WatchRequest request, String userId) async {
@@ -493,21 +495,13 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
   Future<void> _confirmDelete(WatchRequest request) async {
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (userId == null || userId.isEmpty) return;
-    if (request.requesterId != userId) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Only the Watch Plan creator can delete it.'),
-          backgroundColor: FlixieColors.danger,
-        ),
-      );
-      return;
-    }
+    final isCreator = request.requesterId == userId;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete Watch Plan?'),
+        title: Text(isCreator ? 'Close Watch Plan?' : 'Leave Watch Plan?'),
         content: const Text(
-          'This permanently removes the plan, its schedule and related notifications for everyone.',
+          'This permanently closes the shared plan, its schedule and related notifications for everyone.',
         ),
         actions: [
           TextButton(
@@ -520,7 +514,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
               backgroundColor: FlixieColors.danger,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Delete permanently'),
+            child: Text(isCreator ? 'Close for everyone' : 'Leave and close'),
           ),
         ],
       ),
@@ -549,7 +543,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         });
         auth.updateCachedWatchRequests(_all);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Watch Plan deleted')),
+          const SnackBar(content: Text('Watch Plan closed')),
         );
         if (widget.initialRequestId?.isNotEmpty == true) {
           if (context.canPop()) {
@@ -571,18 +565,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
   }
 
   Future<void> _closeWatchPlan(WatchRequest request) async {
-    final userId = context.read<AuthProvider>().dbUser?.id;
-    if (userId == null || userId.isEmpty) return;
-    await WatchPlanVisibilityStore.closePlan(userId, request.id);
-    if (!mounted) return;
-    setState(() => _closedPlanIds = {..._closedPlanIds, request.id});
-    _applyFilter();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Watch Plan closed')),
-    );
-    if (widget.initialRequestId == request.id && context.canPop()) {
-      context.pop();
-    }
+    await _confirmDelete(request);
   }
 
   Future<void> _withRequestAction(
@@ -1348,7 +1331,11 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     );
     addSection('Upcoming', 'Your agreed watch plans', upcoming);
     addSection('Ready to wrap up', 'The planned time has passed', postWatch);
-    addSection('Planning', 'Invites waiting or being arranged', planning);
+    addSection(
+      'Scheduling in progress',
+      'Invites waiting or being arranged',
+      planning,
+    );
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -2878,7 +2865,11 @@ class _WatchRequestCard extends StatelessWidget {
           ]),
         ),
         const SizedBox(height: 14),
-        if (hasPendingSchedule) ...[
+        // A creation-time date is only actionable once this person has
+        // accepted the invitation. Showing it earlier puts two competing
+        // decisions on screen and makes it look as though the invite is
+        // already confirmed.
+        if (hasPendingSchedule && request.isAccepted) ...[
           _PlanSurface(
             child: _ScheduleConfirmationCard(
               proposedFor: pendingSchedule.proposedFor!,
@@ -3853,9 +3844,6 @@ class _WatchRequestCard extends StatelessWidget {
             ]),
             tinted: true),
         const SizedBox(height: 22),
-        const SizedBox(height: 4),
-        _buildPlanActivity(),
-        const SizedBox(height: 12),
         Row(children: [
           const Expanded(
               child: Text('Your takes',
@@ -5178,6 +5166,13 @@ class _WatchRequestCard extends StatelessWidget {
   String _dateLabel(DateTime? value) {
     if (value == null) return 'the suggested time';
     final local = value.toLocal();
+    if (value.isUtc && value.hour == 12 && value.minute == 0) {
+      const weekdays = [
+        'Monday', 'Tuesday', 'Wednesday', 'Thursday',
+        'Friday', 'Saturday', 'Sunday',
+      ];
+      return 'Watch on ${weekdays[local.weekday - 1]}';
+    }
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final date = DateTime(local.year, local.month, local.day);
@@ -5254,8 +5249,11 @@ class _ScheduleConfirmationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final date = MaterialLocalizations.of(context).formatFullDate(proposedFor);
-    final time = TimeOfDay.fromDateTime(proposedFor).format(context);
+    final isDateOnly =
+        proposedFor.isUtc && proposedFor.hour == 12 && proposedFor.minute == 0;
+    final local = proposedFor.toLocal();
+    final date = MaterialLocalizations.of(context).formatFullDate(local);
+    final time = TimeOfDay.fromDateTime(local).format(context);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(
           awaitingOtherPerson ? 'Waiting for confirmation' : 'Confirm the plan',
@@ -5266,8 +5264,12 @@ class _ScheduleConfirmationCard extends StatelessWidget {
       const SizedBox(height: 6),
       Text(
           awaitingOtherPerson
-              ? 'Your friend needs to confirm this date and time.'
-              : 'Your friend suggested this date and time.',
+              ? isDateOnly
+                  ? 'Your friend needs to confirm this watch day.'
+                  : 'Your friend needs to confirm this date and time.'
+              : isDateOnly
+                  ? 'Your friend suggested this watch day.'
+                  : 'Your friend suggested this date and time.',
           style: const TextStyle(color: FlixieColors.light, fontSize: 13)),
       const SizedBox(height: 14),
       Container(
@@ -5290,7 +5292,7 @@ class _ScheduleConfirmationCard extends StatelessWidget {
                         color: FlixieColors.textPrimary,
                         fontWeight: FontWeight.w700)),
                 const SizedBox(height: 3),
-                Text(time,
+                    Text(isDateOnly ? 'Time to be decided' : time,
                     style: const TextStyle(
                         color: FlixieColors.light, fontSize: 13)),
               ])),
@@ -5303,7 +5305,7 @@ class _ScheduleConfirmationCard extends StatelessWidget {
           child: FilledButton.icon(
             onPressed: onConfirm,
             icon: const Icon(Icons.check_rounded, size: 18),
-            label: const Text('Confirm date & time'),
+            label: Text(isDateOnly ? 'Confirm watch day' : 'Confirm date & time'),
           ),
         ),
       if (!awaitingOtherPerson) const SizedBox(height: 6),

@@ -8,6 +8,7 @@ import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/core/auth/push_notification_service.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/models/group_watch_request.dart';
+import 'package:flixie_app/core/navigation/tab_refresh_controller.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/features/social/data/watch_request_cache.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -530,6 +531,11 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
           .toList(growable: false);
       _candidateChoiceDrafts.removeWhere((key, _) => matchingIds.contains(key));
     });
+    // Group Watch Plans are also rendered in the main Watch Plans overview
+    // and Home. Their lists own separate snapshots, so notify them after any
+    // movie-option add/remove/update rather than waiting for a manual pull.
+    TabRefreshController.requestSocialRefresh();
+    TabRefreshController.requestHomeRefresh();
   }
 
   Future<void> _saveGroupCandidateChoices(GroupWatchRequest request) async {
@@ -1254,6 +1260,13 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
 
   String _fullDateTime(DateTime value) {
     final local = value.toLocal();
+    if (value.isUtc && value.hour == 12 && value.minute == 0) {
+      const weekdays = [
+        'Monday', 'Tuesday', 'Wednesday', 'Thursday',
+        'Friday', 'Saturday', 'Sunday',
+      ];
+      return 'Watch on ${weekdays[local.weekday - 1]}';
+    }
     final time = TimeOfDay.fromDateTime(local).format(context);
     return '${local.day} ${_kRequestMonths[local.month - 1]}, $time';
   }

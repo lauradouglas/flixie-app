@@ -224,12 +224,6 @@ class _SearchScreenState extends State<SearchScreen> {
                     _onSearchChanged('');
                   },
                 ),
-              IconButton(
-                tooltip: 'Search filters',
-                icon:
-                    const Icon(Icons.tune_rounded, color: FlixieColors.medium),
-                onPressed: () {},
-              ),
             ],
           ),
           filled: true,

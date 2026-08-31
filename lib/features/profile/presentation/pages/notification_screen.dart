@@ -17,6 +17,7 @@ import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/core/calendar/watch_calendar_service.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/notification_activity_card.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/notification_request_card.dart';
+import 'package:flixie_app/features/social/presentation/widgets/flixie_time_picker_sheet.dart';
 
 /// How often the screen silently re-fetches notifications in the background.
 const Duration _kPollInterval = Duration(seconds: 60);
@@ -1049,9 +1050,14 @@ class _NotificationScheduleProposalSheetState
   }
 
   Future<void> _pickTime() async {
-    final picked = await showTimePicker(
+    final picked = await showModalBottomSheet<TimeOfDay>(
       context: context,
-      initialTime: TimeOfDay.fromDateTime(_selected),
+      useRootNavigator: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => FlixieTimePickerSheet(
+        initialTime: TimeOfDay.fromDateTime(_selected),
+      ),
     );
     if (picked == null) return;
     setState(() {

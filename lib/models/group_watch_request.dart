@@ -389,6 +389,13 @@ class GroupWatchRequest {
         [];
     final messagesRaw = json['messages'] as List<dynamic>? ?? [];
     final candidatesRaw = json['candidates'] as List<dynamic>? ?? [];
+    final candidates = candidatesRaw
+        .whereType<Map<String, dynamic>>()
+        .map(GroupWatchPlanCandidate.fromJson)
+        .toList();
+    final selectedCandidateId = json['selectedCandidateId']?.toString();
+    final hasUnresolvedMovieChoices =
+        candidates.length > 1 && selectedCandidateId == null;
 
     // Movie and requester are nested objects in the API response
     final movie = json['movie'] as Map<String, dynamic>?;
@@ -425,13 +432,19 @@ class GroupWatchRequest {
       message: json['message'] as String?,
       mediaType: json['mediaType'] as String? ??
           (json['showId'] != null ? 'show' : 'movie'),
-      mediaId: _intValue(json['movieId'] ?? json['showId'] ?? json['mediaId']),
+      mediaId: hasUnresolvedMovieChoices
+          ? null
+          : _intValue(json['movieId'] ?? json['showId'] ?? json['mediaId']),
       createdAt: json['createdAt'] as String?,
       updatedAt: json['updatedAt'] as String?,
-      movieTitle: movie?['title'] as String? ?? json['movieTitle'] as String?,
-      moviePosterPath: movie?['posterPath'] as String? ??
-          json['moviePosterUrl'] as String? ??
-          json['moviePosterPath'] as String?,
+      movieTitle: hasUnresolvedMovieChoices
+          ? null
+          : movie?['title'] as String? ?? json['movieTitle'] as String?,
+      moviePosterPath: hasUnresolvedMovieChoices
+          ? null
+          : movie?['posterPath'] as String? ??
+              json['moviePosterUrl'] as String? ??
+              json['moviePosterPath'] as String?,
       requesterUsername: requester?['username'] as String? ??
           json['requesterUsername'] as String?,
       requesterAvatar: requester?['avatar'] == null
@@ -448,11 +461,8 @@ class GroupWatchRequest {
       messages: messagesRaw
           .map((e) => GroupRequestMessage.fromJson(e as Map<String, dynamic>))
           .toList(),
-      candidates: candidatesRaw
-          .whereType<Map<String, dynamic>>()
-          .map(GroupWatchPlanCandidate.fromJson)
-          .toList(),
-      selectedCandidateId: json['selectedCandidateId']?.toString(),
+      candidates: candidates,
+      selectedCandidateId: selectedCandidateId,
       status: WatchRequestStatus.fromString(json['status'] as String?),
       proposedDate: json['proposedDate'] as String?,
       scheduledFor: json['scheduledFor'] as String?,

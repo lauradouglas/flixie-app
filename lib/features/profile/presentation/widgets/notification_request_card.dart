@@ -2,12 +2,16 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import 'package:flixie_app/core/analytics/detail_source.dart';
 
 import 'package:flixie_app/models/notification.dart';
 import 'package:flixie_app/models/profile_avatar.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/color_utils.dart';
+import 'package:flixie_app/core/auth/auth_provider.dart';
+import 'package:flixie_app/features/social/presentation/widgets/group_avatar.dart';
+import 'package:flixie_app/models/group.dart';
 
 class NotificationRequestCard extends StatelessWidget {
   const NotificationRequestCard({
@@ -616,6 +620,16 @@ class NotificationRequestCard extends StatelessWidget {
             ? name
             : _requestKind;
     final groupName = notification.groupWatchGroupName?.trim() ?? '';
+    final groupId = notification.groupWatchGroupId;
+    final group = _isEveryoneLogged
+        ? context.select<AuthProvider, Group?>((auth) {
+            final groups = auth.cachedGroups ?? const <Group>[];
+            return groups.where((candidate) {
+              return candidate.id == groupId ||
+                  (groupId == null && candidate.name == groupName);
+            }).firstOrNull;
+          })
+        : null;
     final initials = _isEveryoneLogged && groupName.isNotEmpty
         ? groupName
             .substring(0, groupName.length > 4 ? 4 : groupName.length)
@@ -686,27 +700,9 @@ class NotificationRequestCard extends StatelessWidget {
                         children: [
                           if (!_isFriendRequest) ...[
                             _isEveryoneLogged
-                                ? Container(
-                                    width: 34,
-                                    height: 34,
-                                    alignment: Alignment.center,
-                                    decoration: BoxDecoration(
-                                      color: avatarBg,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Text(
-                                      initials.isNotEmpty ? initials : 'GROUP',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.clip,
-                                      style: const TextStyle(
-                                        color: FlixieColors.primary,
-                                        fontSize: 10,
-                                        height: 1,
-                                        letterSpacing: .3,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                  )
+                                ? group == null
+                                    ? _GroupAvatarFallback(initials: initials)
+                                    : GroupAvatar(group: group, radius: 17)
                                 : GestureDetector(
                                     onTap: canOpenProfile ? openProfile : null,
                                     child: ProfileAvatarView(
@@ -1098,6 +1094,30 @@ class _PendingWatchDetail extends StatelessWidget {
       ],
     );
   }
+}
+
+class _GroupAvatarFallback extends StatelessWidget {
+  const _GroupAvatarFallback({required this.initials});
+
+  final String initials;
+
+  @override
+  Widget build(BuildContext context) => CircleAvatar(
+        radius: 17,
+        backgroundColor: FlixieColors.primary.withValues(alpha: .3),
+        child: Text(
+          initials.isNotEmpty ? initials : 'GROUP',
+          maxLines: 1,
+          overflow: TextOverflow.clip,
+          style: const TextStyle(
+            color: FlixieColors.primary,
+            fontSize: 10,
+            height: 1,
+            letterSpacing: .3,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      );
 }
 
 class _RequestMediaPreview extends StatelessWidget {

@@ -148,6 +148,51 @@ void main() {
       expect(request.displayStatusLabel, 'Accepted · scheduling in progress');
     });
 
+    test('marks a newly created dated plan as scheduling in progress', () {
+      final request = WatchRequest.fromJson({
+        'id': 'wr-dated-invite',
+        'status': 'PENDING',
+        'scheduleStatus': 'NONE',
+        'proposedDate': '2026-09-01T00:00:00.000Z',
+      });
+
+      expect(request.isAwaitingScheduleApproval, isTrue);
+      expect(request.displayStatusLabel, 'Scheduling in progress');
+    });
+
+    test('does not expose a first movie before multi-option choices lock in',
+        () {
+      final request = WatchRequest.fromJson({
+        'id': 'wr-movie-options',
+        'movieId': 101,
+        'movie': {'id': 101, 'title': 'Incorrect first option'},
+        'candidates': [
+          {'id': 'option-1', 'movieId': 101, 'title': 'Option one'},
+          {'id': 'option-2', 'movieId': 202, 'title': 'Option two'},
+        ],
+      });
+
+      expect(request.movie, isNull);
+      expect(request.movieId, isNull);
+    });
+
+    test('keeps the selected movie visible after multi-option choices lock in',
+        () {
+      final request = WatchRequest.fromJson({
+        'id': 'wr-movie-selected',
+        'movieId': 202,
+        'movie': {'id': 202, 'title': 'Selected option'},
+        'selectedCandidateId': 'option-2',
+        'candidates': [
+          {'id': 'option-1', 'movieId': 101, 'title': 'Option one'},
+          {'id': 'option-2', 'movieId': 202, 'title': 'Selected option'},
+        ],
+      });
+
+      expect(request.movie?.title, 'Selected option');
+      expect(request.movieId, 202);
+    });
+
     test('maps lifecycle and per-user actions to Watch Plan stages', () {
       final invitation = WatchRequest.fromJson({
         'id': 'invite',

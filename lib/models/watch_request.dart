@@ -398,6 +398,13 @@ class WatchRequest {
     final requester = json['requester'] as Map<String, dynamic>?;
     final recipient = json['recipient'] as Map<String, dynamic>?;
     final group = json['group'] as Map<String, dynamic>?;
+    final candidates = candidatesRaw
+        .whereType<Map<String, dynamic>>()
+        .map(WatchPlanCandidate.fromJson)
+        .toList();
+    final selectedCandidateId = json['selectedCandidateId']?.toString();
+    final hasUnresolvedMovieChoices =
+        candidates.length > 1 && selectedCandidateId == null;
 
     return WatchRequest(
       id: json['id']?.toString() ?? '',
@@ -409,7 +416,9 @@ class WatchRequest {
       message: json['message'] as String?,
       status: json['status'] as String? ?? 'open',
       response: json['response'] as String?,
-      movieId: _intValue(json['movieId'] ?? movie?['id']),
+      movieId: hasUnresolvedMovieChoices
+          ? null
+          : _intValue(json['movieId'] ?? movie?['id']),
       showId: _intValue(json['showId'] ?? show?['id']),
       type: json['type'] as String? ?? 'MOVIE_WATCH_REQUEST',
       createdAt: json['createdAt'] as String?,
@@ -431,11 +440,8 @@ class WatchRequest {
           .whereType<Map<String, dynamic>>()
           .map(WatchConfirmation.fromJson)
           .toList(),
-      candidates: candidatesRaw
-          .whereType<Map<String, dynamic>>()
-          .map(WatchPlanCandidate.fromJson)
-          .toList(),
-      selectedCandidateId: json['selectedCandidateId']?.toString(),
+      candidates: candidates,
+      selectedCandidateId: selectedCandidateId,
       needsWatchConfirmation: _boolValue(json['needsWatchConfirmation']),
       hasCurrentUserLoggedWatch: _boolValue(json['hasCurrentUserLoggedWatch']),
       acceptedAt: _dateTimeValue(json['acceptedAt']),
@@ -458,7 +464,9 @@ class WatchRequest {
           recipient != null ? WatchRequestUser.fromJson(recipient) : null,
       createdBy:
           createdBy != null ? WatchRequestUser.fromJson(createdBy) : null,
-      movie: movie != null ? WatchRequestMovieDetails.fromJson(movie) : null,
+      movie: movie != null && !hasUnresolvedMovieChoices
+          ? WatchRequestMovieDetails.fromJson(movie)
+          : null,
     );
   }
 
@@ -519,13 +527,18 @@ class WatchRequest {
   bool get isDeclined => normalizedStatus == 'declined';
   bool get isTerminal => isCompleted || isCancelled || isExpired || isDeclined;
   bool get isAwaitingScheduleApproval =>
-      isAccepted && normalizedScheduleStatus != 'AGREED';
+      normalizedScheduleStatus != 'AGREED' &&
+      (isAccepted || proposedDate != null || latestPendingProposal != null);
 
   String get displayStatusLabel {
     if (normalizedWatchedStatus == 'WATCHED') return 'Watched';
     if (normalizedWatchedStatus == 'NOT_WATCHED') return 'Not watched';
     if (normalizedWatchedStatus == 'PARTIAL') return 'Confirming';
-    if (isAwaitingScheduleApproval) return 'Accepted · scheduling in progress';
+    if (isAwaitingScheduleApproval) {
+      return isAccepted
+          ? 'Accepted · scheduling in progress'
+          : 'Scheduling in progress';
+    }
     if (normalizedScheduleStatus == 'AGREED') return 'Scheduled';
     if (normalizedScheduleStatus == 'PROPOSED') return 'Proposed';
     if (isAccepted) return 'Accepted';

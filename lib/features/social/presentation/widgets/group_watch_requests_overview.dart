@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
+import 'package:flixie_app/core/navigation/tab_refresh_controller.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/models/group.dart';
@@ -30,7 +31,18 @@ class _GroupWatchRequestsOverviewState
   @override
   void initState() {
     super.initState();
+    TabRefreshController.social.addListener(_onWatchPlansChanged);
     _load();
+  }
+
+  @override
+  void dispose() {
+    TabRefreshController.social.removeListener(_onWatchPlansChanged);
+    super.dispose();
+  }
+
+  void _onWatchPlansChanged() {
+    if (mounted) _load();
   }
 
   @override
@@ -132,7 +144,11 @@ class _GroupWatchRequestsOverviewState
         'The planned time has passed',
         readyToWrapUp,
       );
-      addSection('Planning', 'Invites waiting or being arranged', planning);
+      addSection(
+        'Scheduling in progress',
+        'Invites waiting or being arranged',
+        planning,
+      );
     } else {
       for (final item in visible) {
         content.add(Padding(

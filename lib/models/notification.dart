@@ -343,6 +343,16 @@ class FlixieNotification {
     return group?['name'] as String?;
   }
 
+  /// The group owning a group-scoped Watch Plan notification.
+  String? get groupWatchGroupId {
+    final payloadId = data?['groupId']?.toString();
+    if (payloadId != null && payloadId.isNotEmpty) return payloadId;
+    final request = link?['groupRequest'] as Map<String, dynamic>?;
+    final directId = request?['groupId']?.toString();
+    if (directId != null && directId.isNotEmpty) return directId;
+    return (request?['group'] as Map<String, dynamic>?)?['id']?.toString();
+  }
+
   /// The message stored on the embedded group invite request (includes group name).
   String get groupInviteMessage {
     final l = link;

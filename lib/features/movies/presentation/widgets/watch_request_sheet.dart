@@ -21,6 +21,7 @@ import 'package:flixie_app/features/authentication/presentation/pages/auth_ui.da
 import 'package:flixie_app/features/movies/data/search_service.dart';
 import 'package:flixie_app/features/movies/utils/group_provider_match.dart';
 import 'package:flixie_app/models/movie_short.dart';
+import 'package:flixie_app/features/social/presentation/widgets/flixie_time_picker_sheet.dart';
 
 enum _WatchContext { home, cinema, undecided }
 
@@ -295,7 +296,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
           'MOVIE',
           _movieChoices.first.id,
           candidateMovieIds: _movieChoices.map((movie) => movie.id).toList(),
-          proposedDate: _proposedDate?.toIso8601String(),
+          proposedDate: _proposedDate?.toUtc().toIso8601String(),
           location: _locationLabel,
         );
         final conversationId = result?['conversationId'] as String?;
@@ -313,7 +314,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
           'message': _messageController.text.trim(),
           'type': 'MOVIE_WATCH_REQUEST',
           if (_proposedDate != null)
-            'proposedDate': _proposedDate!.toIso8601String(),
+            'proposedDate': _proposedDate!.toUtc().toIso8601String(),
           if (_locationLabel != null) 'location': _locationLabel,
         });
         final request = result?['request'] as Map<String, dynamic>?;
@@ -378,9 +379,6 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
   bool get _hasValidSchedule {
     if (_scheduleMode == _ScheduleMode.decideLater) return true;
     if (_selectedDate == null) return false;
-    if (_scheduleMode == _ScheduleMode.dateAndTime && _selectedTime == null) {
-      return false;
-    }
     final proposed = _proposedDate;
     return proposed == null || !proposed.isBefore(DateTime.now());
   }
@@ -389,9 +387,12 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
     if (_scheduleMode == _ScheduleMode.decideLater) return null;
     final date = _selectedDate;
     if (date == null) return null;
-    if (_scheduleMode != _ScheduleMode.dateAndTime) return date;
     final time = _selectedTime;
-    if (time == null) return null;
+    if (_scheduleMode != _ScheduleMode.dateAndTime || time == null) {
+      // Noon UTC is a date-only sentinel: it keeps the intended calendar day
+      // stable in every time zone and is never rendered as a watch time.
+      return DateTime.utc(date.year, date.month, date.day, 12);
+    }
     return DateTime(date.year, date.month, date.day, time.hour, time.minute);
   }
 
@@ -415,9 +416,14 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
   }
 
   Future<void> _pickTime() async {
-    final picked = await showTimePicker(
+    final picked = await showModalBottomSheet<TimeOfDay>(
       context: context,
-      initialTime: _selectedTime ?? TimeOfDay.now(),
+      useRootNavigator: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => FlixieTimePickerSheet(
+        initialTime: _selectedTime ?? TimeOfDay.now(),
+      ),
     );
     if (picked != null && mounted) setState(() => _selectedTime = picked);
   }
