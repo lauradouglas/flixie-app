@@ -733,7 +733,9 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                       for (final mode in _ScheduleMode.values)
                         SizedBox(
                           width: narrow
-                              ? (constraints.maxWidth - 8) / 2
+                              ? (_isGroupMode
+                                  ? (constraints.maxWidth - 16) / 3
+                                  : (constraints.maxWidth - 8) / 2)
                               : (constraints.maxWidth - 16) / 3,
                           child: _ModeTab(
                             label: switch (mode) {

@@ -929,14 +929,14 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         onSuccess: () {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Watch request sent!')),
+              const SnackBar(content: Text('Watch Plan sent!')),
             );
           }
         },
         onError: () {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Failed to send watch request')),
+              const SnackBar(content: Text('Failed to send Watch Plan')),
             );
           }
         },

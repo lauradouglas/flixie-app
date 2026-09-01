@@ -79,7 +79,7 @@ class _GettingStartedGuideScreenState extends State<GettingStartedGuideScreen> {
       accent: FlixieColors.secondary,
       actions: [
         _GuideAction(Icons.event_available_outlined,
-            'Tap Invite on a movie to send a friend a watch request'),
+            'Tap Invite on a movie to create a Watch Plan with a friend'),
         _GuideAction(Icons.groups_rounded,
             'Open Social to create a group for your film crew'),
         _GuideAction(Icons.forum_outlined,

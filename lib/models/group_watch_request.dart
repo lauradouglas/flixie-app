@@ -109,15 +109,15 @@ enum WatchRequestFilter {
   String get emptyMessage {
     switch (this) {
       case WatchRequestFilter.all:
-        return 'No watch requests yet.';
+        return 'No Watch Plans yet.';
       case WatchRequestFilter.needsResponse:
-        return 'No requests need your response';
+        return 'No Watch Plans need your response';
       case WatchRequestFilter.active:
-        return 'No active watch requests';
+        return 'No active Watch Plans';
       case WatchRequestFilter.completed:
         return 'No completed watches yet';
       case WatchRequestFilter.byMe:
-        return "You haven't created any requests yet";
+        return "You haven't created any Watch Plans yet";
     }
   }
 }

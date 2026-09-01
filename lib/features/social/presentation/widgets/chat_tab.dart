@@ -321,7 +321,7 @@ class GroupChatTabState extends State<GroupChatTab> {
   ) {
     final payload = msg.watchRequestPayload;
     final movieTitle =
-        req?.movieTitle ?? payload?['movieTitle'] as String? ?? 'Watch Request';
+        req?.movieTitle ?? payload?['movieTitle'] as String? ?? 'Watch Plan';
     final posterPath = req?.moviePosterPath ??
         payload?['moviePosterPath'] as String? ??
         payload?['posterPath'] as String?;
@@ -425,7 +425,7 @@ class GroupChatTabState extends State<GroupChatTab> {
                                           fontWeight: FontWeight.w700)),
                                   if (requesterUsername != null) ...[
                                     const SizedBox(height: 4),
-                                    Text('Requested by @$requesterUsername',
+                                    Text('Created by @$requesterUsername',
                                         style: const TextStyle(
                                             color: FlixieColors.medium,
                                             fontSize: 12)),
@@ -619,7 +619,7 @@ class GroupChatTabState extends State<GroupChatTab> {
                               style: const TextStyle(color: FlixieColors.light),
                               textInputAction: TextInputAction.send,
                               decoration: InputDecoration(
-                                hintText: 'Reply to this request…',
+                                hintText: 'Reply to this Watch Plan…',
                                 hintStyle:
                                     const TextStyle(color: FlixieColors.medium),
                                 filled: true,

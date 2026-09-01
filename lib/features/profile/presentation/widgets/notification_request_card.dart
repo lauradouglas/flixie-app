@@ -26,6 +26,7 @@ class NotificationRequestCard extends StatelessWidget {
     required this.onDeclineSchedule,
     required this.onSuggestSchedule,
     required this.onClose,
+    required this.onWatchSummaryViewed,
   });
 
   final FlixieNotification notification;
@@ -38,6 +39,7 @@ class NotificationRequestCard extends StatelessWidget {
   final VoidCallback onDeclineSchedule;
   final VoidCallback onSuggestSchedule;
   final VoidCallback onClose;
+  final VoidCallback onWatchSummaryViewed;
 
   bool get _isResolved =>
       notification.action == FlixieNotification.actionAccepted ||
@@ -122,9 +124,9 @@ class NotificationRequestCard extends StatelessWidget {
       case FlixieNotification.groupRequest:
         return 'Group watch';
       case FlixieNotification.movieWatchRequest:
-        return 'Watch request';
+        return 'Watch Plan';
       case FlixieNotification.showWatchRequest:
-        return 'Show request';
+        return 'Show Watch Plan';
       case FlixieNotification.friendRequest:
       default:
         return 'Friend request';
@@ -189,6 +191,33 @@ class NotificationRequestCard extends StatelessWidget {
       final target = _targetTitle;
       final groupName = notification.groupWatchGroupName;
       final scheduleLabel = _acceptedScheduleLabel;
+      final allAccepted =
+          notification.data?['allAccepted']?.toString() == 'true';
+      if (notification.action == FlixieNotification.actionAccepted &&
+          groupName != null &&
+          groupName.isNotEmpty) {
+        return RichText(
+          text: TextSpan(
+            style: const TextStyle(
+              color: FlixieColors.light,
+              fontSize: 13,
+              height: 1.25,
+            ),
+            children: [
+              TextSpan(
+                text: allAccepted
+                    ? 'Everyone accepted the '
+                    : '$sender accepted the ',
+              ),
+              TextSpan(
+                text: groupName,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const TextSpan(text: ' Watch Plan.'),
+            ],
+          ),
+        );
+      }
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -446,7 +475,7 @@ class NotificationRequestCard extends StatelessWidget {
             height: 1.25,
           ),
           children: [
-            const TextSpan(text: 'sent you a watch request'),
+            const TextSpan(text: 'invited you to a Watch Plan'),
             if (title != null && title.isNotEmpty) ...[
               const TextSpan(text: ' for '),
               _linkedTitleSpan(context, title),
@@ -607,7 +636,7 @@ class NotificationRequestCard extends StatelessWidget {
     return switch (notification.type) {
       FlixieNotification.friendRequest => 'your friend request',
       FlixieNotification.groupInvite => 'your group invite',
-      _ => 'your watch request',
+      _ => 'your Watch Plan',
     };
   }
 
@@ -875,7 +904,10 @@ class NotificationRequestCard extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: () => context.push(_watchRequestPath),
+                  onPressed: () {
+                    if (_isEveryoneLogged) onWatchSummaryViewed();
+                    context.push(_watchRequestPath);
+                  },
                   style: FilledButton.styleFrom(
                     backgroundColor: FlixieColors.primary,
                     foregroundColor: Colors.black,
@@ -891,7 +923,7 @@ class NotificationRequestCard extends StatelessWidget {
                     size: 18,
                   ),
                   label: Text(
-                    _isEveryoneLogged ? 'View watch summary' : 'View request',
+                    _isEveryoneLogged ? 'View watch summary' : 'View plan',
                     style: TextStyle(fontWeight: FontWeight.w800),
                   ),
                 ),

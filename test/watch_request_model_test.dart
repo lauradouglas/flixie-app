@@ -3,6 +3,36 @@ import 'package:flixie_app/models/watch_request.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('WatchRequest reminder title uses the selected candidate', () {
+    final request = WatchRequest.fromJson({
+      'id': 'plan-1',
+      'requesterId': 'creator-1',
+      'recipientId': 'friend-1',
+      'status': 'scheduled',
+      'type': 'MOVIE_WATCH_REQUEST',
+      'selectedCandidateId': 'candidate-2',
+      'candidates': [
+        {
+          'id': 'candidate-1',
+          'movieId': 1,
+          'mediaType': 'movie',
+          'addedByUserId': 'creator-1',
+          'movie': {'id': 1, 'title': 'First choice'},
+        },
+        {
+          'id': 'candidate-2',
+          'movieId': 2,
+          'mediaType': 'movie',
+          'addedByUserId': 'friend-1',
+          'movie': {'id': 2, 'title': 'Selected movie'},
+        },
+      ],
+    });
+
+    expect(request.movie, isNull);
+    expect(request.watchPlanTitle, 'Selected movie');
+  });
+
   group('WatchRequest', () {
     test('analytics participants include the creator and direct friend', () {
       final request = WatchRequest.fromJson({

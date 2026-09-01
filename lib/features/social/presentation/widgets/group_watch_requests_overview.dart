@@ -13,9 +13,14 @@ import 'package:flixie_app/models/group_watch_request.dart';
 enum _GroupRequestFilter { active, completed }
 
 class GroupWatchRequestsOverview extends StatefulWidget {
-  const GroupWatchRequestsOverview({super.key, required this.groups});
+  const GroupWatchRequestsOverview({
+    super.key,
+    required this.groups,
+    required this.currentUserId,
+  });
 
   final List<Group> groups;
+  final String currentUserId;
 
   @override
   State<GroupWatchRequestsOverview> createState() =>
@@ -97,7 +102,7 @@ class _GroupWatchRequestsOverviewState
     final visible =
         _items.where((item) => _matches(item.request, _filter)).toList();
     final needsReply = active
-        .where((item) => item.request.currentUserResponse == null)
+        .where((item) => _needsReply(item.request, widget.currentUserId))
         .toList();
     final upcoming = active.where((item) {
       final scheduledFor = DateTime.tryParse(item.request.scheduledFor ?? '');
@@ -131,7 +136,11 @@ class _GroupWatchRequestsOverviewState
       for (final item in items) {
         content.add(Padding(
           padding: const EdgeInsets.only(bottom: 10),
-          child: _GroupRequestTile(group: item.group, request: item.request),
+          child: _GroupRequestTile(
+            group: item.group,
+            request: item.request,
+            currentUserId: widget.currentUserId,
+          ),
         ));
       }
     }
@@ -153,7 +162,11 @@ class _GroupWatchRequestsOverviewState
       for (final item in visible) {
         content.add(Padding(
           padding: const EdgeInsets.only(bottom: 10),
-          child: _GroupRequestTile(group: item.group, request: item.request),
+          child: _GroupRequestTile(
+            group: item.group,
+            request: item.request,
+            currentUserId: widget.currentUserId,
+          ),
         ));
       }
     }
@@ -282,10 +295,12 @@ class _GroupRequestTile extends StatelessWidget {
   const _GroupRequestTile({
     required this.group,
     required this.request,
+    required this.currentUserId,
   });
 
   final Group group;
   final GroupWatchRequest request;
+  final String currentUserId;
 
   @override
   Widget build(BuildContext context) {
@@ -299,19 +314,26 @@ class _GroupRequestTile extends StatelessWidget {
     void open() => context.push(
           '/groups/$groupId?tab=requests&requestId=${request.id}',
         );
-    final accepted = request.memberStatuses
-        .where((member) => member.status.toUpperCase() == 'ACCEPTED')
+    final invitees = request.memberStatuses
+        .where((member) => member.memberId != request.userId)
         .toList();
-    final acceptedCount = request.acceptedCount > accepted.length
-        ? request.acceptedCount
-        : accepted.length;
-    final waiting =
-        (group.memberCount ?? request.responseCount) - acceptedCount;
+    final acceptedInvitees = invitees
+        .where((member) => member.status.toUpperCase() == 'ACCEPTED')
+        .length;
+    final respondedInvitees = invitees.where((member) {
+      return const {'ACCEPTED', 'DECLINED', 'MAYBE'}
+          .contains(member.status.toUpperCase());
+    }).length;
+    // Creating a group Watch Plan is the creator's acceptance. Only the
+    // remaining group members need to respond.
+    final acceptedCount = 1 + acceptedInvitees;
+    final participantCount = group.memberCount ?? (invitees.length + 1);
+    final waiting = participantCount - 1 - respondedInvitees;
 
     final completed = request.status == WatchRequestStatus.completed;
     final scheduled = request.status == WatchRequestStatus.scheduled ||
         request.scheduledFor != null;
-    final needsReply = request.isActive && request.currentUserResponse == null;
+    final needsReply = request.isActive && _needsReply(request, currentUserId);
     final label = completed
         ? 'WATCHED TOGETHER'
         : needsReply
@@ -490,6 +512,17 @@ String _scheduledLabel(String value) {
   final date = DateTime.tryParse(value)?.toLocal();
   if (date == null) return 'Scheduled';
   return '${date.day}/${date.month} · ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+}
+
+bool _needsReply(GroupWatchRequest request, String currentUserId) {
+  if (currentUserId.isEmpty || request.userId == currentUserId) return false;
+  if (request.canRespond == false || request.currentUserResponse != null) {
+    return false;
+  }
+  return !request.memberStatuses.any((member) =>
+      member.memberId == currentUserId &&
+      const {'ACCEPTED', 'DECLINED', 'MAYBE'}
+          .contains(member.status.toUpperCase()));
 }
 
 String _initial(String? value) {

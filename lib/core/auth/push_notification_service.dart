@@ -13,6 +13,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 import 'package:flixie_app/core/auth/firebase_options.dart';
 import 'package:flixie_app/core/auth/notification_deep_link.dart';
+import 'package:flixie_app/core/auth/watch_plan_reminder_policy.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
 
@@ -83,12 +84,13 @@ class PushNotificationService {
   /// The userId of the currently logged-in user. Used to suppress
   /// notifications intended for a different user (e.g. the sender).
   static String? _currentUserId;
+  static final Map<String, Future<void>> _watchPlanReminderScheduling = {};
 
   /// High-importance notification channel used for Android.
   static const _androidChannel = AndroidNotificationChannel(
     'flixie_notifications',
     'Flixie Notifications',
-    description: 'Friend and watch-request notifications from Flixie.',
+    description: 'Friend and Watch Plan notifications from Flixie.',
     importance: Importance.high,
   );
 
@@ -112,6 +114,32 @@ class PushNotificationService {
     required String withName,
     required String deepLink,
     String scope = 'DIRECT',
+  }) {
+    final key = '$scope:$planId';
+    final previous = _watchPlanReminderScheduling[key] ?? Future<void>.value();
+    final scheduled = previous.then((_) => _scheduleWatchPlanReminders(
+          planId: planId,
+          scheduledFor: scheduledFor,
+          title: title,
+          withName: withName,
+          deepLink: deepLink,
+          scope: scope,
+        ));
+    _watchPlanReminderScheduling[key] = scheduled;
+    return scheduled.whenComplete(() {
+      if (identical(_watchPlanReminderScheduling[key], scheduled)) {
+        _watchPlanReminderScheduling.remove(key);
+      }
+    });
+  }
+
+  static Future<void> _scheduleWatchPlanReminders({
+    required String planId,
+    required DateTime scheduledFor,
+    required String title,
+    required String withName,
+    required String deepLink,
+    required String scope,
   }) async {
     try {
       // Home can refresh before auth has completed notification setup. Wait
@@ -122,6 +150,11 @@ class PushNotificationService {
       if (!_localNotificationsReady) {
         logger.w(
             '[Local reminders] Skipped $planId: notifications are not ready');
+        return;
+      }
+      final currentUserId = _currentUserId;
+      if (currentUserId == null || currentUserId.isEmpty) {
+        logger.w('[Local reminders] Skipped $planId: no signed-in user');
         return;
       }
       if (!_timeZonesInitialized) {
@@ -144,6 +177,17 @@ class PushNotificationService {
       await _localNotifications.cancel(reminderId);
       await _localNotifications.cancel(followUpId);
       await _localNotifications.cancel(morningId);
+      // Older builds could schedule before auth attached the current user,
+      // producing a second set under the anonymous identity. Remove that set
+      // whenever the canonical signed-in schedule is refreshed.
+      final anonymousId = _watchPlanReminderIdForUser(
+        planId,
+        scope,
+        'anonymous',
+      );
+      await _localNotifications.cancel(anonymousId);
+      await _localNotifications.cancel((anonymousId + 1) & 0x3fffffff);
+      await _localNotifications.cancel((anonymousId + 2) & 0x3fffffff);
 
       final details = NotificationDetails(
         android: AndroidNotificationDetails(
@@ -168,12 +212,16 @@ class PushNotificationService {
         localScheduledFor.year,
         localScheduledFor.month,
         localScheduledFor.day,
-        9,
+        watchPlanMorningReminderHour,
+      );
+      final scheduleMorning = shouldScheduleWatchPlanMorningReminder(
+        localScheduledFor,
+        now: now,
       );
       tz.TZDateTime scheduleAt(DateTime dateTime) => _usingTimeZoneFallback
           ? tz.TZDateTime.from(dateTime.toUtc(), tz.UTC)
           : tz.TZDateTime.from(dateTime, tz.local);
-      if (morningOfWatch.isAfter(now)) {
+      if (scheduleMorning) {
         await _localNotifications.zonedSchedule(
           morningId,
           'Watch plan today',
@@ -190,7 +238,11 @@ class PushNotificationService {
         await _localNotifications.zonedSchedule(
           reminderId,
           'Watch starts soon',
-          '$title starts in one hour.',
+          watchPlanOneHourReminderBody(
+            title: title,
+            withName: withName,
+            scope: scope,
+          ),
           scheduleAt(beforeWatch),
           details,
           uiLocalNotificationDateInterpretation:
@@ -215,7 +267,7 @@ class PushNotificationService {
       final pending = await _localNotifications.pendingNotificationRequests();
       logger.i(
         '[Local reminders] Registered $planId '
-        '(morning=${morningOfWatch.isAfter(now)}, oneHour=${beforeWatch.isAfter(now)}, '
+        '(morning=$scheduleMorning, oneHour=${beforeWatch.isAfter(now)}, '
         'followUp=${followUp.isAfter(now)}, pending=${pending.length})',
       );
     } catch (error) {
@@ -232,13 +284,33 @@ class PushNotificationService {
     await _localNotifications.cancel(reminderId);
     await _localNotifications.cancel((reminderId + 1) & 0x3fffffff);
     await _localNotifications.cancel((reminderId + 2) & 0x3fffffff);
+    final anonymousId = _watchPlanReminderIdForUser(
+      planId,
+      scope,
+      'anonymous',
+    );
+    await _localNotifications.cancel(anonymousId);
+    await _localNotifications.cancel((anonymousId + 1) & 0x3fffffff);
+    await _localNotifications.cancel((anonymousId + 2) & 0x3fffffff);
   }
 
   /// Dart's String.hashCode is deliberately not stable between app launches.
   /// Local notification IDs must survive a restart, so use a deterministic
   /// FNV-1a hash over the signed-in user, plan scope and plan ID instead.
   static int _watchPlanReminderId(String planId, String scope) {
-    final key = '${_currentUserId ?? 'anonymous'}:$scope:$planId';
+    return _watchPlanReminderIdForUser(
+      planId,
+      scope,
+      _currentUserId ?? 'anonymous',
+    );
+  }
+
+  static int _watchPlanReminderIdForUser(
+    String planId,
+    String scope,
+    String userId,
+  ) {
+    final key = '$userId:$scope:$planId';
     var hash = 0x811c9dc5;
     for (final unit in key.codeUnits) {
       hash ^= unit;
@@ -580,7 +652,7 @@ class PushNotificationService {
         type == 'WATCH_REQUEST';
     final title = notification?.title ??
         message.data['title']?.toString() ??
-        (isWatchRequest ? 'New watch request' : null);
+        (isWatchRequest ? 'New Watch Plan' : null);
     final body = notification?.body ??
         message.data['body']?.toString() ??
         message.data['message']?.toString() ??

@@ -470,7 +470,7 @@ class _HomeScreenState extends State<HomeScreen> {
       await PushNotificationService.scheduleWatchPlanReminders(
         planId: plan.id,
         scheduledFor: scheduledFor,
-        title: plan.movie?.title ?? 'Watch together',
+        title: plan.watchPlanTitle,
         withName:
             isGroupPlan ? groupName! : otherUser?.username ?? 'your friend',
         deepLink: isGroupPlan && plan.groupId?.isNotEmpty == true
@@ -493,6 +493,15 @@ class _HomeScreenState extends State<HomeScreen> {
           try {
             final requests =
                 await GroupService.getGroupWatchRequests(group.id!);
+            for (final request in requests) {
+              final canonicalId = request.databaseRequestId;
+              if (canonicalId != null && canonicalId != request.id) {
+                await PushNotificationService.cancelWatchPlanReminders(
+                  request.id,
+                  scope: 'GROUP',
+                );
+              }
+            }
             return requests
                 .map((request) => _asHomeGroupWatchPlan(group, request))
                 .toList(growable: false);
@@ -530,7 +539,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ))
         .toList(growable: false);
     return WatchRequest(
-      id: request.id,
+      // Use the canonical Postgres ID everywhere reminders are scheduled.
+      // The chat mirror ID may differ and previously created a duplicate set
+      // when Home and the group plan screen both refreshed the same plan.
+      id: request.databaseRequestId ?? request.id,
       requesterId: request.userId,
       recipientId: '',
       status: request.status.apiValue,

@@ -446,7 +446,7 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Open a movie and tap Request to watch with ${friend.shortName}.',
+          'Open a movie and create a Watch Plan with ${friend.shortName}.',
         ),
       ),
     );
@@ -1099,7 +1099,7 @@ class _EnhancedFriendCard extends StatelessWidget {
                         Icon(Icons.movie_filter_outlined,
                             color: FlixieColors.secondary, size: 18),
                         SizedBox(width: 8),
-                        Text('Request watch',
+                        Text('Create Watch Plan',
                             style: TextStyle(color: Colors.white)),
                       ]),
                     ),
@@ -1184,7 +1184,7 @@ class _ActivityEmptyState extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             hasFriends
-                ? 'Request a watch or add more titles to spark activity.'
+                ? 'Create a Watch Plan or add more titles to spark activity.'
                 : 'Add friends to start seeing ratings, watchlists and reviews here.',
             style: const TextStyle(color: FlixieColors.medium, fontSize: 13),
           ),

@@ -33,6 +33,7 @@ import 'package:flixie_app/features/watch_plans/presentation/sheets/watch_plan_c
 import 'package:flixie_app/features/watch_plans/presentation/sheets/watch_plan_location_sheet.dart';
 import 'package:flixie_app/features/watch_plans/presentation/sheets/watch_plan_schedule_sheet.dart';
 import 'package:flixie_app/features/watch_plans/presentation/widgets/friend_plan/friend_watch_plan_card.dart';
+import 'package:flixie_app/features/watch_plans/presentation/widgets/friend_plan/friend_watch_plan_types.dart';
 
 enum _RequestAudience { friends, groups }
 
@@ -214,7 +215,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
           PushNotificationService.scheduleWatchPlanReminders(
             planId: request.id,
             scheduledFor: scheduledFor,
-            title: request.movie?.title ?? 'Watch together',
+            title: request.watchPlanTitle,
             withName: request.participants
                     .map((participant) => participant.user)
                     .whereType<WatchRequestUser>()
@@ -296,6 +297,11 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         onSuccess: () {
           if (!mounted) return;
           _load();
+          // Group plans are rendered by a separate overview with its own
+          // data source. Notify it immediately after creation as well as
+          // refreshing the direct-plan list.
+          TabRefreshController.requestSocialRefresh();
+          TabRefreshController.requestHomeRefresh();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Watch Plan sent'),
@@ -681,7 +687,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
           await PushNotificationService.scheduleWatchPlanReminders(
             planId: state.request.id,
             scheduledFor: agreedTime,
-            title: state.request.movie?.title ?? 'Watch together',
+            title: state.request.watchPlanTitle,
             withName: state.request.participants
                     .map((participant) => participant.user)
                     .whereType<WatchRequestUser>()
@@ -976,7 +982,11 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
                     ? directBody
                     : _loadingGroups
                         ? const Center(child: CircularProgressIndicator())
-                        : GroupWatchRequestsOverview(groups: _groups),
+                        : GroupWatchRequestsOverview(
+                            groups: _groups,
+                            currentUserId:
+                                context.read<AuthProvider>().dbUser?.id ?? '',
+                          ),
               ),
             ],
           );

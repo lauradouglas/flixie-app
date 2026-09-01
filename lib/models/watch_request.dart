@@ -503,6 +503,27 @@ class WatchRequest {
       analyticsContentType == 'show' ? showId : movieId;
   String get analyticsPlanType => groupId == null ? 'friend' : 'group';
 
+  /// The locked-in title for user-facing reminders and calendar entries.
+  /// Some API views omit the top-level movie for the plan creator while
+  /// still returning the selected candidate, so do not rely on [movie] alone.
+  String get watchPlanTitle {
+    final movieTitle = movie?.title.trim();
+    if (movieTitle?.isNotEmpty == true) return movieTitle!;
+    if (selectedCandidateId != null) {
+      for (final candidate in candidates) {
+        if (candidate.id == selectedCandidateId) {
+          final title = candidate.title?.trim();
+          if (title?.isNotEmpty == true) return title!;
+        }
+      }
+    }
+    if (candidates.length == 1) {
+      final title = candidates.single.title?.trim();
+      if (title?.isNotEmpty == true) return title!;
+    }
+    return 'Watch together';
+  }
+
   /// Total intended participants, including the creator. Direct requests are
   /// always one creator plus one friend. Group responses represent invitees.
   int get analyticsParticipantCount {

@@ -35,7 +35,7 @@ class HelpSupportScreen extends StatelessWidget {
             question: 'Is registration required to use Flixie?',
             answer:
                 'Yes. A free Flixie account is required because your movie activity, '
-                'preferences, lists, reviews, friendships, groups, and watch requests '
+                'preferences, lists, reviews, friendships, groups, and Watch Plans '
                 'are connected to your profile.',
           ),
           _FaqTile(
@@ -89,11 +89,11 @@ class HelpSupportScreen extends StatelessWidget {
             question: 'How do I invite someone to watch a movie?',
             answer: 'Open a movie\'s detail page and tap "Invite to Watch". '
                 'Select a friend, add an optional message, then tap Send Invite. '
-                'They\'ll see the request in their Notifications.',
+                'They\'ll see the Watch Plan in their Notifications.',
           ),
           _FaqTile(
-            question: 'Where do I see my sent and received watch requests?',
-            answer: 'Go to your Profile and tap "Watch Requests" in the menu. '
+            question: 'Where do I see my Watch Plans?',
+            answer: 'Go to your Profile and tap "Watch Plans" in the menu. '
                 'You can filter by status (Pending, Accepted, Declined) and search '
                 'by movie title or username.',
           ),

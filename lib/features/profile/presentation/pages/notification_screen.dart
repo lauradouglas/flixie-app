@@ -304,12 +304,17 @@ class _NotificationScreenState extends State<NotificationScreen> {
         }
         if (!mounted) return;
         // Show success toast
+        final isWatchPlan =
+            notification.type == FlixieNotification.movieWatchRequest ||
+                notification.type == FlixieNotification.showWatchRequest ||
+                notification.type == FlixieNotification.groupRequest;
+        final subject = isWatchPlan ? 'Watch Plan' : 'Request';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               action == FlixieNotification.actionAccepted
-                  ? 'Request accepted successfully.'
-                  : 'Request declined successfully.',
+                  ? '$subject accepted successfully.'
+                  : '$subject declined successfully.',
             ),
             backgroundColor: FlixieColors.surfaceElevated,
           ),
@@ -816,7 +821,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
   String get _emptyBody {
     return switch (_filter) {
       _NotificationFilter.requests =>
-        'Watch requests and invites will appear here when someone needs a response.',
+        'Watch Plans and invites will appear here when someone needs a response.',
       _NotificationFilter.activity =>
         'Friend, group, and watch updates will show up here.',
       _NotificationFilter.all => 'You are all caught up.',
@@ -874,6 +879,12 @@ class _NotificationScreenState extends State<NotificationScreen> {
             _respondToScheduleProposal(notification, 'declined'),
         onSuggestSchedule: () => _suggestSchedule(notification),
         onClose: () => _closeNotification(notification),
+        onWatchSummaryViewed: () {
+          // Viewing the final summary consumes this notification. Removal is
+          // optimistic so the card is already gone when the user navigates
+          // back, while the server deletion completes in the background.
+          unawaited(_closeNotification(notification));
+        },
       );
     }
     final deepLink = notificationDeepLinkPath({
