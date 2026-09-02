@@ -106,7 +106,7 @@ class MovieCarouselTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: FlixieColors.medium,
-                        fontSize: 9.5,
+                        fontSize: 11,
                         height: 1.2,
                         fontWeight: FontWeight.w500,
                       ),

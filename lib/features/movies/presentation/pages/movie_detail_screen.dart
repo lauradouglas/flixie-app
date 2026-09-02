@@ -1358,11 +1358,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         ),
       );
     }
-    // This dense, poster-led page has fixed visual proportions. Respecting a
-    // large device text scale here causes titles and CTAs to crowd each other
-    // out, so use the designed type scale for the page instead.
+    // Preserve the device text scale. Dense poster-led sections must reflow
+    // or scroll rather than override a user's accessibility preference.
     return MediaQuery(
-      data: MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
+      data: MediaQuery.of(context),
       child: Scaffold(
         backgroundColor: FlixieColors.background,
         body: RefreshIndicator(

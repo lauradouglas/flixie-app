@@ -59,7 +59,6 @@ class GroupWatchPlanCard extends StatelessWidget {
                               request.movieTitle ?? 'Watch Plan',
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              textScaler: TextScaler.noScaling,
                               style: const TextStyle(
                                 color: FlixieColors.light,
                                 fontWeight: FontWeight.w800,

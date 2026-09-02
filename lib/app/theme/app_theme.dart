@@ -6,6 +6,8 @@ class FlixieColors {
   static const Color primary = Color(0xFF7C4DFF);
   static const Color primaryShade = Color(0xFF6534E8);
   static const Color primaryTint = Color(0xFF7C4DFF);
+  // Accessible purple for normal-sized text on the dark surface ramp.
+  static const Color primaryText = Color(0xFFB9A0FF);
 
   // Secondary – cyan accent
   static const Color secondary = Color(0xFF00D1C7);
@@ -219,7 +221,7 @@ class AppTheme {
       // Outlined buttons
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: FlixieColors.primary,
+          foregroundColor: FlixieColors.primaryText,
           side: const BorderSide(color: FlixieColors.primary),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
@@ -231,7 +233,7 @@ class AppTheme {
       // Text buttons
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: FlixieColors.primary,
+          foregroundColor: FlixieColors.primaryText,
         ),
       ),
 
@@ -488,7 +490,7 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: FlixieColors.primary,
+          foregroundColor: FlixieColors.primaryShade,
           side: const BorderSide(color: FlixieColors.primary),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
@@ -497,7 +499,7 @@ class AppTheme {
         ),
       ),
       textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(foregroundColor: FlixieColors.primary),
+        style: TextButton.styleFrom(foregroundColor: FlixieColors.primaryShade),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,

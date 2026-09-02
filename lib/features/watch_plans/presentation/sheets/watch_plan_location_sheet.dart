@@ -39,8 +39,7 @@ class _WatchPlanLocationSheetState extends State<WatchPlanLocationSheet> {
           color: FlixieColors.background,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           child: MediaQuery(
-            data: MediaQuery.of(context)
-                .copyWith(textScaler: TextScaler.noScaling),
+            data: MediaQuery.of(context),
             child: SingleChildScrollView(
               padding: EdgeInsets.fromLTRB(
                   24, 14, 24, 20 + MediaQuery.viewInsetsOf(context).bottom),

@@ -40,10 +40,10 @@ class _WatchPlanScheduleSheetState extends State<WatchPlanScheduleSheet> {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         clipBehavior: Clip.antiAlias,
         child: MediaQuery(
-          // The controls use fixed, compact sizes so a large system text scale
-          // cannot cause touch labels to overflow their cards.
-          data:
-              MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
+          // Keep the device text scale. The scrollable sheet and flexible
+          // controls must make room for larger labels instead of suppressing
+          // the user's accessibility preference.
+          data: MediaQuery.of(context),
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(24, 14, 24, 20),
             child:

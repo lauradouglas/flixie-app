@@ -335,97 +335,113 @@ class FriendMovieChoicesSection extends StatelessWidget {
         .where((candidate) => candidate.id != selectedCandidateId)
         .toList(growable: false);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Chosen movie',
-          style: TextStyle(
-              color: FlixieColors.textPrimary,
-              fontSize: 18,
-              fontWeight: FontWeight.w900)),
-      const SizedBox(height: 5),
-      const Text(
-          'The final title is selected. Rescheduling will keep this choice.',
-          style: TextStyle(color: FlixieColors.medium, fontSize: 12)),
-      const SizedBox(height: 12),
       Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
             color: FlixieColors.surfaceElevated,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: FlixieColors.primary, width: 2)),
-        child: Row(children: [
-          ClipRRect(
-              borderRadius: BorderRadius.circular(9),
-              child: SizedBox(
-                  width: 52,
-                  height: 78,
-                  child: selected.posterPath == null
-                      ? const _MoviePosterPlaceholder()
-                      : CachedNetworkImage(
-                          imageUrl:
-                              'https://image.tmdb.org/t/p/w185${selected.posterPath}',
-                          fit: BoxFit.cover))),
-          const SizedBox(width: 12),
-          Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Text(selected.title ?? 'Untitled',
-                    style: const TextStyle(
-                        color: FlixieColors.textPrimary,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800)),
-                const SizedBox(height: 6),
-                const Text('Selected for this Watch Plan',
-                    style: TextStyle(
-                        color: FlixieColors.success,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700)),
-              ])),
-          const Icon(Icons.check_circle_rounded, color: FlixieColors.success),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const Expanded(
+              child: Text('Chosen movie',
+                  style: TextStyle(
+                      color: FlixieColors.textPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900)),
+            ),
+            if (alternatives.isNotEmpty)
+              _OtherMovieOptionsMenu(alternatives: alternatives),
+            if (organiser)
+              IconButton(
+                onPressed: onChangeMovie,
+                tooltip: 'Change selected movie',
+                icon: const Icon(Icons.edit_outlined),
+                color: FlixieColors.primaryText,
+              ),
+          ]),
+          const SizedBox(height: 6),
+          Row(children: [
+            ClipRRect(
+                borderRadius: BorderRadius.circular(9),
+                child: SizedBox(
+                    width: 52,
+                    height: 78,
+                    child: selected.posterPath == null
+                        ? const _MoviePosterPlaceholder()
+                        : CachedNetworkImage(
+                            imageUrl:
+                                'https://image.tmdb.org/t/p/w185${selected.posterPath}',
+                            fit: BoxFit.cover))),
+            const SizedBox(width: 12),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(selected.title ?? 'Untitled',
+                      style: const TextStyle(
+                          color: FlixieColors.textPrimary,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 6),
+                  const Text('Selected for this Watch Plan',
+                      style: TextStyle(
+                          color: FlixieColors.success,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700)),
+                ])),
+            const Icon(Icons.check_circle_rounded, color: FlixieColors.success),
+          ]),
         ]),
       ),
-      if (organiser) ...[
-        const SizedBox(height: 8),
-        Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-                onPressed: onChangeMovie,
-                icon: const Icon(Icons.edit_outlined, size: 16),
-                label: const Text('Change selected movie')))
-      ],
-      if (alternatives.isNotEmpty) ...[
-        const SizedBox(height: 4),
-        Material(
-            color: Colors.transparent,
-            child: ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              title: Text('Other movie options (${alternatives.length})',
-                  style: const TextStyle(
-                      color: FlixieColors.light,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700)),
-              children: alternatives
-                  .map((candidate) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: ClipRRect(
-                            borderRadius: BorderRadius.circular(6),
-                            child: SizedBox(
-                                width: 32,
-                                height: 48,
-                                child: candidate.posterPath == null
-                                    ? const _MoviePosterPlaceholder()
-                                    : CachedNetworkImage(
-                                        imageUrl:
-                                            'https://image.tmdb.org/t/p/w92${candidate.posterPath}',
-                                        fit: BoxFit.cover))),
-                        title: Text(candidate.title ?? 'Untitled',
-                            style: const TextStyle(
-                                color: FlixieColors.light, fontSize: 14)),
-                      ))
-                  .toList(growable: false),
-            ))
-      ],
     ]);
   }
+}
+
+class _OtherMovieOptionsMenu extends StatelessWidget {
+  const _OtherMovieOptionsMenu({required this.alternatives});
+
+  final List<WatchPlanCandidate> alternatives;
+
+  @override
+  Widget build(BuildContext context) => PopupMenuButton<void>(
+        tooltip: 'View other movie options',
+        padding: EdgeInsets.zero,
+        splashRadius: 22,
+        itemBuilder: (context) => [
+          PopupMenuItem<void>(
+            enabled: false,
+            child: Text(
+              '${alternatives.length} other ${alternatives.length == 1 ? 'option' : 'options'}',
+              style: const TextStyle(
+                color: FlixieColors.textPrimary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          ...alternatives.map(
+            (candidate) => PopupMenuItem<void>(
+              enabled: false,
+              child: Text(candidate.title ?? 'Untitled',
+                  style: const TextStyle(color: FlixieColors.light)),
+            ),
+          ),
+        ],
+        child: Semantics(
+          button: true,
+          label:
+              'View ${alternatives.length} other movie ${alternatives.length == 1 ? 'option' : 'options'}',
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Text('${alternatives.length} other',
+                style: const TextStyle(
+                    color: FlixieColors.primaryText,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800)),
+            const Icon(Icons.expand_more_rounded,
+                color: FlixieColors.primaryText, size: 18),
+          ]),
+        ),
+      );
 }
 
 class _MoviePosterPlaceholder extends StatelessWidget {

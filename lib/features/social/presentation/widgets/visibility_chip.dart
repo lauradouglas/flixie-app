@@ -16,25 +16,44 @@ class VisibilityChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        decoration: BoxDecoration(
-          color:
-              selected ? FlixieColors.primary : FlixieColors.tabBarBackground,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? FlixieColors.primary : FlixieColors.tabBarBorder,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? Colors.black : FlixieColors.medium,
-            fontWeight: FontWeight.w600,
-            fontSize: 13,
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '$label${selected ? ', selected' : ''}',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: AnimatedContainer(
+              duration: reduceMotion
+                  ? Duration.zero
+                  : const Duration(milliseconds: 150),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: selected
+                    ? FlixieColors.primary
+                    : FlixieColors.tabBarBackground,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: selected
+                      ? FlixieColors.primary
+                      : FlixieColors.tabBarBorder,
+                ),
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: selected ? Colors.black : FlixieColors.medium,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ),
           ),
         ),
       ),

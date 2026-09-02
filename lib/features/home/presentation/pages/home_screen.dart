@@ -3346,7 +3346,7 @@ class _FriendInteractionAvatarStack extends StatelessWidget {
                   '+$overflow',
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 9,
+                    fontSize: 11,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -3415,7 +3415,7 @@ class _WatchPlanAvatarStack extends StatelessWidget {
                   '+$overflow',
                   style: const TextStyle(
                     color: FlixieColors.primary,
-                    fontSize: 9,
+                    fontSize: 11,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -3453,8 +3453,8 @@ class _HeroCompactIconButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
           onTap: isBusy ? null : onPressed,
           child: SizedBox(
-            width: 36,
-            height: 36,
+            width: 48,
+            height: 48,
             child: isBusy
                 ? _SpinningActionIcon(icon: icon, color: foregroundColor)
                 : Icon(icon, color: foregroundColor, size: 22),

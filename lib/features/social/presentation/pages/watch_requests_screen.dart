@@ -1097,12 +1097,11 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         child: body,
       ),
     );
-    // The plan detail is a deliberately dense, reference-led layout. It
-    // should not double in size when the device's global text scaling is high.
+    // Preserve the device text scale; this surface uses flexible and
+    // scrollable layouts rather than overriding accessibility preferences.
     return isFocused
         ? MediaQuery(
-            data: MediaQuery.of(context)
-                .copyWith(textScaler: TextScaler.noScaling),
+            data: MediaQuery.of(context),
             child: screen,
           )
         : screen;
