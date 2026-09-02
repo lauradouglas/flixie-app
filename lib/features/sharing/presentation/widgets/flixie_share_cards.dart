@@ -188,7 +188,7 @@ class RatingShareCardContent extends StatelessWidget {
             right: 20,
             top: 28,
             child: Text(
-              data.recommended == false ? 'RATED' : 'RATED & RECOMMENDED',
+              data.recommended == true ? 'RATED & RECOMMENDED' : 'RATED',
               style: const TextStyle(
                 color: FlixieColors.secondary,
                 fontSize: 9,

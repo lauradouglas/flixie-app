@@ -638,25 +638,37 @@ class _NotificationScreenState extends State<NotificationScreen> {
           children: filters.map((entry) {
             final (f, label) = entry;
             final selected = _filter == f;
+            final count = _countForFilter(f);
             return Expanded(
-              child: GestureDetector(
-                onTap: () => setState(() => _filter = f),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? FlixieColors.primary.withValues(alpha: 0.25)
-                        : Colors.transparent,
+              child: Semantics(
+                button: true,
+                selected: selected,
+                label: '$label, $count notifications',
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => setState(() => _filter = f),
                     borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '$label ${_countForFilter(f)}',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color:
-                          selected ? FlixieColors.primary : FlixieColors.light,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+                    child: Container(
+                      constraints: const BoxConstraints(minHeight: 44),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? FlixieColors.primary.withValues(alpha: 0.25)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '$label $count',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: selected
+                              ? FlixieColors.primaryText
+                              : FlixieColors.light,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
                 ),

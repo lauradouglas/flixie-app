@@ -74,4 +74,16 @@ void main() {
     expect(find.byIcon(Icons.movie_filter_rounded), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('empty card uses the shared icon treatment and a direct action',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: HomeWatchPlanEmptyCard(onCreate: () {})),
+    ));
+
+    expect(find.byIcon(Icons.movie_filter_rounded), findsOneWidget);
+    expect(find.text('WATCH TOGETHER'), findsOneWidget);
+    expect(find.text('Make a plan'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

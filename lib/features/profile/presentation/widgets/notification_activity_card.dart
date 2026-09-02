@@ -54,11 +54,10 @@ class NotificationActivityCard extends StatelessWidget {
               ? FlixieColors.tabBarBackgroundFocused
               : FlixieColors.tabBarBackgroundFocused.withValues(alpha: 0.68),
           borderRadius: BorderRadius.circular(12),
-          border: Border(
-            left: BorderSide(
-              color: isUnread ? _accentColor : Colors.transparent,
-              width: 3,
-            ),
+          border: Border.all(
+            color: isUnread
+                ? _accentColor.withValues(alpha: 0.65)
+                : Colors.white.withValues(alpha: 0.06),
           ),
         ),
         padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
@@ -128,13 +127,17 @@ class NotificationActivityCard extends StatelessWidget {
                       ),
                       if (!notification.isRead)
                         Padding(
-                          padding: const EdgeInsets.only(left: 2, top: 8),
-                          child: Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: FlixieColors.tertiary,
-                              shape: BoxShape.circle,
+                          padding: const EdgeInsets.only(left: 6, top: 3),
+                          child: Semantics(
+                            label: 'New notification',
+                            child: const Text(
+                              'NEW',
+                              style: TextStyle(
+                                color: FlixieColors.tertiary,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.6,
+                              ),
                             ),
                           ),
                         ),
@@ -158,7 +161,7 @@ class NotificationActivityCard extends StatelessWidget {
                           ? 'View profile'
                           : 'View list',
                       style: const TextStyle(
-                        color: FlixieColors.primary,
+                        color: FlixieColors.primaryText,
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
                       ),

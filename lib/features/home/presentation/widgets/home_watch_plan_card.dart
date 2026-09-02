@@ -19,6 +19,10 @@ class HomeWatchPlanCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final poster = state.plan.movie?.posterPath;
     final tone = state.colorRole.color;
+    // The brand purple works for borders and controls, but compact status copy
+    // needs the contrast-safe text token against this dark card surface.
+    final statusTextColor =
+        tone == FlixieColors.primary ? FlixieColors.primaryText : tone;
     return Semantics(
       button: true,
       label:
@@ -51,13 +55,14 @@ class HomeWatchPlanCard extends StatelessWidget {
                       Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(state.statusIcon, color: tone, size: 16),
+                            Icon(state.statusIcon,
+                                color: statusTextColor, size: 16),
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(state.eyebrow,
                                   maxLines: 2,
                                   style: TextStyle(
-                                      color: tone,
+                                      color: statusTextColor,
                                       fontSize: 11,
                                       fontWeight: FontWeight.w900,
                                       letterSpacing: .8)),
@@ -183,9 +188,9 @@ class HomeWatchPlanEmptyCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('✨ WATCH TOGETHER',
+                        Text('WATCH TOGETHER',
                             style: TextStyle(
-                                color: FlixieColors.primary,
+                                color: FlixieColors.primaryText,
                                 fontSize: 11,
                                 fontWeight: FontWeight.w900,
                                 letterSpacing: .8)),

@@ -513,6 +513,8 @@ class FriendWatchPlanCard extends StatelessWidget {
                   const SizedBox(height: 7),
                   Text(
                     title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: FlixieColors.textPrimary,
                       fontSize: 22,
@@ -560,7 +562,7 @@ class FriendWatchPlanCard extends StatelessWidget {
               final actionButton = FilledButton(
                 onPressed: action,
                 style: FilledButton.styleFrom(
-                  minimumSize: const Size(0, 40),
+                  minimumSize: const Size(0, 44),
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                 ),
                 child: Text(actionLabel),

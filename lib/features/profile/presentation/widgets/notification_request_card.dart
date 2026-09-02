@@ -179,6 +179,10 @@ class NotificationRequestCard extends StatelessWidget {
     }
   }
 
+  Color get _accentTextColor => _accentColor == FlixieColors.primary
+      ? FlixieColors.primaryText
+      : _accentColor;
+
   Widget _buildSubtitleWidget(BuildContext context) {
     if (_isEveryoneLogged) {
       final title = notification.watchMediaTitle ?? 'this watch';
@@ -711,11 +715,10 @@ class NotificationRequestCard extends StatelessWidget {
             ? FlixieColors.tabBarBackgroundFocused
             : FlixieColors.tabBarBackgroundFocused.withValues(alpha: 0.72),
         borderRadius: BorderRadius.circular(12),
-        border: Border(
-          left: BorderSide(
-            color: isUnread ? accent : Colors.transparent,
-            width: 3,
-          ),
+        border: Border.all(
+          color: isUnread
+              ? accent.withValues(alpha: 0.65)
+              : Colors.white.withValues(alpha: 0.06),
         ),
       ),
       child: Padding(
@@ -795,13 +798,32 @@ class NotificationRequestCard extends StatelessWidget {
                                   ],
                                 ),
                                 const SizedBox(height: 3),
-                                Text(
-                                  _requestKind,
-                                  style: TextStyle(
-                                    color: accent,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                  ),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        _requestKind,
+                                        style: TextStyle(
+                                          color: _accentTextColor,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
+                                    if (isUnread)
+                                      Semantics(
+                                        label: 'New notification',
+                                        child: const Text(
+                                          'NEW',
+                                          style: TextStyle(
+                                            color: FlixieColors.tertiary,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 0.6,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -929,6 +951,7 @@ class NotificationRequestCard extends StatelessWidget {
                     backgroundColor: FlixieColors.primary,
                     foregroundColor: Colors.black,
                     padding: const EdgeInsets.symmetric(vertical: 10),
+                    minimumSize: const Size(0, 44),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -941,7 +964,7 @@ class NotificationRequestCard extends StatelessWidget {
                   ),
                   label: Text(
                     _isEveryoneLogged ? 'View watch summary' : 'View plan',
-                    style: TextStyle(fontWeight: FontWeight.w800),
+                    style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
                 ),
               ),
@@ -956,8 +979,7 @@ class NotificationRequestCard extends StatelessWidget {
                         backgroundColor: FlixieColors.primary,
                         foregroundColor: Colors.black,
                         padding: const EdgeInsets.symmetric(vertical: 8),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        minimumSize: const Size(0, 44),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -979,8 +1001,7 @@ class NotificationRequestCard extends StatelessWidget {
                           color: FlixieColors.medium.withValues(alpha: 0.5),
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 8),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        minimumSize: const Size(0, 44),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -1003,7 +1024,7 @@ class NotificationRequestCard extends StatelessWidget {
                   label: const Text('Suggest another time'),
                   style: TextButton.styleFrom(
                     foregroundColor: FlixieColors.medium,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    minimumSize: const Size(0, 44),
                   ),
                 ),
               ),
@@ -1022,8 +1043,7 @@ class NotificationRequestCard extends StatelessWidget {
                       horizontal: 14,
                       vertical: 8,
                     ),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    minimumSize: const Size(0, 44),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -1050,8 +1070,7 @@ class NotificationRequestCard extends StatelessWidget {
                       horizontal: 14,
                       vertical: 8,
                     ),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    minimumSize: const Size(0, 44),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -1074,7 +1093,7 @@ class NotificationRequestCard extends StatelessWidget {
                         backgroundColor: FlixieColors.success,
                         foregroundColor: Colors.black,
                         padding: const EdgeInsets.symmetric(vertical: 10),
-                        minimumSize: const Size(0, 42),
+                        minimumSize: const Size(0, 44),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -1094,7 +1113,7 @@ class NotificationRequestCard extends StatelessWidget {
                         foregroundColor: FlixieColors.danger,
                         side: const BorderSide(color: FlixieColors.danger),
                         padding: const EdgeInsets.symmetric(vertical: 10),
-                        minimumSize: const Size(0, 42),
+                        minimumSize: const Size(0, 44),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),

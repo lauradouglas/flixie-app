@@ -86,8 +86,11 @@ class ProfileHeader extends StatelessWidget {
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
+                // A single badge can sit beside the handle. Multiple featured
+                // badges use their own line so their Wrap never forms an
+                // accidental second row alongside the username.
                 final badgesInline =
-                    profileBadges.isNotEmpty && constraints.maxWidth >= 240;
+                    profileBadges.length == 1 && constraints.maxWidth >= 240;
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -143,7 +146,7 @@ class ProfileHeader extends StatelessWidget {
                       const SizedBox(height: 7),
                       Text(
                         bioText,
-                        maxLines: 2,
+                        maxLines: 3,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: FlixieColors.light,

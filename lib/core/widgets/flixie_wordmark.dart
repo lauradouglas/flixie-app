@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
-import 'package:flixie_app/app/theme/flixie_typography.dart';
 
 class FlixieWordmark extends StatelessWidget {
   const FlixieWordmark({
@@ -19,11 +18,16 @@ class FlixieWordmark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final legacyWordmarkFont = switch (Theme.of(context).platform) {
+      TargetPlatform.iOS || TargetPlatform.macOS => '.SF Pro Display',
+      _ => 'Roboto',
+    };
     return Text.rich(
       flixieWordmarkSpan(
         fontSize: fontSize,
         fontWeight: fontWeight,
         letterSpacing: letterSpacing,
+        fontFamily: legacyWordmarkFont,
       ),
       textAlign: textAlign,
     );
@@ -34,15 +38,13 @@ TextSpan flixieWordmarkSpan({
   double fontSize = 24,
   FontWeight fontWeight = FontWeight.w800,
   double letterSpacing = -0.5,
+  String? fontFamily,
 }) {
-  const base = TextStyle(
-    fontFamily: FlixieTypography.fontFamily,
-    height: 1,
-  );
+  final base = TextStyle(fontFamily: fontFamily, height: 1);
   return TextSpan(
     children: [
       TextSpan(
-        text: 'flix',
+        text: 'fli',
         style: base.copyWith(
           color: Colors.white,
           fontSize: fontSize,
@@ -51,7 +53,7 @@ TextSpan flixieWordmarkSpan({
         ),
       ),
       TextSpan(
-        text: 'ie',
+        text: 'xie',
         style: base.copyWith(
           color: FlixieColors.primary,
           fontSize: fontSize,

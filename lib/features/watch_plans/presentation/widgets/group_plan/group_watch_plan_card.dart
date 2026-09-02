@@ -67,7 +67,10 @@ class GroupWatchPlanCard extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: 7),
-                            Row(
+                            Wrap(
+                              spacing: 7,
+                              runSpacing: 5,
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
                                 ProfileAvatarView(
                                   avatar: request.requesterAvatar,
@@ -81,12 +84,14 @@ class GroupWatchPlanCard extends StatelessWidget {
                                   size: 24,
                                   profileBadges: request.requesterProfileBadges,
                                 ),
-                                const SizedBox(width: 7),
-                                Flexible(
+                                ConstrainedBox(
+                                  constraints:
+                                      const BoxConstraints(maxWidth: 180),
                                   child: Text(
                                     isMyRequest
                                         ? 'You invited the group'
                                         : '@${request.requesterUsername ?? 'Member'}',
+                                    maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       color: FlixieColors.light,
@@ -95,20 +100,16 @@ class GroupWatchPlanCard extends StatelessWidget {
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 7),
                                 _StatusPill(
                                   status: request.status,
                                   needsResponse: needsResponse,
                                 ),
                                 if (createdDate.isNotEmpty)
-                                  Flexible(
-                                    child: Text(
-                                      ' · $createdDate',
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: FlixieColors.medium,
-                                        fontSize: 11,
-                                      ),
+                                  Text(
+                                    createdDate,
+                                    style: const TextStyle(
+                                      color: FlixieColors.medium,
+                                      fontSize: 11,
                                     ),
                                   ),
                               ],
@@ -189,6 +190,9 @@ class GroupWatchPlanCard extends StatelessWidget {
                       onPressed: onOpen,
                       icon: const Icon(Icons.visibility_outlined, size: 15),
                       label: const Text('View plan'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 44),
+                      ),
                     ),
                   ],
                 ),
