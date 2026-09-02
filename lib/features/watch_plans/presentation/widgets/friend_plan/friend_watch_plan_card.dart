@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/calendar/watch_calendar_service.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
+import 'package:flixie_app/features/watch_plans/presentation/utils/watch_plan_display_state.dart';
 import 'package:flixie_app/features/watch_plans/presentation/widgets/friend_plan/friend_post_watch_section.dart';
 import 'package:flixie_app/features/watch_plans/presentation/widgets/friend_plan/friend_movie_choices_section.dart';
 import 'package:flixie_app/features/watch_plans/presentation/widgets/friend_plan/friend_participants_section.dart';
@@ -92,21 +93,24 @@ class FriendWatchPlanCard extends StatelessWidget {
   final FriendAcceptanceScheduleDraft? acceptanceScheduleDraft;
 
   Color get _statusColor {
+    if (request.isCompleted) {
+      return WatchPlanColorRole.complete.color;
+    }
     if (request.normalizedWatchedStatus == 'WATCHED') {
-      return FlixieColors.primary;
+      return WatchPlanColorRole.waiting.color;
     }
     if (request.normalizedWatchedStatus == 'NOT_WATCHED') {
-      return FlixieColors.danger;
+      return WatchPlanColorRole.failed.color;
     }
     if (request.normalizedScheduleStatus == 'AGREED') {
-      return FlixieColors.secondary;
+      return WatchPlanColorRole.waiting.color;
     }
     if (request.normalizedScheduleStatus == 'PROPOSED') {
-      return FlixieColors.warning;
+      return WatchPlanColorRole.action.color;
     }
-    if (request.isAccepted) return FlixieColors.success;
-    if (request.isDeclined) return FlixieColors.danger;
-    return FlixieColors.warning;
+    if (request.isAccepted) return WatchPlanColorRole.waiting.color;
+    if (request.isDeclined) return WatchPlanColorRole.failed.color;
+    return WatchPlanColorRole.action.color;
   }
 
   IconData get _statusIcon {

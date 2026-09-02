@@ -1,0 +1,223 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
+
+import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/features/home/presentation/models/home_watch_plan_state.dart';
+import 'package:flixie_app/features/watch_plans/presentation/utils/watch_plan_display_state.dart';
+
+class HomeWatchPlanCard extends StatelessWidget {
+  const HomeWatchPlanCard({
+    super.key,
+    required this.state,
+    required this.onOpen,
+  });
+
+  final HomeWatchPlanState state;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final poster = state.plan.movie?.posterPath;
+    final tone = state.colorRole.color;
+    return Semantics(
+      button: true,
+      label:
+          '${state.eyebrow}. ${state.title}. ${state.supportingText}. ${state.actionLabel}',
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onOpen,
+              borderRadius: BorderRadius.circular(18),
+              child: Ink(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Color.alphaBlend(
+                    tone.withValues(alpha: .10),
+                    FlixieColors.surfaceElevated,
+                  ),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: tone.withValues(alpha: .75)),
+                ),
+                child: LayoutBuilder(builder: (context, constraints) {
+                  final narrow = constraints.maxWidth < 390 ||
+                      MediaQuery.textScalerOf(context).scale(1) > 1.15;
+                  final details = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(state.statusIcon, color: tone, size: 16),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(state.eyebrow,
+                                  maxLines: 2,
+                                  style: TextStyle(
+                                      color: tone,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: .8)),
+                            ),
+                          ]),
+                      const SizedBox(height: 5),
+                      Text(state.title,
+                          maxLines: narrow ? 3 : 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 4),
+                      Text(state.supportingText,
+                          maxLines: narrow ? 3 : 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: FlixieColors.medium,
+                              fontSize: 13,
+                              height: 1.25)),
+                    ],
+                  );
+                  final button = FilledButton(
+                    onPressed: onOpen,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: tone,
+                      foregroundColor: state.colorRole.foreground,
+                      minimumSize: const Size(0, 44),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                    ),
+                    child: Text(state.actionLabel,
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                  );
+                  final leading = ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: SizedBox(
+                      width: 58,
+                      height: 87,
+                      child: poster?.isNotEmpty == true
+                          ? CachedNetworkImage(
+                              imageUrl: poster!.startsWith('http')
+                                  ? poster
+                                  : 'https://image.tmdb.org/t/p/w185$poster',
+                              fit: BoxFit.cover,
+                              errorWidget: (_, __, ___) => _placeholder(tone),
+                            )
+                          : _placeholder(tone),
+                    ),
+                  );
+                  if (narrow) {
+                    return Column(children: [
+                      Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            leading,
+                            const SizedBox(width: 12),
+                            Expanded(child: details)
+                          ]),
+                      const SizedBox(height: 10),
+                      SizedBox(width: double.infinity, child: button),
+                    ]);
+                  }
+                  return Row(children: [
+                    leading,
+                    const SizedBox(width: 12),
+                    Expanded(child: details),
+                    const SizedBox(width: 12),
+                    button,
+                  ]);
+                }),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _placeholder(Color tone) => ColoredBox(
+        color: tone.withValues(alpha: .14),
+        child: Icon(Icons.movie_filter_rounded, color: tone, size: 28),
+      );
+}
+
+class HomeWatchPlanEmptyCard extends StatelessWidget {
+  const HomeWatchPlanEmptyCard({super.key, required this.onCreate});
+  final VoidCallback onCreate;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Semantics(
+          container: true,
+          label:
+              'Watch together. Plan your next watch. Pick movies and decide with friends.',
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: FlixieColors.surfaceElevated.withValues(alpha: .65),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: FlixieColors.primary.withValues(alpha: .55),
+              ),
+            ),
+            child: Column(
+              children: [
+                const Row(children: [
+                  SizedBox(
+                    width: 58,
+                    height: 87,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Color(0x337C4DFF),
+                        borderRadius: BorderRadius.all(Radius.circular(10)),
+                      ),
+                      child: Icon(Icons.movie_filter_rounded,
+                          color: FlixieColors.primary, size: 28),
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('✨ WATCH TOGETHER',
+                            style: TextStyle(
+                                color: FlixieColors.primary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: .8)),
+                        SizedBox(height: 5),
+                        Text('Plan your next watch',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800)),
+                        SizedBox(height: 4),
+                        Text('Pick movies and decide with friends.',
+                            style: TextStyle(
+                                color: FlixieColors.medium,
+                                fontSize: 13,
+                                height: 1.25)),
+                      ],
+                    ),
+                  ),
+                ]),
+                const SizedBox(height: 10),
+                FilledButton(
+                  onPressed: onCreate,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(44),
+                    foregroundColor: Colors.white,
+                    backgroundColor: FlixieColors.primary,
+                  ),
+                  child: const Text('Make a plan'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+}

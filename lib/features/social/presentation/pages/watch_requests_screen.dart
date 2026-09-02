@@ -1218,18 +1218,18 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     }
 
     addSection(
-      'Needs reply',
-      'Plans waiting for your response',
+      'Needs you',
+      'Watch Plans with an action for you',
       sections.needsReply,
     );
     addSection('Upcoming', 'Your agreed watch plans', sections.upcoming);
-    addSection('Ready to wrap up', 'The planned time has passed',
-        sections.readyToWrapUp);
     addSection(
-      'Scheduling in progress',
+      'Planning',
       'Invites waiting or being arranged',
       sections.planning,
     );
+    addSection('Ready to wrap up', 'The planned time has passed',
+        sections.readyToWrapUp);
 
     return RefreshIndicator(
       onRefresh: _load,

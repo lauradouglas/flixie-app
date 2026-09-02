@@ -44,6 +44,10 @@ import 'package:flixie_app/features/home/presentation/widgets/trending_friends_s
 import 'package:flixie_app/features/home/presentation/widgets/personalized_recommendation_card.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_sheet.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/write_review_sheet.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/watch_request_sheet.dart';
+import 'package:flixie_app/features/home/presentation/models/home_watch_plan_state.dart';
+import 'package:flixie_app/features/home/presentation/widgets/home_watch_plan_card.dart';
+import 'package:flixie_app/features/home/presentation/widgets/watch_plans_introduction_card.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/sharing/models/share_card_data.dart';
@@ -73,6 +77,8 @@ class _HomeScreenState extends State<HomeScreen> {
   int _watchRequestsNeedingResponse = 0;
   List<WatchRequest> _watchPlansToShow = const [];
   bool _isLoadingWatchPlans = false;
+  bool _watchPlansIntroDismissed = false;
+  bool _hasUsedWatchPlans = false;
   bool _isLoading = true;
   bool _isLoadingRecommendations = false;
   String? _error;
@@ -172,6 +178,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _watchlistMovieIds = Set.of(snapshot.watchlistMovieIds);
     _watchRequestsNeedingResponse = snapshot.watchRequestsNeedingResponse;
     _watchPlansToShow = List.of(snapshot.watchPlansToShow);
+    _hasUsedWatchPlans = snapshot.hasUsedWatchPlans;
     _isLoadingWatchPlans = false;
     _heroPage = snapshot.heroPage;
     _forYouPage = snapshot.forYouPage;
@@ -220,6 +227,7 @@ class _HomeScreenState extends State<HomeScreen> {
       watchlistMovieIds: Set.of(_watchlistMovieIds),
       watchRequestsNeedingResponse: _watchRequestsNeedingResponse,
       watchPlansToShow: List.of(_watchPlansToShow),
+      hasUsedWatchPlans: _hasUsedWatchPlans,
       heroPage: _heroPage,
       forYouPage: _forYouPage,
       scrollOffset:
@@ -373,6 +381,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _watchlistMovieIds = {};
         _watchRequestsNeedingResponse = 0;
         _watchPlansToShow = const [];
+        _hasUsedWatchPlans = false;
         _isLoadingRecommendations = false;
       });
       return;
@@ -429,9 +438,12 @@ class _HomeScreenState extends State<HomeScreen> {
       directPlans,
       closedPlanIds,
       groupPlans,
+      WatchPlanVisibilityStore.isIntroductionDismissed(user.id)
+          .catchError((_) => false),
     ]).timeout(
       const Duration(seconds: 4),
-      onTimeout: () => const [<WatchRequest>[], <String>{}, <WatchRequest>[]],
+      onTimeout: () =>
+          const [<WatchRequest>[], <String>{}, <WatchRequest>[], false],
     );
     if (!mounted || _loadedForUserId != user.id) return;
 
@@ -448,6 +460,8 @@ class _HomeScreenState extends State<HomeScreen> {
         user: user,
         closedPlanIds: results[1] as Set<String>,
       );
+      _watchPlansIntroDismissed = results[3] as bool;
+      _hasUsedWatchPlans = allPlans.isNotEmpty;
       _isLoadingWatchPlans = false;
     });
   }
@@ -564,6 +578,24 @@ class _HomeScreenState extends State<HomeScreen> {
       // direct-plan detail route.
       conversationId: '__group_home__',
       selectedCandidateId: request.selectedCandidateId,
+      candidates: request.candidates
+          .map((candidate) => WatchPlanCandidate(
+                id: candidate.id,
+                movieId: candidate.movieId,
+                showId: candidate.showId,
+                mediaType: candidate.showId != null ? 'show' : 'movie',
+                addedByUserId: candidate.addedByUserId,
+                addedByUsername: candidate.addedByUsername,
+                addedByAvatar: candidate.addedByAvatar,
+                title: candidate.title,
+                posterPath: candidate.posterPath,
+                selectedByUserIds: candidate.selectedByUserIds,
+              ))
+          .toList(growable: false),
+      hasCurrentUserAccepted: request.hasCurrentUserAccepted,
+      hasCurrentUserCompleted: request.hasCurrentUserCompleted,
+      canSchedule: request.canSchedule,
+      canComplete: request.canComplete,
       requester: requester,
       createdBy: requester,
       participants: participants,
@@ -760,20 +792,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }) {
     final now = DateTime.now();
     final plans = requests.where((request) {
-      final scheduledFor = request.scheduledFor;
-      final isAgreed =
-          request.normalizedScheduleStatus == 'AGREED' || request.isScheduled;
-      final needsReply = _watchPlanNeedsResponse(request, user.id);
+      final completedAt = request.completedAt ?? request.lastActivityAt;
+      final recentCompletion = completedAt == null ||
+          completedAt.isAfter(now.subtract(const Duration(days: 7)));
       return request.isWatchRequest &&
-          !request.isTerminal &&
+          !request.isCancelled &&
+          !request.isExpired &&
+          !request.isDeclined &&
           !closedPlanIds.contains(request.id) &&
-          !_hasLoggedWatchForPlan(user, request) &&
-          !_isPlanFullyRated(request) &&
-          (needsReply ||
-              (isAgreed &&
-                  scheduledFor != null &&
-                  !scheduledFor
-                      .isBefore(now.subtract(const Duration(days: 5)))));
+          (!request.isCompleted || recentCompletion);
     }).toList()
       ..sort(
         (left, right) {
@@ -793,7 +820,7 @@ class _HomeScreenState extends State<HomeScreen> {
               .compareTo(rightTime ?? rightFallback);
         },
       );
-    return plans.take(10).toList(growable: false);
+    return plans;
   }
 
   bool _watchPlanNeedsResponse(WatchRequest request, String userId) {
@@ -815,25 +842,6 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_watchPlanNeedsResponse(request, userId)) return 1;
     if (scheduledFor != null && !scheduledFor.isAfter(now)) return 2;
     return 3;
-  }
-
-  bool _isPlanFullyRated(WatchRequest plan) {
-    final participantIds = <String>{
-      if (plan.requesterId.isNotEmpty) plan.requesterId,
-      // Some older/direct API shapes omit the recipient from `participants`.
-      // A plan must remain on Home until both sides have rated it.
-      if (plan.recipientId.isNotEmpty) plan.recipientId,
-      ...plan.participants
-          .where(
-              (participant) => participant.response.toUpperCase() == 'ACCEPTED')
-          .map((participant) => participant.user?.id)
-          .whereType<String>(),
-    };
-    if (participantIds.isEmpty) return false;
-    return participantIds.every((userId) => plan.watchConfirmations.any(
-          (confirmation) =>
-              confirmation.userId == userId && confirmation.rating != null,
-        ));
   }
 
   bool _hasLoggedWatchForPlan(models.User user, WatchRequest plan) {
@@ -949,6 +957,72 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _openWatchPlanCreation() async {
+    final auth = context.read<AuthProvider>();
+    final userId = auth.dbUser?.id;
+    if (userId == null || userId.isEmpty) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => MovieWatchRequestSheet(
+        movieId: null,
+        movieTitle: null,
+        requesterId: userId,
+        friends: auth.cachedFriends?.friendships ?? const [],
+        onSuccess: () {
+          unawaited(WatchPlanVisibilityStore.dismissIntroduction(userId));
+          if (mounted) {
+            setState(() {
+              _watchPlansIntroDismissed = true;
+              _hasUsedWatchPlans = true;
+            });
+            unawaited(_preloadInitialWatchPlans(auth.dbUser));
+          }
+        },
+        onError: () {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Could not create the Watch Plan'),
+            backgroundColor: FlixieColors.danger,
+          ));
+        },
+      ),
+    );
+  }
+
+  Future<void> _dismissWatchPlansIntroduction() async {
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (userId == null) return;
+    setState(() => _watchPlansIntroDismissed = true);
+    await WatchPlanVisibilityStore.dismissIntroduction(userId);
+  }
+
+  Future<void> _showWatchPlansExplanation() => showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Choose together'),
+          content: const Text(
+            'Add a few movie options, invite a friend or group, then choose the final movie and arrange when and where to watch.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Got it'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _openWatchPlanCreation();
+              },
+              child: const Text('Make a plan'),
+            ),
+          ],
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final unreadCount = context.watch<AuthProvider>().unreadNotificationCount;
@@ -957,6 +1031,16 @@ class _HomeScreenState extends State<HomeScreen> {
         ? user!.firstName!.trim()
         : user?.username;
     final heroMovies = _heroMovies;
+    final selectedWatchPlan = user == null
+        ? null
+        : selectHomeWatchPlanState(_watchPlansToShow, user.id);
+    final attentionCount = user == null
+        ? 0
+        : homeWatchPlanAttentionCount(_watchPlansToShow, user.id);
+    final showWatchPlansIntro = user != null &&
+        !_isLoadingWatchPlans &&
+        !_hasUsedWatchPlans &&
+        !_watchPlansIntroDismissed;
 
     return FlixiePageScaffold(
       backgroundColor: FlixieColors.background,
@@ -1012,14 +1096,28 @@ class _HomeScreenState extends State<HomeScreen> {
                             name: greetingName,
                             avatar: user?.avatar,
                             profileBadges: user?.profileBadges ?? const [],
-                            requestCount: _watchRequestsNeedingResponse,
+                            requestCount: attentionCount,
                             onSearch: () => context.push('/search'),
                             onWatchlist: () => context.go('/watchlist'),
                             onInvite: () => context.go('/social'),
-                            onRequests: () => context.push('/watch-requests'),
+                            onRequests: attentionCount > 0
+                                ? () => context.push('/watch-requests')
+                                : _openWatchPlanCreation,
+                            featureCard: showWatchPlansIntro
+                                ? WatchPlansIntroductionCard(
+                                    onCreate: _openWatchPlanCreation,
+                                    onLearnMore: _showWatchPlansExplanation,
+                                    onDismiss: _dismissWatchPlansIntroduction,
+                                  )
+                                : null,
                           ),
                         ),
-                        _buildUpcomingWatchPlanSection(context, user),
+                        _buildUpcomingWatchPlanSection(
+                          context,
+                          user,
+                          selectedState: selectedWatchPlan,
+                          suppressEmptyState: showWatchPlansIntro,
+                        ),
                         if (heroMovies.isNotEmpty) ...[
                           const HomeSectionHeader(title: 'Trending now'),
                           const SizedBox(height: 4),
@@ -1970,21 +2068,72 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildUpcomingWatchPlanSection(
     BuildContext context,
-    models.User? user,
-  ) {
+    models.User? user, {
+    required HomeWatchPlanState? selectedState,
+    required bool suppressEmptyState,
+  }) {
     final plans = _watchPlansToShow;
     if (_isLoadingWatchPlans && plans.isEmpty && user != null) {
-      return const Padding(
-        padding: EdgeInsets.fromLTRB(16, 0, 16, 20),
-        child: SkeletonBox(
-          width: double.infinity,
-          height: 100,
-          borderRadius: 14,
-        ),
+      return const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          HomeSectionHeader(title: 'Watch together'),
+          SizedBox(height: 8),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: SkeletonBox(
+              width: double.infinity,
+              height: 116,
+              borderRadius: 18,
+            ),
+          ),
+          SizedBox(height: 16),
+        ],
       );
     }
-    if (plans.isEmpty || user == null) {
+    if (user == null || suppressEmptyState) {
       return const SizedBox.shrink();
+    }
+    if (selectedState == null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          HomeSectionHeader(
+            title: 'Watch together',
+            onSeeAll: () => context.push('/watch-requests'),
+          ),
+          const SizedBox(height: 8),
+          HomeWatchPlanEmptyCard(onCreate: _openWatchPlanCreation),
+          const SizedBox(height: 16),
+        ],
+      );
+    }
+    // The selector deliberately returns one contextual card. Keep the legacy
+    // carousel below as a defensive fallback for an unknown future state.
+    if (selectedState.plan.id.isNotEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          HomeSectionHeader(
+            title: 'Watch together',
+            onSeeAll: () => context.push('/watch-requests'),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: HomeWatchPlanCard(
+              state: selectedState,
+              onOpen: () async {
+                final auth = context.read<AuthProvider>();
+                await context.push(selectedState.route);
+                if (!mounted) return;
+                await _preloadInitialWatchPlans(auth.dbUser);
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+      );
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2778,6 +2927,7 @@ class _HomeSessionSnapshot {
     required this.watchlistMovieIds,
     required this.watchRequestsNeedingResponse,
     required this.watchPlansToShow,
+    required this.hasUsedWatchPlans,
     required this.heroPage,
     required this.forYouPage,
     required this.scrollOffset,
@@ -2793,6 +2943,7 @@ class _HomeSessionSnapshot {
   final Set<int> watchlistMovieIds;
   final int watchRequestsNeedingResponse;
   final List<WatchRequest> watchPlansToShow;
+  final bool hasUsedWatchPlans;
   final int heroPage;
   final int forYouPage;
   final double scrollOffset;

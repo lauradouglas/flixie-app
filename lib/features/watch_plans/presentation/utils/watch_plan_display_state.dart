@@ -1,4 +1,27 @@
+import 'package:flutter/material.dart';
+
+import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/models/watch_request.dart';
+
+/// Semantic colours shared by Watch Plan presentation surfaces.
+///
+/// These describe meaning, not backend lifecycle values: an accepted plan can
+/// still be [action] for one participant and [waiting] for another.
+enum WatchPlanColorRole { neutral, action, waiting, complete, failed }
+
+extension WatchPlanColorRoleStyle on WatchPlanColorRole {
+  Color get color => switch (this) {
+        WatchPlanColorRole.neutral => FlixieColors.primary,
+        WatchPlanColorRole.action => FlixieColors.warning,
+        WatchPlanColorRole.waiting => FlixieColors.secondary,
+        WatchPlanColorRole.complete => FlixieColors.success,
+        WatchPlanColorRole.failed => FlixieColors.danger,
+      };
+
+  Color get foreground => this == WatchPlanColorRole.neutral
+      ? Colors.white
+      : FlixieColors.background;
+}
 
 enum WatchPlanFilter {
   active,
@@ -44,12 +67,33 @@ class WatchPlanDisplayState {
       !request.isExpired;
 
   static bool needsAttention(WatchRequest request, String currentUserId) {
+    if (!isActive(request)) return false;
+    final isCreator = request.requesterId == currentUserId;
     final isIncoming = request.requesterId != currentUserId &&
         (request.recipientId == currentUserId ||
             request.participantFor(currentUserId) != null);
     final proposal = request.latestPendingProposal;
+    final accepted = request.hasCurrentUserAccepted == true ||
+        request.participantFor(currentUserId)?.response.toUpperCase() ==
+            'ACCEPTED' ||
+        isCreator;
+    final unresolvedChoices = accepted &&
+        request.candidates.length > 1 &&
+        request.selectedCandidateId == null;
+    final hasChosen = request.candidates
+        .any((candidate) => candidate.selectedBy(currentUserId));
+    final everyoneChose = request.candidates
+            .expand((candidate) => candidate.selectedByUserIds)
+            .toSet()
+            .length >=
+        request.analyticsParticipantCount;
     return (request.isPending && isIncoming) ||
-        (proposal != null && proposal.proposerId != currentUserId);
+        (proposal != null && proposal.proposerId != currentUserId) ||
+        (unresolvedChoices && !isCreator && !hasChosen) ||
+        (unresolvedChoices && isCreator && everyoneChose) ||
+        (request.selectedCandidateId != null &&
+            request.scheduledFor == null &&
+            (request.canSchedule == true || isCreator));
   }
 
   static bool isUpcoming(WatchRequest request, {DateTime? now}) =>

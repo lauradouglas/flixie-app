@@ -22,6 +22,7 @@ class GreetingHeader extends StatelessWidget {
     required this.onWatchlist,
     required this.onInvite,
     required this.onRequests,
+    this.featureCard,
   });
 
   final String? name;
@@ -32,6 +33,7 @@ class GreetingHeader extends StatelessWidget {
   final VoidCallback onWatchlist;
   final VoidCallback onInvite;
   final VoidCallback onRequests;
+  final Widget? featureCard;
 
   @override
   Widget build(BuildContext context) {
@@ -72,6 +74,10 @@ class GreetingHeader extends StatelessWidget {
               ),
             ],
           ),
+          if (featureCard != null) ...[
+            const SizedBox(height: 12),
+            featureCard!,
+          ],
           const SizedBox(height: 10),
           Row(
             children: [
@@ -89,15 +95,17 @@ class GreetingHeader extends StatelessWidget {
               const SizedBox(width: 8),
               _ActionButton(
                 icon: Icons.group_add_rounded,
-                label: 'Invite',
+                label: 'Invite friends',
                 onTap: onInvite,
               ),
               const SizedBox(width: 8),
               _ActionButton(
                 icon: Icons.local_activity_rounded,
-                label: 'Plans',
+                label: requestCount > 0 ? 'Plans' : 'Make plan',
                 onTap: onRequests,
                 badgeCount: requestCount,
+                supportingLabel:
+                    requestCount > 0 ? '$requestCount needs you' : null,
               ),
             ],
           ),
@@ -113,12 +121,14 @@ class _ActionButton extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.badgeCount = 0,
+    this.supportingLabel,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
   final int badgeCount;
+  final String? supportingLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -129,63 +139,90 @@ class _ActionButton extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: onTap,
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                SizedBox(
-                  width: 30,
-                  height: 27,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    alignment: Alignment.center,
-                    children: [
-                      Icon(icon, color: FlixieColors.primary, size: 18),
-                      if (badgeCount > 0)
-                        Positioned(
-                          top: -3,
-                          right: -5,
-                          child: Container(
-                            constraints: const BoxConstraints(
-                              minWidth: 20,
-                              minHeight: 20,
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 5, vertical: 2),
-                            alignment: Alignment.center,
-                            decoration: const BoxDecoration(
-                              color: FlixieColors.tertiary,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Text(
-                              badgeCount > 99 ? '99+' : '$badgeCount',
-                              style: const TextStyle(
-                                color: Colors.black,
-                                fontSize: 11,
-                                height: 1,
-                                fontWeight: FontWeight.w900,
+          child: SizedBox(
+            height: 96,
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 30,
+                      height: 27,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        alignment: Alignment.center,
+                        children: [
+                          Icon(icon, color: FlixieColors.primary, size: 18),
+                          if (badgeCount > 0)
+                            Positioned(
+                              top: -3,
+                              right: -5,
+                              child: Container(
+                                constraints: const BoxConstraints(
+                                  minWidth: 20,
+                                  minHeight: 20,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 5, vertical: 2),
+                                alignment: Alignment.center,
+                                decoration: const BoxDecoration(
+                                  color: FlixieColors.tertiary,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Text(
+                                  badgeCount > 99 ? '99+' : '$badgeCount',
+                                  style: const TextStyle(
+                                    color: Colors.black,
+                                    fontSize: 11,
+                                    height: 1,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
                               ),
                             ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    SizedBox(
+                      height: 12,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          label,
+                          maxLines: 1,
+                          style: const TextStyle(
+                            color: FlixieColors.light,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            height: 1,
                           ),
                         ),
-                    ],
-                  ),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    SizedBox(
+                      height: 9,
+                      child: supportingLabel == null
+                          ? null
+                          : FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                supportingLabel!,
+                                maxLines: 1,
+                                style: const TextStyle(
+                                  color: FlixieColors.medium,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1,
+                                ),
+                              ),
+                            ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: FlixieColors.light,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    height: 1,
-                  ),
-                ),
-                ],
               ),
             ),
           ),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/social/presentation/widgets/request_poster_placeholder.dart';
+import 'package:flixie_app/features/watch_plans/presentation/utils/watch_plan_display_state.dart';
 import 'package:flixie_app/models/group_watch_request.dart';
 
 class GroupWatchPlanCard extends StatelessWidget {
@@ -96,7 +97,10 @@ class GroupWatchPlanCard extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(width: 7),
-                                _StatusPill(status: request.status),
+                                _StatusPill(
+                                  status: request.status,
+                                  needsResponse: needsResponse,
+                                ),
                                 if (createdDate.isNotEmpty)
                                   Flexible(
                                     child: Text(
@@ -207,20 +211,24 @@ class GroupWatchPlanCard extends StatelessWidget {
 }
 
 class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.status});
+  const _StatusPill({required this.status, required this.needsResponse});
 
   final WatchRequestStatus status;
+  final bool needsResponse;
 
   @override
   Widget build(BuildContext context) {
     final color = switch (status) {
-      WatchRequestStatus.open => FlixieColors.primary,
+      WatchRequestStatus.open => needsResponse
+          ? WatchPlanColorRole.action.color
+          : WatchPlanColorRole.waiting.color,
       WatchRequestStatus.accepted ||
       WatchRequestStatus.scheduled =>
-        FlixieColors.secondary,
-      WatchRequestStatus.completed => FlixieColors.success,
-      WatchRequestStatus.expired => FlixieColors.medium,
-      WatchRequestStatus.cancelled => FlixieColors.danger,
+        WatchPlanColorRole.waiting.color,
+      WatchRequestStatus.completed => WatchPlanColorRole.complete.color,
+      WatchRequestStatus.expired ||
+      WatchRequestStatus.cancelled =>
+        WatchPlanColorRole.failed.color,
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),

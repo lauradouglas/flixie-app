@@ -11,6 +11,7 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/color_utils.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/features/social/presentation/widgets/group_avatar.dart';
+import 'package:flixie_app/features/watch_plans/presentation/utils/watch_plan_display_state.dart';
 import 'package:flixie_app/models/group.dart';
 
 class NotificationRequestCard extends StatelessWidget {
@@ -149,7 +150,18 @@ class NotificationRequestCard extends StatelessWidget {
   }
 
   Color get _accentColor {
-    if (_isEveryoneLogged) return FlixieColors.success;
+    if (_isEveryoneLogged) return WatchPlanColorRole.complete.color;
+    switch (notification.watchPlanEvent) {
+      case 'PLAN_CANCELLED':
+        return WatchPlanColorRole.failed.color;
+      case 'PLAN_SCHEDULED':
+      case 'PLAN_RESCHEDULED':
+        return WatchPlanColorRole.waiting.color;
+      case 'PLAN_INVITED':
+      case 'SCHEDULE_PROPOSED':
+      case 'TITLE_SELECTED':
+        return WatchPlanColorRole.action.color;
+    }
     switch (notification.type) {
       case FlixieNotification.groupInvite:
       case FlixieNotification.groupRequest:
