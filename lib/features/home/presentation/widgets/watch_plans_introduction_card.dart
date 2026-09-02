@@ -55,12 +55,32 @@ class WatchPlansIntroductionCard extends StatelessWidget {
           const Text('Add a few movies, invite friends and choose together.',
               style: TextStyle(color: FlixieColors.medium, fontSize: 13)),
           const SizedBox(height: 12),
-          Wrap(spacing: 8, runSpacing: 8, children: [
-            FilledButton(
-                onPressed: onCreate, child: const Text('Make a watch plan')),
-            OutlinedButton(
-                onPressed: onLearnMore, child: const Text('See how it works')),
-          ]),
+          LayoutBuilder(builder: (context, constraints) {
+            final compactLabels = constraints.maxWidth < 360;
+            return Row(children: [
+              Expanded(
+                child: FilledButton(
+                  onPressed: onCreate,
+                  child: Text(
+                    compactLabels ? 'Make plan' : 'Make a watch plan',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: onLearnMore,
+                  child: Text(
+                    compactLabels ? 'How it works' : 'See how it works',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+            ]);
+          }),
         ]),
       );
 }

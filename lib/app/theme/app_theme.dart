@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:flixie_app/app/theme/flixie_typography.dart';
+
 /// Flixie color palette - cinematic dark theme.
 class FlixieColors {
   // Primary – vivid purple
@@ -103,6 +105,7 @@ class AppTheme {
 
     return ThemeData(
       useMaterial3: true,
+      fontFamily: FlixieTypography.fontFamily,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: Colors.transparent,
 
@@ -311,46 +314,10 @@ class AppTheme {
       iconTheme: const IconThemeData(color: FlixieColors.light),
 
       // Text theme
-      textTheme: const TextTheme(
-        displayLarge: TextStyle(
-          color: FlixieColors.white,
-          fontWeight: FontWeight.bold,
-        ),
-        displayMedium: TextStyle(
-          color: FlixieColors.white,
-          fontWeight: FontWeight.bold,
-        ),
-        displaySmall: TextStyle(
-          color: FlixieColors.white,
-          fontWeight: FontWeight.bold,
-        ),
-        headlineLarge: TextStyle(
-          color: FlixieColors.white,
-          fontWeight: FontWeight.bold,
-        ),
-        headlineMedium: TextStyle(
-          color: FlixieColors.white,
-          fontWeight: FontWeight.w600,
-        ),
-        headlineSmall: TextStyle(
-          color: FlixieColors.light,
-          fontWeight: FontWeight.w600,
-        ),
-        titleLarge: TextStyle(
-          color: FlixieColors.light,
-          fontWeight: FontWeight.w600,
-        ),
-        titleMedium: TextStyle(color: FlixieColors.light),
-        titleSmall: TextStyle(color: FlixieColors.medium),
-        bodyLarge: TextStyle(color: FlixieColors.light),
-        bodyMedium: TextStyle(color: FlixieColors.light),
-        bodySmall: TextStyle(color: FlixieColors.medium),
-        labelLarge: TextStyle(
-          color: FlixieColors.light,
-          fontWeight: FontWeight.w600,
-        ),
-        labelMedium: TextStyle(color: FlixieColors.medium),
-        labelSmall: TextStyle(color: FlixieColors.mediumShade),
+      textTheme: FlixieTypography.textTheme(
+        primary: FlixieColors.textPrimary,
+        secondary: FlixieColors.light,
+        muted: FlixieColors.medium,
       ),
     );
   }
@@ -394,6 +361,7 @@ class AppTheme {
 
     return ThemeData(
       useMaterial3: true,
+      fontFamily: FlixieTypography.fontFamily,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: Colors.transparent,
       appBarTheme: const AppBarTheme(
@@ -546,22 +514,10 @@ class AppTheme {
       ),
       dividerTheme: const DividerThemeData(color: outline, thickness: 1),
       iconTheme: const IconThemeData(color: textDark),
-      textTheme: const TextTheme(
-        displayLarge: TextStyle(color: textDark, fontWeight: FontWeight.bold),
-        displayMedium: TextStyle(color: textDark, fontWeight: FontWeight.bold),
-        displaySmall: TextStyle(color: textDark, fontWeight: FontWeight.bold),
-        headlineLarge: TextStyle(color: textDark, fontWeight: FontWeight.bold),
-        headlineMedium: TextStyle(color: textDark, fontWeight: FontWeight.w600),
-        headlineSmall: TextStyle(color: textDark, fontWeight: FontWeight.w600),
-        titleLarge: TextStyle(color: textDark, fontWeight: FontWeight.w600),
-        titleMedium: TextStyle(color: textDark),
-        titleSmall: TextStyle(color: textMuted),
-        bodyLarge: TextStyle(color: textDark),
-        bodyMedium: TextStyle(color: textDark),
-        bodySmall: TextStyle(color: textMuted),
-        labelLarge: TextStyle(color: textDark, fontWeight: FontWeight.w600),
-        labelMedium: TextStyle(color: textMuted),
-        labelSmall: TextStyle(color: textMuted),
+      textTheme: FlixieTypography.textTheme(
+        primary: textDark,
+        secondary: textDark,
+        muted: textMuted,
       ),
     );
   }

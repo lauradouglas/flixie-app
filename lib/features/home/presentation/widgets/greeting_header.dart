@@ -105,7 +105,7 @@ class GreetingHeader extends StatelessWidget {
                 onTap: onRequests,
                 badgeCount: requestCount,
                 supportingLabel:
-                    requestCount > 0 ? '$requestCount needs you' : null,
+                    requestCount > 0 ? '$requestCount need(s) you' : null,
               ),
             ],
           ),

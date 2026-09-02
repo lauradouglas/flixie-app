@@ -1,5 +1,6 @@
-import 'dart:async';
 import 'dart:ui';
+
+import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -76,7 +77,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Set<int> _watchlistMovieIds = {};
   int _watchRequestsNeedingResponse = 0;
   List<WatchRequest> _watchPlansToShow = const [];
-  bool _isLoadingWatchPlans = false;
+  // Start pending so an authenticated first frame cannot mistake the still
+  // loading collection for a user who has never created a Watch Plan.
+  bool _isLoadingWatchPlans = true;
   bool _watchPlansIntroDismissed = false;
   bool _hasUsedWatchPlans = false;
   bool _isLoading = true;
@@ -1194,8 +1197,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildHeroCarousel(BuildContext context, List<MovieShort> movies) {
     final count = movies.length.clamp(0, _maxHeroCarouselItems);
+    final visibleMovies = movies.take(count).toList(growable: false);
+    final sharedPosterHeight = visibleMovies.fold<double>(
+      0,
+      (largest, movie) => _heroPosterHeight(movie) > largest
+          ? _heroPosterHeight(movie)
+          : largest,
+    );
+    final textScale =
+        MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6).toDouble();
+    // Every page reserves the height required by the largest card in this
+    // carousel. This keeps card edges and pagination aligned when a title,
+    // date, or social row takes more room than its neighbours.
+    final carouselHeight = sharedPosterHeight + (220 * textScale);
     return SizedBox(
-      height: 560,
+      height: carouselHeight,
       child: Stack(
         children: [
           Padding(
@@ -1211,7 +1227,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   context,
                   movies[index],
                 );
-                final detailCard = _buildHeroCard(context, movies[index]);
+                final detailCard = _buildHeroCard(
+                  context,
+                  movies[index],
+                  posterHeight: sharedPosterHeight,
+                );
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 6),
                   child: AnimatedBuilder(
@@ -1258,6 +1278,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  double _heroPosterHeight(MovieShort movie) =>
+      movie.name.length <= 20 ? 375.0 : 350.0;
+
   Widget _buildCarouselDots(List<MovieShort> movies) {
     final count = movies.length.clamp(0, _maxHeroCarouselItems);
     if (count <= 1) return const SizedBox.shrink();
@@ -1281,7 +1304,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildHeroCard(BuildContext context, MovieShort movie) {
+  Widget _buildHeroCard(
+    BuildContext context,
+    MovieShort movie, {
+    required double posterHeight,
+  }) {
     final inWatchlist = _watchlistMovieIds.contains(movie.id);
     final isUpdating = _watchlistUpdatesInFlight.contains(movie.id);
     final friendActivityLoading = context.read<AuthProvider>().dbUser != null &&
@@ -1291,8 +1318,6 @@ class _HomeScreenState extends State<HomeScreen> {
         interactions.where((interaction) => interaction.onWatchlist).toList();
     final favouritedBy =
         interactions.where((interaction) => interaction.favourited).toList();
-    final posterHeight = movie.name.length <= 20 ? 375.0 : 350.0;
-
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
@@ -1329,14 +1354,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                         Center(
-                          child: FractionallySizedBox(
-                            widthFactor: 0.62,
-                            heightFactor: 1,
-                            child: ClipRect(
+                          child: SizedBox(
+                            height: posterHeight,
+                            child: AspectRatio(
+                              aspectRatio: 2 / 3,
                               child: CachedNetworkImage(
                                 imageUrl:
                                     'https://image.tmdb.org/t/p/w780${movie.poster}',
-                                fit: BoxFit.cover,
+                                fit: BoxFit.contain,
                                 alignment: Alignment.center,
                                 errorWidget: (_, __, ___) => _heroFallback(),
                               ),

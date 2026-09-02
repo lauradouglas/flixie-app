@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/app/theme/flixie_typography.dart';
 
 class FlixieWordmark extends StatelessWidget {
   const FlixieWordmark({
@@ -34,7 +35,10 @@ TextSpan flixieWordmarkSpan({
   FontWeight fontWeight = FontWeight.w800,
   double letterSpacing = -0.5,
 }) {
-  const base = TextStyle(height: 1);
+  const base = TextStyle(
+    fontFamily: FlixieTypography.fontFamily,
+    height: 1,
+  );
   return TextSpan(
     children: [
       TextSpan(

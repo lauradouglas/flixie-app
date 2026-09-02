@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/app/theme/flixie_typography.dart';
 
 class FlixieSectionHeader extends StatelessWidget {
   const FlixieSectionHeader({
@@ -37,10 +38,11 @@ class FlixieSectionHeader extends StatelessWidget {
       maxLines: maxTitleLines,
       overflow: TextOverflow.ellipsis,
       style: titleStyle ??
-          textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-            letterSpacing: 1.5,
+          (uppercase
+                  ? FlixieTypography.eyebrow.copyWith(fontSize: 16)
+                  : textTheme.titleLarge)
+              ?.copyWith(
+            color: FlixieColors.textPrimary,
           ),
     );
 
@@ -71,10 +73,8 @@ class FlixieSectionHeader extends StatelessWidget {
               ),
               child: Text(
                 '$badge',
-                style: const TextStyle(
+                style: FlixieTypography.compactLabel.copyWith(
                   color: FlixieColors.primary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),

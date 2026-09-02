@@ -61,6 +61,10 @@ class NotificationRequestCard extends StatelessWidget {
   bool get _isFriendRequest =>
       notification.type == FlixieNotification.friendRequest;
 
+  bool get _isGroupWatchRequest =>
+      notification.type == FlixieNotification.groupRequest ||
+      notification.data?['scope']?.toString() == 'GROUP';
+
   String get _watchRequestPath {
     final groupId = notification.data?['groupId']?.toString() ??
         notification.groupInviteGroupId;
@@ -662,7 +666,7 @@ class NotificationRequestCard extends StatelessWidget {
             : _requestKind;
     final groupName = notification.groupWatchGroupName?.trim() ?? '';
     final groupId = notification.groupWatchGroupId;
-    final group = _isEveryoneLogged
+    final group = (_isEveryoneLogged || _isGroupWatchRequest)
         ? context.select<AuthProvider, Group?>((auth) {
             final groups = auth.cachedGroups ?? const <Group>[];
             return groups.where((candidate) {
@@ -671,11 +675,12 @@ class NotificationRequestCard extends StatelessWidget {
             }).firstOrNull;
           })
         : null;
-    final initials = _isEveryoneLogged && groupName.isNotEmpty
-        ? groupName
-            .substring(0, groupName.length > 4 ? 4 : groupName.length)
-            .toUpperCase()
-        : notification.senderInitials ?? '';
+    final initials =
+        (_isEveryoneLogged || _isGroupWatchRequest) && groupName.isNotEmpty
+            ? groupName
+                .substring(0, groupName.length > 4 ? 4 : groupName.length)
+                .toUpperCase()
+            : notification.senderInitials ?? '';
     final avatarBg = avatarColorFromIconColor(notification.senderIconColor);
     final accent = _accentColor;
     final msg = notification.watchRequestMessage;
@@ -740,7 +745,7 @@ class NotificationRequestCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           if (!_isFriendRequest) ...[
-                            _isEveryoneLogged
+                            (_isEveryoneLogged || _isGroupWatchRequest)
                                 ? group == null
                                     ? _GroupAvatarFallback(initials: initials)
                                     : GroupAvatar(group: group, radius: 17)
