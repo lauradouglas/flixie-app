@@ -164,8 +164,8 @@ class FriendPostWatchSection extends StatelessWidget {
             child: _buildPostWatchStatus(context, other, mine, otherEntry)),
         if (state == FriendPostWatchState.waitingForMe) ...[
           const SizedBox(height: 12),
-          _PostWatchSurface(
-              child: const Text(
+          const _PostWatchSurface(
+              child: Text(
                   'Their rating is hidden for now. Log your own take before seeing theirs.',
                   style: TextStyle(color: FlixieColors.light, fontSize: 13)))
         ],

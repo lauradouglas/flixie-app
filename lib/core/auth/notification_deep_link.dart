@@ -48,6 +48,11 @@ String notificationDeepLinkPath(Map<String, dynamic> data) {
     return '/watch-requests/$requestId';
   }
 
+  // An invited user is not yet a group member. Keep them at the notification
+  // card that contains the explicit Accept / Decline decision instead of
+  // opening the group's member-only surface.
+  if (type == 'GROUP_INVITE') return '/notifications';
+
   if (route != null && route.startsWith('/')) {
     return _attributeNotificationDetailRoute(route);
   }
@@ -58,10 +63,6 @@ String notificationDeepLinkPath(Map<String, dynamic> data) {
       groupId != null &&
       groupId.isNotEmpty) {
     return '/groups/$groupId?tab=requests';
-  }
-
-  if (type == 'GROUP_INVITE' && groupId != null && groupId.isNotEmpty) {
-    return '/groups/$groupId';
   }
 
   if (type == 'FRIEND_REQUEST' && friendId != null && friendId.isNotEmpty) {

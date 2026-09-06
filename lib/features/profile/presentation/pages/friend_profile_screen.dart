@@ -767,8 +767,8 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
         );
 
       case _FriendshipStatus.pending:
-        return Row(
-          mainAxisSize: MainAxisSize.min,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             ElevatedButton.icon(
               icon: const Icon(Icons.check),
@@ -779,14 +779,15 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
               ),
               onPressed: _acceptRequest,
             ),
-            const SizedBox(width: 8),
-            OutlinedButton(
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
                 foregroundColor: FlixieColors.danger,
                 side: const BorderSide(color: FlixieColors.danger),
               ),
               onPressed: _declineRequest,
-              child: const Text('Decline'),
+              icon: const Icon(Icons.close_rounded),
+              label: const Text('Decline'),
             ),
           ],
         );
@@ -938,7 +939,11 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
           children: [
             _modernHeader(user),
-            if (!widget.previewMode) ...[
+            // Notification deep links use preview mode to suppress ordinary
+            // profile actions. An incoming friend request is an exception:
+            // its recipient still needs the Accept / Decline decision here.
+            if (!widget.previewMode ||
+                _friendshipStatus == _FriendshipStatus.pending) ...[
               const SizedBox(height: 18),
               _profileActions(),
               if (_friendshipStatus == _FriendshipStatus.friends) ...[
@@ -1090,34 +1095,53 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
 
   Widget _modernStats(int watched, int watchlist, int favourites) {
     final values = [
-      (watched, 'Watched'),
-      (watchlist, 'Watchlist'),
-      (favourites, 'Favourites'),
+      (watched, 'Watched', Icons.visibility_outlined),
+      (watchlist, 'Watchlist', Icons.bookmark_border_rounded),
+      (favourites, 'Favourites', Icons.favorite_border_rounded),
     ];
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: BoxDecoration(
-        color: FlixieColors.surface.withValues(alpha: .72),
-        border: Border.all(color: FlixieColors.tabBarBorder),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(children: [
-        for (var i = 0; i < values.length; i++) ...[
-          Expanded(
-            child: Column(children: [
-              Text('${values[i].$1}',
-                  style: const TextStyle(
-                      color: FlixieColors.primary,
-                      fontSize: 25,
-                      fontWeight: FontWeight.w800)),
-              Text(values[i].$2,
-                  style: const TextStyle(color: FlixieColors.light)),
-            ]),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Taste at a glance',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: FlixieColors.light,
+                fontWeight: FontWeight.w800,
+              ),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            color: FlixieColors.surface.withValues(alpha: .72),
+            border: Border.all(color: FlixieColors.tabBarBorder),
+            borderRadius: BorderRadius.circular(14),
           ),
-          if (i < values.length - 1)
-            Container(width: 1, height: 50, color: FlixieColors.tabBarBorder),
-        ],
-      ]),
+          child: Row(children: [
+            for (var i = 0; i < values.length; i++) ...[
+              Expanded(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(values[i].$3, color: FlixieColors.primary, size: 20),
+                  const SizedBox(height: 5),
+                  Text('${values[i].$1}',
+                      style: const TextStyle(
+                          color: FlixieColors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900)),
+                  Text(values[i].$2,
+                      style: const TextStyle(
+                          color: FlixieColors.medium,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600)),
+                ]),
+              ),
+              if (i < values.length - 1)
+                Container(
+                    width: 1, height: 48, color: FlixieColors.tabBarBorder),
+            ],
+          ]),
+        ),
+      ],
     );
   }
 

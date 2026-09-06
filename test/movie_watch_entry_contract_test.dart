@@ -3,7 +3,7 @@ import 'package:flixie_app/models/movie_watch_entry.dart';
 
 void main() {
   test('a Watch Plan watch-entry payload keeps rating and recommendation', () {
-    final payload = LogMovieWatchRequest(
+    final payload = const LogMovieWatchRequest(
       movieId: 123,
       watchedAt: '2026-08-30T20:00:00.000Z',
       rating: 8,

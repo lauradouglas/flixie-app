@@ -109,6 +109,9 @@ void main() {
 
     expect(selected?.plan.id, 'today');
     expect(selected?.type, HomeWatchPlanStateType.today);
+    expect(selected?.title, 'Inception');
+    expect(selected?.eyebrow, 'STARTS IN 3 HOURS');
+    expect(selected?.supportingText, contains('Scheduled'));
   });
 
   test('cancelled plans are excluded', () {

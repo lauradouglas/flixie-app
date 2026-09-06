@@ -41,8 +41,20 @@ class FriendMovieChoicesSection extends StatelessWidget {
     final canChooseMovies =
         organiser || request.isAccepted || request.isScheduled;
     final selectedCandidate = request.selectedCandidateId;
-    if (selectedCandidate != null) {
-      return _buildFinalMovieSummary(selectedCandidate, organiser);
+    // One option is already the plan's final title. Older requests can lack
+    // the persisted selectedCandidateId, so derive the same state here while
+    // the server catches those records up.
+    final singleOptionIsFinal = selectedCandidate == null &&
+        request.candidates.length == 1 &&
+        (request.isAccepted || request.isScheduled);
+    final effectiveSelectedCandidate = selectedCandidate ??
+        (singleOptionIsFinal ? request.candidates.single.id : null);
+    if (effectiveSelectedCandidate != null) {
+      return _buildFinalMovieSummary(
+        effectiveSelectedCandidate,
+        organiser,
+        autoFinal: singleOptionIsFinal,
+      );
     }
     final acceptedIds = <String>{request.requesterId, request.recipientId};
     final savingMovieChoices =
@@ -326,7 +338,11 @@ class FriendMovieChoicesSection extends StatelessWidget {
     );
   }
 
-  Widget _buildFinalMovieSummary(String selectedCandidateId, bool organiser) {
+  Widget _buildFinalMovieSummary(
+    String selectedCandidateId,
+    bool organiser, {
+    required bool autoFinal,
+  }) {
     final selected = request.candidates
         .where((candidate) => candidate.id == selectedCandidateId)
         .firstOrNull;
@@ -340,7 +356,7 @@ class FriendMovieChoicesSection extends StatelessWidget {
         decoration: BoxDecoration(
             color: FlixieColors.surfaceElevated,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: FlixieColors.primary, width: 2)),
+            border: Border.all(color: FlixieColors.tabBarBorder)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
             const Expanded(
@@ -354,9 +370,13 @@ class FriendMovieChoicesSection extends StatelessWidget {
               _OtherMovieOptionsMenu(alternatives: alternatives),
             if (organiser)
               IconButton(
-                onPressed: onChangeMovie,
-                tooltip: 'Change selected movie',
-                icon: const Icon(Icons.edit_outlined),
+                onPressed: autoFinal ? onAddCandidate : onChangeMovie,
+                tooltip: autoFinal
+                    ? 'Add another movie option'
+                    : 'Change selected movie',
+                icon: Icon(autoFinal
+                    ? Icons.add_circle_outline_rounded
+                    : Icons.edit_outlined),
                 color: FlixieColors.primaryText,
               ),
           ]),

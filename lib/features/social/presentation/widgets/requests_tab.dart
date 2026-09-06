@@ -28,6 +28,8 @@ import 'package:flixie_app/features/watch_plans/presentation/widgets/group_plan/
 import 'package:flixie_app/features/watch_plans/presentation/widgets/group_plan/group_watch_plan_card.dart';
 import 'package:flixie_app/features/watch_plans/controllers/group_watch_plan_controller.dart';
 
+enum _GroupPlanDeclineChoice { suggestAnotherTime, leavePlan }
+
 class _GroupRequestProviderSummary extends StatefulWidget {
   const _GroupRequestProviderSummary({
     required this.groupId,
@@ -282,13 +284,16 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
           await context.read<WatchRequestCache>().refreshGroup(widget.groupId);
       for (final request in requests) {
         final scheduledFor = DateTime.tryParse(request.scheduledFor ?? '');
-        if (scheduledFor != null && scheduledFor.isAfter(DateTime.now())) {
+        if (scheduledFor != null &&
+            scheduledFor.isAfter(DateTime.now()) &&
+            _currentUserStatus(request) != 'DECLINED') {
           PushNotificationService.scheduleWatchPlanReminders(
             planId: request.databaseRequestId ?? request.id,
             scheduledFor: scheduledFor.toLocal(),
             title: request.movieTitle ?? 'Group watch',
             withName: widget.groupName ?? 'your group',
-            deepLink: '/groups/${widget.groupId}?tab=plans',
+            deepLink:
+                '/groups/${widget.groupId}?tab=requests&requestId=${request.databaseRequestId ?? request.id}',
             scope: 'GROUP',
           );
         }
@@ -331,7 +336,8 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
   List<GroupWatchRequest> get _filtered =>
       _controller.filtered(focusedId: widget.initialRequestId);
 
-  Future<void> _respond(GroupWatchRequest req, String status) async {
+  Future<void> _respond(GroupWatchRequest req, String status,
+      {bool suppressNotification = false}) async {
     final userId = widget.currentUserId;
     if (userId.isEmpty) return;
 
@@ -348,7 +354,8 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
       final decision = WatchResponseDecision.fromString(status);
       try {
         await GroupService.respondToWatchRequest(
-            convId, req.id, userId, decision);
+            convId, req.id, userId, decision,
+            suppressNotification: suppressNotification);
       } catch (e) {
         logger.d('New respond endpoint failed, using legacy: $e');
         await GroupService.updateWatchRequestForMember(
@@ -393,6 +400,79 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
         });
       }
     }
+  }
+
+  Future<void> _showDeclineOptions(GroupWatchRequest req) async {
+    final hasProposedTime = req.proposedDate?.trim().isNotEmpty == true;
+    final choice = await showModalBottomSheet<_GroupPlanDeclineChoice>(
+      context: context,
+      useSafeArea: true,
+      backgroundColor: FlixieColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              hasProposedTime ? 'Can’t make that time?' : 'Leave this plan?',
+              style: const TextStyle(
+                color: FlixieColors.light,
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              hasProposedTime
+                  ? 'You can stay in the plan and suggest a time that suits you.'
+                  : 'Leaving means you will no longer receive updates for this Watch Plan.',
+              style: const TextStyle(color: FlixieColors.medium, fontSize: 13),
+            ),
+            if (hasProposedTime) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => Navigator.pop(
+                      sheetContext, _GroupPlanDeclineChoice.suggestAnotherTime),
+                  icon: const Icon(Icons.edit_calendar_outlined),
+                  label: const Text('Suggest another time'),
+                ),
+              ),
+            ],
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => Navigator.pop(
+                    sheetContext, _GroupPlanDeclineChoice.leavePlan),
+                icon: const Icon(Icons.person_remove_outlined),
+                label: const Text('Not interested in this plan'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: FlixieColors.danger,
+                  side: const BorderSide(color: FlixieColors.danger),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || choice == null) return;
+    if (choice == _GroupPlanDeclineChoice.suggestAnotherTime) {
+      // They remain pending until they actually send a replacement time.
+      await _scheduleRequest(req, acceptingAfterSelection: true);
+      return;
+    }
+    await _respond(req, 'DECLINED');
+  }
+
+  Future<void> _acceptPlan(GroupWatchRequest req) async {
+    await _respond(req, 'ACCEPTED');
   }
 
   String _groupPlanRequestId(GroupWatchRequest request) =>
@@ -725,7 +805,7 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
   }
 
   Future<void> _scheduleRequest(GroupWatchRequest req,
-      {String? initialIso}) async {
+      {String? initialIso, bool acceptingAfterSelection = false}) async {
     final selected =
         await showModalBottomSheet<({DateTime scheduledFor, String? location})>(
       context: context,
@@ -741,32 +821,13 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
     if (!mounted || selected == null) return;
 
     final userId = widget.currentUserId;
-    final convId = widget.conversationId ?? req.groupId;
-    final analytics = context.read<AnalyticsController>();
     setState(() => _processing[req.id] = true);
     try {
-      final updated = await GroupService.scheduleWatchRequest(
-        convId,
+      await GroupService.proposeWatchPlanSchedule(
         req.id,
-        userId: userId,
-        scheduledFor: selected.scheduledFor.toUtc().toIso8601String(),
+        userId,
+        proposedFor: selected.scheduledFor.toUtc().toIso8601String(),
         location: selected.location,
-      );
-      await analytics.watchPlanScheduled(
-        watchPlanId: updated.databaseRequestId ?? updated.id,
-        contentId: updated.mediaId,
-        contentType: updated.analyticsContentType,
-        planType: 'group',
-        participantCount: updated.analyticsParticipantCount,
-        source: 'group',
-      );
-      await PushNotificationService.scheduleWatchPlanReminders(
-        planId: updated.databaseRequestId ?? updated.id,
-        scheduledFor: selected.scheduledFor,
-        title: updated.movieTitle ?? 'Group watch',
-        withName: widget.groupName ?? 'your group',
-        deepLink: '/groups/${widget.groupId}?tab=plans',
-        scope: 'GROUP',
       );
       await _load();
       if (mounted) {
@@ -794,7 +855,7 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Scheduled for ${_fullDateTime(selected.scheduledFor)}',
+                    'Time proposed for ${_fullDateTime(selected.scheduledFor)}',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -808,16 +869,7 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
             backgroundColor: FlixieColors.surfaceElevated,
             duration: const Duration(seconds: 5),
             persist: false,
-            action: SnackBarAction(
-              label: 'Calendar',
-              textColor: FlixieColors.success,
-              onPressed: () => WatchCalendarService.addScheduledWatch(
-                title: req.movieTitle ?? 'Watch together',
-                scheduledFor: selected.scheduledFor,
-                note: req.message,
-                location: selected.location ?? req.location,
-              ),
-            ),
+            action: null,
           ),
         );
       }
@@ -825,7 +877,45 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
       logger.e('Schedule watch request error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to schedule watch')),
+          const SnackBar(content: Text('Failed to propose a time')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _processing.remove(req.id));
+    }
+  }
+
+  Future<void> _approveProposedTime(GroupWatchRequest req) async {
+    final proposed = DateTime.tryParse(req.proposedDate ?? '')?.toLocal();
+    if (proposed == null || !proposed.isAfter(DateTime.now())) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content:
+              Text('That proposed time has passed. Update the time instead.'),
+          backgroundColor: FlixieColors.danger,
+        ));
+      }
+      return;
+    }
+    setState(() => _processing[req.id] = true);
+    try {
+      await GroupService.proposeWatchPlanSchedule(
+        req.id,
+        widget.currentUserId,
+        proposedFor: proposed.toUtc().toIso8601String(),
+        location: req.location,
+      );
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Time sent to the group for approval.')),
+        );
+      }
+    } catch (e) {
+      logger.e('Approve proposed time error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to approve the proposed time')),
         );
       }
     } finally {
@@ -1140,8 +1230,7 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
                 label: 'Decline',
                 icon: Icons.cancel_outlined,
                 color: FlixieColors.danger,
-                onPressed:
-                    isProcessing ? null : () => _respond(req, 'DECLINED'),
+                onPressed: isProcessing ? null : () => _showDeclineOptions(req),
                 loading: processingResponse == 'DECLINED',
               ),
             ),
@@ -1162,8 +1251,7 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
                 label: 'Accept',
                 icon: Icons.check_circle_outline,
                 color: FlixieColors.primary,
-                onPressed:
-                    isProcessing ? null : () => _respond(req, 'ACCEPTED'),
+                onPressed: isProcessing ? null : () => _acceptPlan(req),
                 filled: true,
                 loading: processingResponse == 'ACCEPTED',
               ),
@@ -1173,6 +1261,36 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
       ],
     );
   }
+
+  Widget _rejoinPlanAction(GroupWatchRequest req) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Interested in the new plan?',
+              style: TextStyle(
+                  color: FlixieColors.light,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900)),
+          const SizedBox(height: 5),
+          const Text(
+            'You previously declined. Join again to receive plan updates and reminders.',
+            style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: _responseButton(
+              label: 'Join this plan',
+              icon: Icons.check_circle_outline_rounded,
+              color: FlixieColors.primary,
+              onPressed: _processingResponses[req.id] != null
+                  ? null
+                  : () => _acceptPlan(req),
+              filled: true,
+              loading: _processingResponses[req.id] == 'ACCEPTED',
+            ),
+          ),
+        ],
+      );
 
   Widget _manageActions(GroupWatchRequest req) {
     final userId = widget.currentUserId;
@@ -1223,20 +1341,7 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
             ),
             const SizedBox(height: 18),
           ],
-          _GroupPlanDetailRow(
-            icon: Icons.event_available_outlined,
-            label: 'Scheduled',
-            value: _fullDateTime(scheduledFor),
-          ),
-          const SizedBox(height: 10),
-          _GroupPlanDetailRow(
-            icon: Icons.location_on_outlined,
-            label: 'Location',
-            value: req.location?.trim().isNotEmpty == true
-                ? req.location!.trim()
-                : 'Not set',
-          ),
-          const SizedBox(height: 16),
+          if (isAfterWatchTime) const SizedBox(height: 2),
           Row(children: [
             Expanded(
               child: ElevatedButton(
@@ -1277,26 +1382,187 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Plan the details',
-            style: TextStyle(
+        Text(
+            req.proposedDate?.isNotEmpty == true
+                ? 'Respond to the proposed time'
+                : 'Plan the details',
+            style: const TextStyle(
                 color: FlixieColors.light,
                 fontSize: 15,
                 fontWeight: FontWeight.w800)),
         const SizedBox(height: 5),
-        const Text('Choose a time and add a place if you have one.',
-            style: TextStyle(color: FlixieColors.medium, fontSize: 12)),
+        Text(
+            req.proposedDate?.isNotEmpty == true
+                ? 'Keep it or suggest a time that works better for you.'
+                : 'Choose a time and add a place if you have one.',
+            style: const TextStyle(color: FlixieColors.medium, fontSize: 12)),
         const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: () =>
-                _scheduleRequest(req, initialIso: req.proposedDate),
-            icon: const Icon(Icons.edit_calendar_outlined),
-            label: const Text('Suggest a time'),
+        if (req.proposedDate?.isNotEmpty == true)
+          Row(children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => _approveProposedTime(req),
+                icon: const Icon(Icons.check_circle_outline),
+                label: const Text('Approve time'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _scheduleRequest(req),
+                icon: const Icon(Icons.edit_calendar_outlined),
+                label: const Text('Update time'),
+              ),
+            ),
+          ])
+        else
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _scheduleRequest(req),
+              icon: const Icon(Icons.edit_calendar_outlined),
+              label: const Text('Suggest a time'),
+            ),
           ),
-        ),
       ],
     );
+  }
+
+  Widget? _scheduleProposalActions(GroupWatchRequest req) {
+    final proposal = req.activeScheduleProposal;
+    if (proposal == null) return null;
+    final mine = proposal.responseFor(widget.currentUserId);
+    final proposedAt = DateTime.tryParse(proposal.proposedFor ?? '')?.toLocal();
+    final when =
+        proposedAt == null ? 'the proposed time' : _fullDateTime(proposedAt);
+    if (mine?.status == 'PENDING') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Does this time work for you?',
+              style: TextStyle(
+                  color: FlixieColors.light,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900)),
+          const SizedBox(height: 5),
+          Text(when,
+              style: const TextStyle(
+                  color: FlixieColors.secondary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800)),
+          if (proposal.location?.isNotEmpty == true) ...[
+            const SizedBox(height: 4),
+            Text(proposal.location!,
+                style:
+                    const TextStyle(color: FlixieColors.medium, fontSize: 12)),
+          ],
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () =>
+                  _respondToScheduleProposal(req, proposal.id, 'accepted'),
+              icon: const Icon(Icons.check_rounded),
+              label: const Text('Works for me'),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              // Start from the proposal being changed. Defaulting to “now +
+              // two hours” made this look like the app had altered the time.
+              onPressed: () =>
+                  _scheduleRequest(req, initialIso: proposal.proposedFor),
+              icon: const Icon(Icons.edit_calendar_outlined, size: 18),
+              label: const Text('Suggest another time'),
+            ),
+          ),
+          Align(
+            alignment: Alignment.center,
+            child: TextButton(
+              onPressed: () =>
+                  _respondToScheduleProposal(req, proposal.id, 'declined'),
+              child: Text(req.scheduledFor == null
+                  ? 'Can’t make this one'
+                  : 'Keep current time'),
+            ),
+          ),
+        ],
+      );
+    }
+    final waiting = proposal.responses
+        .where((response) => response.status == 'PENDING')
+        .length;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(
+          proposal.proposerId == widget.currentUserId
+              ? 'Waiting for the group'
+              : 'Time response saved',
+          style: const TextStyle(
+              color: FlixieColors.light,
+              fontSize: 16,
+              fontWeight: FontWeight.w900)),
+      const SizedBox(height: 5),
+      Text(
+          '$when · $waiting ${waiting == 1 ? 'reply' : 'replies'} still needed',
+          style: const TextStyle(color: FlixieColors.medium, fontSize: 12)),
+    ]);
+  }
+
+  Future<void> _respondToScheduleProposal(
+    GroupWatchRequest req,
+    String proposalId,
+    String decision,
+  ) async {
+    final proposal = req.activeScheduleProposal;
+    final proposedAt = proposal == null
+        ? null
+        : DateTime.tryParse(proposal.proposedFor ?? '')?.toLocal();
+    if (decision == 'accepted' &&
+        proposedAt != null &&
+        !proposedAt.isAfter(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('That proposed time has passed. Suggest a new time.'),
+          backgroundColor: FlixieColors.danger,
+        ),
+      );
+      return;
+    }
+    setState(() => _processing[req.id] = true);
+    try {
+      final updated = await GroupService.respondToWatchPlanSchedule(
+        req.id,
+        proposalId,
+        widget.currentUserId,
+        decision,
+      );
+      if (updated.scheduledFor != null) {
+        final scheduled = DateTime.tryParse(updated.scheduledFor!)?.toLocal();
+        if (scheduled != null) {
+          await PushNotificationService.scheduleWatchPlanReminders(
+            planId: updated.databaseRequestId ?? updated.id,
+            scheduledFor: scheduled,
+            title: updated.movieTitle ?? 'Group watch',
+            withName: widget.groupName ?? 'your group',
+            deepLink:
+                '/groups/${widget.groupId}?tab=requests&requestId=${updated.id}',
+            scope: 'GROUP',
+          );
+        }
+      }
+      await _load();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Could not save your schedule response')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _processing.remove(req.id));
+    }
   }
 
   bool _canScheduleAsParticipant(GroupWatchRequest req) {
@@ -1414,12 +1680,15 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
       isMyRequest: isMyRequest,
       canManage: canManage,
       isProcessing: isProcessing,
-      needsReply: _needsCurrentUserResponse(req),
+      needsReply: _needsCurrentUserResponse(req) || myStatus == 'DECLINED',
       posterUrl: posterUrl,
       proposedDate: proposedDate,
       stage: _groupPlanStage(req, isMyRequest),
-      responseActions: _responseActions(req),
+      responseActions: myStatus == 'DECLINED'
+          ? _rejoinPlanAction(req)
+          : _responseActions(req),
       manageActions: _manageActions(req),
+      scheduleActions: _scheduleProposalActions(req),
       movieChoicesBuilder: (_) => _groupMovieChoicesSection(req, myStatus),
       activity: GroupPlanActivity(
         req: req,
@@ -1495,6 +1764,7 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
     return RefreshIndicator(
       onRefresh: _load,
       color: FlixieColors.primary,
+      triggerMode: RefreshIndicatorTriggerMode.anywhere,
       child: Column(
         children: [
           if (widget.initialRequestId?.isNotEmpty != true) _buildSummaryStrip(),
@@ -1593,49 +1863,6 @@ class GroupRequestsTabState extends State<GroupRequestsTab> {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _GroupPlanDetailRow extends StatelessWidget {
-  const _GroupPlanDetailRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, color: FlixieColors.secondary, size: 20),
-        const SizedBox(width: 10),
-        Expanded(
-          child: RichText(
-            text: TextSpan(
-              style: const TextStyle(fontSize: 14),
-              children: [
-                TextSpan(
-                  text: '$label: ',
-                  style: const TextStyle(
-                    color: FlixieColors.light,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                TextSpan(
-                  text: value,
-                  style: const TextStyle(color: FlixieColors.medium),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

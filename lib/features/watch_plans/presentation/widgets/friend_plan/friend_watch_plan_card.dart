@@ -690,7 +690,8 @@ class FriendWatchPlanCard extends StatelessWidget {
         pendingSchedule.proposedFor != null;
     final canMessage =
         request.groupId?.isEmpty != false && other?.id.isNotEmpty == true;
-    final hasChoices = request.isAccepted &&
+    final hasBothParticipants = request.isAccepted || request.isScheduled;
+    final hasChoices = hasBothParticipants &&
         request.candidates
             .any((candidate) => candidate.selectedByUserIds.isNotEmpty);
     final hasSchedule = request.normalizedScheduleStatus == 'AGREED';
@@ -718,7 +719,7 @@ class FriendWatchPlanCard extends StatelessWidget {
             ]),
             const SizedBox(height: 10),
             Text(
-                request.selectedCandidateId == null
+                request.selectedCandidateId == null || !hasBothParticipants
                     ? 'Planning a watch together'
                     : movie?.title ?? 'Watch Plan',
                 style: const TextStyle(
@@ -781,7 +782,10 @@ class FriendWatchPlanCard extends StatelessWidget {
           _PlanSurface(child: _planActions(invitationDecisionOnly: true)),
           const SizedBox(height: 14),
         ],
-        if (request.candidates.isNotEmpty) ...[
+        // A creator's provisional choice is not a shared final movie until
+        // the invitee accepts. Keeping it out of this detail avoids falsely
+        // presenting the plan as ready before both people are participating.
+        if (request.candidates.isNotEmpty && hasBothParticipants) ...[
           _PlanSurface(child: _movieChoicesSection()),
           const SizedBox(height: 14),
         ],
@@ -797,13 +801,13 @@ class FriendWatchPlanCard extends StatelessWidget {
             const SizedBox(height: 14),
             Row(children: [
               Expanded(child: Divider(color: stageColor(true), thickness: 4)),
-              SizedBox(width: 10),
+              const SizedBox(width: 10),
               Expanded(
                   child: Divider(color: stageColor(hasChoices), thickness: 4)),
-              SizedBox(width: 10),
+              const SizedBox(width: 10),
               Expanded(
                   child: Divider(color: stageColor(hasSchedule), thickness: 4)),
-              SizedBox(width: 10),
+              const SizedBox(width: 10),
               Expanded(
                   child: Divider(color: stageColor(hasWatched), thickness: 4)),
             ]),
@@ -1179,7 +1183,7 @@ class FriendWatchPlanCard extends StatelessWidget {
                         isAfterWatchTime
                             ? "After you've watched"
                             : 'Watched early?',
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: FlixieColors.textPrimary,
                           fontSize: 17,
                           fontWeight: FontWeight.w900,
@@ -1656,7 +1660,7 @@ class _ScheduleConfirmationCard extends StatelessWidget {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(
           awaitingOtherPerson ? 'Waiting for confirmation' : 'Confirm the plan',
-          style: TextStyle(
+          style: const TextStyle(
               color: FlixieColors.textPrimary,
               fontSize: 18,
               fontWeight: FontWeight.w800)),
@@ -1704,15 +1708,14 @@ class _ScheduleConfirmationCard extends StatelessWidget {
           child: FilledButton.icon(
             onPressed: onConfirm,
             icon: const Icon(Icons.check_rounded, size: 18),
-            label:
-                Text(isDateOnly ? 'Confirm watch day' : 'Confirm date & time'),
+            label: const Text('Works for me'),
           ),
         ),
       if (!awaitingOtherPerson) const SizedBox(height: 6),
       Center(
         child: TextButton(
           onPressed: onChange,
-          child: const Text('Suggest a different time'),
+          child: const Text('Propose a different date & time'),
         ),
       ),
     ]);

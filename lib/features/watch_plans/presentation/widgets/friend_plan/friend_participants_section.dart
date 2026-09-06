@@ -52,7 +52,7 @@ class FriendParticipantsSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('Participants',
-            style: TextStyle(color: FlixieColors.medium, fontSize: 13)),
+            style: TextStyle(color: FlixieColors.light, fontSize: 13)),
         const SizedBox(height: 10),
         Wrap(
           spacing: 6,
@@ -78,8 +78,8 @@ class FriendParticipantsSection extends StatelessWidget {
                       ? '$accepted accepted · $waiting waiting · scheduling in progress'
                       : '$accepted accepted · $waiting waiting'
                   : 'Waiting for responses',
-          style: TextStyle(
-              color: accepted > 0 ? FlixieColors.success : FlixieColors.medium,
+          style: const TextStyle(
+              color: FlixieColors.light,
               fontSize: 12,
               fontWeight: FontWeight.w700),
         ),
@@ -107,7 +107,7 @@ class FriendParticipantsSection extends StatelessWidget {
                       ? FlixieColors.danger
                       : accepted
                           ? FlixieColors.success
-                          : Colors.transparent,
+                          : FlixieColors.tabBarBorder,
                   width: 2.5,
                 ),
               ),
@@ -119,7 +119,7 @@ class FriendParticipantsSection extends StatelessWidget {
                       ? user.username[0].toUpperCase()
                       : '?',
                   fallbackColor: FlixieColors.primary,
-                  size: 34,
+                  size: 42,
                 ),
               ),
             ),
@@ -160,14 +160,8 @@ class FriendParticipantsSection extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: declined
-                  ? FlixieColors.danger
-                  : accepted
-                      ? (schedulingInProgress
-                          ? FlixieColors.primary
-                          : FlixieColors.success)
-                      : FlixieColors.medium,
+            style: const TextStyle(
+              color: FlixieColors.light,
               fontSize: 10,
               fontWeight: FontWeight.w700,
             ),

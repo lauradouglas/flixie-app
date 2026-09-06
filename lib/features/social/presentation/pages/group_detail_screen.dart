@@ -303,9 +303,12 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                           color: FlixieColors.primary,
                           width: 3,
                         ),
-                        insets: EdgeInsets.symmetric(horizontal: 14),
+                        // Each tab owns a consistent, touch-friendly indicator
+                        // width. Label-sized indicators shrink Chat's underline
+                        // to a near-invisible dot after the insets are applied.
+                        insets: EdgeInsets.symmetric(horizontal: 18),
                       ),
-                      indicatorSize: TabBarIndicatorSize.label,
+                      indicatorSize: TabBarIndicatorSize.tab,
                       dividerColor: Colors.white.withValues(alpha: 0.08),
                       labelColor: FlixieColors.primary,
                       unselectedLabelColor: FlixieColors.medium,

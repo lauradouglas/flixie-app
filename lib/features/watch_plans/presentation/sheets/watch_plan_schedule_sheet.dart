@@ -156,13 +156,24 @@ class _WatchPlanScheduleSheetState extends State<WatchPlanScheduleSheet> {
     );
   }
 
-  void _save() => Navigator.pop(context, (
-        proposedFor: _selected,
-        message: _leaveTimeUndecided || _mode == _ScheduleEntryMode.dateOnly
-            ? 'Time to be decided'
-            : null,
-        location: widget.initialLocation?.trim(),
-      ));
+  void _save() {
+    if (!_selected.isAfter(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Choose a date and time in the future.'),
+          backgroundColor: FlixieColors.danger,
+        ),
+      );
+      return;
+    }
+    Navigator.pop(context, (
+      proposedFor: _selected,
+      message: _leaveTimeUndecided || _mode == _ScheduleEntryMode.dateOnly
+          ? 'Time to be decided'
+          : null,
+      location: widget.initialLocation?.trim(),
+    ));
+  }
 
   Future<void> _pickDate() async {
     final picked = await showModalBottomSheet<DateTime>(

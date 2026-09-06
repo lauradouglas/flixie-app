@@ -22,8 +22,8 @@ class GroupPlanActivity extends StatelessWidget {
     final participantCount = req.analyticsParticipantCount;
     final accepted = req.acceptedCount + 1;
     final finalised = req.selectedCandidateId != null;
-    final scheduled =
-        (req.scheduledFor ?? req.proposedDate)?.isNotEmpty == true;
+    final scheduled = req.scheduledFor?.isNotEmpty == true;
+    final proposed = !scheduled && req.proposedDate?.isNotEmpty == true;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('Plan activity',
           style: TextStyle(
@@ -54,10 +54,12 @@ class GroupPlanActivity extends StatelessWidget {
           finalised),
       _groupActivityRow(
           Icons.calendar_month_outlined,
-          'Scheduled',
+          proposed ? 'Time proposed' : 'Scheduled',
           scheduled
-              ? formatDateTimeString(req.scheduledFor ?? req.proposedDate)
-              : 'No time set yet',
+              ? formatDateTimeString(req.scheduledFor)
+              : proposed
+                  ? '${formatDateTimeString(req.proposedDate)} · awaiting agreement'
+                  : 'No time set yet',
           scheduled),
       _groupActivityRow(
           Icons.visibility_outlined,

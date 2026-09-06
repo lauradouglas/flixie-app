@@ -156,6 +156,33 @@ void main() {
         findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('review card keeps the shared verdict-first structure',
+      (tester) async {
+    final data = ShareCardData.review(
+      mediaType: ShareCardMediaType.movie,
+      mediaId: 42,
+      title: 'The Film',
+      posterPath: null,
+      user: user,
+      review: _review(
+        title: 'A lasting favourite',
+        body: 'The ending stayed with me long after the credits.',
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: FlixieShareCard(data: data))),
+    );
+
+    expect(find.text('8.0'), findsOneWidget);
+    expect(find.text('A lasting favourite'), findsOneWidget);
+    expect(
+      find.text('The ending stayed with me long after the credits.'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Review _review({required String title, required String body}) => Review(

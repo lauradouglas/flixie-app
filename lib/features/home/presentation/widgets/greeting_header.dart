@@ -101,7 +101,7 @@ class GreetingHeader extends StatelessWidget {
               const SizedBox(width: 8),
               _ActionButton(
                 icon: Icons.local_activity_rounded,
-                label: requestCount > 0 ? 'Plans' : 'Make plan',
+                label: 'Plans',
                 onTap: onRequests,
                 badgeCount: requestCount,
                 supportingLabel:
@@ -140,10 +140,10 @@ class _ActionButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           onTap: onTap,
           child: SizedBox(
-            height: 96,
+            height: 80,
             child: Center(
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
+                padding: const EdgeInsets.symmetric(vertical: 7),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [

@@ -37,6 +37,12 @@ class GroupMovieChoicesSection extends StatelessWidget {
     final isCreator = request.userId == currentUserId;
     final canChoose = isCreator || myStatus == 'ACCEPTED';
     final everyoneCount = request.analyticsParticipantCount;
+    final mostApprovals = request.candidates.fold<int>(
+      0,
+      (highest, candidate) => candidate.selectedByUserIds.length > highest
+          ? candidate.selectedByUserIds.length
+          : highest,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -52,7 +58,7 @@ class GroupMovieChoicesSection extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           isCreator
-              ? 'The Watch Plan creator makes the final choice.'
+              ? 'Choose every title you would watch, then make the final choice.'
               : canChoose
                   ? 'Choose every title you would watch. The creator makes the final choice.'
                   : 'Accept the invitation first, then choose the movies you would watch.',
@@ -73,10 +79,12 @@ class GroupMovieChoicesSection extends StatelessWidget {
                 final supportCount = candidate.selectedByUserIds.toSet().length;
                 final everyoneWouldWatch =
                     everyoneCount > 0 && supportCount >= everyoneCount;
-                // For participants, green means "I selected this". For the
-                // creator choosing the winner, green must instead have the
-                // stronger and unambiguous meaning "everyone selected this".
-                final highlighted = isCreator ? everyoneWouldWatch : selected;
+                // The creator's saved choices are useful data, not a visual
+                // selection state. Reserve the highlight for a member's own
+                // active vote and surface the group preference separately.
+                final highlighted = selected && !isCreator;
+                final hasMostApprovals =
+                    supportCount > 0 && supportCount == mostApprovals;
                 final canRemove = request.selectedCandidateId == null &&
                     request.candidates.length > 1 &&
                     (isCreator || candidate.addedByUserId == currentUserId);
@@ -86,18 +94,16 @@ class GroupMovieChoicesSection extends StatelessWidget {
                 return SizedBox(
                   width: cardWidth,
                   child: InkWell(
-                    onTap: !canChoose
+                    onTap: !canChoose || processing
                         ? null
-                        : isCreator
-                            ? () => onSelectFinalMovie(candidate.id)
-                            : () => onToggleCandidate(candidate.id),
+                        : () => onToggleCandidate(candidate.id),
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: highlighted
                             ? FlixieColors.success.withValues(alpha: .1)
-                            : FlixieColors.tabBarBackgroundFocused,
+                            : Colors.transparent,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: highlighted
@@ -153,43 +159,33 @@ class GroupMovieChoicesSection extends StatelessWidget {
                                       ),
                                     ]),
                                     const SizedBox(height: 2),
-                                    if (isCreator && everyoneWouldWatch)
-                                      Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.groups_rounded,
-                                            color: FlixieColors.success,
-                                            size: 14,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Flexible(
-                                            child: Text(
-                                              'Everyone would watch · $supportCount of $everyoneCount',
-                                              style: const TextStyle(
-                                                color: FlixieColors.success,
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w800,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      )
-                                    else
-                                      Text(
-                                        '$supportCount of $everyoneCount would watch',
-                                        style: const TextStyle(
-                                          color: FlixieColors.medium,
-                                          fontSize: 12,
-                                        ),
+                                    Text(
+                                      everyoneWouldWatch
+                                          ? "Everyone's match"
+                                          : hasMostApprovals
+                                              ? 'Most approvals · $supportCount of $everyoneCount would watch'
+                                              : '$supportCount of $everyoneCount would watch',
+                                      style: TextStyle(
+                                        color: everyoneWouldWatch ||
+                                                hasMostApprovals
+                                            ? FlixieColors.success
+                                            : FlixieColors.medium,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
                                       ),
+                                    ),
                                   ],
                                 ),
                               ),
-                              if (isCreator && cardWidth >= 380)
-                                const _FinalMovieChip()
-                              else if (!isCreator && selected)
+                              if (selected && !isCreator)
                                 const Icon(Icons.check_circle,
                                     color: FlixieColors.success, size: 28),
+                              if (hasMostApprovals && !everyoneWouldWatch)
+                                const Padding(
+                                  padding: EdgeInsets.only(left: 6),
+                                  child: Icon(Icons.trending_up_rounded,
+                                      color: FlixieColors.success, size: 20),
+                                ),
                               if (canRemove)
                                 IconButton(
                                   onPressed: processing
@@ -201,15 +197,20 @@ class GroupMovieChoicesSection extends StatelessWidget {
                                   color: FlixieColors.medium,
                                   visualDensity: VisualDensity.compact,
                                 ),
+                              if (isCreator)
+                                IconButton(
+                                  onPressed: processing
+                                      ? null
+                                      : () => onSelectFinalMovie(candidate.id),
+                                  tooltip: 'Make final movie',
+                                  icon: const Icon(
+                                      Icons.check_circle_outline_rounded,
+                                      size: 23),
+                                  color: FlixieColors.primaryText,
+                                  visualDensity: VisualDensity.compact,
+                                ),
                             ],
                           ),
-                          if (isCreator && cardWidth < 380) ...[
-                            const SizedBox(height: 10),
-                            _FinalMovieChip(
-                              expanded: true,
-                              onTap: () => onSelectFinalMovie(candidate.id),
-                            ),
-                          ],
                         ],
                       ),
                     ),
@@ -219,7 +220,7 @@ class GroupMovieChoicesSection extends StatelessWidget {
             );
           },
         ),
-        if (!isCreator && canChoose) ...[
+        if (canChoose) ...[
           const SizedBox(height: 4),
           SizedBox(
             width: double.infinity,
@@ -254,44 +255,6 @@ class GroupMovieChoicesSection extends StatelessWidget {
             ),
           ),
       ],
-    );
-  }
-}
-
-class _FinalMovieChip extends StatelessWidget {
-  const _FinalMovieChip({this.onTap, this.expanded = false});
-
-  final VoidCallback? onTap;
-  final bool expanded;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: expanded ? double.infinity : null,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: FlixieColors.primary,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.lock_outline, color: Colors.white, size: 15),
-            SizedBox(width: 5),
-            Text(
-              'Make final',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

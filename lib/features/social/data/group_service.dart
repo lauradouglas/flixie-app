@@ -203,6 +203,36 @@ class GroupService {
     );
   }
 
+  static Future<GroupWatchRequest> proposeWatchPlanSchedule(
+    String requestId,
+    String userId, {
+    required String proposedFor,
+    String? location,
+  }) async {
+    final data = await ApiClient.post(
+      '/groups/request/$requestId/schedule-proposals',
+      body: {
+        'userId': userId,
+        'proposedFor': proposedFor,
+        if (location != null && location.isNotEmpty) 'location': location,
+      },
+    );
+    return GroupWatchRequest.fromJson(data as Map<String, dynamic>);
+  }
+
+  static Future<GroupWatchRequest> respondToWatchPlanSchedule(
+    String requestId,
+    String proposalId,
+    String userId,
+    String decision,
+  ) async {
+    final data = await ApiClient.post(
+      '/groups/request/$requestId/schedule-proposals/$proposalId/respond',
+      body: {'userId': userId, 'decision': decision},
+    );
+    return GroupWatchRequest.fromJson(data as Map<String, dynamic>);
+  }
+
   /// Save the movies this member would watch in a group Watch Plan.
   static Future<GroupWatchRequest> saveWatchPlanChoices(
     String requestId,
@@ -346,6 +376,7 @@ class GroupService {
     String userId,
     WatchResponseDecision decision, {
     String? message,
+    bool suppressNotification = false,
   }) async {
     await ApiClient.post(
       '/conversations/$conversationId/watch-requests/$requestId/responses',
@@ -353,6 +384,7 @@ class GroupService {
         'userId': userId,
         'decision': decision.apiValue.toLowerCase(),
         if (message != null && message.isNotEmpty) 'message': message,
+        if (suppressNotification) 'suppressNotification': true,
       },
     );
   }

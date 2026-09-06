@@ -72,6 +72,7 @@ class PushNotificationService {
   static String? _initializedUserId;
   static Timer? _pendingNavigationTimer;
   static GoRouter? _router;
+  static GlobalKey<NavigatorState>? _navigatorKey;
   static String? _pendingNavigationPath;
   static bool _navigationReady = false;
   static bool _nativeTapBridgeInitialized = false;
@@ -397,6 +398,7 @@ class PushNotificationService {
     required String userId,
     required GlobalKey<NavigatorState> navigatorKey,
   }) async {
+    _navigatorKey = navigatorKey;
     _currentUserId = userId;
     _navigationReady = true;
     _flushPendingNavigation();
@@ -423,18 +425,31 @@ class PushNotificationService {
       'notificationCenter=${settings.notificationCenter}',
     );
 
-    if (settings.authorizationStatus == AuthorizationStatus.denied) {
-      logger.w('[FCM] Notification permission denied – skipping FCM setup');
-      return;
+    final canPresentNotifications =
+        settings.authorizationStatus == AuthorizationStatus.authorized ||
+            settings.authorizationStatus == AuthorizationStatus.provisional;
+
+    // A device may still need an FCM token when alert permission is denied:
+    // the user can re-enable notifications later, and the app can receive
+    // data-only messages. Do not make token registration depend on the
+    // permission prompt's result.
+    if (!canPresentNotifications) {
+      logger.w(
+          '[FCM] Notification permission denied – registering token without foreground presentation');
+    } else {
+      // Initialise flutter_local_notifications so we can display a heads-up
+      // banner when a message arrives while the app is in the foreground.
+      await _initLocalNotifications(navigatorKey);
     }
 
-    // Initialise flutter_local_notifications so we can display a heads-up
-    // banner when a message arrives while the app is in the foreground.
-    await _initLocalNotifications(navigatorKey);
+    // Ensure Firebase Messaging auto-init is enabled so token generation
+    // starts even if the user has denied notification alerts.
+    await _messaging.setAutoInitEnabled(true);
+    logger.d('[FCM] Auto-init enabled');
 
-    // iOS: allow FCM to show alert/badge/sound when the app is in the foreground.
-    // Without this iOS silently suppresses foreground FCM messages.
-    if (Platform.isIOS) {
+    // iOS: allow FCM to show alert/badge/sound when the app is in the
+    // foreground only if the user has permitted notification presentation.
+    if (Platform.isIOS && canPresentNotifications) {
       await FirebaseMessaging.instance
           .setForegroundNotificationPresentationOptions(
         alert: true,
@@ -443,10 +458,6 @@ class PushNotificationService {
       );
       logger.d(
           '[FCM] iOS foreground presentation enabled (alert/badge/sound=true)');
-
-      // Ensure Firebase Messaging auto-init is enabled so token generation starts.
-      await _messaging.setAutoInitEnabled(true);
-      logger.d('[FCM] iOS auto-init enabled');
     }
 
     // Re-register whenever the token is rotated by Firebase.
@@ -463,6 +474,8 @@ class PushNotificationService {
     // Foreground messages: FCM does NOT show a system notification by default,
     // so we display one manually via flutter_local_notifications.
     // Only show if we still have a logged-in user (guards against post-logout delivery).
+    if (!canPresentNotifications) return;
+
     _onMessageSubscription = FirebaseMessaging.onMessage.listen((message) {
       logger.d('[FCM] Foreground message: ${message.notification?.title}');
       logger.d('[FCM] Foreground payload: data=${message.data}');
@@ -761,6 +774,10 @@ class PushNotificationService {
       _pendingNavigationTimer = null;
       _lastNavigatedPath = path;
       _lastNavigatedAt = DateTime.now();
+      // A push deep-link is a destination change, not a continuation of an
+      // unfinished sheet. Clear modal routes first so a restored creation
+      // sheet cannot remain on top of the Watch Plan it opens.
+      _navigatorKey?.currentState?.popUntil((route) => route is! PopupRoute);
       logger.i('[FCM] Navigating with GoRouter → $path');
       _router!.go(path);
     } catch (error) {

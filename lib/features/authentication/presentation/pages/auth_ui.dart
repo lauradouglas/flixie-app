@@ -801,10 +801,14 @@ class MovieSearchSheet extends StatefulWidget {
     super.key,
     required this.searchMovies,
     this.title = 'Search for movies',
+    this.initialMovies,
+    this.initialResultsLabel,
   });
 
   final Future<List<MovieShort>> Function(String query) searchMovies;
   final String title;
+  final Future<List<MovieShort>> Function()? initialMovies;
+  final String? initialResultsLabel;
 
   @override
   State<MovieSearchSheet> createState() => _MovieSearchSheetState();
@@ -814,6 +818,12 @@ class _MovieSearchSheetState extends State<MovieSearchSheet> {
   final _controller = TextEditingController();
   List<MovieShort> _results = [];
   bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialMovies != null) _loadInitialMovies();
+  }
 
   @override
   void dispose() {
@@ -837,6 +847,17 @@ class _MovieSearchSheetState extends State<MovieSearchSheet> {
     }
   }
 
+  Future<void> _loadInitialMovies() async {
+    setState(() => _loading = true);
+    try {
+      final movies = await widget.initialMovies!();
+      if (!mounted) return;
+      setState(() => _results = movies);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -852,6 +873,16 @@ class _MovieSearchSheetState extends State<MovieSearchSheet> {
                     fontWeight: FontWeight.w700,
                   ),
             ),
+            if (widget.initialResultsLabel != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                widget.initialResultsLabel!,
+                style: const TextStyle(
+                  color: FlixieColors.medium,
+                  fontSize: 13,
+                ),
+              ),
+            ],
             const SizedBox(height: 14),
             AppTextField(
               controller: _controller,

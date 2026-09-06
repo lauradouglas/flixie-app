@@ -39,6 +39,7 @@ class MovieWatchRequestSheet extends StatefulWidget {
     required this.onError,
     this.initialFriendId,
     this.initialGroupId,
+    this.initialGroupMode = false,
     this.fromMovieMatch = false,
   });
 
@@ -51,6 +52,7 @@ class MovieWatchRequestSheet extends StatefulWidget {
   final VoidCallback onError;
   final String? initialFriendId;
   final String? initialGroupId;
+  final bool initialGroupMode;
   final bool fromMovieMatch;
 
   @override
@@ -101,8 +103,10 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
           ];
     _selectedMovieId = widget.movieId;
     _fetchGroups();
-    if (widget.initialGroupId != null) {
+    if (widget.initialGroupMode || widget.initialGroupId != null) {
       _isGroupMode = true;
+    }
+    if (widget.initialGroupId != null) {
       _selectedGroupId = widget.initialGroupId;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _selectGroup(widget.initialGroupId!);
@@ -279,7 +283,16 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
   Future<void> _send() async {
     final canSend =
         _isGroupMode ? _selectedGroupId != null : _selectedFriendId != null;
-    if (!canSend || _isSending || _movieChoices.isEmpty || !_hasValidSchedule) {
+    if (!canSend || _isSending || _movieChoices.isEmpty) {
+      return;
+    }
+    if (!_hasValidSchedule) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Choose a date and time in the future.'),
+          backgroundColor: FlixieColors.danger,
+        ),
+      );
       return;
     }
     final analytics = context.read<AnalyticsController>();
@@ -366,12 +379,48 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
     }
   }
 
+  Future<void> _browseCinemaReleases() async {
+    if (_movieChoices.length >= 5) return;
+    final region =
+        context.read<AuthProvider>().dbUser?.watchProviderRegion ?? 'GB';
+    final movie = await showModalBottomSheet<MovieShort>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: FlixieColors.surface,
+      builder: (_) => MovieSearchSheet(
+        title: 'In cinemas near you',
+        initialResultsLabel: 'Now playing in $region',
+        initialMovies: () async {
+          final releases =
+              await MovieService().getNowPlayingMovies(region: region);
+          return releases
+              .where((item) =>
+                  !_movieChoices.any((choice) => choice.id == item.id))
+              .toList(growable: false);
+        },
+        searchMovies: (query) async {
+          final result = await SearchService.search(query, type: 'movie');
+          return result.results
+              .where((item) => item.movie != null)
+              .map((item) => item.movie!)
+              .where((item) =>
+                  !_movieChoices.any((choice) => choice.id == item.id))
+              .toList();
+        },
+      ),
+    );
+    if (movie != null && mounted) {
+      setState(() => _movieChoices.add(movie));
+      _selectMovieChoice(movie);
+    }
+  }
+
   void _removeMovieChoice(MovieShort movie) {
-    if (_movieChoices.length <= 1) return;
     setState(() {
       _movieChoices.remove(movie);
       if (_selectedMovieId == movie.id) {
-        _selectedMovieId = _movieChoices.first.id;
+        _selectedMovieId =
+            _movieChoices.isEmpty ? null : _movieChoices.first.id;
       }
     });
   }
@@ -784,7 +833,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                 ),
                 const SizedBox(height: 10),
                 if (_movieChoices.isEmpty)
-                  _MovieOptionsEmptyCard(onTap: _addMovieChoice)
+                  _MovieOptionsEmptyCard(onTap: _browseCinemaReleases)
                 else
                   _SelectedPlanTitle(
                     choices: _movieChoices,
@@ -1129,20 +1178,30 @@ class _SelectedPlanTitle extends StatelessWidget {
                                           child: Icon(Icons.check_circle,
                                               color: FlixieColors.success,
                                               size: 18)),
-                                    if (choices.length > 1)
-                                      Positioned(
-                                          right: 3,
-                                          top: 3,
+                                    Positioned(
+                                      right: 2,
+                                      top: 2,
+                                      child: Tooltip(
+                                        message: 'Remove ${choice.name}',
+                                        child: Material(
+                                          color: Colors.black54,
+                                          shape: const CircleBorder(),
                                           child: InkWell(
-                                              onTap: () => onRemove(choice),
-                                              child: const CircleAvatar(
-                                                  radius: 11,
-                                                  backgroundColor:
-                                                      Colors.black54,
-                                                  child: Icon(
-                                                      Icons.close_rounded,
-                                                      size: 14,
-                                                      color: Colors.white)))),
+                                            onTap: () => onRemove(choice),
+                                            customBorder: const CircleBorder(),
+                                            child: const SizedBox(
+                                              width: 28,
+                                              height: 28,
+                                              child: Icon(
+                                                Icons.close_rounded,
+                                                size: 17,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   ]))),
                           const SizedBox(height: 4),
                           Text(choice.name,

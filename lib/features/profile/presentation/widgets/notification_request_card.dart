@@ -937,6 +937,20 @@ class NotificationRequestCard extends StatelessWidget {
                 height: 28,
                 child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
               ),
+            ] else if (notification.type == FlixieNotification.groupInvite &&
+                notification.linkedRequestId != null &&
+                notification.groupInviteGroupId != null) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => context.push(
+                    '/group-invites/${notification.linkedRequestId}?groupId=${notification.groupInviteGroupId}',
+                  ),
+                  icon: const Icon(Icons.visibility_outlined, size: 18),
+                  label: const Text('View invitation'),
+                ),
+              ),
             ] else if (_isWatchNotification &&
                 notification.linkedRequestId != null) ...[
               const SizedBox(height: 10),

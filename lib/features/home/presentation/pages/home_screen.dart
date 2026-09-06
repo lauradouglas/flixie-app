@@ -481,6 +481,9 @@ class _HomeScreenState extends State<HomeScreen> {
           !scheduledFor.isAfter(DateTime.now())) {
         continue;
       }
+      final hasDeclinedGroupPlan = plan.groupName?.isNotEmpty == true &&
+          plan.participantFor(userId)?.response.toUpperCase() == 'DECLINED';
+      if (hasDeclinedGroupPlan) continue;
       final groupName = plan.groupName?.trim();
       final isGroupPlan = groupName?.isNotEmpty == true;
       final otherUser = plan.otherUser(userId);
@@ -491,7 +494,7 @@ class _HomeScreenState extends State<HomeScreen> {
         withName:
             isGroupPlan ? groupName! : otherUser?.username ?? 'your friend',
         deepLink: isGroupPlan && plan.groupId?.isNotEmpty == true
-            ? '/groups/${plan.groupId}?tab=plans'
+            ? '/groups/${plan.groupId}?tab=requests&requestId=${plan.id}'
             : '/watch-requests/${plan.id}',
         scope: isGroupPlan ? 'GROUP' : 'DIRECT',
       );
@@ -847,12 +850,29 @@ class _HomeScreenState extends State<HomeScreen> {
     return 3;
   }
 
-  bool _hasLoggedWatchForPlan(models.User user, WatchRequest plan) {
-    // A movie can be watched several times. Only the confirmation attached to
-    // this specific plan proves that this particular viewing was logged.
-    return plan.watchConfirmations.any(
-      (confirmation) => confirmation.userId == user.id && confirmation.watched,
-    );
+  Future<void> _openHomeWatchPlan(
+    HomeWatchPlanState state,
+    models.User user,
+  ) async {
+    // The completed-plan recap is a one-time home prompt. The plan itself is
+    // still available from Watch Plans; only this personalised home surface is
+    // dismissed after it has been opened.
+    if (state.type == HomeWatchPlanStateType.recap) {
+      await WatchPlanVisibilityStore.closePlan(user.id, state.plan.id);
+      if (mounted) {
+        setState(() {
+          _watchPlansToShow = _watchPlansToShow
+              .where((plan) => plan.id != state.plan.id)
+              .toList(growable: false);
+        });
+      }
+    }
+
+    if (!mounted) return;
+    final auth = context.read<AuthProvider>();
+    await context.push(state.route);
+    if (!mounted) return;
+    await _preloadInitialWatchPlans(auth.dbUser);
   }
 
   Future<void> _toggleHeroWatchlist(
@@ -1103,9 +1123,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             onSearch: () => context.push('/search'),
                             onWatchlist: () => context.go('/watchlist'),
                             onInvite: () => context.go('/social'),
-                            onRequests: attentionCount > 0
-                                ? () => context.push('/watch-requests')
-                                : _openWatchPlanCreation,
+                            onRequests: () => context.push('/watch-requests'),
                             featureCard: showWatchPlansIntro
                                 ? WatchPlansIntroductionCard(
                                     onCreate: _openWatchPlanCreation,
@@ -2120,78 +2138,50 @@ class _HomeScreenState extends State<HomeScreen> {
       return const SizedBox.shrink();
     }
     if (selectedState == null) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          HomeSectionHeader(
-            title: 'Watch together',
-            onSeeAll: () => context.push('/watch-requests'),
-          ),
-          const SizedBox(height: 8),
-          HomeWatchPlanEmptyCard(onCreate: _openWatchPlanCreation),
-          const SizedBox(height: 16),
-        ],
-      );
+      // Creation is always available from the quick action. Do not reserve a
+      // full home section when there is no live plan to return to.
+      return const SizedBox.shrink();
     }
-    // The selector deliberately returns one contextual card. Keep the legacy
-    // carousel below as a defensive fallback for an unknown future state.
-    if (selectedState.plan.id.isNotEmpty) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          HomeSectionHeader(
-            title: 'Watch together',
-            onSeeAll: () => context.push('/watch-requests'),
-          ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: HomeWatchPlanCard(
-              state: selectedState,
-              onOpen: () async {
-                final auth = context.read<AuthProvider>();
-                await context.push(selectedState.route);
-                if (!mounted) return;
-                await _preloadInitialWatchPlans(auth.dbUser);
-              },
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
-      );
-    }
+    final carouselStates = homeWatchPlanStates(plans, user.id).take(5).toList(
+          growable: false,
+        );
+    if (carouselStates.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         HomeSectionHeader(
-          title: 'Watch plans',
+          title: 'Watch together',
           onSeeAll: () => context.push('/watch-requests'),
         ),
         const SizedBox(height: 8),
         LayoutBuilder(
           builder: (context, constraints) {
-            // Keep plans as a compact horizontal row. Each card owns its
-            // natural width. On phones, leave only a small next-card preview
-            // to make the horizontal swipe affordance clear.
+            // Every plan uses the current contextual card, with a next-card
+            // preview that makes the horizontal carousel discoverable.
             final cardWidth = constraints.maxWidth >= 600
                 ? 420.0
-                : constraints.maxWidth * .90;
-            final preferredHeight =
-                cardWidth / (constraints.maxWidth >= 600 ? 3.0 : 2.55);
-            final viewportCap = MediaQuery.sizeOf(context).height * .34;
-            final carouselHeight =
-                preferredHeight < viewportCap ? preferredHeight : viewportCap;
-            return SizedBox(
-              height: carouselHeight,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: plans.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 10),
-                itemBuilder: (context, index) => SizedBox(
-                  width: cardWidth,
-                  height: double.infinity,
-                  child: _buildWatchPlanCard(context, user, plans[index]),
+                : constraints.maxWidth * .84;
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var index = 0;
+                        index < carouselStates.length;
+                        index++) ...[
+                      if (index > 0) const SizedBox(width: 12),
+                      SizedBox(
+                        width: cardWidth,
+                        child: HomeWatchPlanCard(
+                          state: carouselStates[index],
+                          onOpen: () =>
+                              _openHomeWatchPlan(carouselStates[index], user),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             );
@@ -2200,315 +2190,6 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 20),
       ],
     );
-  }
-
-  Widget _buildWatchPlanCard(
-    BuildContext context,
-    models.User user,
-    WatchRequest plan,
-  ) {
-    final scheduledFor = plan.scheduledFor;
-    final needsReply = _watchPlanNeedsResponse(plan, user.id);
-    final isPast =
-        scheduledFor != null && !scheduledFor.isAfter(DateTime.now());
-    final watchAlreadyLogged = isPast && _hasLoggedWatchForPlan(user, plan);
-    final isDue = isPast && !watchAlreadyLogged;
-    final other = plan.otherUser(user.id);
-    final participants = <WatchRequestUser>[
-      ...plan.participants
-          .map((participant) => participant.user)
-          .whereType<WatchRequestUser>()
-          .where((participant) => participant.id != user.id),
-      if (other != null) other,
-    ]
-        .fold(<String, WatchRequestUser>{}, (byId, participant) {
-          byId[participant.id] = participant;
-          return byId;
-        })
-        .values
-        .toList(growable: false);
-    final withLabel = plan.groupName?.trim().isNotEmpty == true
-        ? plan.groupName!.trim()
-        : other?.username.isNotEmpty == true
-            ? other!.username
-            : 'Your friends';
-    final posterPath = plan.movie?.posterPath;
-    final location = plan.location?.trim();
-    final isGroupPlan = plan.conversationId == '__group_home__';
-    final railColor = isGroupPlan ? FlixieColors.primary : FlixieColors.success;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () => plan.conversationId == '__group_home__'
-            ? context.push(
-                '/groups/${plan.groupId}?tab=requests&requestId=${plan.id}')
-            : context.push('/watch-requests/${plan.id}'),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: FlixieColors.surfaceElevated.withValues(alpha: 0.72),
-            borderRadius: BorderRadius.circular(14),
-            border:
-                Border.all(color: FlixieColors.primary.withValues(alpha: .34)),
-          ),
-          child: Stack(
-            children: [
-              Positioned(
-                left: 0,
-                top: 0,
-                bottom: 0,
-                child: Container(
-                  width: 6,
-                  decoration: BoxDecoration(
-                    color: railColor,
-                    borderRadius: const BorderRadius.horizontal(
-                      left: Radius.circular(14),
-                    ),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 10, 12, 10),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(9),
-                      child: AspectRatio(
-                        // Movie posters are 2:3 portrait (width : height).
-                        // As a direct stretched Row child it fills the card's
-                        // available height instead of sizing from its width.
-                        aspectRatio: 2 / 3,
-                        child: posterPath != null && posterPath.isNotEmpty
-                            ? CachedNetworkImage(
-                                imageUrl:
-                                    'https://image.tmdb.org/t/p/w342$posterPath',
-                                fit: BoxFit.cover,
-                                errorWidget: (_, __, ___) => _heroFallback(),
-                              )
-                            : _heroFallback(),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 26,
-                                height: 26,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                      color: railColor.withValues(alpha: .7)),
-                                ),
-                                child: Icon(
-                                  isGroupPlan
-                                      ? Icons.groups_rounded
-                                      : Icons.person_outline_rounded,
-                                  size: 14,
-                                  color: railColor,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  isGroupPlan
-                                      ? '$withLabel · ${participants.length + 1} people'
-                                      : 'With $withLabel',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: FlixieColors.light,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            needsReply
-                                ? 'Your reply is needed'
-                                : isDue
-                                    ? 'Time to log your watch'
-                                    : watchAlreadyLogged
-                                        ? 'Watch logged'
-                                        : scheduledFor == null
-                                            ? 'Plan being arranged'
-                                            : _watchPlanScheduleHeadline(
-                                                scheduledFor),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              height: 1.15,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            plan.movie?.title ?? 'Watch plan',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                color: FlixieColors.medium,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 14),
-                          if (location != null && location.isNotEmpty) ...[
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.location_on_outlined,
-                                  size: 15,
-                                  color: FlixieColors.secondary,
-                                ),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    location,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: FlixieColors.light,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ] else
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (isDue || watchAlreadyLogged)
-                                  const Icon(
-                                    Icons.check_rounded,
-                                    size: 18,
-                                    color: FlixieColors.success,
-                                  )
-                                else
-                                  Container(
-                                    width: 12,
-                                    height: 12,
-                                    decoration: const BoxDecoration(
-                                      color: FlixieColors.primary,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  needsReply
-                                      ? 'Reply now'
-                                      : isDue
-                                          ? 'Log watch'
-                                          : watchAlreadyLogged
-                                              ? 'Watch logged'
-                                              : scheduledFor == null
-                                                  ? 'Planning'
-                                                  : _watchPlanScheduleCaption(
-                                                      scheduledFor),
-                                  style: TextStyle(
-                                    color: needsReply ||
-                                            isDue ||
-                                            watchAlreadyLogged
-                                        ? FlixieColors.success
-                                        : FlixieColors.primary,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ],
-                            ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        if (participants.isNotEmpty)
-                          _WatchPlanAvatarStack(participants: participants),
-                        const Spacer(),
-                        const Icon(
-                          Icons.chevron_right_rounded,
-                          color: FlixieColors.light,
-                          size: 26,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _formatWatchPlanDate(DateTime raw) {
-    final date = raw.toLocal();
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final target = DateTime(date.year, date.month, date.day);
-    final dayOffset = target.difference(today).inDays;
-    const weekdays = [
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
-    ];
-    final dayLabel = dayOffset == 0
-        ? 'Today'
-        : dayOffset == 1
-            ? 'Tomorrow'
-            : weekdays[date.weekday - 1];
-    final displayHour = date.hour % 12 == 0 ? 12 : date.hour % 12;
-    final minute = date.minute.toString().padLeft(2, '0');
-    final period = date.hour < 12 ? 'AM' : 'PM';
-    return '$dayLabel · $displayHour:$minute $period';
-  }
-
-  String _watchPlanScheduleHeadline(DateTime raw) {
-    final date = raw.toLocal();
-    final now = DateTime.now();
-    final remaining = date.difference(now);
-    if (remaining.inMinutes < 60) {
-      final minutes = remaining.inMinutes.clamp(1, 59);
-      return 'Starts in $minutes min';
-    }
-    if (remaining.inHours < 6) {
-      final hours = remaining.inHours + (remaining.inMinutes % 60 == 0 ? 0 : 1);
-      return 'Scheduled in $hours ${hours == 1 ? 'hour' : 'hours'}';
-    }
-    final today = DateTime(now.year, now.month, now.day);
-    final target = DateTime(date.year, date.month, date.day);
-    final dayOffset = target.difference(today).inDays;
-    if (dayOffset == 0) return 'Scheduled today';
-    if (dayOffset == 1) return 'Scheduled tomorrow';
-    return 'Scheduled ${_formatWatchPlanDate(raw)}';
-  }
-
-  String _watchPlanScheduleCaption(DateTime raw) {
-    final date = raw.toLocal();
-    final now = DateTime.now();
-    final remaining = date.difference(now);
-    if (remaining.inHours < 6) return 'Upcoming';
-    final displayHour = date.hour % 12 == 0 ? 12 : date.hour % 12;
-    final minute = date.minute.toString().padLeft(2, '0');
-    final period = date.hour < 12 ? 'AM' : 'PM';
-    return '$displayHour:$minute $period';
   }
 
   Widget _buildFriendActivitySection(BuildContext context) {
@@ -3371,75 +3052,6 @@ class _FriendInteractionAvatarStack extends StatelessWidget {
                   '+$overflow',
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _WatchPlanAvatarStack extends StatelessWidget {
-  const _WatchPlanAvatarStack({required this.participants});
-
-  final List<WatchRequestUser> participants;
-
-  @override
-  Widget build(BuildContext context) {
-    const size = 28.0;
-    const spacing = 19.0;
-    final visible = participants.take(2).toList(growable: false);
-    final overflow = participants.length - visible.length;
-    final count = visible.length + (overflow > 0 ? 1 : 0);
-    return SizedBox(
-      width: size + ((count - 1).clamp(0, 2) * spacing),
-      height: size,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          for (var index = 0; index < visible.length; index++)
-            Positioned(
-              left: index * spacing,
-              child: Container(
-                width: size,
-                height: size,
-                padding: const EdgeInsets.all(1.5),
-                decoration: const BoxDecoration(
-                  color: FlixieColors.primary,
-                  shape: BoxShape.circle,
-                ),
-                child: ProfileAvatarView(
-                  avatar: visible[index].avatar,
-                  fallbackText: visible[index].username.isEmpty
-                      ? '?'
-                      : visible[index].username[0].toUpperCase(),
-                  fallbackColor: FlixieColors.surface,
-                  size: 25,
-                ),
-              ),
-            ),
-          if (overflow > 0)
-            Positioned(
-              left: visible.length * spacing,
-              child: Container(
-                width: size,
-                height: size,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: FlixieColors.primary.withValues(alpha: 0.2),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: FlixieColors.primary.withValues(alpha: 0.38),
-                  ),
-                ),
-                child: Text(
-                  '+$overflow',
-                  style: const TextStyle(
-                    color: FlixieColors.primary,
                     fontSize: 11,
                     fontWeight: FontWeight.w900,
                   ),

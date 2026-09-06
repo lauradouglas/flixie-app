@@ -41,94 +41,115 @@ class GroupWatchPlanCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           onTap: onOpen,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(0, 0, 12, 0),
+            padding: const EdgeInsets.all(14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _poster(),
-                      const SizedBox(width: 13),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              request.movieTitle ?? 'Watch Plan',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: FlixieColors.light,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 17,
-                                height: 1.12,
-                              ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _poster(),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            request.movieTitle ?? 'Watch Plan',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: FlixieColors.light,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 17,
+                              height: 1.12,
                             ),
-                            const SizedBox(height: 7),
-                            Wrap(
-                              spacing: 7,
-                              runSpacing: 5,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                ProfileAvatarView(
-                                  avatar: request.requesterAvatar,
-                                  fallbackText:
-                                      (request.requesterUsername?.isNotEmpty ==
-                                                  true
-                                              ? request.requesterUsername![0]
-                                              : '?')
-                                          .toUpperCase(),
-                                  fallbackColor: FlixieColors.primary,
-                                  size: 24,
-                                  profileBadges: request.requesterProfileBadges,
+                          ),
+                          const SizedBox(height: 7),
+                          Wrap(
+                            spacing: 7,
+                            runSpacing: 5,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              ProfileAvatarView(
+                                avatar: request.requesterAvatar,
+                                fallbackText:
+                                    (request.requesterUsername?.isNotEmpty ==
+                                                true
+                                            ? request.requesterUsername![0]
+                                            : '?')
+                                        .toUpperCase(),
+                                fallbackColor: FlixieColors.primary,
+                                size: 24,
+                                profileBadges: request.requesterProfileBadges,
+                              ),
+                              ConstrainedBox(
+                                constraints:
+                                    const BoxConstraints(maxWidth: 180),
+                                child: Text(
+                                  isMyRequest
+                                      ? 'You invited the group'
+                                      : '@${request.requesterUsername ?? 'Member'}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: FlixieColors.light,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
-                                ConstrainedBox(
-                                  constraints:
-                                      const BoxConstraints(maxWidth: 180),
+                              ),
+                              _StatusPill(
+                                status: request.status,
+                                needsResponse: needsResponse,
+                              ),
+                              if (createdDate.isNotEmpty)
+                                Text(
+                                  createdDate,
+                                  style: const TextStyle(
+                                    color: FlixieColors.medium,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          if (proposedDate.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                const Icon(Icons.event_outlined,
+                                    size: 15, color: FlixieColors.medium),
+                                const SizedBox(width: 6),
+                                Expanded(
                                   child: Text(
-                                    isMyRequest
-                                        ? 'You invited the group'
-                                        : '@${request.requesterUsername ?? 'Member'}',
-                                    maxLines: 1,
+                                    request.scheduledFor != null
+                                        ? 'Scheduled for $proposedDate'
+                                        : 'Proposed for $proposedDate',
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
-                                      color: FlixieColors.light,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                                _StatusPill(
-                                  status: request.status,
-                                  needsResponse: needsResponse,
-                                ),
-                                if (createdDate.isNotEmpty)
-                                  Text(
-                                    createdDate,
-                                    style: const TextStyle(
                                       color: FlixieColors.medium,
-                                      fontSize: 11,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
+                                ),
                               ],
                             ),
-                            if (proposedDate.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              Row(
+                          ],
+                          if (request.location?.trim().isNotEmpty == true)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(Icons.event_outlined,
-                                      size: 15, color: FlixieColors.medium),
+                                  const Icon(Icons.location_on_outlined,
+                                      size: 15, color: FlixieColors.secondary),
                                   const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
-                                      request.scheduledFor != null
-                                          ? 'Scheduled for $proposedDate'
-                                          : 'Proposed for $proposedDate',
-                                      overflow: TextOverflow.ellipsis,
+                                      request.location!.trim(),
                                       style: const TextStyle(
-                                        color: FlixieColors.medium,
+                                        color: FlixieColors.light,
                                         fontSize: 12,
                                         fontWeight: FontWeight.w600,
                                       ),
@@ -136,35 +157,11 @@ class GroupWatchPlanCard extends StatelessWidget {
                                   ),
                                 ],
                               ),
-                            ],
-                            if (request.location?.trim().isNotEmpty == true)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Icon(Icons.location_on_outlined,
-                                        size: 15,
-                                        color: FlixieColors.secondary),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        request.location!.trim(),
-                                        style: const TextStyle(
-                                          color: FlixieColors.light,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                          ],
-                        ),
+                            ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
                 if (request.message?.isNotEmpty == true) ...[
                   const SizedBox(height: 12),
@@ -203,12 +200,15 @@ class GroupWatchPlanCard extends StatelessWidget {
       );
 
   Widget _poster() => ClipRRect(
-        borderRadius: const BorderRadius.horizontal(left: Radius.circular(15)),
+        borderRadius: BorderRadius.circular(10),
         child: SizedBox(
-          width: 92,
-          child: posterUrl == null
-              ? const RequestPosterPlaceholder()
-              : CachedNetworkImage(imageUrl: posterUrl!, fit: BoxFit.cover),
+          width: 84,
+          child: AspectRatio(
+            aspectRatio: 2 / 3,
+            child: posterUrl == null
+                ? const RequestPosterPlaceholder()
+                : CachedNetworkImage(imageUrl: posterUrl!, fit: BoxFit.cover),
+          ),
         ),
       );
 }

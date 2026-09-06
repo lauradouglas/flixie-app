@@ -17,7 +17,7 @@ class WatchPlansIntroductionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
         decoration: BoxDecoration(
           gradient: LinearGradient(colors: [
             FlixieColors.primary.withValues(alpha: .28),
@@ -29,58 +29,61 @@ class WatchPlansIntroductionCard extends StatelessWidget {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
             const Icon(Icons.movie_filter_rounded,
-                color: FlixieColors.success, size: 18),
-            const SizedBox(width: 7),
+                color: FlixieColors.success, size: 22),
+            const SizedBox(width: 10),
             const Expanded(
-                child: Text('WATCH TOGETHER',
-                    style: TextStyle(
-                        color: FlixieColors.success,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: .8))),
-            IconButton(
-              onPressed: onDismiss,
-              tooltip: 'Dismiss',
-              visualDensity: VisualDensity.compact,
-              icon: const Icon(Icons.close_rounded,
-                  color: FlixieColors.medium, size: 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Make a Watch Plan',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900)),
+                  SizedBox(height: 2),
+                  Text('Pick a movie with friends.',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style:
+                          TextStyle(color: FlixieColors.medium, fontSize: 12)),
+                ],
+              ),
+            ),
+            SizedBox(
+              width: 28,
+              height: 32,
+              child: IconButton(
+                onPressed: onDismiss,
+                tooltip: 'Dismiss',
+                padding: EdgeInsets.zero,
+                icon: const Icon(Icons.close_rounded,
+                    color: FlixieColors.medium, size: 18),
+              ),
             ),
           ]),
-          const Text('Can’t decide what to watch?',
-              style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900)),
-          const SizedBox(height: 4),
-          const Text('Add a few movies, invite friends and choose together.',
-              style: TextStyle(color: FlixieColors.medium, fontSize: 13)),
-          const SizedBox(height: 12),
-          LayoutBuilder(builder: (context, constraints) {
-            final compactLabels = constraints.maxWidth < 360;
-            return Row(children: [
-              Expanded(
-                child: FilledButton(
-                  onPressed: onCreate,
-                  child: Text(
-                    compactLabels ? 'Make plan' : 'Make a watch plan',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
+          const SizedBox(height: 8),
+          Row(children: [
+            TextButton(
+              onPressed: onLearnMore,
+              style: TextButton.styleFrom(
+                minimumSize: const Size(0, 36),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: onLearnMore,
-                  child: Text(
-                    compactLabels ? 'How it works' : 'See how it works',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
+              child: const Text('How it works'),
+            ),
+            const Spacer(),
+            FilledButton(
+              onPressed: onCreate,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 38),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
               ),
-            ]);
-          }),
+              child: const Text('Create plan'),
+            ),
+          ]),
         ]),
       );
 }

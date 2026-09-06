@@ -126,6 +126,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
   final Map<String, FriendWatchPlanAction> _busyActions = {};
   List<Group> _groups = [];
   bool _loadingGroups = true;
+  int _groupActiveCount = 0;
   _RequestAudience _audience = _RequestAudience.friends;
   bool _showSearch = false;
   final Map<String, FriendAcceptanceScheduleDraft> _acceptScheduleDrafts = {};
@@ -173,9 +174,30 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
           _groups = groups;
           _loadingGroups = false;
         });
+        await _refreshGroupActiveCount(groups);
       }
     } catch (_) {
       if (mounted) setState(() => _loadingGroups = false);
+    }
+  }
+
+  Future<void> _refreshGroupActiveCount([List<Group>? source]) async {
+    final groupIds = (source ?? _groups)
+        .map((group) => group.id)
+        .whereType<String>()
+        .where((id) => id.isNotEmpty)
+        .toList(growable: false);
+    try {
+      final groupedRequests = await Future.wait(
+        groupIds.map(GroupService.getGroupWatchRequests),
+      );
+      final active = groupedRequests
+          .expand((requests) => requests)
+          .where((request) => request.isActive)
+          .length;
+      if (mounted) setState(() => _groupActiveCount = active);
+    } catch (_) {
+      // The group overview itself remains independently refreshable.
     }
   }
 
@@ -282,6 +304,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     );
     if (!mounted || movie == null) return;
 
+    final creatingGroupPlan = _audience == _RequestAudience.groups;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -294,9 +317,14 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         moviePoster: movie.poster,
         requesterId: userId,
         friends: auth.cachedFriends?.friendships ?? const [],
+        initialGroupMode: creatingGroupPlan,
         onSuccess: () {
           if (!mounted) return;
           _load();
+          if (creatingGroupPlan) {
+            setState(() => _audience = _RequestAudience.groups);
+            _refreshGroupActiveCount();
+          }
           // Group plans are rendered by a separate overview with its own
           // data source. Notify it immediately after creation as well as
           // refreshing the direct-plan list.
@@ -663,6 +691,17 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     final userId = context.read<AuthProvider>().dbUser?.id;
     final analytics = context.read<AnalyticsController>();
     if (userId == null || userId.isEmpty) return;
+    if (decision == 'accepted' &&
+        proposal.proposedFor != null &&
+        !proposal.proposedFor!.toLocal().isAfter(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('That proposed time has passed. Suggest a new time.'),
+          backgroundColor: FlixieColors.danger,
+        ),
+      );
+      return;
+    }
 
     await _withRequestAction(request, FriendWatchPlanAction.scheduling,
         () async {
@@ -973,6 +1012,8 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
                 child: _AudienceSwitcher(
                   selected: _audience,
+                  friendActiveCount: _countFor(WatchPlanFilter.active),
+                  groupActiveCount: _groupActiveCount,
                   onChanged: (value) => setState(() => _audience = value),
                 ),
               ),
@@ -1679,10 +1720,14 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
 class _AudienceSwitcher extends StatelessWidget {
   const _AudienceSwitcher({
     required this.selected,
+    required this.friendActiveCount,
+    required this.groupActiveCount,
     required this.onChanged,
   });
 
   final _RequestAudience selected;
+  final int friendActiveCount;
+  final int groupActiveCount;
   final ValueChanged<_RequestAudience> onChanged;
 
   @override
@@ -1699,14 +1744,29 @@ class _AudienceSwitcher extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _item(_RequestAudience.friends, 'Friends', Icons.group_outlined),
-          _item(_RequestAudience.groups, 'Groups', Icons.groups_2_outlined),
+          _item(
+            _RequestAudience.friends,
+            'Friends',
+            Icons.group_outlined,
+            friendActiveCount,
+          ),
+          _item(
+            _RequestAudience.groups,
+            'Groups',
+            Icons.groups_2_outlined,
+            groupActiveCount,
+          ),
         ],
       ),
     );
   }
 
-  Widget _item(_RequestAudience value, String label, IconData icon) {
+  Widget _item(
+    _RequestAudience value,
+    String label,
+    IconData icon,
+    int activeCount,
+  ) {
     final isSelected = selected == value;
     return Expanded(
       child: InkWell(
@@ -1728,7 +1788,7 @@ class _AudienceSwitcher extends StatelessWidget {
                   color: isSelected ? Colors.white : FlixieColors.medium),
               const SizedBox(width: 8),
               Text(
-                label,
+                '$label · $activeCount',
                 style: TextStyle(
                   color: isSelected ? Colors.white : FlixieColors.medium,
                   fontSize: 14,

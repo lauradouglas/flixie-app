@@ -129,13 +129,7 @@ class _GroupWatchPlanScheduleSheetState
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () => Navigator.pop(
-                    context,
-                    (
-                      scheduledFor: _selected,
-                      location: _locationController.text.trim(),
-                    ),
-                  ),
+                  onPressed: _confirmSchedule,
                   child: const Text('Confirm schedule'),
                 ),
               ),
@@ -150,6 +144,25 @@ class _GroupWatchPlanScheduleSheetState
   void dispose() {
     _locationController.dispose();
     super.dispose();
+  }
+
+  void _confirmSchedule() {
+    if (!_selected.isAfter(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Choose a date and time in the future.'),
+          backgroundColor: FlixieColors.danger,
+        ),
+      );
+      return;
+    }
+    Navigator.pop(
+      context,
+      (
+        scheduledFor: _selected,
+        location: _locationController.text.trim(),
+      ),
+    );
   }
 
   Future<void> _pickDate() async {

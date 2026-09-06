@@ -89,6 +89,16 @@ HomeWatchPlanState? selectHomeWatchPlanState(
   Iterable<WatchRequest> plans,
   String currentUserId, {
   DateTime? now,
+}) =>
+    homeWatchPlanStates(plans, currentUserId, now: now).firstOrNull;
+
+/// Returns every live Watch Plan in the same priority order used for the Home
+/// carousel. Keeping this shared with the featured-state selector prevents
+/// friend and group plans from falling into separate visual systems.
+List<HomeWatchPlanState> homeWatchPlanStates(
+  Iterable<WatchRequest> plans,
+  String currentUserId, {
+  DateTime? now,
 }) {
   final currentTime = now ?? DateTime.now();
   final states = plans
@@ -101,7 +111,7 @@ HomeWatchPlanState? selectHomeWatchPlanState(
     if (priority != 0) return priority;
     return _activityDate(b.plan).compareTo(_activityDate(a.plan));
   });
-  return states.firstOrNull;
+  return states;
 }
 
 int homeWatchPlanAttentionCount(
@@ -204,6 +214,20 @@ HomeWatchPlanState? _stateFor(
         'View plan',
         false);
   }
+  if (group &&
+      plan.selectedCandidateId != null &&
+      plan.scheduledFor == null &&
+      plan.proposedDate != null) {
+    return _state(
+        plan,
+        HomeWatchPlanStateType.chooseSchedule,
+        4,
+        'TIME PROPOSED',
+        plan.watchPlanTitle,
+        _dateTime(plan.proposedDate),
+        'Review time',
+        true);
+  }
   if (plan.selectedCandidateId != null && plan.scheduledFor == null) {
     return _state(
         plan,
@@ -274,7 +298,7 @@ HomeWatchPlanState? _stateFor(
         plan,
         HomeWatchPlanStateType.recap,
         9,
-        'WATCHED TOGETHER',
+        'EVERYONE WATCHED',
         'Your recap is ready',
         group ? '${plan.watchPlanTitle} · $companion' : plan.watchPlanTitle,
         'View recap',
@@ -282,17 +306,14 @@ HomeWatchPlanState? _stateFor(
   }
   if (scheduled != null && scheduled.isAfter(now)) {
     final today = _sameDay(scheduled.toLocal(), now.toLocal());
+    final scheduleDetail = _dateTime(scheduled);
     return _state(
         plan,
         today ? HomeWatchPlanStateType.today : HomeWatchPlanStateType.upcoming,
         today ? 8 : 10,
-        today
-            ? '${_time(scheduled)} TODAY'
-            : _dateTime(scheduled).toUpperCase(),
-        today ? plan.watchPlanTitle : _dateTime(scheduled),
-        today
-            ? '${group ? companion : 'With @$other'}${plan.location == null ? '' : ' · ${plan.location}'}'
-            : '${plan.watchPlanTitle} · ${group ? companion : 'With @$other'}',
+        _scheduleCountdown(scheduled, now, today),
+        plan.watchPlanTitle,
+        'Scheduled $scheduleDetail · ${group ? companion : 'With @$other'}${plan.location == null ? '' : ' · ${plan.location}'}',
         'View plan',
         false);
   }
@@ -338,6 +359,21 @@ String _time(DateTime? value) {
   final date = value.toLocal();
   final hour = date.hour % 12 == 0 ? 12 : date.hour % 12;
   return '$hour:${date.minute.toString().padLeft(2, '0')} ${date.hour < 12 ? 'AM' : 'PM'}';
+}
+
+String _scheduleCountdown(DateTime scheduled, DateTime now, bool today) {
+  final remaining = scheduled.difference(now);
+  if (remaining.inMinutes < 60) {
+    final minutes = remaining.inMinutes.clamp(1, 59);
+    return 'STARTS IN $minutes MIN';
+  }
+  if (remaining.inHours < 6) {
+    final hours = remaining.inHours + (remaining.inMinutes % 60 == 0 ? 0 : 1);
+    return 'STARTS IN $hours ${hours == 1 ? 'HOUR' : 'HOURS'}';
+  }
+  return today
+      ? '${_time(scheduled)} TODAY'
+      : _dateTime(scheduled).toUpperCase();
 }
 
 String _dateTime(DateTime? value) {

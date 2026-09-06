@@ -14,18 +14,40 @@ class MovieSearchResultTile extends StatelessWidget {
   final MovieShort movie;
   final VoidCallback? onTap;
 
-  String? get _year {
+  String? get _releaseDateLabel {
     final releaseDate = movie.releaseDate;
     if (releaseDate == null || releaseDate.isEmpty) return null;
     final parsed = DateTime.tryParse(releaseDate);
-    if (parsed != null) return parsed.year.toString();
-    return releaseDate.length >= 4 ? releaseDate.substring(0, 4) : null;
+    if (parsed != null) return _formatDate(parsed);
+
+    // Some cinema feeds return an already-localised value such as “29 Jun
+    // 2026”. Keep that intact rather than truncating it to “29 J”.
+    final words = releaseDate.trim().split(RegExp(r'\s+'));
+    if (words.length >= 2) return words.take(3).join(' ');
+    return releaseDate;
+  }
+
+  String _formatDate(DateTime date) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${date.day} ${months[date.month - 1]} ${date.year}';
   }
 
   @override
   Widget build(BuildContext context) {
-    final year = _year;
-    final overview = movie.overview?.trim();
+    final releaseDate = _releaseDateLabel;
     final rating = movie.voteAverage;
 
     return Card(
@@ -33,14 +55,14 @@ class MovieSearchResultTile extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.all(10),
           child: Row(
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(6),
                 child: SizedBox(
                   width: 50,
-                  height: 75,
+                  height: 68,
                   child: movie.poster != null
                       ? CachedNetworkImage(
                           imageUrl:
@@ -66,49 +88,26 @@ class MovieSearchResultTile extends StatelessWidget {
                           .bodyLarge
                           ?.copyWith(fontWeight: FontWeight.w600),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Wrap(
-                      spacing: 7,
-                      runSpacing: 4,
+                      spacing: 10,
+                      runSpacing: 5,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        const _MovieTypePill(),
-                        if (year != null)
-                          Text(
-                            year,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(color: FlixieColors.medium),
+                        if (releaseDate != null)
+                          _MovieMetadata(
+                            icon: Icons.calendar_today_outlined,
+                            label: releaseDate,
                           ),
                         if (rating != null && rating > 0) ...[
-                          const Icon(
-                            Icons.star_rounded,
-                            size: 14,
+                          _MovieMetadata(
+                            icon: Icons.star_rounded,
+                            label: rating.toStringAsFixed(1),
                             color: FlixieColors.warning,
-                          ),
-                          Text(
-                            rating.toStringAsFixed(1),
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(color: FlixieColors.warning),
                           ),
                         ],
                       ],
                     ),
-                    if (overview != null && overview.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        overview,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: FlixieColors.light),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -125,28 +124,28 @@ class MovieSearchResultTile extends StatelessWidget {
   }
 }
 
-class _MovieTypePill extends StatelessWidget {
-  const _MovieTypePill();
+class _MovieMetadata extends StatelessWidget {
+  const _MovieMetadata({
+    required this.icon,
+    required this.label,
+    this.color = FlixieColors.medium,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: FlixieColors.danger.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: FlixieColors.danger.withValues(alpha: 0.38),
-        ),
-      ),
-      child: const Text(
-        'Movie',
-        style: TextStyle(
-          color: FlixieColors.danger,
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 4),
+        Text(label,
+            style: TextStyle(
+                color: color, fontSize: 12, fontWeight: FontWeight.w700)),
+      ],
     );
   }
 }

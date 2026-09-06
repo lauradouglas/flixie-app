@@ -422,7 +422,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final watchlistCount = (dbUser?.movieWatchlist?.length ?? 0) +
         (dbUser?.showWatchlist?.length ?? 0);
     final favoritesCount = favoriteMovies.length;
-    final averageRating = _averageRatingLabel(_ratings);
 
     final visibleActivity = _activity;
 
@@ -493,7 +492,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             watched: watchedCount,
                             watchlist: watchlistCount,
                             favorites: favoritesCount,
-                            averageRating: averageRating,
                             onWatchHistory: () =>
                                 context.push('/watch-history'),
                             onWatchlist: () => context.push('/watchlist'),
@@ -878,12 +876,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       onFindMovies: () => context.push('/search'),
       onSeeRatings: () => context.push('/stats'),
     );
-  }
-
-  String _averageRatingLabel(List<MovieRating> ratings) {
-    if (ratings.isEmpty) return '--';
-    final total = ratings.fold<int>(0, (sum, rating) => sum + rating.rating);
-    return (total / ratings.length).toStringAsFixed(1);
   }
 
   String? _memberSinceLabel(String? value) {
@@ -2472,7 +2464,6 @@ class _ProfileDashboard extends StatelessWidget {
     required this.watched,
     required this.watchlist,
     required this.favorites,
-    required this.averageRating,
     required this.onWatchHistory,
     required this.onWatchlist,
     required this.onFavourites,
@@ -2482,7 +2473,6 @@ class _ProfileDashboard extends StatelessWidget {
   final int watched;
   final int watchlist;
   final int favorites;
-  final String averageRating;
   final VoidCallback onWatchHistory;
   final VoidCallback onWatchlist;
   final VoidCallback onFavourites;
@@ -2496,7 +2486,7 @@ class _ProfileDashboard extends StatelessWidget {
         Row(
           children: [
             Text(
-              'Taste snapshot',
+              'Taste at a glance',
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     color: FlixieColors.light,
                     fontWeight: FontWeight.w800,
@@ -2509,51 +2499,42 @@ class _ProfileDashboard extends StatelessWidget {
             ),
           ],
         ),
-        SizedBox(
-          height: 68,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            children: [
-              SizedBox(
-                width: 122,
-                child: _DashboardMetric(
-                  icon: Icons.visibility_outlined,
-                  label: 'Watched',
-                  value: '$watched',
-                  onTap: onWatchHistory,
-                ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 122,
-                child: _DashboardMetric(
-                  icon: Icons.bookmark_border_rounded,
-                  label: 'Watchlist',
-                  value: '$watchlist',
-                  onTap: onWatchlist,
-                ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 122,
-                child: _DashboardMetric(
-                  icon: Icons.favorite_border_rounded,
-                  label: 'Favourites',
-                  value: '$favorites',
-                  onTap: onFavourites,
-                ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 122,
-                child: _DashboardMetric(
-                  icon: Icons.star_border_rounded,
-                  label: 'Avg rating',
-                  value: averageRating,
-                ),
-              ),
-            ],
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            color: FlixieColors.surface.withValues(alpha: .72),
+            border: Border.all(color: FlixieColors.tabBarBorder),
+            borderRadius: BorderRadius.circular(14),
           ),
+          child: Row(children: [
+            Expanded(
+              child: _DashboardMetric(
+                icon: Icons.visibility_outlined,
+                label: 'Watched',
+                value: '$watched',
+                onTap: onWatchHistory,
+              ),
+            ),
+            Container(width: 1, height: 48, color: FlixieColors.tabBarBorder),
+            Expanded(
+              child: _DashboardMetric(
+                icon: Icons.bookmark_border_rounded,
+                label: 'Watchlist',
+                value: '$watchlist',
+                onTap: onWatchlist,
+              ),
+            ),
+            Container(width: 1, height: 48, color: FlixieColors.tabBarBorder),
+            Expanded(
+              child: _DashboardMetric(
+                icon: Icons.favorite_border_rounded,
+                label: 'Favourites',
+                value: '$favorites',
+                onTap: onFavourites,
+              ),
+            ),
+          ]),
         ),
       ],
     );
@@ -2575,50 +2556,27 @@ class _DashboardMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: FlixieColors.surfaceElevated,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            children: [
-              Icon(icon, color: FlixieColors.primary, size: 20),
-              const SizedBox(width: 9),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      value,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: FlixieColors.white,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 18,
-                      ),
-                    ),
-                    Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: FlixieColors.medium,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: onTap,
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, color: FlixieColors.primary, size: 20),
+        const SizedBox(height: 5),
+        Text(value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+                color: FlixieColors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 20)),
+        Text(label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+                color: FlixieColors.medium,
+                fontSize: 11,
+                fontWeight: FontWeight.w600)),
+      ]),
     );
   }
 }

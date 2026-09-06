@@ -126,12 +126,6 @@ class FriendPlanActions extends StatelessWidget {
                   ? 'Waiting for them to respond to ${dateLabel(proposal.proposedFor)}'
                   : 'New time proposed for ${dateLabel(proposal.proposedFor)}. Your current plan stays in place until they agree.',
             ),
-            const SizedBox(height: 8),
-            _ActionIconText(
-              icon: Icons.edit_calendar_outlined,
-              label: 'Propose a different time',
-              onPressed: onSuggestDifferentTime,
-            ),
           ],
         );
       }
@@ -195,7 +189,7 @@ class FriendPlanActions extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: _ActionPrimaryButton(
-              label: 'Accept time',
+              label: 'Works for me',
               onPressed: () => onRespondToProposal(proposal, 'accepted'),
             ),
           ),
@@ -209,14 +203,18 @@ class FriendPlanActions extends StatelessWidget {
                 side: const BorderSide(color: FlixieColors.danger),
                 minimumSize: const Size(0, 44),
               ),
-              child: const Text('Keep current time'),
+              child: Text(request.scheduledFor == null
+                  ? 'Can’t make this one'
+                  : 'Keep current time'),
             ),
           ),
-          const SizedBox(height: 8),
-          _ActionIconText(
-            icon: Icons.edit_calendar_outlined,
-            label: 'Propose another time instead',
-            onPressed: onSuggestDifferentTime,
+          const SizedBox(height: 6),
+          Center(
+            child: _ActionIconText(
+              icon: Icons.edit_calendar_outlined,
+              label: 'Suggest another time',
+              onPressed: onSuggestDifferentTime,
+            ),
           ),
         ],
       );

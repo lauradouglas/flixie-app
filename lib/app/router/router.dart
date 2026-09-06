@@ -36,6 +36,7 @@ import 'package:flixie_app/features/movies/presentation/pages/movie_lists_screen
 import 'package:flixie_app/features/social/presentation/pages/social_screen.dart';
 import 'package:flixie_app/features/social/presentation/pages/friends_activity_screen.dart';
 import 'package:flixie_app/features/social/presentation/pages/group_detail_screen.dart';
+import 'package:flixie_app/features/social/presentation/pages/group_invitation_detail_screen.dart';
 import 'package:flixie_app/features/social/presentation/pages/direct_chat_screen.dart';
 import 'package:flixie_app/features/social/presentation/utils/activity_reply_payload.dart';
 import 'package:flixie_app/features/social/presentation/pages/group_members_screen.dart';
@@ -85,6 +86,7 @@ String _screenNameFor(GoRouterState state) {
     '/social' => 'Social',
     '/friends-activity' => 'Friends Activity',
     '/groups/:id' => 'Group Detail',
+    '/group-invites/:requestId' => 'Group Invitation',
     '/groups/:id/members' => 'Group Members',
     '/profile' => 'Profile',
     '/friends/:id' => 'Friend Profile',
@@ -356,6 +358,16 @@ GoRouter buildRouter(
             path: '/my-reviews',
             pageBuilder: (context, state) =>
                 _calmPage(state, const MyReviewsScreen()),
+          ),
+          GoRoute(
+            path: '/group-invites/:requestId',
+            pageBuilder: (context, state) => _pushPage(
+              state,
+              GroupInvitationDetailScreen(
+                groupId: state.uri.queryParameters['groupId'] ?? '',
+                requestId: state.pathParameters['requestId'] ?? '',
+              ),
+            ),
           ),
           GoRoute(
             path: '/friends/:id',

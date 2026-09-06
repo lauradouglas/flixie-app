@@ -35,7 +35,7 @@ class SpecialAvatarFrame extends StatelessWidget {
                     ? const [FlixieColors.primary, FlixieColors.secondary]
                     : const [Color(0xFF9B83CC), Color(0xFF6D5A96)];
     return Container(
-      padding: EdgeInsets.all(isFounder ? 3 : 2),
+      padding: EdgeInsets.all(isFounder ? 4 : 3),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: SweepGradient(colors: [...colors, colors.first]),

@@ -21,6 +21,7 @@ Future<void> showShareCardSheet(
     useRootNavigator: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
+    barrierColor: FlixieColors.background.withValues(alpha: .72),
     builder: (_) => ShareCardSheet(data: data),
   );
 }
@@ -174,14 +175,14 @@ class _ShareCardSheetState extends State<ShareCardSheet> {
   @override
   Widget build(BuildContext context) {
     final screen = MediaQuery.sizeOf(context);
-    final previewHeight = (screen.height * .57).clamp(360.0, 570.0);
+    final previewHeight = (screen.height * .53).clamp(340.0, 530.0);
     return ColoredBox(
       color: FlixieColors.surface,
       child: SafeArea(
-        top: true,
+        top: false,
         bottom: true,
         child: Container(
-          constraints: BoxConstraints(maxHeight: screen.height * .94),
+          constraints: BoxConstraints(maxHeight: screen.height * .85),
           decoration: const BoxDecoration(
             color: FlixieColors.surface,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),

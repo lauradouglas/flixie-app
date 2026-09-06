@@ -301,6 +301,55 @@ class GroupWatchPlanCandidate {
   }
 }
 
+class GroupScheduleProposalResponse {
+  const GroupScheduleProposalResponse(
+      {required this.userId, required this.status});
+  final String userId;
+  final String status;
+
+  factory GroupScheduleProposalResponse.fromJson(Map<String, dynamic> json) =>
+      GroupScheduleProposalResponse(
+        userId: json['userId']?.toString() ?? '',
+        status: json['status']?.toString() ?? 'PENDING',
+      );
+}
+
+class GroupScheduleProposal {
+  const GroupScheduleProposal({
+    required this.id,
+    required this.proposerId,
+    required this.proposedFor,
+    required this.status,
+    this.location,
+    this.message,
+    this.responses = const [],
+  });
+  final String id;
+  final String proposerId;
+  final String? proposedFor;
+  final String status;
+  final String? location;
+  final String? message;
+  final List<GroupScheduleProposalResponse> responses;
+
+  factory GroupScheduleProposal.fromJson(Map<String, dynamic> json) =>
+      GroupScheduleProposal(
+        id: json['id']?.toString() ?? '',
+        proposerId: json['proposerId']?.toString() ?? '',
+        proposedFor: json['proposedFor']?.toString(),
+        status: json['status']?.toString() ?? 'PENDING',
+        location: json['location']?.toString(),
+        message: json['message']?.toString(),
+        responses: (json['responses'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(GroupScheduleProposalResponse.fromJson)
+            .toList(),
+      );
+
+  GroupScheduleProposalResponse? responseFor(String userId) =>
+      responses.where((response) => response.userId == userId).firstOrNull;
+}
+
 class GroupWatchRequest {
   final String id;
 
@@ -322,6 +371,7 @@ class GroupWatchRequest {
   final List<GroupRequestMessage> messages;
   final List<GroupWatchPlanCandidate> candidates;
   final String? selectedCandidateId;
+  final List<GroupScheduleProposal> scheduleProposals;
 
   // Lifecycle fields
   final WatchRequestStatus status;
@@ -362,6 +412,7 @@ class GroupWatchRequest {
     this.messages = const [],
     this.candidates = const [],
     this.selectedCandidateId,
+    this.scheduleProposals = const [],
     this.status = WatchRequestStatus.open,
     this.proposedDate,
     this.scheduledFor,
@@ -394,6 +445,11 @@ class GroupWatchRequest {
         .map(GroupWatchPlanCandidate.fromJson)
         .toList();
     final selectedCandidateId = json['selectedCandidateId']?.toString();
+    final scheduleProposals =
+        (json['scheduleProposals'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(GroupScheduleProposal.fromJson)
+            .toList();
     final hasUnresolvedMovieChoices =
         candidates.length > 1 && selectedCandidateId == null;
 
@@ -463,6 +519,7 @@ class GroupWatchRequest {
           .toList(),
       candidates: candidates,
       selectedCandidateId: selectedCandidateId,
+      scheduleProposals: scheduleProposals,
       status: WatchRequestStatus.fromString(json['status'] as String?),
       proposedDate: json['proposedDate'] as String?,
       scheduledFor: json['scheduledFor'] as String?,
@@ -527,6 +584,10 @@ class GroupWatchRequest {
 
   /// True when members can still respond (request is active and not expired).
   bool get canRespond => isActive && !hasExpired;
+
+  GroupScheduleProposal? get activeScheduleProposal => scheduleProposals
+      .where((proposal) => proposal.status == 'PENDING')
+      .firstOrNull;
 
   /// A group request is mirrored between Postgres and the conversation store.
   /// Deep links may contain either identifier depending on where they began.

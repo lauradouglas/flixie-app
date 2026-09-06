@@ -158,26 +158,21 @@ class GroupPostWatchSection extends StatelessWidget {
         const Divider(height: 22, color: FlixieColors.tabBarBorder),
         Text(statusText,
             style: const TextStyle(color: FlixieColors.light, fontSize: 14)),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: req.memberStatuses.map((member) {
-            final logged = member.watchedAt != null;
-            return Row(mainAxisSize: MainAxisSize.min, children: [
-              ProfileAvatarView(
-                avatar: member.avatar,
-                fallbackText: (member.username ?? '?')[0].toUpperCase(),
-                fallbackColor: FlixieColors.primary,
-                size: 36,
-              ),
-              const SizedBox(width: 6),
-              Icon(logged ? Icons.check_circle_rounded : Icons.schedule_rounded,
-                  color: logged ? FlixieColors.success : FlixieColors.medium,
-                  size: 18),
-            ]);
-          }).toList(),
-        ),
+        if (watchedMembers.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: watchedMembers.map((member) {
+              return Row(mainAxisSize: MainAxisSize.min, children: [
+                _borderedMemberAvatar(member, size: 38),
+                const SizedBox(width: 6),
+                const Icon(Icons.check_circle_rounded,
+                    color: FlixieColors.success, size: 18),
+              ]);
+            }).toList(),
+          ),
+        ],
       ])),
     ]);
   }
@@ -253,22 +248,8 @@ class GroupPostWatchSection extends StatelessWidget {
                         style: const TextStyle(
                             color: FlixieColors.light, fontSize: 15)),
                   ],
-                  const SizedBox(height: 20),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: FlixieColors.primary.withValues(alpha: .16),
-                      borderRadius: BorderRadius.circular(22),
-                    ),
-                    child: Text(
-                      '👥 Group watch · ${req.analyticsParticipantCount} people',
-                      style: const TextStyle(
-                          color: FlixieColors.light,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700),
-                    ),
-                  ),
+                  const SizedBox(height: 18),
+                  _watcherAvatars(entries),
                 ],
               )),
             ]),
@@ -316,10 +297,19 @@ class GroupPostWatchSection extends StatelessWidget {
               style: const TextStyle(color: FlixieColors.medium, fontSize: 14)),
         ]),
         const SizedBox(height: 14),
-        ...entries.map((member) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _entry(member, isYou: member.memberId == currentUserId),
-            )),
+        card(
+          Column(
+            children: [
+              for (var index = 0; index < entries.length; index++) ...[
+                _entry(entries[index],
+                    isYou: entries[index].memberId == currentUserId),
+                if (index < entries.length - 1)
+                  const Divider(height: 26, color: FlixieColors.tabBarBorder),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
         Row(children: [
           Expanded(
               child: FilledButton.icon(
@@ -391,76 +381,108 @@ class GroupPostWatchSection extends StatelessWidget {
         ]),
       );
 
-  Widget _entry(GroupRequestMemberStatus member, {required bool isYou}) =>
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: FlixieColors.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: FlixieColors.tabBarBorder),
-        ),
+  Widget _entry(GroupRequestMemberStatus member, {required bool isYou}) {
+    final recommends = (member.rating ?? 0) >= 7;
+    final hasRating = member.rating != null;
+    final opinionColor = hasRating
+        ? recommends
+            ? FlixieColors.success
+            : FlixieColors.warning
+        : FlixieColors.medium;
+    final opinionLabel = !hasRating
+        ? 'No rating'
+        : recommends
+            ? 'Recommends'
+            : 'Would skip';
+    return Row(children: [
+      _borderedMemberAvatar(member, size: 52),
+      const SizedBox(width: 12),
+      Expanded(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            ProfileAvatarView(
-              avatar: member.avatar,
-              fallbackText: (member.username ?? '?')[0].toUpperCase(),
-              fallbackColor: FlixieColors.primary,
-              size: 42,
-              profileBadges: member.profileBadges,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                  Text(isYou ? 'You' : member.username ?? 'Member',
-                      style: const TextStyle(
-                          color: FlixieColors.light,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600)),
-                  const Text('Logged after the plan',
-                      style: TextStyle(color: FlixieColors.medium)),
-                ])),
-            if (member.rating != null)
-              Text('★ ${member.rating}/10',
-                  style: const TextStyle(
-                      color: FlixieColors.warning,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700)),
-          ]),
-          if (member.rating != null ||
-              (member.reviewText?.isNotEmpty ?? false)) ...[
-            const SizedBox(height: 16),
-            Row(children: [
-              if (member.rating != null)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: FlixieColors.success),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                      member.rating! >= 7 ? '👍 Recommends' : '👎 Would skip',
-                      style: const TextStyle(
-                          color: FlixieColors.success,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700)),
-                ),
-              if (member.reviewText?.isNotEmpty ?? false) ...[
-                const SizedBox(width: 12),
-                Expanded(
-                    child: Text('“${member.reviewText}”',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            color: FlixieColors.light,
-                            fontStyle: FontStyle.italic))),
-              ],
-            ]),
-          ],
+          Text(isYou ? 'You' : member.username ?? 'Member',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  color: FlixieColors.light,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700)),
+          const SizedBox(height: 3),
+          Text(hasRating ? '★ ${member.rating}/10' : 'No rating',
+              style: TextStyle(
+                  color: hasRating ? FlixieColors.warning : FlixieColors.medium,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800)),
         ]),
-      );
+      ),
+      Container(width: 1, height: 42, color: FlixieColors.tabBarBorder),
+      const SizedBox(width: 12),
+      Icon(
+        hasRating
+            ? recommends
+                ? Icons.thumb_up_alt_rounded
+                : Icons.thumb_down_alt_rounded
+            : Icons.remove_circle_outline_rounded,
+        color: opinionColor,
+        size: 21,
+      ),
+      const SizedBox(width: 7),
+      Flexible(
+        child: Text(opinionLabel,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+                color: opinionColor,
+                fontSize: 13,
+                fontWeight: FontWeight.w800)),
+      ),
+    ]);
+  }
+
+  Widget _watcherAvatars(List<GroupRequestMemberStatus> entries) {
+    if (entries.isEmpty) {
+      return Text('${req.analyticsParticipantCount} people',
+          style: const TextStyle(color: FlixieColors.medium, fontSize: 13));
+    }
+    const size = 38.0;
+    const overlap = 11.0;
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      const Text('With',
+          style: TextStyle(color: FlixieColors.light, fontSize: 14)),
+      const SizedBox(width: 8),
+      SizedBox(
+        width: size + (entries.length - 1) * (size - overlap),
+        height: size,
+        child: Stack(children: [
+          for (var index = 0; index < entries.length; index++)
+            Positioned(
+              left: index * (size - overlap),
+              child: _borderedMemberAvatar(entries[index], size: size),
+            ),
+        ]),
+      ),
+    ]);
+  }
+
+  Widget _borderedMemberAvatar(
+    GroupRequestMemberStatus member, {
+    required double size,
+  }) {
+    final avatar = ProfileAvatarView(
+      avatar: member.avatar,
+      fallbackText: (member.username ?? '?')[0].toUpperCase(),
+      fallbackColor: FlixieColors.primary,
+      size: size - 5,
+      profileBadges: member.profileBadges,
+    );
+    if (member.profileBadges.isNotEmpty) return avatar;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: FlixieColors.primary, width: 2.5),
+      ),
+      child: Padding(padding: const EdgeInsets.all(2), child: avatar),
+    );
+  }
 
   Widget _poster(String? url) => ClipRRect(
         borderRadius: BorderRadius.circular(16),

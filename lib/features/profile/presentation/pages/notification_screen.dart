@@ -9,7 +9,9 @@ import 'package:flixie_app/features/social/presentation/controllers/friend_actio
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/core/auth/notification_deep_link.dart';
 import 'package:flixie_app/features/profile/data/notification_service.dart';
+import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/features/social/data/request_service.dart';
+import 'package:flixie_app/core/navigation/tab_refresh_controller.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/utils/notification_visibility.dart';
@@ -299,6 +301,22 @@ class _NotificationScreenState extends State<NotificationScreen> {
             notification.type == FlixieNotification.friendRequest) {
           final friends = await _friendActions.getFriends(userId);
           if (mounted) auth.updateCachedFriends(friends);
+        } else if (userId != null &&
+            notification.type == FlixieNotification.groupInvite) {
+          // Group membership has just changed on the server. Refresh this
+          // cache before returning to Social so its existing IndexedStack
+          // cannot render the stale pre-invite group list.
+          try {
+            final groups = await GroupService.getUserGroups(userId);
+            if (mounted) auth.updateCachedGroups(groups);
+          } catch (error) {
+            // The request itself has succeeded. Preserve that success and
+            // fall back to the usual background refresh if the cache fetch
+            // happens to fail.
+            logger.w('[NotificationScreen] group cache refresh failed: $error');
+            await auth.refreshUserData();
+          }
+          TabRefreshController.requestSocialRefresh();
         } else {
           await auth.refreshUserData();
         }

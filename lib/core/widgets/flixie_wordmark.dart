@@ -44,7 +44,7 @@ TextSpan flixieWordmarkSpan({
   return TextSpan(
     children: [
       TextSpan(
-        text: 'fli',
+        text: 'flix',
         style: base.copyWith(
           color: Colors.white,
           fontSize: fontSize,
@@ -53,7 +53,7 @@ TextSpan flixieWordmarkSpan({
         ),
       ),
       TextSpan(
-        text: 'xie',
+        text: 'ie',
         style: base.copyWith(
           color: FlixieColors.primary,
           fontSize: fontSize,
