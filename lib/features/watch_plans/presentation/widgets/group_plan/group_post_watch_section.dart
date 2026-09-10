@@ -49,132 +49,205 @@ class GroupPostWatchSection extends StatelessWidget {
         .toList(growable: false);
     final hasLogged =
         watchedMembers.any((member) => member.memberId == currentUserId);
+    GroupRequestMemberStatus? myStatus;
+    for (final member in req.memberStatuses) {
+      if (member.memberId == currentUserId) {
+        myStatus = member;
+        break;
+      }
+    }
+    final hasMissed = myStatus?.status.toUpperCase() == 'DECLINED';
     final totalParticipants = req.analyticsParticipantCount;
-    final memberWord = watchedMembers.length == 1 ? 'member' : 'members';
-    final statusText = hasLogged
-        ? '${watchedMembers.length} of $totalParticipants logged'
-        : watchedMembers.isEmpty
-            ? 'No watches logged yet'
-            : '${watchedMembers.length} $memberWord has logged';
+    final waitingMembers = req.memberStatuses
+        .where((member) =>
+            member.watchedAt == null &&
+            member.status.toUpperCase() != 'DECLINED')
+        .toList(growable: false);
+    final title = req.movieTitle ?? 'this watch plan';
+    final dateLabel = scheduledAt == null
+        ? 'Time to be confirmed'
+        : formatDateTime(scheduledAt!);
 
     Widget surface(Widget child) => Container(
           width: double.infinity,
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             color: FlixieColors.surface,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(color: FlixieColors.tabBarBorder),
           ),
           child: child,
         );
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      surface(Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: SizedBox(
-            width: 82,
-            height: 123,
-            child: posterUrl == null
-                ? const ColoredBox(
-                    color: FlixieColors.surfaceElevated,
-                    child: Icon(Icons.movie_outlined),
-                  )
-                : CachedNetworkImage(imageUrl: posterUrl!, fit: BoxFit.cover),
-          ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('DID THE PLAN HAPPEN?',
-                style: TextStyle(
-                    color: FlixieColors.secondary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.1)),
-            const SizedBox(height: 7),
-            Text(req.movieTitle ?? 'Watch Plan',
-                style: const TextStyle(
-                    color: FlixieColors.primary,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800)),
-            const SizedBox(height: 8),
-            Text(formatDateTime(scheduledAt!),
-                style:
-                    const TextStyle(color: FlixieColors.light, fontSize: 14)),
-            const SizedBox(height: 10),
-            Text(groupName ?? 'Group watch',
-                style:
-                    const TextStyle(color: FlixieColors.medium, fontSize: 14)),
-          ]),
-        ),
-      ])),
-      const SizedBox(height: 12),
       surface(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(hasLogged ? 'Watch logged' : 'Did you watch it?',
-            style: const TextStyle(
-                color: FlixieColors.light,
-                fontSize: 21,
-                fontWeight: FontWeight.w800)),
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              width: 78,
+              height: 116,
+              child: posterUrl == null
+                  ? const ColoredBox(
+                      color: FlixieColors.surfaceElevated,
+                      child: Icon(Icons.movie_outlined),
+                    )
+                  : CachedNetworkImage(imageUrl: posterUrl!, fit: BoxFit.cover),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(req.movieTitle ?? 'Watch Plan',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: FlixieColors.primary,
+                        fontSize: 23,
+                        fontWeight: FontWeight.w800)),
+                const SizedBox(height: 8),
+                Text(dateLabel,
+                    style: const TextStyle(
+                        color: FlixieColors.light, fontSize: 15)),
+                const SizedBox(height: 6),
+                Text(
+                    '${groupName ?? 'Group watch'} · $totalParticipants members',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: FlixieColors.medium, fontSize: 14)),
+                const SizedBox(height: 12),
+                _participantAvatars(req.memberStatuses),
+              ])),
+        ]),
+        const Divider(height: 30, color: FlixieColors.tabBarBorder),
+        Text(
+          hasLogged
+              ? 'Your watch is logged'
+              : hasMissed
+                  ? 'You couldn’t make it'
+                  : 'How did $title go?',
+          style: const TextStyle(
+              color: FlixieColors.textPrimary,
+              fontSize: 21,
+              fontWeight: FontWeight.w800),
+        ),
         const SizedBox(height: 7),
         Text(
           hasLogged
-              ? 'Your watch is saved. We’ll reveal the group recap once everyone has logged.'
-              : 'Log your own viewing. Everyone responds separately.',
+              ? 'Your viewing is saved. The group recap will grow as everyone adds theirs.'
+              : hasMissed
+                  ? 'You’re marked as unable to make it. The rest of the group can still log this watch.'
+                  : 'Log your own viewing when you’re ready. Everyone responds separately.',
           style: const TextStyle(color: FlixieColors.medium, height: 1.4),
         ),
-        if (!hasLogged) ...[
+        if (!hasLogged && !hasMissed) ...[
           const SizedBox(height: 16),
           SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: onLogWatch,
-              icon: const Icon(Icons.check_rounded),
-              label: const Text('Log your watch'),
-            ),
-          ),
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: onLogWatch,
+                icon: const Icon(Icons.check_rounded),
+                label: const Text('Log your watch'),
+              )),
           const SizedBox(height: 4),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-            TextButton(
-              onPressed: onNotThisTime,
-              child: const Text('Not this time'),
-            ),
-            TextButton(
-              onPressed: onReschedule,
-              child: const Text('Reschedule'),
-            ),
-          ]),
+          Center(
+              child: TextButton.icon(
+            onPressed: onNotThisTime,
+            icon: const Icon(Icons.event_busy_outlined, size: 18),
+            label: const Text('I didn’t make it'),
+          )),
+        ] else if (hasMissed) ...[
+          const SizedBox(height: 14),
+          SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onReschedule,
+                icon: const Icon(Icons.edit_calendar_outlined),
+                label: const Text('Suggest a new time'),
+              )),
         ],
       ])),
       const SizedBox(height: 12),
       surface(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('WATCH STATUS · ${watchedMembers.length} OF $totalParticipants',
-            style: const TextStyle(
-                color: FlixieColors.medium,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1)),
-        const Divider(height: 22, color: FlixieColors.tabBarBorder),
-        Text(statusText,
-            style: const TextStyle(color: FlixieColors.light, fontSize: 14)),
+        Row(children: [
+          const Expanded(
+              child: Text('Group progress',
+                  style: TextStyle(
+                      color: FlixieColors.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800))),
+          Text('${watchedMembers.length} of $totalParticipants watched',
+              style: TextStyle(
+                  color: watchedMembers.isEmpty
+                      ? FlixieColors.medium
+                      : FlixieColors.success,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800)),
+        ]),
+        const SizedBox(height: 12),
         if (watchedMembers.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: watchedMembers.map((member) {
-              return Row(mainAxisSize: MainAxisSize.min, children: [
-                _borderedMemberAvatar(member, size: 38),
-                const SizedBox(width: 6),
-                const Icon(Icons.check_circle_rounded,
-                    color: FlixieColors.success, size: 18),
-              ]);
-            }).toList(),
-          ),
+          _memberSummary(watchedMembers,
+              icon: Icons.check_circle_rounded,
+              color: FlixieColors.success,
+              label: 'watched'),
+          if (waitingMembers.isNotEmpty) const SizedBox(height: 10),
         ],
+        if (waitingMembers.isNotEmpty)
+          _memberSummary(waitingMembers,
+              icon: Icons.schedule_rounded,
+              color: FlixieColors.medium,
+              label: 'still to respond')
+        else if (watchedMembers.isEmpty)
+          const Text('No one has logged their watch yet.',
+              style: TextStyle(color: FlixieColors.medium, fontSize: 14)),
       ])),
     ]);
+  }
+
+  Widget _memberSummary(
+    List<GroupRequestMemberStatus> members, {
+    required IconData icon,
+    required Color color,
+    required String label,
+  }) {
+    final names = members
+        .map((member) => member.memberId == currentUserId
+            ? 'You'
+            : member.username ?? 'a member')
+        .take(3)
+        .join(', ');
+    final extra = members.length > 3 ? ' +${members.length - 3}' : '';
+    return Row(children: [
+      _participantAvatars(members, size: 32),
+      const SizedBox(width: 10),
+      Expanded(
+          child: Text('$names$extra $label',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style:
+                  const TextStyle(color: FlixieColors.medium, fontSize: 14))),
+      Icon(icon, color: color, size: 18),
+    ]);
+  }
+
+  Widget _participantAvatars(List<GroupRequestMemberStatus> members,
+      {double size = 34}) {
+    final visible = members.take(5).toList(growable: false);
+    if (visible.isEmpty) return const SizedBox.shrink();
+    const overlap = 10.0;
+    return SizedBox(
+      width: size + (visible.length - 1) * (size - overlap),
+      height: size,
+      child: Stack(children: [
+        for (var index = 0; index < visible.length; index++)
+          Positioned(
+              left: index * (size - overlap),
+              child: _borderedMemberAvatar(visible[index], size: size)),
+      ]),
+    );
   }
 
   Widget _buildRecap(BuildContext context) {
@@ -467,20 +540,32 @@ class GroupPostWatchSection extends StatelessWidget {
     GroupRequestMemberStatus member, {
     required double size,
   }) {
+    final hasSpecialFrame = member.profileBadges.isNotEmpty;
+    // `size` is the footprint reserved by the avatar stack. Account for the
+    // frame/border inside that footprint; otherwise Stack clips the lower and
+    // right edges of every ring.
+    final avatarSize = size - (hasSpecialFrame ? 6 : 9);
     final avatar = ProfileAvatarView(
       avatar: member.avatar,
       fallbackText: (member.username ?? '?')[0].toUpperCase(),
       fallbackColor: FlixieColors.primary,
-      size: size - 5,
+      size: avatarSize,
       profileBadges: member.profileBadges,
     );
-    if (member.profileBadges.isNotEmpty) return avatar;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: FlixieColors.primary, width: 2.5),
-      ),
-      child: Padding(padding: const EdgeInsets.all(2), child: avatar),
+    return SizedBox.square(
+      dimension: size,
+      child: hasSpecialFrame
+          ? Center(child: avatar)
+          : DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: FlixieColors.primary, width: 2.5),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(2),
+                child: avatar,
+              ),
+            ),
     );
   }
 

@@ -5,10 +5,14 @@ import 'package:flixie_app/features/watch_plans/presentation/utils/watch_plan_di
 
 enum HomeWatchPlanStateType {
   invitation,
+  groupEveryoneAccepted,
+  groupSomeAccepted,
+  groupNoOneAccepted,
   chooseMovies,
   waitingForChoices,
   chooseFinalMovie,
   reviewSchedule,
+  waitingForScheduleApproval,
   chooseSchedule,
   chooseLocation,
   logAfterOther,
@@ -51,7 +55,12 @@ class HomeWatchPlanState {
         HomeWatchPlanStateType.logAfterOther ||
         HomeWatchPlanStateType.logWatch =>
           WatchPlanColorRole.action,
+        HomeWatchPlanStateType.groupEveryoneAccepted =>
+          WatchPlanColorRole.complete,
+        HomeWatchPlanStateType.groupSomeAccepted => WatchPlanColorRole.action,
+        HomeWatchPlanStateType.groupNoOneAccepted => WatchPlanColorRole.failed,
         HomeWatchPlanStateType.waitingForChoices ||
+        HomeWatchPlanStateType.waitingForScheduleApproval ||
         HomeWatchPlanStateType.waitingForLogs ||
         HomeWatchPlanStateType.today ||
         HomeWatchPlanStateType.upcoming =>
@@ -62,9 +71,14 @@ class HomeWatchPlanState {
 
   IconData get statusIcon => switch (type) {
         HomeWatchPlanStateType.invitation => Icons.chat_bubble_outline_rounded,
+        HomeWatchPlanStateType.groupEveryoneAccepted => Icons.groups_rounded,
+        HomeWatchPlanStateType.groupSomeAccepted => Icons.group_off_rounded,
+        HomeWatchPlanStateType.groupNoOneAccepted => Icons.cancel_outlined,
         HomeWatchPlanStateType.chooseMovies => Icons.ballot_outlined,
         HomeWatchPlanStateType.chooseFinalMovie => Icons.lock_outline_rounded,
         HomeWatchPlanStateType.reviewSchedule => Icons.update_rounded,
+        HomeWatchPlanStateType.waitingForScheduleApproval =>
+          Icons.hourglass_top_rounded,
         HomeWatchPlanStateType.chooseSchedule => Icons.schedule_rounded,
         HomeWatchPlanStateType.chooseLocation => Icons.location_on_outlined,
         HomeWatchPlanStateType.logAfterOther ||
@@ -145,7 +159,50 @@ HomeWatchPlanState? _stateFor(
   final accepted = plan.hasCurrentUserAccepted == true ||
       plan.participantFor(userId)?.response.toUpperCase() == 'ACCEPTED' ||
       isCreator;
+  final groupResponses =
+      group ? plan.participants : const <WatchRequestParticipant>[];
+  final groupRepliesResolved = groupResponses.isNotEmpty &&
+      groupResponses.every((participant) {
+        final response = participant.response.toUpperCase();
+        return response == 'ACCEPTED' || response == 'DECLINED';
+      });
+  final acceptedGroupMembers = groupResponses
+      .where((participant) => participant.response.toUpperCase() == 'ACCEPTED')
+      .length;
 
+  if (groupRepliesResolved && plan.scheduledFor == null) {
+    if (acceptedGroupMembers == groupResponses.length) {
+      return _state(
+          plan,
+          HomeWatchPlanStateType.groupEveryoneAccepted,
+          3,
+          'EVERYONE IS IN',
+          plan.watchPlanTitle,
+          '$companion is ready to plan the details.',
+          'View plan',
+          false);
+    }
+    if (acceptedGroupMembers == 0) {
+      return _state(
+          plan,
+          HomeWatchPlanStateType.groupNoOneAccepted,
+          3,
+          'NO ONE CAN MAKE IT',
+          plan.watchPlanTitle,
+          '$companion needs a new plan.',
+          'View plan',
+          false);
+    }
+    return _state(
+        plan,
+        HomeWatchPlanStateType.groupSomeAccepted,
+        3,
+        'GROUP RESPONSES ARE IN',
+        plan.watchPlanTitle,
+        '$acceptedGroupMembers of ${groupResponses.length} members are in.',
+        'View plan',
+        false);
+  }
   if (plan.isPending && !isCreator) {
     return _state(
         plan,
@@ -157,13 +214,29 @@ HomeWatchPlanState? _stateFor(
         'View invitation',
         true);
   }
+  final pendingProposal = plan.latestPendingProposal;
+  final hasApprovedProposal =
+      pendingProposal?.responseFor(userId)?.isAccepted == true;
+  if (pendingProposal != null && (isCreator || hasApprovedProposal)) {
+    return _state(
+        plan,
+        HomeWatchPlanStateType.waitingForScheduleApproval,
+        5,
+        'SCHEDULING',
+        _dateTime(pendingProposal.proposedFor),
+        group
+            ? 'Waiting for $companion to approve the time'
+            : 'Waiting for @$other to approve the time',
+        'View plan',
+        false);
+  }
   if (plan.canRespondToProposal(userId)) {
     final proposal = plan.latestPendingProposal!;
     return _state(
         plan,
         HomeWatchPlanStateType.reviewSchedule,
         5,
-        'NEW TIME SUGGESTED',
+        'SCHEDULING',
         _dateTime(proposal.proposedFor),
         '${plan.watchPlanTitle} · Suggested by $other',
         'Review time',
@@ -218,6 +291,17 @@ HomeWatchPlanState? _stateFor(
       plan.selectedCandidateId != null &&
       plan.scheduledFor == null &&
       plan.proposedDate != null) {
+    if (isCreator) {
+      return _state(
+          plan,
+          HomeWatchPlanStateType.waitingForScheduleApproval,
+          5,
+          'TIME SUGGESTED',
+          _dateTime(plan.proposedDate!),
+          'Waiting for $companion to approve the time',
+          'View plan',
+          false);
+    }
     return _state(
         plan,
         HomeWatchPlanStateType.chooseSchedule,
@@ -239,6 +323,53 @@ HomeWatchPlanState? _stateFor(
         'Choose a time',
         true);
   }
+  final logged = plan.hasCurrentUserConfirmed(userId) ||
+      plan.hasCurrentUserLoggedWatch == true ||
+      plan.hasCurrentUserCompleted == true;
+  final anotherLogged =
+      plan.watchConfirmations.any((item) => item.userId != userId);
+  final allDirectParticipantsLogged = !group &&
+      plan.watchConfirmations
+              .where((item) => item.watched)
+              .map((item) => item.userId)
+              .toSet()
+              .length >=
+          2;
+  if (plan.isCompleted || allDirectParticipantsLogged) {
+    return _state(
+        plan,
+        HomeWatchPlanStateType.recap,
+        9,
+        'EVERYONE WATCHED',
+        'Your recap is ready',
+        group ? '${plan.watchPlanTitle} · $companion' : plan.watchPlanTitle,
+        'View recap',
+        false);
+  }
+  if (logged && plan.scheduledFor != null) {
+    return _state(
+        plan,
+        HomeWatchPlanStateType.waitingForLogs,
+        11,
+        'YOUR WATCH IS LOGGED',
+        group
+            ? '${plan.watchConfirmations.length} of ${plan.analyticsParticipantCount} watches logged'
+            : 'Waiting for @$other',
+        'Your shared recap will appear when everyone has logged.',
+        'View plan',
+        false);
+  }
+  if (anotherLogged && plan.scheduledFor != null) {
+    return _state(
+        plan,
+        HomeWatchPlanStateType.logAfterOther,
+        7,
+        '@${other.toUpperCase()} LOGGED THEIRS',
+        'Your turn',
+        'Add your watch to unlock your shared recap.',
+        'Log your watch',
+        true);
+  }
   if (plan.scheduledFor != null && (plan.location?.trim().isEmpty ?? true)) {
     return _state(
         plan,
@@ -252,22 +383,6 @@ HomeWatchPlanState? _stateFor(
   }
   final scheduled = plan.scheduledFor;
   if (scheduled != null && !scheduled.isAfter(now)) {
-    final logged = plan.hasCurrentUserConfirmed(userId) ||
-        plan.hasCurrentUserLoggedWatch == true ||
-        plan.hasCurrentUserCompleted == true;
-    final anotherLogged =
-        plan.watchConfirmations.any((item) => item.userId != userId);
-    if (!logged && anotherLogged) {
-      return _state(
-          plan,
-          HomeWatchPlanStateType.logAfterOther,
-          7,
-          '@${other.toUpperCase()} LOGGED THEIRS',
-          'Your turn',
-          'Add your watch to unlock your shared recap.',
-          'Log your watch',
-          true);
-    }
     if (!logged) {
       return _state(
           plan,
@@ -279,30 +394,6 @@ HomeWatchPlanState? _stateFor(
           'Log watch',
           true);
     }
-    if (!plan.isCompleted) {
-      return _state(
-          plan,
-          HomeWatchPlanStateType.waitingForLogs,
-          11,
-          'YOUR WATCH IS LOGGED',
-          group
-              ? '${plan.watchConfirmations.length} of ${plan.analyticsParticipantCount} watches logged'
-              : 'Waiting for @$other',
-          'Your shared recap will appear when everyone has logged.',
-          'View plan',
-          false);
-    }
-  }
-  if (plan.isCompleted) {
-    return _state(
-        plan,
-        HomeWatchPlanStateType.recap,
-        9,
-        'EVERYONE WATCHED',
-        'Your recap is ready',
-        group ? '${plan.watchPlanTitle} · $companion' : plan.watchPlanTitle,
-        'View recap',
-        false);
   }
   if (scheduled != null && scheduled.isAfter(now)) {
     final today = _sameDay(scheduled.toLocal(), now.toLocal());

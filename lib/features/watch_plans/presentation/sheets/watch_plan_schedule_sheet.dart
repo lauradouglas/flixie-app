@@ -8,10 +8,12 @@ class WatchPlanScheduleSheet extends StatefulWidget {
     super.key,
     this.initial,
     this.initialLocation,
+    this.showLocation = false,
   });
 
   final DateTime? initial;
   final String? initialLocation;
+  final bool showLocation;
 
   @override
   State<WatchPlanScheduleSheet> createState() => _WatchPlanScheduleSheetState();
@@ -21,6 +23,7 @@ class _WatchPlanScheduleSheetState extends State<WatchPlanScheduleSheet> {
   late DateTime _selected;
   late _ScheduleEntryMode _mode;
   bool _leaveTimeUndecided = false;
+  late final TextEditingController _locationController;
 
   @override
   void initState() {
@@ -28,6 +31,15 @@ class _WatchPlanScheduleSheetState extends State<WatchPlanScheduleSheet> {
     _selected = widget.initial?.toLocal() ??
         DateTime.now().add(const Duration(hours: 2));
     _mode = _ScheduleEntryMode.dateAndTime;
+    _locationController = TextEditingController(
+      text: widget.initialLocation?.trim() ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _locationController.dispose();
+    super.dispose();
   }
 
   @override
@@ -129,6 +141,18 @@ class _WatchPlanScheduleSheetState extends State<WatchPlanScheduleSheet> {
                           TextStyle(color: FlixieColors.light, fontSize: 13)),
                 ]),
               ],
+              if (widget.showLocation) ...[
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _locationController,
+                  style: const TextStyle(color: FlixieColors.light),
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.location_on_outlined),
+                    labelText: 'Location (optional)',
+                    hintText: 'e.g. My place or local cinema',
+                  ),
+                ),
+              ],
               const SizedBox(height: 18),
               Container(
                   width: double.infinity,
@@ -171,7 +195,9 @@ class _WatchPlanScheduleSheetState extends State<WatchPlanScheduleSheet> {
       message: _leaveTimeUndecided || _mode == _ScheduleEntryMode.dateOnly
           ? 'Time to be decided'
           : null,
-      location: widget.initialLocation?.trim(),
+      location: widget.showLocation
+          ? _locationController.text.trim()
+          : widget.initialLocation?.trim(),
     ));
   }
 

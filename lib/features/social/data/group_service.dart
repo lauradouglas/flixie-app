@@ -233,6 +233,17 @@ class GroupService {
     return GroupWatchRequest.fromJson(data as Map<String, dynamic>);
   }
 
+  static Future<GroupWatchRequest> acceptInitialWatchPlanSchedule(
+    String requestId,
+    String userId,
+  ) async {
+    final data = await ApiClient.post(
+      '/groups/request/$requestId/schedule-proposals/initial/accept',
+      body: {'userId': userId},
+    );
+    return GroupWatchRequest.fromJson(data as Map<String, dynamic>);
+  }
+
   /// Save the movies this member would watch in a group Watch Plan.
   static Future<GroupWatchRequest> saveWatchPlanChoices(
     String requestId,

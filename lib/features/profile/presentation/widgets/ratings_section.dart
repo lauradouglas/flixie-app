@@ -58,7 +58,8 @@ class RatingsSection extends StatelessWidget {
               style: textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
             ),
           )
-        else
+        else ...[
+          const SizedBox(height: 12),
           SizedBox(
             height: 190,
             child: ListView.separated(
@@ -68,6 +69,7 @@ class RatingsSection extends StatelessWidget {
               itemBuilder: (_, i) => _RatingCard(rating: recentRatings[i]),
             ),
           ),
+        ],
       ],
     );
   }

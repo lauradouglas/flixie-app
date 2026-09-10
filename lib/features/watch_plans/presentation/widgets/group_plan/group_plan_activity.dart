@@ -21,6 +21,13 @@ class GroupPlanActivity extends StatelessWidget {
         req.memberStatuses.where((member) => member.rating != null).length;
     final participantCount = req.analyticsParticipantCount;
     final accepted = req.acceptedCount + 1;
+    final declined = req.declinedCount;
+    final allResponded = accepted + req.declinedCount >= participantCount;
+    final acceptanceColor = accepted >= participantCount
+      ? FlixieColors.success
+      : allResponded
+        ? FlixieColors.warning
+        : FlixieColors.medium;
     final finalised = req.selectedCandidateId != null;
     final scheduled = req.scheduledFor?.isNotEmpty == true;
     final proposed = !scheduled && req.proposedDate?.isNotEmpty == true;
@@ -35,9 +42,12 @@ class GroupPlanActivity extends StatelessWidget {
           Icons.send_rounded, 'Invited', 'Group watch plan created', true),
       _groupActivityRow(
           Icons.check_circle_outline_rounded,
-          'Accepted',
-          '$accepted of $participantCount people accepted',
-          accepted >= participantCount),
+            'Responses',
+            allResponded
+              ? '$accepted accepted · $declined declined'
+              : '$accepted accepted · $declined declined · ${participantCount - accepted - declined} waiting',
+          accepted >= participantCount,
+          color: acceptanceColor),
       _groupActivityRow(
           Icons.bookmark_added_outlined,
           'Choices saved',
@@ -81,13 +91,14 @@ class GroupPlanActivity extends StatelessWidget {
 
   Widget _groupActivityRow(
           IconData icon, String title, String detail, bool complete,
-          {bool last = false}) =>
+      {bool last = false, Color? color}) =>
       Padding(
         padding: EdgeInsets.only(bottom: last ? 0 : 8),
         child: Row(children: [
           Icon(icon,
               size: 17,
-              color: complete ? FlixieColors.success : FlixieColors.medium),
+              color: color ??
+                (complete ? FlixieColors.success : FlixieColors.medium)),
           const SizedBox(width: 8),
           Expanded(
               child: Text.rich(
@@ -95,9 +106,9 @@ class GroupPlanActivity extends StatelessWidget {
                     TextSpan(
                         text: title,
                         style: TextStyle(
-                            color: complete
-                                ? FlixieColors.light
-                                : FlixieColors.medium,
+                            color: color != null || complete
+                              ? FlixieColors.light
+                              : FlixieColors.medium,
                             fontSize: 13,
                             fontWeight: FontWeight.w700)),
                     TextSpan(

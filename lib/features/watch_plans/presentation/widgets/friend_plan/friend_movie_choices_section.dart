@@ -40,6 +40,7 @@ class FriendMovieChoicesSection extends StatelessWidget {
     // is the reliable source once the invitee has accepted.
     final canChooseMovies =
         organiser || request.isAccepted || request.isScheduled;
+    final readOnlyPreview = !canChooseMovies;
     final selectedCandidate = request.selectedCandidateId;
     // One option is already the plan's final title. Older requests can lack
     // the persisted selectedCandidateId, so derive the same state here while
@@ -66,11 +67,13 @@ class FriendMovieChoicesSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          selectedCandidate == null && organiser
-              ? 'Choose the final movie'
-              : selectedCandidate == null
-                  ? 'What could you watch?'
-                  : 'Chosen movie',
+          readOnlyPreview
+              ? 'Movie options'
+              : selectedCandidate == null && organiser
+                  ? 'Choose the final movie'
+                  : selectedCandidate == null
+                      ? 'What could you watch?'
+                      : 'Chosen movie',
           style: const TextStyle(
             color: FlixieColors.textPrimary,
             fontSize: 17,
@@ -79,24 +82,15 @@ class FriendMovieChoicesSection extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          selectedCandidate == null && organiser
-              ? 'As the Watch Plan creator, you make the final choice. Use “Make final” to lock in a movie.'
-              : selectedCandidate == null
-                  ? '${request.candidates.length} of 5 options · choose every title you would watch. The Watch Plan creator makes the final choice.'
-                  : 'The final title is selected. Rescheduling will keep this choice.',
+          readOnlyPreview
+              ? '${request.candidates.length} option${request.candidates.length == 1 ? '' : 's'} for this Watch Plan. Accept the invitation to choose what you would watch.'
+              : selectedCandidate == null && organiser
+                  ? 'As the Watch Plan creator, you make the final choice. Use “Make final” to lock in a movie.'
+                  : selectedCandidate == null
+                      ? '${request.candidates.length} of 5 options · choose every title you would watch. The Watch Plan creator makes the final choice.'
+                      : 'The final title is selected. Rescheduling will keep this choice.',
           style: const TextStyle(color: FlixieColors.medium, fontSize: 12),
         ),
-        if (!canChooseMovies) ...[
-          const SizedBox(height: 10),
-          const Text(
-            'Accept the invitation first, then choose the movies you would watch.',
-            style: TextStyle(
-              color: FlixieColors.warning,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
         const SizedBox(height: 12),
         LayoutBuilder(builder: (context, constraints) {
           final candidateCards = request.candidates.map((candidate) {
@@ -123,15 +117,15 @@ class FriendMovieChoicesSection extends StatelessWidget {
                     duration: const Duration(milliseconds: 160),
                     padding: const EdgeInsets.all(9),
                     decoration: BoxDecoration(
-                      color: pickedByMe
+                      color: everyoneMatch
                           ? FlixieColors.success.withValues(alpha: 0.1)
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(13),
                       border: Border.all(
-                        color: pickedByMe
+                        color: everyoneMatch
                             ? FlixieColors.success
                             : FlixieColors.tabBarBorder,
-                        width: pickedByMe ? 2 : 1,
+                        width: everyoneMatch ? 2 : 1,
                       ),
                     ),
                     child: Row(
@@ -165,11 +159,13 @@ class FriendMovieChoicesSection extends StatelessWidget {
                                       fontWeight: FontWeight.w800)),
                               const SizedBox(height: 3),
                               Text(
-                                isFinal
-                                    ? 'Selected for this Watch Plan'
-                                    : everyoneMatch
-                                        ? 'Everyone\'s match'
-                                        : '$selectedCount of ${acceptedIds.length} would watch',
+                                readOnlyPreview
+                                    ? 'Movie option'
+                                    : isFinal
+                                        ? 'Selected for this Watch Plan'
+                                        : everyoneMatch
+                                            ? 'Everyone\'s match'
+                                            : '$selectedCount of ${acceptedIds.length} would watch',
                                 style: TextStyle(
                                   color: isFinal || everyoneMatch
                                       ? FlixieColors.success
@@ -273,7 +269,7 @@ class FriendMovieChoicesSection extends StatelessWidget {
                 .toList(growable: false),
           );
         }),
-        if (selectedCandidate == null)
+        if (selectedCandidate == null && !readOnlyPreview)
           Column(children: [
             if (request.candidates.length < 5)
               Align(
@@ -351,69 +347,59 @@ class FriendMovieChoicesSection extends StatelessWidget {
         .where((candidate) => candidate.id != selectedCandidateId)
         .toList(growable: false);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-            color: FlixieColors.surfaceElevated,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: FlixieColors.tabBarBorder)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            const Expanded(
-              child: Text('Chosen movie',
-                  style: TextStyle(
-                      color: FlixieColors.textPrimary,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900)),
-            ),
-            if (alternatives.isNotEmpty)
-              _OtherMovieOptionsMenu(alternatives: alternatives),
-            if (organiser)
-              IconButton(
-                onPressed: autoFinal ? onAddCandidate : onChangeMovie,
-                tooltip: autoFinal
-                    ? 'Add another movie option'
-                    : 'Change selected movie',
-                icon: Icon(autoFinal
-                    ? Icons.add_circle_outline_rounded
-                    : Icons.edit_outlined),
-                color: FlixieColors.primaryText,
-              ),
-          ]),
+      Row(children: [
+        const Expanded(
+          child: Text('Chosen movie',
+              style: TextStyle(
+                  color: FlixieColors.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900)),
+        ),
+        if (alternatives.isNotEmpty)
+          _OtherMovieOptionsMenu(alternatives: alternatives),
+        if (organiser)
+          IconButton(
+            onPressed: autoFinal ? onAddCandidate : onChangeMovie,
+            tooltip: autoFinal
+                ? 'Add another movie option'
+                : 'Change selected movie',
+            icon: Icon(autoFinal
+                ? Icons.add_circle_outline_rounded
+                : Icons.edit_outlined),
+            color: FlixieColors.primaryText,
+          ),
+      ]),
+      const SizedBox(height: 8),
+      Row(children: [
+        ClipRRect(
+            borderRadius: BorderRadius.circular(9),
+            child: SizedBox(
+                width: 52,
+                height: 78,
+                child: selected.posterPath == null
+                    ? const _MoviePosterPlaceholder()
+                    : CachedNetworkImage(
+                        imageUrl:
+                            'https://image.tmdb.org/t/p/w185${selected.posterPath}',
+                        fit: BoxFit.cover))),
+        const SizedBox(width: 12),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(selected.title ?? 'Untitled',
+              style: const TextStyle(
+                  color: FlixieColors.textPrimary,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800)),
           const SizedBox(height: 6),
-          Row(children: [
-            ClipRRect(
-                borderRadius: BorderRadius.circular(9),
-                child: SizedBox(
-                    width: 52,
-                    height: 78,
-                    child: selected.posterPath == null
-                        ? const _MoviePosterPlaceholder()
-                        : CachedNetworkImage(
-                            imageUrl:
-                                'https://image.tmdb.org/t/p/w185${selected.posterPath}',
-                            fit: BoxFit.cover))),
-            const SizedBox(width: 12),
-            Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                  Text(selected.title ?? 'Untitled',
-                      style: const TextStyle(
-                          color: FlixieColors.textPrimary,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 6),
-                  const Text('Selected for this Watch Plan',
-                      style: TextStyle(
-                          color: FlixieColors.success,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700)),
-                ])),
-            const Icon(Icons.check_circle_rounded, color: FlixieColors.success),
-          ]),
-        ]),
-      ),
+          const Text('Selected for this Watch Plan',
+              style: TextStyle(
+                  color: FlixieColors.success,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700)),
+        ])),
+        const Icon(Icons.check_circle_rounded, color: FlixieColors.success),
+      ]),
     ]);
   }
 }

@@ -429,22 +429,27 @@ class FriendWatchPlanCard extends StatelessWidget {
   ) {
     final time = _effectiveWatchTime;
     final isPast = time != null && !time.isAfter(DateTime.now());
+    final hasPendingSchedule = request.normalizedScheduleStatus == 'PROPOSED' &&
+        request.latestPendingProposal?.proposedFor != null;
     final incoming = request.isPending && request.requesterId != myUserId;
     final hasLogged = request.hasCurrentUserLoggedWatch == true ||
         request.watchConfirmations.any((entry) => entry.userId == myUserId);
-    final label = isPast
-        ? 'DID YOU WATCH IT?'
-        : incoming
-            ? 'NEEDS REPLY · ${request.candidates.length} MOVIE OPTIONS'
-            : request.normalizedScheduleStatus == 'AGREED'
-                ? 'SCHEDULED'
-                : 'PLANNING TOGETHER';
-    final actionLabel = isPast && !hasLogged
+    final label = hasPendingSchedule
+        ? 'SCHEDULING'
+        : isPast
+            ? 'DID YOU WATCH IT?'
+            : incoming
+                ? 'NEEDS REPLY · ${request.candidates.length} MOVIE OPTIONS'
+                : request.normalizedScheduleStatus == 'AGREED'
+                    ? 'SCHEDULED'
+                    : 'PLANNING TOGETHER';
+    final actionLabel = isPast && !hasPendingSchedule && !hasLogged
         ? 'Log watch'
         : incoming
             ? 'Choose movies'
             : 'View plan';
-    final action = isPast && !hasLogged ? onConfirmWatched : onOpen;
+    final action =
+        isPast && !hasPendingSchedule && !hasLogged ? onConfirmWatched : onOpen;
     final title = movie?.title ??
         request.candidates
             .where((candidate) => candidate.id == request.selectedCandidateId)
@@ -673,9 +678,14 @@ class FriendWatchPlanCard extends StatelessWidget {
     if (hasCompleted && request.watchConfirmations.isNotEmpty) {
       return _postWatchSection(other, movie, posterUrl);
     }
+    final pendingSchedule = request.latestPendingProposal;
+    final hasPendingSchedule = request.normalizedScheduleStatus == 'PROPOSED' &&
+        pendingSchedule != null &&
+        pendingSchedule.proposedFor != null;
     final postWatchTime = _effectiveWatchTime;
     if (postWatchTime != null &&
         !postWatchTime.isAfter(DateTime.now()) &&
+        !hasPendingSchedule &&
         (request.selectedCandidateId != null ||
             request.movie != null ||
             request.candidates.isNotEmpty)) {
@@ -684,13 +694,11 @@ class FriendWatchPlanCard extends StatelessWidget {
     final companion = request.groupName?.trim().isNotEmpty == true
         ? request.groupName!
         : other?.username ?? 'your group';
-    final pendingSchedule = request.latestPendingProposal;
-    final hasPendingSchedule = request.normalizedScheduleStatus == 'PROPOSED' &&
-        pendingSchedule != null &&
-        pendingSchedule.proposedFor != null;
     final canMessage =
         request.groupId?.isEmpty != false && other?.id.isNotEmpty == true;
     final hasBothParticipants = request.isAccepted || request.isScheduled;
+    final hasVisibleMovie =
+        request.selectedCandidateId != null || request.candidates.length == 1;
     final hasChoices = hasBothParticipants &&
         request.candidates
             .any((candidate) => candidate.selectedByUserIds.isNotEmpty);
@@ -699,6 +707,9 @@ class FriendWatchPlanCard extends StatelessWidget {
         request.isCompleted || request.normalizedWatchedStatus == 'WATCHED';
     Color stageColor(bool complete) =>
         complete ? FlixieColors.success : FlixieColors.tabBarBorder;
+    final stageLabel = hasPendingSchedule ? 'SCHEDULING' : 'PLANNING TOGETHER';
+    final stageTone =
+        hasPendingSchedule ? FlixieColors.primary : FlixieColors.success;
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 2, 0, 32),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -707,21 +718,26 @@ class FriendWatchPlanCard extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.check_rounded, size: 16, color: FlixieColors.success),
-              SizedBox(width: 7),
-              Text('PLANNING TOGETHER',
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(
+                  hasPendingSchedule
+                      ? Icons.schedule_rounded
+                      : Icons.check_rounded,
+                  size: 16,
+                  color: stageTone),
+              const SizedBox(width: 7),
+              Text(stageLabel,
                   style: TextStyle(
-                      color: FlixieColors.success,
+                      color: stageTone,
                       fontSize: 10,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 1.4)),
             ]),
             const SizedBox(height: 10),
             Text(
-                request.selectedCandidateId == null || !hasBothParticipants
+                !hasVisibleMovie
                     ? 'Planning a watch together'
-                    : movie?.title ?? 'Watch Plan',
+                    : request.watchPlanTitle,
                 style: const TextStyle(
                     color: FlixieColors.primary,
                     fontSize: 22,
@@ -782,47 +798,56 @@ class FriendWatchPlanCard extends StatelessWidget {
           _PlanSurface(child: _planActions(invitationDecisionOnly: true)),
           const SizedBox(height: 14),
         ],
-        // A creator's provisional choice is not a shared final movie until
-        // the invitee accepts. Keeping it out of this detail avoids falsely
-        // presenting the plan as ready before both people are participating.
-        if (request.candidates.isNotEmpty && hasBothParticipants) ...[
+        // Invitees can review every option before accepting. Selection stays
+        // disabled until both people are participating.
+        if (request.candidates.isNotEmpty) ...[
           _PlanSurface(child: _movieChoicesSection()),
           const SizedBox(height: 14),
         ],
-        _PlanSurface(
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Plan progress',
-                style: TextStyle(
-                    color: FlixieColors.light,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800)),
-            _participantsSection(other),
-            const SizedBox(height: 14),
-            Row(children: [
-              Expanded(child: Divider(color: stageColor(true), thickness: 4)),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: Divider(color: stageColor(hasChoices), thickness: 4)),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: Divider(color: stageColor(hasSchedule), thickness: 4)),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: Divider(color: stageColor(hasWatched), thickness: 4)),
+        if (!hasSchedule && !hasWatched)
+          _PlanSurface(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Plan progress',
+                  style: TextStyle(
+                      color: FlixieColors.light,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800)),
+              _participantsSection(other),
+              const SizedBox(height: 14),
+              Row(children: [
+                Expanded(child: Divider(color: stageColor(true), thickness: 4)),
+                const SizedBox(width: 10),
+                Expanded(
+                    child:
+                        Divider(color: stageColor(hasChoices), thickness: 4)),
+                const SizedBox(width: 10),
+                Expanded(
+                    child: Divider(
+                        color: hasSchedule
+                            ? stageColor(true)
+                            : hasPendingSchedule
+                                ? FlixieColors.primary
+                                : stageColor(false),
+                        thickness: 4)),
+                const SizedBox(width: 10),
+                Expanded(
+                    child:
+                        Divider(color: stageColor(hasWatched), thickness: 4)),
+              ]),
+              const SizedBox(height: 10),
+              const Text('Invited → Choose together → Scheduled → Watched',
+                  style: TextStyle(color: FlixieColors.medium, fontSize: 12)),
             ]),
-            const SizedBox(height: 10),
-            const Text('Invited → Choose together → Scheduled → Watched',
-                style: TextStyle(color: FlixieColors.medium, fontSize: 12)),
-          ]),
-        ),
+          ),
         const SizedBox(height: 14),
-        if (request.selectedCandidateId != null &&
+        if (hasSchedule &&
+            request.selectedCandidateId != null &&
             !request.hasCurrentUserConfirmed(myUserId)) ...[
           _PlanSurface(
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Watched it already?',
+              const Text('Watching before then?',
                   style: TextStyle(
                       color: FlixieColors.textPrimary,
                       fontSize: 18,
@@ -852,7 +877,7 @@ class FriendWatchPlanCard extends StatelessWidget {
               const Expanded(
                   child: Text('Next step',
                       style: TextStyle(
-                          color: FlixieColors.light,
+                          color: FlixieColors.textPrimary,
                           fontSize: 19,
                           fontWeight: FontWeight.w800))),
               Text(request.requesterId == myUserId ? 'PLAN OWNER' : 'WAITING',
@@ -867,7 +892,7 @@ class FriendWatchPlanCard extends StatelessWidget {
                     ? 'After everyone responds, choose the final movie and add the final time.'
                     : 'Choose the movies you would watch, then wait for the plan owner to make the final pick.',
                 style: const TextStyle(
-                    color: FlixieColors.medium, fontSize: 14, height: 1.35)),
+                    color: FlixieColors.light, fontSize: 14, height: 1.35)),
             if (canMessage) ...[
               const SizedBox(height: 16),
               SizedBox(
@@ -1227,29 +1252,42 @@ class FriendWatchPlanCard extends StatelessWidget {
                     value: _effectiveLocation ?? 'Not set',
                   ),
                   const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _PrimaryActionButton(
-                          label: 'Add to calendar',
-                          onPressed: () =>
-                              WatchCalendarService.addScheduledWatch(
-                            title: movie?.title ?? 'Watch together',
-                            scheduledFor: _effectiveWatchTime!,
-                            runtimeMinutes: movie?.runtimeMinutes,
-                            note: request.message,
-                            location: _effectiveLocation,
-                          ),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final calendar = _PrimaryActionButton(
+                        label: 'Add to calendar',
+                        onPressed: () => WatchCalendarService.addScheduledWatch(
+                          title: movie?.title ?? 'Watch together',
+                          scheduledFor: _effectiveWatchTime!,
+                          runtimeMinutes: movie?.runtimeMinutes,
+                          note: request.message,
+                          location: _effectiveLocation,
                         ),
-                      ),
-                      const SizedBox(width: 9),
-                      Expanded(
-                        child: _SecondaryActionButton(
-                          label: 'Edit plan',
-                          onPressed: onSuggestDifferentTime,
-                        ),
-                      ),
-                    ],
+                      );
+                      final edit = _SecondaryActionButton(
+                        label: 'Edit plan',
+                        onPressed: onSuggestDifferentTime,
+                      );
+                      final needsVerticalActions = constraints.maxWidth < 520 ||
+                          MediaQuery.textScalerOf(context).scale(1) > 1.0;
+                      if (needsVerticalActions) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            calendar,
+                            const SizedBox(height: 9),
+                            edit,
+                          ],
+                        );
+                      }
+                      return Row(
+                        children: [
+                          Expanded(child: calendar),
+                          const SizedBox(width: 9),
+                          Expanded(child: edit),
+                        ],
+                      );
+                    },
                   ),
                   if (request.normalizedScheduleStatus == 'AGREED' ||
                       request.isCompleted) ...[
@@ -1260,13 +1298,13 @@ class FriendWatchPlanCard extends StatelessWidget {
                         onPressed: onClosePlan,
                         icon:
                             const Icon(Icons.visibility_off_outlined, size: 18),
-                        label: const Text('Close watch plan'),
+                        label: const Text('I can’t make it'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: FlixieColors.light,
                           side: BorderSide(
                             color: FlixieColors.light.withValues(alpha: .45),
                           ),
-                          minimumSize: const Size(0, 46),
+                          minimumSize: const Size(0, 48),
                         ),
                       ),
                     ),
@@ -2041,16 +2079,15 @@ class _PrimaryActionButton extends StatelessWidget {
       style: ElevatedButton.styleFrom(
         backgroundColor: FlixieColors.primary,
         foregroundColor: Colors.black,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        minimumSize: const Size(0, 36),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        minimumSize: const Size(0, 48),
       ),
       child: Text(
         label,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
       ),
     );
   }
@@ -2069,16 +2106,15 @@ class _SecondaryActionButton extends StatelessWidget {
       style: OutlinedButton.styleFrom(
         foregroundColor: FlixieColors.light,
         side: BorderSide(color: FlixieColors.medium.withValues(alpha: 0.5)),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        minimumSize: const Size(0, 36),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        minimumSize: const Size(0, 48),
       ),
       child: Text(
         label,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
       ),
     );
   }

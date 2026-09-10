@@ -27,6 +27,7 @@ class GroupFocusedWatchPlan extends StatelessWidget {
     required this.completedContent,
     required this.postWatchContent,
     required this.onChangeMovie,
+    required this.onEditSchedule,
   });
 
   final GroupWatchRequest req;
@@ -45,6 +46,7 @@ class GroupFocusedWatchPlan extends StatelessWidget {
   final Widget completedContent;
   final Widget postWatchContent;
   final VoidCallback onChangeMovie;
+  final VoidCallback onEditSchedule;
 
   @override
   Widget build(BuildContext context) {
@@ -89,7 +91,8 @@ class GroupFocusedWatchPlan extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        surface(
+        Padding(
+          padding: EdgeInsets.zero,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -145,13 +148,30 @@ class GroupFocusedWatchPlan extends StatelessWidget {
               const SizedBox(height: 16),
               const Divider(height: 1, color: FlixieColors.tabBarBorder),
               const SizedBox(height: 12),
-              _planProgress(accepted.length + 1, invitees.length + 1),
+              _planProgress(
+                accepted.length + 1,
+                invitees.length + 1,
+                declined.length,
+              ),
             ],
           ),
         ),
         const SizedBox(height: 12),
         surface(
           child: _planOverview(
+            timeAction: req.scheduledFor?.isNotEmpty == true && canManage
+                ? TextButton.icon(
+                    onPressed: isProcessing ? null : onEditSchedule,
+                    icon: const Icon(Icons.edit_calendar_outlined, size: 15),
+                    label: const Text('Edit', style: TextStyle(fontSize: 12)),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(0, 24),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  )
+                : null,
             movieAction: showChangeMovie
                 ? TextButton.icon(
                     onPressed: isProcessing ? null : onChangeMovie,
@@ -300,12 +320,28 @@ class GroupFocusedWatchPlan extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            Text(
-                '${accepted.length + 1} accepted · ${invitees.length - accepted.length - declined.length} waiting${declined.isEmpty ? '' : ' · ${declined.length} declined'}',
-                style: const TextStyle(
-                    color: FlixieColors.success,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700)),
+            Text.rich(
+              TextSpan(
+                style:
+                    const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                children: [
+                  TextSpan(
+                    text: '${accepted.length + 1} accepted',
+                    style: const TextStyle(color: FlixieColors.success),
+                  ),
+                  TextSpan(
+                    text:
+                        ' · ${invitees.length - accepted.length - declined.length} waiting',
+                    style: const TextStyle(color: FlixieColors.warning),
+                  ),
+                  if (declined.isNotEmpty)
+                    TextSpan(
+                      text: ' · ${declined.length} declined',
+                      style: const TextStyle(color: FlixieColors.danger),
+                    ),
+                ],
+              ),
+            ),
           ]),
         ),
         const SizedBox(height: 12),
@@ -349,8 +385,8 @@ class GroupFocusedWatchPlan extends StatelessWidget {
         ),
       ),
     ];
-    const avatarSize = 30.0;
-    const overlap = 9.0;
+    const avatarSize = 34.0;
+    const overlap = 10.0;
     return Semantics(
       label: 'With ${participants.length} accepted participants',
       child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -362,25 +398,15 @@ class GroupFocusedWatchPlan extends StatelessWidget {
               avatarSize + (participants.length - 1) * (avatarSize - overlap),
           height: avatarSize,
           child: Stack(
+            clipBehavior: Clip.none,
             children: [
               for (var index = 0; index < participants.length; index++)
                 Positioned(
                   left: index * (avatarSize - overlap),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: FlixieColors.surface,
-                        width: 2,
-                      ),
-                    ),
-                    child: ProfileAvatarView(
-                      avatar: participants[index].avatar,
-                      fallbackText: participants[index].fallback,
-                      fallbackColor: FlixieColors.primary,
-                      size: avatarSize - 4,
-                      profileBadges: participants[index].badges,
-                    ),
+                  child: _compactParticipantAvatar(
+                    avatar: participants[index].avatar,
+                    fallback: participants[index].fallback,
+                    badges: participants[index].badges,
                   ),
                 ),
             ],
@@ -390,7 +416,49 @@ class GroupFocusedWatchPlan extends StatelessWidget {
     );
   }
 
-  Widget _planOverview({Widget? movieAction, Widget? actions}) {
+  Widget _compactParticipantAvatar({
+    required ProfileAvatar? avatar,
+    required String fallback,
+    required List<String> badges,
+  }) {
+    const specialBadges = {
+      'FOUNDER',
+      'OG_USER',
+      'VERIFIED',
+      'EARLY_ADOPTER',
+      'FOUNDING_FILM_FRIEND',
+    };
+    final hasSpecialFrame = badges.any(specialBadges.contains);
+    if (hasSpecialFrame) {
+      return ProfileAvatarView(
+        avatar: avatar,
+        fallbackText: fallback,
+        fallbackColor: FlixieColors.primary,
+        size: badges.contains('FOUNDER') ? 26 : 28,
+        profileBadges: badges,
+      );
+    }
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: FlixieColors.primary.withValues(alpha: 0.65),
+        ),
+      ),
+      child: ProfileAvatarView(
+        avatar: avatar,
+        fallbackText: fallback,
+        fallbackColor: FlixieColors.primary,
+        size: 32,
+      ),
+    );
+  }
+
+  Widget _planOverview({
+    Widget? timeAction,
+    Widget? movieAction,
+    Widget? actions,
+  }) {
     final scheduled = req.scheduledFor?.trim();
     final proposed = req.proposedDate?.trim();
     final time = scheduled?.isNotEmpty == true
@@ -406,7 +474,7 @@ class GroupFocusedWatchPlan extends StatelessWidget {
               fontSize: 16,
               fontWeight: FontWeight.w900)),
       const SizedBox(height: 12),
-      _overviewRow(Icons.calendar_month_outlined, time),
+      _overviewRow(Icons.calendar_month_outlined, time, trailing: timeAction),
       const SizedBox(height: 9),
       _overviewRow(
           Icons.location_on_outlined,
@@ -478,10 +546,10 @@ class GroupFocusedWatchPlan extends StatelessWidget {
         ]),
       ]);
 
-  Widget _planProgress(int accepted, int total) {
+  Widget _planProgress(int accepted, int total, int declined) {
     final steps = [
       ('Invited', true),
-      ('Group in', accepted >= total),
+      ('Group replied', accepted + declined >= total),
       ('Movie chosen', req.selectedCandidateId != null),
       ('Scheduled', req.scheduledFor != null),
       ('Watched', req.status == WatchRequestStatus.completed),

@@ -156,6 +156,7 @@ class WatchScheduleProposal {
   final String status;
   final String? createdAt;
   final String? updatedAt;
+  final List<WatchScheduleProposalResponse> responses;
 
   const WatchScheduleProposal({
     required this.id,
@@ -166,6 +167,7 @@ class WatchScheduleProposal {
     this.status = 'PENDING',
     this.createdAt,
     this.updatedAt,
+    this.responses = const [],
   });
 
   factory WatchScheduleProposal.fromJson(Map<String, dynamic> json) {
@@ -178,11 +180,36 @@ class WatchScheduleProposal {
       status: json['status']?.toString() ?? 'PENDING',
       createdAt: json['createdAt'] as String?,
       updatedAt: json['updatedAt'] as String?,
+      responses: (json['responses'] as List<dynamic>? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(WatchScheduleProposalResponse.fromJson)
+          .toList(),
     );
   }
 
   String get normalizedStatus => status.toUpperCase();
   bool get isPending => normalizedStatus == 'PENDING';
+
+  WatchScheduleProposalResponse? responseFor(String userId) =>
+      responses.where((response) => response.userId == userId).firstOrNull;
+}
+
+class WatchScheduleProposalResponse {
+  const WatchScheduleProposalResponse({
+    required this.userId,
+    required this.status,
+  });
+
+  final String userId;
+  final String status;
+
+  factory WatchScheduleProposalResponse.fromJson(Map<String, dynamic> json) =>
+      WatchScheduleProposalResponse(
+        userId: json['userId']?.toString() ?? '',
+        status: json['status']?.toString() ?? 'PENDING',
+      );
+
+  bool get isAccepted => status.toUpperCase() == 'ACCEPTED';
 }
 
 class WatchConfirmation {

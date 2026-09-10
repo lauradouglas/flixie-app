@@ -232,6 +232,11 @@ class FriendPostWatchSection extends StatelessWidget {
     final difference = mine?.rating != null && theirs?.rating != null
         ? (mine!.rating! - theirs!.rating!).abs()
         : null;
+    final ratingMatch = _RatingMatchCopy.fromRatings(
+      mine?.rating,
+      theirs?.rating,
+    );
+    final ratingsSaved = entries.where((entry) => entry.rating != null).length;
     final scheduled = scheduledLabel;
 
     Widget surface(Widget child, {bool tinted = false}) => Container(
@@ -307,16 +312,20 @@ class FriendPostWatchSection extends StatelessWidget {
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
                 const Expanded(
-                    child: Text('How you matched',
+                    child: Text('Your rating match',
                         style: TextStyle(
-                            color: FlixieColors.light,
+                            color: FlixieColors.textPrimary,
                             fontSize: 20,
                             fontWeight: FontWeight.w800))),
-                Text(
-                    '✓ ${difference == null ? 'RATINGS PENDING' : difference <= 1 ? 'CLOSE MATCH' : 'DIFFERENT TAKES'}',
-                    style: const TextStyle(
-                        color: FlixieColors.success,
-                        fontWeight: FontWeight.w800)),
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(ratingMatch.icon, color: ratingMatch.color, size: 18),
+                  const SizedBox(width: 5),
+                  Text(ratingMatch.label,
+                      style: TextStyle(
+                          color: ratingMatch.color,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800)),
+                ]),
               ]),
               const SizedBox(height: 12),
               Row(children: [
@@ -335,14 +344,17 @@ class FriendPostWatchSection extends StatelessWidget {
               ]),
               if (difference != null) ...[
                 const SizedBox(height: 14),
-                Center(
-                    child: Text(
-                        difference == 0
-                            ? '👍 You both gave it the same rating'
-                            : '👍 ${difference == 1 ? 'Only 1 point apart' : '$difference points apart'}',
-                        style: const TextStyle(
-                            color: FlixieColors.success,
-                            fontWeight: FontWeight.w800)))
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Icon(ratingMatch.icon, color: ratingMatch.color, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                      child: Text(ratingMatch.message,
+                          style: TextStyle(
+                              color: ratingMatch.color,
+                              fontSize: 15,
+                              height: 1.35,
+                              fontWeight: FontWeight.w700))),
+                ])
               ],
             ]),
             tinted: true),
@@ -354,20 +366,29 @@ class FriendPostWatchSection extends StatelessWidget {
                       color: FlixieColors.light,
                       fontSize: 20,
                       fontWeight: FontWeight.w800))),
-          Text('${entries.length} watches logged',
+          Text(
+              ratingsSaved == 2
+                  ? 'Both rated it'
+                  : '$ratingsSaved of 2 ratings saved',
               style: const TextStyle(color: FlixieColors.medium)),
         ]),
         const SizedBox(height: 12),
-        ...entries.map((entry) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _friendRecapEntry(
-                entry,
-                entry.userId == myUserId
-                    ? context.read<AuthProvider>().dbUser?.username ?? 'You'
-                    : other?.username ?? 'Friend',
-                entry.userId == myUserId
-                    ? context.read<AuthProvider>().dbUser?.avatar
-                    : other?.avatar))),
+        surface(Column(children: [
+          for (var index = 0; index < entries.length; index++) ...[
+            _friendRecapEntry(
+              entries[index],
+              entries[index].userId == myUserId
+                  ? context.read<AuthProvider>().dbUser?.username ?? 'You'
+                  : other?.username ?? 'Friend',
+              entries[index].userId == myUserId
+                  ? context.read<AuthProvider>().dbUser?.avatar
+                  : other?.avatar,
+            ),
+            if (index < entries.length - 1)
+              const Divider(height: 26, color: FlixieColors.tabBarBorder),
+          ],
+        ])),
+        const SizedBox(height: 16),
         Row(children: [
           Expanded(
               child: FilledButton.icon(
@@ -431,69 +452,142 @@ class FriendPostWatchSection extends StatelessWidget {
 
   Widget _friendRecapEntry(
           WatchConfirmation entry, String name, ProfileAvatar? avatar) =>
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-            color: FlixieColors.surface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: FlixieColors.tabBarBorder)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          ProfileAvatarView(
+              avatar: avatar,
+              fallbackText: name[0].toUpperCase(),
+              fallbackColor: FlixieColors.primary,
+              size: 48),
+          const SizedBox(width: 12),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(name,
+                    style: const TextStyle(
+                        color: FlixieColors.light,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700)),
+                Text(entry.rating == null ? 'No rating' : 'Rated this watch',
+                    style: const TextStyle(color: FlixieColors.medium))
+              ])),
+          if (entry.rating != null)
+            Text('★ ${entry.rating}/10',
+                style: const TextStyle(
+                    color: FlixieColors.warning,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800))
+        ]),
+        if (entry.rating != null ||
+            (entry.reviewText?.isNotEmpty ?? false)) ...[
+          const SizedBox(height: 14),
           Row(children: [
-            ProfileAvatarView(
-                avatar: avatar,
-                fallbackText: name[0].toUpperCase(),
-                fallbackColor: FlixieColors.primary,
-                size: 48),
-            const SizedBox(width: 12),
-            Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                  Text(name,
+            if (entry.rating != null)
+              Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                      border: Border.all(color: FlixieColors.success),
+                      borderRadius: BorderRadius.circular(18)),
+                  child: Text(
+                      entry.rating! >= 7 ? '👍 Recommends' : '👎 Would skip',
+                      style: const TextStyle(
+                          color: FlixieColors.success,
+                          fontWeight: FontWeight.w700))),
+            if (entry.reviewText?.isNotEmpty ?? false) ...[
+              const SizedBox(width: 12),
+              Expanded(
+                  child: Text('“${entry.reviewText}”',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           color: FlixieColors.light,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700)),
-                  const Text('Watched together',
-                      style: TextStyle(color: FlixieColors.medium))
-                ])),
-            if (entry.rating != null)
-              Text('★ ${entry.rating}/10',
-                  style: const TextStyle(
-                      color: FlixieColors.warning,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800))
+                          fontStyle: FontStyle.italic)))
+            ]
           ]),
-          if (entry.rating != null ||
-              (entry.reviewText?.isNotEmpty ?? false)) ...[
-            const SizedBox(height: 14),
-            Row(children: [
-              if (entry.rating != null)
-                Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                        border: Border.all(color: FlixieColors.success),
-                        borderRadius: BorderRadius.circular(18)),
-                    child: Text(
-                        entry.rating! >= 7 ? '👍 Recommends' : '👎 Would skip',
-                        style: const TextStyle(
-                            color: FlixieColors.success,
-                            fontWeight: FontWeight.w700))),
-              if (entry.reviewText?.isNotEmpty ?? false) ...[
-                const SizedBox(width: 12),
-                Expanded(
-                    child: Text('“${entry.reviewText}”',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            color: FlixieColors.light,
-                            fontStyle: FontStyle.italic)))
-              ]
-            ]),
-          ]
-        ]),
+        ]
+      ]);
+}
+
+class _RatingMatchCopy {
+  const _RatingMatchCopy({
+    required this.label,
+    required this.message,
+    required this.color,
+    required this.icon,
+  });
+
+  final String label;
+  final String message;
+  final Color color;
+  final IconData icon;
+
+  factory _RatingMatchCopy.fromRatings(int? mine, int? theirs) {
+    if (mine == null || theirs == null) {
+      return const _RatingMatchCopy(
+        label: 'RATINGS PENDING',
+        message: 'Both ratings are needed to compare your takes.',
+        color: FlixieColors.medium,
+        icon: Icons.schedule_rounded,
       );
+    }
+    final difference = (mine - theirs).abs();
+    if (difference == 0) {
+      if (mine >= 8) {
+        return _RatingMatchCopy(
+          label: 'BOTH LOVED IT',
+          message: 'You both landed on $mine/10.',
+          color: FlixieColors.success,
+          icon: Icons.favorite_rounded,
+        );
+      }
+      if (mine <= 4) {
+        return _RatingMatchCopy(
+          label: 'SAME VERDICT',
+          message: 'You both landed on $mine/10 — it missed for both of you.',
+          color: FlixieColors.warning,
+          icon: Icons.thumb_down_alt_rounded,
+        );
+      }
+      return _RatingMatchCopy(
+        label: 'SAME TAKE',
+        message: 'You both gave it $mine/10.',
+        color: FlixieColors.success,
+        icon: Icons.check_circle_rounded,
+      );
+    }
+    if (difference == 1) {
+      return _RatingMatchCopy(
+        label: 'IN STEP',
+        message: 'A very similar take: $mine/10 and $theirs/10.',
+        color: FlixieColors.success,
+        icon: Icons.handshake_rounded,
+      );
+    }
+    if (difference == 2) {
+      return const _RatingMatchCopy(
+        label: 'SIMILAR TASTES',
+        message: 'You saw it similarly, with a little room for debate.',
+        color: FlixieColors.primary,
+        icon: Icons.forum_rounded,
+      );
+    }
+    if (difference == 3) {
+      return const _RatingMatchCopy(
+        label: 'DIFFERENT TAKES',
+        message: 'You saw this one quite differently.',
+        color: FlixieColors.warning,
+        icon: Icons.compare_arrows_rounded,
+      );
+    }
+    return const _RatingMatchCopy(
+      label: 'A REAL SPLIT',
+      message: 'One of you enjoyed it far more than the other.',
+      color: FlixieColors.warning,
+      icon: Icons.call_split_rounded,
+    );
+  }
 }
 
 class _PostWatchSurface extends StatelessWidget {

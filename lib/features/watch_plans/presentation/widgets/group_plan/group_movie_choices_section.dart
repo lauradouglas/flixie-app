@@ -35,15 +35,9 @@ class GroupMovieChoicesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isCreator = request.userId == currentUserId;
-    final canChoose = isCreator || myStatus == 'ACCEPTED';
+    final canVote = !isCreator && myStatus == 'ACCEPTED';
+    final canCurate = isCreator || canVote;
     final everyoneCount = request.analyticsParticipantCount;
-    final mostApprovals = request.candidates.fold<int>(
-      0,
-      (highest, candidate) => candidate.selectedByUserIds.length > highest
-          ? candidate.selectedByUserIds.length
-          : highest,
-    );
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -58,8 +52,8 @@ class GroupMovieChoicesSection extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           isCreator
-              ? 'Choose every title you would watch, then make the final choice.'
-              : canChoose
+              ? 'Review the group’s choices, add options, or make the final choice.'
+              : canVote
                   ? 'Choose every title you would watch. The creator makes the final choice.'
                   : 'Accept the invitation first, then choose the movies you would watch.',
           style: const TextStyle(color: FlixieColors.medium, fontSize: 12),
@@ -79,12 +73,9 @@ class GroupMovieChoicesSection extends StatelessWidget {
                 final supportCount = candidate.selectedByUserIds.toSet().length;
                 final everyoneWouldWatch =
                     everyoneCount > 0 && supportCount >= everyoneCount;
-                // The creator's saved choices are useful data, not a visual
-                // selection state. Reserve the highlight for a member's own
-                // active vote and surface the group preference separately.
-                final highlighted = selected && !isCreator;
-                final hasMostApprovals =
-                    supportCount > 0 && supportCount == mostApprovals;
+                // A green surface means every active participant agrees—not
+                // merely that this person voted for it or it has a plurality.
+                final highlighted = everyoneWouldWatch;
                 final canRemove = request.selectedCandidateId == null &&
                     request.candidates.length > 1 &&
                     (isCreator || candidate.addedByUserId == currentUserId);
@@ -94,7 +85,7 @@ class GroupMovieChoicesSection extends StatelessWidget {
                 return SizedBox(
                   width: cardWidth,
                   child: InkWell(
-                    onTap: !canChoose || processing
+                    onTap: !canVote || processing
                         ? null
                         : () => onToggleCandidate(candidate.id),
                     borderRadius: BorderRadius.circular(12),
@@ -162,12 +153,9 @@ class GroupMovieChoicesSection extends StatelessWidget {
                                     Text(
                                       everyoneWouldWatch
                                           ? "Everyone's match"
-                                          : hasMostApprovals
-                                              ? 'Most approvals · $supportCount of $everyoneCount would watch'
-                                              : '$supportCount of $everyoneCount would watch',
+                                          : '$supportCount of $everyoneCount would watch',
                                       style: TextStyle(
-                                        color: everyoneWouldWatch ||
-                                                hasMostApprovals
+                                        color: everyoneWouldWatch
                                             ? FlixieColors.success
                                             : FlixieColors.medium,
                                         fontSize: 12,
@@ -180,12 +168,6 @@ class GroupMovieChoicesSection extends StatelessWidget {
                               if (selected && !isCreator)
                                 const Icon(Icons.check_circle,
                                     color: FlixieColors.success, size: 28),
-                              if (hasMostApprovals && !everyoneWouldWatch)
-                                const Padding(
-                                  padding: EdgeInsets.only(left: 6),
-                                  child: Icon(Icons.trending_up_rounded,
-                                      color: FlixieColors.success, size: 20),
-                                ),
                               if (canRemove)
                                 IconButton(
                                   onPressed: processing
@@ -220,7 +202,7 @@ class GroupMovieChoicesSection extends StatelessWidget {
             );
           },
         ),
-        if (canChoose) ...[
+        if (canVote) ...[
           const SizedBox(height: 4),
           SizedBox(
             width: double.infinity,
@@ -239,7 +221,7 @@ class GroupMovieChoicesSection extends StatelessWidget {
           ),
         ],
         if (request.selectedCandidateId == null &&
-            canChoose &&
+            canCurate &&
             request.candidates.length < 5)
           Align(
             alignment: Alignment.centerLeft,

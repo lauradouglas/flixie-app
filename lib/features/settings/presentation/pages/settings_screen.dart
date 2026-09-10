@@ -19,6 +19,7 @@ import 'package:flixie_app/features/profile/presentation/widgets/change_avatar_s
 import 'package:flixie_app/core/safety/safety_service.dart';
 import 'package:flixie_app/core/analytics/analytics_consent.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
+import 'package:flixie_app/core/reviews/app_review_service.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -156,6 +157,11 @@ class SettingsScreen extends StatelessWidget {
                 onTap: () => _sendFeedback(),
               ),
               SettingsTile(
+                icon: Icons.star_outline_rounded,
+                label: 'Rate Flixie',
+                onTap: () => _openStoreRating(context),
+              ),
+              SettingsTile(
                 icon: Icons.info_outline,
                 label: 'About & Credits',
                 onTap: () => context.push('/about-credits'),
@@ -201,6 +207,17 @@ class SettingsScreen extends StatelessWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _SettingsEditProfileSheet(user: dbUser),
+    );
+  }
+
+  Future<void> _openStoreRating(BuildContext context) async {
+    final opened = await AppReviewService.openStoreListing();
+    if (!context.mounted || opened) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content:
+            Text('Ratings will be available when Flixie is in the App Store.'),
+      ),
     );
   }
 

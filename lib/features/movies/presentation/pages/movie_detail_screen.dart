@@ -25,6 +25,7 @@ import 'package:flixie_app/models/watchlist_movie.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/features/movies/data/movie_service.dart';
 import 'package:flixie_app/features/watchlist/presentation/controllers/watchlist_actions_controller.dart';
+import 'package:flixie_app/core/reviews/app_review_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
@@ -823,6 +824,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             attribution: recommendation,
           );
         }
+        await AppReviewService.recordMovieInteraction(
+          user.id,
+          hasCompletedSetup: user.completedSetup,
+        );
       }
 
       // Successfully updated on server, toggle UI state and update user list
@@ -1176,6 +1181,15 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         },
       ),
     );
+    if (didSubmit) {
+      final user = authProvider.dbUser;
+      if (user != null) {
+        await AppReviewService.recordMovieInteraction(
+          user.id,
+          hasCompletedSetup: user.completedSetup,
+        );
+      }
+    }
     if (didSubmit && writeReview && mounted) {
       await _showWriteReviewSheet(
         context,
@@ -2729,6 +2743,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         contentId: movieId,
         source: widget.recommendation?.source ?? 'movie_detail',
         recommendation: widget.recommendation,
+      );
+      await AppReviewService.recordMovieInteraction(
+        user.id,
+        hasCompletedSetup: user.completedSetup,
       );
 
       // Extract updated vote data from response (safely parse types)

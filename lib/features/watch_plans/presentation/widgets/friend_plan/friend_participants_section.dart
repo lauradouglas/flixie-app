@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
+import 'package:flixie_app/features/profile/data/user_service.dart';
+import 'package:flixie_app/models/profile_avatar.dart';
 import 'package:flixie_app/models/watch_request.dart';
 
-class FriendParticipantsSection extends StatelessWidget {
+class FriendParticipantsSection extends StatefulWidget {
   const FriendParticipantsSection({
     super.key,
     required this.request,
@@ -15,7 +17,59 @@ class FriendParticipantsSection extends StatelessWidget {
   final WatchRequestUser? other;
 
   @override
+  State<FriendParticipantsSection> createState() =>
+      _FriendParticipantsSectionState();
+}
+
+class _FriendParticipantsSectionState extends State<FriendParticipantsSection> {
+  final Map<String, ProfileAvatar?> _resolvedAvatars = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveMissingAvatars();
+  }
+
+  @override
+  void didUpdateWidget(covariant FriendParticipantsSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.request.id != widget.request.id) {
+      _resolveMissingAvatars();
+    }
+  }
+
+  Future<void> _resolveMissingAvatars() async {
+    final users = [
+      widget.request.requester,
+      widget.request.recipient,
+      widget.other,
+    ]
+        .whereType<WatchRequestUser>()
+        .where((user) => user.avatar == null)
+        .toList();
+    if (users.isEmpty) return;
+    final profiles = await Future.wait(users.map((user) async {
+      try {
+        final profile = await UserService.getUserById(user.id);
+        return (id: user.id, avatar: profile.avatar);
+      } catch (_) {
+        return (id: user.id, avatar: null);
+      }
+    }));
+    if (!mounted) return;
+    setState(() {
+      for (final profile in profiles) {
+        if (profile.avatar != null) {
+          _resolvedAvatars[profile.id] = profile.avatar;
+        }
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final request = widget.request;
+    final other = widget.other;
     final users = request.participants
         .map((participant) => participant.user)
         .whereType<WatchRequestUser>()
@@ -114,7 +168,7 @@ class FriendParticipantsSection extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(2),
                 child: ProfileAvatarView(
-                  avatar: user.avatar,
+                  avatar: _resolvedAvatars[user.id] ?? user.avatar,
                   fallbackText: user.username.isNotEmpty
                       ? user.username[0].toUpperCase()
                       : '?',

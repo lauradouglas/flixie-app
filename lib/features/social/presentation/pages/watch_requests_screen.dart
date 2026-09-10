@@ -15,6 +15,7 @@ import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
 import 'package:flixie_app/core/calendar/watch_calendar_service.dart';
+import 'package:flixie_app/core/reviews/app_review_service.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_sheet.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/watch_request_sheet.dart';
 import 'package:flixie_app/features/movies/data/movie_service.dart';
@@ -141,15 +142,58 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     _groups = auth.cachedGroups ?? [];
     _loadingGroups = _groups.isEmpty;
     final cachedRequests = auth.cachedWatchRequests;
-    if (cachedRequests != null) {
-      _all = List.of(cachedRequests);
-      _loading = false;
-      _applyFilter();
+    final focusedRequestId = widget.initialRequestId;
+    if (focusedRequestId == null || focusedRequestId.isEmpty) {
+      if (cachedRequests != null) {
+        _all = List.of(cachedRequests);
+        _loading = false;
+        _applyFilter();
+      }
+    } else {
+      // A detail route must never render a stale list-cache snapshot first.
+      // Fetch its lifecycle state directly before showing the plan.
+      _loadFocusedRequest(focusedRequestId);
+    }
+    if (focusedRequestId == null || focusedRequestId.isEmpty) {
+      _load(showSpinner: cachedRequests == null);
     }
     _loadClosedPlans();
-    _load(showSpinner: cachedRequests == null);
     _loadGroups();
     _searchController.addListener(_applyFilter);
+  }
+
+  Future<void> _loadFocusedRequest(String requestId) async {
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (userId == null || userId.isEmpty) return;
+    try {
+      final state = await RequestService.getWatchRequestState(
+        watchRequestId: requestId,
+        userId: userId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _all = [state.request];
+        _loading = false;
+        _error = null;
+      });
+      final auth = context.read<AuthProvider>();
+      final cached = auth.cachedWatchRequests ?? const <WatchRequest>[];
+      final replaced = cached
+          .map((request) =>
+              request.id == state.request.id ? state.request : request)
+          .toList(growable: true);
+      if (!replaced.any((request) => request.id == state.request.id)) {
+        replaced.add(state.request);
+      }
+      auth.updateCachedWatchRequests(replaced);
+      _applyFilter();
+    } catch (error) {
+      logger.w('[WatchRequestsScreen] focused state load failed: $error');
+      if (!mounted) return;
+      // Preserve the normal list fallback for legacy links or transient
+      // state-endpoint failures, but do not leave a detail page loading.
+      await _load(showSpinner: true);
+    }
   }
 
   Future<void> _loadClosedPlans() async {
@@ -356,11 +400,11 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
 
     setState(() {
       _filtered = _all.where((r) {
-        if (_closedPlanIds.contains(r.id)) return false;
         final focusedId = widget.initialRequestId;
         if (focusedId != null && focusedId.isNotEmpty) {
           return r.id == focusedId;
         }
+        if (_closedPlanIds.contains(r.id)) return false;
         // Status filter
         if (!_matchesStatusFilter(r)) {
           return false;
@@ -489,7 +533,49 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
   }
 
   Future<void> _closeWatchPlan(WatchRequest request) async {
-    await _confirmDelete(request);
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (userId == null || userId.isEmpty) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Can’t make it?'),
+        content: const Text(
+          'This removes the Watch Plan from your list. It stays scheduled for everyone else.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep plan'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: FlixieColors.danger,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('I can’t make it'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    await WatchPlanVisibilityStore.closePlan(userId, request.id);
+    if (!mounted) return;
+    setState(() {
+      _closedPlanIds.add(request.id);
+      _filtered.removeWhere((item) => item.id == request.id);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('You’re no longer attending this plan')),
+    );
+    if (widget.initialRequestId?.isNotEmpty == true) {
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go('/watch-requests');
+      }
+    }
   }
 
   Future<void> _withRequestAction(
@@ -623,6 +709,21 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
           location: selected.location,
         );
         _replaceRequest(state.request);
+        if (selected.message == null) {
+          await PushNotificationService.scheduleWatchPlanReminders(
+            planId: state.request.id,
+            scheduledFor: selected.proposedFor,
+            title: state.request.watchPlanTitle,
+            withName: state.request.participants
+                    .map((participant) => participant.user)
+                    .whereType<WatchRequestUser>()
+                    .where((participant) => participant.id != userId)
+                    .firstOrNull
+                    ?.username ??
+                'your friend',
+            deepLink: '/watch-requests/${state.request.id}',
+          );
+        }
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -739,34 +840,19 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         }
         if (!mounted) return;
         if (decision == 'accepted' && agreedTime != null) {
-          final addToCalendar = await showDialog<bool>(
-                context: context,
-                builder: (dialogContext) => AlertDialog(
-                  title: const Text('Time agreed'),
-                  content: Text(
-                    'Add “${request.movie?.title ?? 'Watch together'}” to your phone calendar?',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(dialogContext, false),
-                      child: const Text('Not now'),
-                    ),
-                    ElevatedButton.icon(
-                      onPressed: () => Navigator.pop(dialogContext, true),
-                      icon: const Icon(Icons.event_available_outlined),
-                      label: const Text('Add to calendar'),
-                    ),
-                  ],
-                ),
+          final addToCalendar = await _showAddToCalendarSheet(
+                title: state.request.movie?.title ?? 'Watch together',
+                scheduledFor: agreedTime,
+                posterPath: state.request.movie?.posterPath,
               ) ??
               false;
           if (addToCalendar) {
             await WatchCalendarService.addScheduledWatch(
-              title: request.movie?.title ?? 'Watch together',
+              title: state.request.movie?.title ?? 'Watch together',
               scheduledFor: agreedTime,
-              runtimeMinutes: request.movie?.runtimeMinutes,
-              note: request.message,
-              location: request.location,
+              runtimeMinutes: state.request.movie?.runtimeMinutes,
+              note: state.request.message,
+              location: state.request.location,
             );
           }
         }
@@ -793,11 +879,159 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     });
   }
 
+  Future<bool?> _showAddToCalendarSheet({
+    required String title,
+    required DateTime scheduledFor,
+    String? posterPath,
+  }) {
+    return showModalBottomSheet<bool>(
+      context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => Container(
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+        decoration: const BoxDecoration(
+          color: FlixieColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: FlixieColors.medium,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Time agreed',
+              style: TextStyle(
+                color: FlixieColors.textPrimary,
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(
+                    width: 64,
+                    height: 96,
+                    child: posterPath == null || posterPath.isEmpty
+                        ? const ColoredBox(
+                            color: FlixieColors.surfaceElevated,
+                            child: Icon(
+                              Icons.movie_outlined,
+                              color: FlixieColors.primary,
+                              size: 28,
+                            ),
+                          )
+                        : Image.network(
+                            'https://image.tmdb.org/t/p/w185$posterPath',
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const ColoredBox(
+                              color: FlixieColors.surfaceElevated,
+                              child: Icon(
+                                Icons.movie_outlined,
+                                color: FlixieColors.primary,
+                                size: 28,
+                              ),
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: FlixieColors.textPrimary,
+                          fontSize: 20,
+                          height: 1.15,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.schedule_rounded,
+                            color: FlixieColors.primary,
+                            size: 19,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _formatFriendlyDateTime(scheduledFor),
+                              style: const TextStyle(
+                                color: FlixieColors.medium,
+                                fontSize: 16,
+                                height: 1.3,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 26),
+            const Text(
+              'Keep the plan handy by adding it to your phone calendar.',
+              style: TextStyle(
+                color: FlixieColors.medium,
+                fontSize: 15,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () => Navigator.pop(sheetContext, true),
+                icon: const Icon(Icons.event_available_outlined),
+                label: const Text('Add to calendar'),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: () => Navigator.pop(sheetContext, false),
+                child: const Text('Not now'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _confirmWatched(WatchRequest request) async {
     final userId = context.read<AuthProvider>().dbUser?.id;
     final analytics = context.read<AnalyticsController>();
     final movieService = context.read<MovieService>();
     if (userId == null || userId.isEmpty) return;
+    final hasCompletedSetup =
+        context.read<AuthProvider>().dbUser?.completedSetup == true;
     var saved = false;
     int? savedRating;
     bool? savedRecommended;
@@ -879,6 +1113,10 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
                 planType: state.request.analyticsPlanType,
                 participantCount: state.request.analyticsParticipantCount,
                 source: 'watch_plan',
+              );
+              await AppReviewService.recordCompletedWatchPlan(
+                userId,
+                hasCompletedSetup: hasCompletedSetup,
               );
             }
             saved = true;

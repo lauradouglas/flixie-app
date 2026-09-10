@@ -397,16 +397,15 @@ class _ActionPrimaryButton extends StatelessWidget {
       style: ElevatedButton.styleFrom(
         backgroundColor: FlixieColors.primary,
         foregroundColor: Colors.black,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        minimumSize: const Size(0, 36),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        minimumSize: const Size(0, 48),
       ),
       child: Text(
         label,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
       ),
     );
   }
@@ -425,16 +424,15 @@ class _ActionSecondaryButton extends StatelessWidget {
       style: OutlinedButton.styleFrom(
         foregroundColor: FlixieColors.light,
         side: BorderSide(color: FlixieColors.medium.withValues(alpha: 0.5)),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        minimumSize: const Size(0, 36),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        minimumSize: const Size(0, 48),
       ),
       child: Text(
         label,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
       ),
     );
   }

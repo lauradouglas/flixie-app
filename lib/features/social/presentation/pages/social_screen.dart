@@ -607,7 +607,9 @@ class _FriendStoryStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 82,
+      // Avatar badges can extend the visual avatar slightly, and the username
+      // line needs a full text line at accessibility-safe metrics.
+      height: 86,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: friends.length,
@@ -628,7 +630,7 @@ class _FriendStoryStrip extends StatelessWidget {
                   size: 54,
                   profileBadges: friend.profileBadges,
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 SizedBox(
                   width: 62,
                   child: Text(

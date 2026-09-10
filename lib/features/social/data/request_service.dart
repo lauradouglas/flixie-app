@@ -38,7 +38,7 @@ class RequestService {
     String? message,
     String? location,
   }) async {
-    await ApiClient.post(
+    final data = await ApiClient.post(
       '/watch-requests/$watchRequestId/schedule-proposals',
       body: {
         'userId': userId,
@@ -49,7 +49,13 @@ class RequestService {
           'location': location.trim(),
       },
     );
-    return getWatchRequestState(watchRequestId: watchRequestId, userId: userId);
+    final result = Map<String, dynamic>.from(data as Map);
+    final request = Map<String, dynamic>.from(result['request'] as Map);
+    return WatchRequestState(
+      request: WatchRequest.fromJson(request),
+      needsWatchConfirmation: false,
+      hasCurrentUserLoggedWatch: false,
+    );
   }
 
   static Future<WatchRequestState> respondToWatchScheduleProposal({
@@ -58,14 +64,20 @@ class RequestService {
     required String userId,
     required String decision,
   }) async {
-    await ApiClient.patch(
+    final data = await ApiClient.patch(
       '/watch-requests/$watchRequestId/schedule-proposals/$proposalId/respond',
       body: {
         'userId': userId,
         'decision': decision,
       },
     );
-    return getWatchRequestState(watchRequestId: watchRequestId, userId: userId);
+    final result = Map<String, dynamic>.from(data as Map);
+    final request = Map<String, dynamic>.from(result['request'] as Map);
+    return WatchRequestState(
+      request: WatchRequest.fromJson(request),
+      needsWatchConfirmation: false,
+      hasCurrentUserLoggedWatch: false,
+    );
   }
 
   static Future<WatchRequestState> confirmWatchRequest({

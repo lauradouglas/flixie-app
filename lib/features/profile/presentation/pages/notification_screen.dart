@@ -19,7 +19,7 @@ import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/core/calendar/watch_calendar_service.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/notification_activity_card.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/notification_request_card.dart';
-import 'package:flixie_app/features/social/presentation/widgets/flixie_time_picker_sheet.dart';
+import 'package:flixie_app/features/watch_plans/presentation/sheets/watch_plan_schedule_sheet.dart';
 
 /// How often the screen silently re-fetches notifications in the background.
 const Duration _kPollInterval = Duration(seconds: 60);
@@ -449,12 +449,14 @@ class _NotificationScreenState extends State<NotificationScreen> {
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (requestId == null || userId == null) return;
 
-    final selected =
-        await showModalBottomSheet<({DateTime proposedFor, String? message})>(
+    final selected = await showModalBottomSheet<
+        ({DateTime proposedFor, String? message, String? location})>(
       context: context,
       isScrollControlled: true,
+      useRootNavigator: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _NotificationScheduleProposalSheet(
+      builder: (_) => WatchPlanScheduleSheet(
         initial: notification.watchRequestScheduledFor,
       ),
     );
@@ -942,209 +944,3 @@ class _NotificationScreenState extends State<NotificationScreen> {
   }
 }
 
-class _NotificationScheduleProposalSheet extends StatefulWidget {
-  const _NotificationScheduleProposalSheet({this.initial});
-
-  final DateTime? initial;
-
-  @override
-  State<_NotificationScheduleProposalSheet> createState() =>
-      _NotificationScheduleProposalSheetState();
-}
-
-class _NotificationScheduleProposalSheetState
-    extends State<_NotificationScheduleProposalSheet> {
-  final TextEditingController _messageController = TextEditingController();
-  late DateTime _selected;
-
-  @override
-  void initState() {
-    super.initState();
-    _selected = widget.initial?.toLocal() ??
-        DateTime.now().add(const Duration(hours: 2));
-  }
-
-  @override
-  void dispose() {
-    _messageController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Material(
-        color: FlixieColors.background,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            16,
-            14,
-            16,
-            MediaQuery.of(context).viewInsets.bottom + 16,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Suggest a time',
-                style: TextStyle(
-                  color: FlixieColors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _QuickScheduleChip(
-                    label: 'Tonight',
-                    onTap: () => setState(() => _selected = _tonight()),
-                  ),
-                  _QuickScheduleChip(
-                    label: 'Tomorrow',
-                    onTap: () => setState(() => _selected = _tomorrow()),
-                  ),
-                  _QuickScheduleChip(
-                    label: 'This weekend',
-                    onTap: () => setState(() => _selected = _thisWeekend()),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.event_outlined,
-                    color: FlixieColors.primary),
-                title: const Text('Date',
-                    style: TextStyle(color: FlixieColors.light)),
-                subtitle: Text(
-                  '${_selected.day} ${_kMonths[_selected.month - 1]} ${_selected.year}',
-                  style: const TextStyle(color: FlixieColors.medium),
-                ),
-                onTap: _pickDate,
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.schedule_rounded,
-                    color: FlixieColors.primary),
-                title: const Text('Time',
-                    style: TextStyle(color: FlixieColors.light)),
-                subtitle: Text(
-                  TimeOfDay.fromDateTime(_selected).format(context),
-                  style: const TextStyle(color: FlixieColors.medium),
-                ),
-                onTap: _pickTime,
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _messageController,
-                maxLines: 2,
-                style: const TextStyle(color: FlixieColors.light),
-                decoration: const InputDecoration(
-                  labelText: 'Note (optional)',
-                  hintText: 'Add a quick note',
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(
-                    context,
-                    (
-                      proposedFor: _selected,
-                      message: _messageController.text.trim(),
-                    ),
-                  ),
-                  child: const Text('Send suggestion'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _selected,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
-    if (picked == null) return;
-    setState(() {
-      _selected = DateTime(
-        picked.year,
-        picked.month,
-        picked.day,
-        _selected.hour,
-        _selected.minute,
-      );
-    });
-  }
-
-  Future<void> _pickTime() async {
-    final picked = await showModalBottomSheet<TimeOfDay>(
-      context: context,
-      useRootNavigator: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => FlixieTimePickerSheet(
-        initialTime: TimeOfDay.fromDateTime(_selected),
-      ),
-    );
-    if (picked == null) return;
-    setState(() {
-      _selected = DateTime(
-        _selected.year,
-        _selected.month,
-        _selected.day,
-        picked.hour,
-        picked.minute,
-      );
-    });
-  }
-
-  DateTime _tonight() {
-    final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day, 20);
-  }
-
-  DateTime _tomorrow() {
-    final tomorrow = DateTime.now().add(const Duration(days: 1));
-    return DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 19, 30);
-  }
-
-  DateTime _thisWeekend() {
-    final now = DateTime.now();
-    final daysUntilSaturday = (DateTime.saturday - now.weekday) % 7;
-    final saturday =
-        now.add(Duration(days: daysUntilSaturday == 0 ? 7 : daysUntilSaturday));
-    return DateTime(saturday.year, saturday.month, saturday.day, 20);
-  }
-}
-
-class _QuickScheduleChip extends StatelessWidget {
-  const _QuickScheduleChip({required this.label, required this.onTap});
-
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return ActionChip(
-      label: Text(label),
-      onPressed: onTap,
-      backgroundColor: FlixieColors.tabBarBackgroundFocused,
-      labelStyle: const TextStyle(color: FlixieColors.light),
-      side: BorderSide(color: FlixieColors.primary.withValues(alpha: 0.3)),
-    );
-  }
-}

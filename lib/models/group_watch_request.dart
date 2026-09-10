@@ -307,11 +307,13 @@ class GroupScheduleProposalResponse {
   final String userId;
   final String status;
 
-  factory GroupScheduleProposalResponse.fromJson(Map<String, dynamic> json) =>
-      GroupScheduleProposalResponse(
-        userId: json['userId']?.toString() ?? '',
-        status: json['status']?.toString() ?? 'PENDING',
-      );
+  factory GroupScheduleProposalResponse.fromJson(Map<String, dynamic> json) {
+    final user = json['user'] as Map<String, dynamic>?;
+    return GroupScheduleProposalResponse(
+      userId: (json['userId'] ?? user?['id'])?.toString() ?? '',
+      status: (json['status'] ?? json['decision'])?.toString() ?? 'PENDING',
+    );
+  }
 }
 
 class GroupScheduleProposal {
@@ -332,19 +334,23 @@ class GroupScheduleProposal {
   final String? message;
   final List<GroupScheduleProposalResponse> responses;
 
-  factory GroupScheduleProposal.fromJson(Map<String, dynamic> json) =>
-      GroupScheduleProposal(
-        id: json['id']?.toString() ?? '',
-        proposerId: json['proposerId']?.toString() ?? '',
-        proposedFor: json['proposedFor']?.toString(),
-        status: json['status']?.toString() ?? 'PENDING',
-        location: json['location']?.toString(),
-        message: json['message']?.toString(),
-        responses: (json['responses'] as List<dynamic>? ?? const [])
-            .whereType<Map<String, dynamic>>()
-            .map(GroupScheduleProposalResponse.fromJson)
-            .toList(),
-      );
+  factory GroupScheduleProposal.fromJson(Map<String, dynamic> json) {
+    final proposer = json['proposer'] as Map<String, dynamic>?;
+    return GroupScheduleProposal(
+      id: json['id']?.toString() ?? '',
+      proposerId: (json['proposerId'] ?? proposer?['id'] ?? json['userId'])
+              ?.toString() ??
+          '',
+      proposedFor: json['proposedFor']?.toString(),
+      status: json['status']?.toString() ?? 'PENDING',
+      location: json['location']?.toString(),
+      message: json['message']?.toString(),
+      responses: (json['responses'] as List<dynamic>? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(GroupScheduleProposalResponse.fromJson)
+          .toList(),
+    );
+  }
 
   GroupScheduleProposalResponse? responseFor(String userId) =>
       responses.where((response) => response.userId == userId).firstOrNull;
@@ -586,7 +592,7 @@ class GroupWatchRequest {
   bool get canRespond => isActive && !hasExpired;
 
   GroupScheduleProposal? get activeScheduleProposal => scheduleProposals
-      .where((proposal) => proposal.status == 'PENDING')
+      .where((proposal) => proposal.status.toUpperCase() == 'PENDING')
       .firstOrNull;
 
   /// A group request is mirrored between Postgres and the conversation store.

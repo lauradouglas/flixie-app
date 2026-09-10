@@ -12,8 +12,12 @@ WatchRequest plan({
   String status = 'accepted',
   String scheduleStatus = 'NONE',
   DateTime? scheduledFor,
+  DateTime? proposedDate,
   String? location,
+  String? groupName,
+  String? groupId,
   String? selectedCandidateId,
+  List<WatchRequestParticipant> participants = const [],
   List<WatchPlanCandidate> candidates = const [],
   List<WatchScheduleProposal> proposals = const [],
   List<WatchConfirmation> confirmations = const [],
@@ -27,8 +31,12 @@ WatchRequest plan({
       type: 'MOVIE_WATCH_REQUEST',
       scheduleStatus: scheduleStatus,
       scheduledFor: scheduledFor,
+      proposedDate: proposedDate,
       location: location,
+      groupName: groupName,
+      groupId: groupId,
       selectedCandidateId: selectedCandidateId,
+      participants: participants,
       candidates: candidates,
       scheduleProposals: proposals,
       watchConfirmations: confirmations,
@@ -166,6 +174,39 @@ void main() {
     expect(selected?.title, 'Waiting for @Jamie');
   });
 
+  test('my early logged watch waits for the other person', () {
+    final selected = selectHomeWatchPlanState([
+      plan(
+        scheduledFor: now.add(const Duration(hours: 1)),
+        location: 'Home',
+        scheduleStatus: 'AGREED',
+        confirmations: const [
+          WatchConfirmation(id: 'mine', userId: 'me', watched: true),
+        ],
+      ),
+    ], 'me', now: now);
+
+    expect(selected?.type, HomeWatchPlanStateType.waitingForLogs);
+    expect(selected?.eyebrow, 'YOUR WATCH IS LOGGED');
+  });
+
+  test('everyone logging early opens the recap instead of the countdown', () {
+    final selected = selectHomeWatchPlanState([
+      plan(
+        scheduledFor: now.add(const Duration(hours: 1)),
+        location: 'Cinema',
+        scheduleStatus: 'AGREED',
+        confirmations: const [
+          WatchConfirmation(id: 'mine', userId: 'me', watched: true),
+          WatchConfirmation(id: 'theirs', userId: 'jamie', watched: true),
+        ],
+      ),
+    ], 'me', now: now);
+
+    expect(selected?.type, HomeWatchPlanStateType.recap);
+    expect(selected?.eyebrow, 'EVERYONE WATCHED');
+  });
+
   test('completed plan uses the green recap presentation', () {
     final selected = selectHomeWatchPlanState([
       plan(status: 'completed'),
@@ -184,5 +225,84 @@ void main() {
 
     expect(selected?.type, HomeWatchPlanStateType.chooseSchedule);
     expect(selected?.colorRole, WatchPlanColorRole.action);
+  });
+
+  test('group creator waits for approval after suggesting a time', () {
+    final selected = selectHomeWatchPlanState([
+      plan(
+        requesterId: 'me',
+        groupName: 'Friday films',
+        selectedCandidateId: 'one',
+        proposedDate: now.add(const Duration(days: 1)),
+      ),
+    ], 'me', now: now);
+
+    expect(
+      selected?.type,
+      HomeWatchPlanStateType.waitingForScheduleApproval,
+    );
+    expect(selected?.requiresAttention, isFalse);
+    expect(selected?.actionLabel, 'View plan');
+  });
+
+  test('group member waits after approving a proposed time', () {
+    final selected = selectHomeWatchPlanState([
+      plan(
+        groupName: 'Friday films',
+        selectedCandidateId: 'one',
+        proposals: [
+          WatchScheduleProposal(
+            id: 'proposal',
+            proposerId: 'jamie',
+            proposedFor: now.add(const Duration(days: 1)),
+            responses: const [
+              WatchScheduleProposalResponse(
+                userId: 'me',
+                status: 'ACCEPTED',
+              ),
+            ],
+          ),
+        ],
+      ),
+    ], 'me', now: now);
+
+    expect(
+      selected?.type,
+      HomeWatchPlanStateType.waitingForScheduleApproval,
+    );
+    expect(selected?.requiresAttention, isFalse);
+  });
+
+  test('resolved group replies use green, amber, and red outcomes', () {
+    WatchRequestParticipant response(String id, String status) =>
+        WatchRequestParticipant(user: WatchRequestUser(id: id, username: id), response: status);
+
+    final everyoneIn = selectHomeWatchPlanState([
+      plan(
+        status: 'open',
+        groupId: 'group',
+        groupName: 'Friday films',
+        participants: [response('me', 'ACCEPTED'), response('jamie', 'ACCEPTED')],
+      ),
+    ], 'me', now: now);
+    final someIn = selectHomeWatchPlanState([
+      plan(
+        groupId: 'group',
+        groupName: 'Friday films',
+        participants: [response('me', 'ACCEPTED'), response('jamie', 'DECLINED')],
+      ),
+    ], 'me', now: now);
+    final nobodyIn = selectHomeWatchPlanState([
+      plan(
+        requesterId: 'me',
+        groupId: 'group',
+        groupName: 'Friday films',
+        participants: [response('jamie', 'DECLINED')],
+      ),
+    ], 'me', now: now);
+
+    expect(everyoneIn?.colorRole, WatchPlanColorRole.complete);
+    expect(someIn?.colorRole, WatchPlanColorRole.action);
+    expect(nobodyIn?.colorRole, WatchPlanColorRole.failed);
   });
 }

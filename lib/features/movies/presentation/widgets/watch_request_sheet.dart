@@ -21,7 +21,7 @@ import 'package:flixie_app/features/authentication/presentation/pages/auth_ui.da
 import 'package:flixie_app/features/movies/data/search_service.dart';
 import 'package:flixie_app/features/movies/utils/group_provider_match.dart';
 import 'package:flixie_app/models/movie_short.dart';
-import 'package:flixie_app/features/social/presentation/widgets/flixie_time_picker_sheet.dart';
+import 'package:flixie_app/features/watch_plans/presentation/sheets/watch_plan_schedule_sheet.dart';
 
 enum _WatchContext { home, cinema, undecided }
 
@@ -451,30 +451,43 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
         _WatchContext.undecided => null,
       };
 
-  Future<void> _pickDate() async {
-    final today = DateTime.now();
-    final picked = await showDatePicker(
+  Future<void> _pickSchedule() async {
+    final initialDate = _selectedDate;
+    final initialTime = _selectedTime;
+    final initial = initialDate == null
+        ? null
+        : DateTime(
+            initialDate.year,
+            initialDate.month,
+            initialDate.day,
+            initialTime?.hour ?? 12,
+            initialTime?.minute ?? 0,
+          );
+    final selected = await showModalBottomSheet<
+        ({DateTime proposedFor, String? message, String? location})>(
       context: context,
-      initialDate: _selectedDate == null || _selectedDate!.isBefore(today)
-          ? today
-          : _selectedDate!,
-      firstDate: DateTime(today.year, today.month, today.day),
-      lastDate: DateTime(today.year + 3),
-    );
-    if (picked != null && mounted) setState(() => _selectedDate = picked);
-  }
-
-  Future<void> _pickTime() async {
-    final picked = await showModalBottomSheet<TimeOfDay>(
-      context: context,
+      isScrollControlled: true,
       useRootNavigator: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => FlixieTimePickerSheet(
-        initialTime: _selectedTime ?? TimeOfDay.now(),
+      builder: (_) => WatchPlanScheduleSheet(
+        initial: initial,
       ),
     );
-    if (picked != null && mounted) setState(() => _selectedTime = picked);
+    if (selected == null || !mounted) return;
+    setState(() {
+      _selectedDate = DateTime(
+        selected.proposedFor.year,
+        selected.proposedFor.month,
+        selected.proposedFor.day,
+      );
+      _scheduleMode = selected.message == null
+          ? _ScheduleMode.dateAndTime
+          : _ScheduleMode.dateOnly;
+      _selectedTime = _scheduleMode == _ScheduleMode.dateAndTime
+          ? TimeOfDay.fromDateTime(selected.proposedFor)
+          : null;
+    });
   }
 
   @override
@@ -773,58 +786,18 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                 const _PlanStepHeading(
                     number: '3', title: 'When?', trailing: 'CAN CHANGE LATER'),
                 const SizedBox(height: 10),
-                LayoutBuilder(builder: (context, constraints) {
-                  final narrow = constraints.maxWidth < 360;
-                  return Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final mode in _ScheduleMode.values)
-                        SizedBox(
-                          width: narrow
-                              ? (_isGroupMode
-                                  ? (constraints.maxWidth - 16) / 3
-                                  : (constraints.maxWidth - 8) / 2)
-                              : (constraints.maxWidth - 16) / 3,
-                          child: _ModeTab(
-                            label: switch (mode) {
-                              _ScheduleMode.dateOnly => 'Date only',
-                              _ScheduleMode.dateAndTime => 'Date & time',
-                              _ScheduleMode.decideLater => 'Decide later'
-                            },
-                            icon: mode == _ScheduleMode.decideLater
-                                ? Icons.more_horiz_rounded
-                                : Icons.calendar_today_outlined,
-                            selected: _scheduleMode == mode,
-                            onTap: () => setState(() => _scheduleMode = mode),
-                          ),
-                        ),
-                    ],
-                  );
-                }),
-                if (_scheduleMode != _ScheduleMode.decideLater) ...[
-                  const SizedBox(height: 8),
-                  Row(children: [
-                    Expanded(
-                        child: _SchedulePicker(
-                            label: 'DATE',
-                            value: _selectedDate == null
-                                ? 'Choose date'
-                                : MaterialLocalizations.of(context)
-                                    .formatMediumDate(_selectedDate!),
-                            onTap: _pickDate)),
-                    if (_scheduleMode == _ScheduleMode.dateAndTime) ...[
-                      const SizedBox(width: 10),
-                      Expanded(
-                          child: _SchedulePicker(
-                              label: 'TIME',
-                              value: _selectedTime == null
-                                  ? 'Choose time'
-                                  : _selectedTime!.format(context),
-                              onTap: _pickTime)),
-                    ],
-                  ]),
-                ],
+                _SchedulePicker(
+                  label: _scheduleMode == _ScheduleMode.dateOnly
+                      ? 'DATE'
+                      : 'DATE & TIME',
+                  value: _selectedDate == null
+                      ? 'Choose when to watch'
+                      : _scheduleMode == _ScheduleMode.dateOnly
+                          ? MaterialLocalizations.of(context)
+                              .formatFullDate(_selectedDate!)
+                          : '${MaterialLocalizations.of(context).formatMediumDate(_selectedDate!)} at ${_selectedTime?.format(context) ?? 'Choose time'}',
+                  onTap: _pickSchedule,
+                ),
                 const SizedBox(height: 16),
                 const _PlanStepHeading(
                   number: '4',

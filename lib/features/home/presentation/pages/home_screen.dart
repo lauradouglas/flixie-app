@@ -95,11 +95,15 @@ class _HomeScreenState extends State<HomeScreen> {
   final PageController _forYouPageController = PageController(
     viewportFraction: 0.88,
   );
+  final ScrollController _watchPlansScrollController = ScrollController();
   final ScrollController _homeScrollController = ScrollController();
   final GlobalKey _forYouSectionKey = GlobalKey();
   bool _recommendationVisibilityCheckScheduled = false;
-  int _heroPage = 0;
-  int _forYouPage = 0;
+  final ValueNotifier<int> _heroPage = ValueNotifier(0);
+  final ValueNotifier<int> _forYouPage = ValueNotifier(0);
+  final ValueNotifier<int> _watchPlansPage = ValueNotifier(0);
+  final ValueNotifier<double?> _watchPlansCardHeight = ValueNotifier(null);
+  String? _watchPlansHeightSignature;
   bool _didAttemptSessionRestore = false;
   int _lastActivityVersion = -1;
 
@@ -125,7 +129,11 @@ class _HomeScreenState extends State<HomeScreen> {
       _authProvider?.addListener(_onAuthChanged);
       TabRefreshController.home.addListener(_onHomeTabRefresh);
       _homeScrollController.addListener(_scheduleRecommendationVisibilityCheck);
-      if (_loadedForUserId == null) _loadAll();
+      if (_loadedForUserId == null) {
+        _loadAll();
+      } else {
+        unawaited(_preloadInitialWatchPlans(_authProvider?.dbUser));
+      }
     });
   }
 
@@ -136,7 +144,12 @@ class _HomeScreenState extends State<HomeScreen> {
     TabRefreshController.home.removeListener(_onHomeTabRefresh);
     _heroPageController.dispose();
     _forYouPageController.dispose();
+    _watchPlansScrollController.dispose();
     _homeScrollController.dispose();
+    _heroPage.dispose();
+    _forYouPage.dispose();
+    _watchPlansPage.dispose();
+    _watchPlansCardHeight.dispose();
     super.dispose();
   }
 
@@ -152,6 +165,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _onHomeTabRefresh() {
     if (!mounted || !_homeScrollController.hasClients) return;
+    unawaited(_preloadInitialWatchPlans(_authProvider?.dbUser));
     unawaited(
       _homeScrollController.animateTo(
         0,
@@ -183,35 +197,12 @@ class _HomeScreenState extends State<HomeScreen> {
     _watchPlansToShow = List.of(snapshot.watchPlansToShow);
     _hasUsedWatchPlans = snapshot.hasUsedWatchPlans;
     _isLoadingWatchPlans = false;
-    _heroPage = snapshot.heroPage;
-    _forYouPage = snapshot.forYouPage;
+    _heroPage.value = 0;
+    _forYouPage.value = 0;
     _loadedForUserId = userId;
     _isLoading = false;
     _isLoadingRecommendations = false;
     _error = null;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (_heroPageController.hasClients && _featuredMovies.isNotEmpty) {
-        _heroPageController.jumpToPage(
-          _heroPage.clamp(0, _featuredMovies.length - 1),
-        );
-      }
-      if (_forYouPageController.hasClients && _forYouMovies.isNotEmpty) {
-        _forYouPageController.jumpToPage(
-          _forYouPage.clamp(0, _forYouMovies.length - 1),
-        );
-      }
-      if (_homeScrollController.hasClients) {
-        _homeScrollController.jumpTo(
-          snapshot.scrollOffset.clamp(
-            0,
-            _homeScrollController.position.maxScrollExtent,
-          ),
-        );
-      }
-      _scheduleRecommendationVisibilityCheck();
-    });
   }
 
   void _storeSessionSnapshot() {
@@ -231,8 +222,8 @@ class _HomeScreenState extends State<HomeScreen> {
       watchRequestsNeedingResponse: _watchRequestsNeedingResponse,
       watchPlansToShow: List.of(_watchPlansToShow),
       hasUsedWatchPlans: _hasUsedWatchPlans,
-      heroPage: _heroPage,
-      forYouPage: _forYouPage,
+      heroPage: _heroPage.value,
+      forYouPage: _forYouPage.value,
       scrollOffset:
           _homeScrollController.hasClients ? _homeScrollController.offset : 0,
     );
@@ -431,7 +422,12 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     if (mounted) setState(() => _isLoadingWatchPlans = true);
 
+    // The list endpoint is intentionally lightweight and can lag behind a
+    // newly-proposed schedule. Hydrate the direct plans before choosing the
+    // featured Home state so a reschedule never falls back to the old,
+    // already-passed appointment.
     final directPlans = RequestService.getWatchRequests(user.id)
+        .then((plans) => _hydrateDirectWatchPlans(plans, user.id))
         .catchError((_) => <WatchRequest>[]);
     final closedPlanIds = WatchPlanVisibilityStore.closedPlanIds(user.id)
         .catchError((_) => <String>{});
@@ -453,21 +449,78 @@ class _HomeScreenState extends State<HomeScreen> {
     final watchRequests = results[0] as List<WatchRequest>;
     final groupWatchPlans = results[2] as List<WatchRequest>;
     final allPlans = [...watchRequests, ...groupWatchPlans];
+    final nextPlans = _watchPlansForHome(
+      allPlans,
+      user: user,
+      closedPlanIds: results[1] as Set<String>,
+    );
+    final plansChanged = _watchPlansFingerprint(_watchPlansToShow) !=
+        _watchPlansFingerprint(nextPlans);
+    final hasCreatedOrAcceptedWatchPlan = allPlans.any(
+      (plan) => _hasCreatedOrAcceptedWatchPlan(plan, user.id),
+    );
     unawaited(_syncLocalWatchPlanReminders(allPlans, userId: user.id));
+    // This is a first-use prompt, rather than a card to re-show when old
+    // plans are no longer returned by the lightweight list endpoint.
+    if (hasCreatedOrAcceptedWatchPlan) {
+      unawaited(WatchPlanVisibilityStore.dismissIntroduction(user.id));
+    }
     context.read<AuthProvider>().updateCachedWatchRequests(watchRequests);
     setState(() {
       _watchRequestsNeedingResponse =
           _countWatchRequestsNeedingResponse(watchRequests, user.id);
-      _watchPlansToShow = _watchPlansForHome(
-        allPlans,
-        user: user,
-        closedPlanIds: results[1] as Set<String>,
-      );
-      _watchPlansIntroDismissed = results[3] as bool;
-      _hasUsedWatchPlans = allPlans.isNotEmpty;
+      if (plansChanged) _watchPlansToShow = nextPlans;
+      _watchPlansIntroDismissed =
+          (results[3] as bool) || hasCreatedOrAcceptedWatchPlan;
+      _hasUsedWatchPlans = hasCreatedOrAcceptedWatchPlan;
       _isLoadingWatchPlans = false;
     });
   }
+
+  Future<List<WatchRequest>> _hydrateDirectWatchPlans(
+    List<WatchRequest> plans,
+    String userId,
+  ) async {
+    final hydratedPlans = await Future.wait(
+      plans.map((plan) async {
+        try {
+          final state = await RequestService.getWatchRequestState(
+            watchRequestId: plan.id,
+            userId: userId,
+          );
+          return state.request;
+        } catch (_) {
+          // A single unavailable plan must not hide the rest of the carousel.
+          return plan;
+        }
+      }),
+    );
+    return List<WatchRequest>.from(hydratedPlans);
+  }
+
+  String _watchPlansFingerprint(Iterable<WatchRequest> plans) => plans
+      .map(
+        (plan) => [
+          plan.id,
+          plan.status,
+          plan.updatedAt ?? '',
+          plan.scheduledFor?.toIso8601String() ?? '',
+          plan.proposedDate?.toIso8601String() ?? '',
+          plan.location ?? '',
+          plan.selectedCandidateId ?? '',
+          ...plan.scheduleProposals.map(
+            (proposal) => [
+              proposal.id,
+              proposal.status,
+              proposal.proposerId,
+              ...proposal.responses.map(
+                (response) => '${response.userId}:${response.status}',
+              ),
+            ].join(','),
+          ),
+        ].join('|'),
+      )
+      .join('\n');
 
   Future<void> _syncLocalWatchPlanReminders(
     List<WatchRequest> plans, {
@@ -584,6 +637,22 @@ class _HomeScreenState extends State<HomeScreen> {
       // direct-plan detail route.
       conversationId: '__group_home__',
       selectedCandidateId: request.selectedCandidateId,
+      proposedDate: DateTime.tryParse(request.proposedDate ?? ''),
+      scheduleProposals: request.scheduleProposals
+          .map((proposal) => WatchScheduleProposal(
+                id: proposal.id,
+                proposerId: proposal.proposerId,
+                proposedFor: DateTime.tryParse(proposal.proposedFor ?? ''),
+                location: proposal.location,
+                status: proposal.status,
+                responses: proposal.responses
+                    .map((response) => WatchScheduleProposalResponse(
+                          userId: response.userId,
+                          status: response.status,
+                        ))
+                    .toList(growable: false),
+              ))
+          .toList(growable: false),
       candidates: request.candidates
           .map((candidate) => WatchPlanCandidate(
                 id: candidate.id,
@@ -641,7 +710,7 @@ class _HomeScreenState extends State<HomeScreen> {
               .clamp(0.0, renderObject.size.height);
       final requiredHeight = renderObject.size.height.clamp(0.0, 160.0) * 0.25;
       if (visibleHeight >= requiredHeight) {
-        unawaited(_trackRecommendationImpression(_forYouPage));
+        unawaited(_trackRecommendationImpression(_forYouPage.value));
       }
     });
   }
@@ -751,7 +820,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       setState(() {
         _forYouMovies = recommendations.take(20).toList();
-        _forYouPage = 0;
+        _forYouPage.value = 0;
       });
       if (_forYouPageController.hasClients) {
         await _forYouPageController.animateToPage(
@@ -791,6 +860,16 @@ class _HomeScreenState extends State<HomeScreen> {
     }).length;
   }
 
+  bool _hasCreatedOrAcceptedWatchPlan(WatchRequest plan, String userId) {
+    if (plan.requesterId == userId) return true;
+
+    // Direct plans can report the current user's response at the top level;
+    // group plans store it against the participant. Support both shapes so
+    // accepting any Watch Plan retires the first-time prompt.
+    return plan.hasCurrentUserAccepted == true ||
+        plan.participantFor(userId)?.response.toUpperCase() == 'ACCEPTED';
+  }
+
   List<WatchRequest> _watchPlansForHome(
     List<WatchRequest> requests, {
     required models.User user,
@@ -805,6 +884,9 @@ class _HomeScreenState extends State<HomeScreen> {
           !request.isCancelled &&
           !request.isExpired &&
           !request.isDeclined &&
+          !(request.groupId != null &&
+              request.participantFor(user.id)?.response.toUpperCase() ==
+                  'DECLINED') &&
           !closedPlanIds.contains(request.id) &&
           (!request.isCompleted || recentCompletion);
     }).toList()
@@ -1238,54 +1320,15 @@ class _HomeScreenState extends State<HomeScreen> {
               controller: _heroPageController,
               padEnds: false,
               clipBehavior: Clip.none,
-              onPageChanged: (i) => setState(() => _heroPage = i),
+              onPageChanged: (index) => _heroPage.value = index,
               itemCount: count,
               itemBuilder: (context, index) {
-                final posterCard = _buildInactiveHeroCard(
-                  context,
-                  movies[index],
-                );
-                final detailCard = _buildHeroCard(
-                  context,
-                  movies[index],
-                  posterHeight: sharedPosterHeight,
-                );
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: AnimatedBuilder(
-                    animation: _heroPageController,
-                    builder: (context, _) {
-                      // A preserved Home tab can briefly coexist with the
-                      // incoming post-signup tree. `page` may only be read
-                      // when exactly one PageView is attached.
-                      final page = _heroPageController.positions.length == 1
-                          ? (_heroPageController.page ?? _heroPage.toDouble())
-                          : _heroPage.toDouble();
-                      // With padEnds disabled a partial-width PageView cannot
-                      // physically scroll all the way to the final page index.
-                      // Without this, the last card's detail layer settles
-                      // slightly transparent over its poster-only layer.
-                      const trailingPageOffset =
-                          (1 - _heroViewportFraction) / _heroViewportFraction;
-                      final isAtTrailingEdge = index == count - 1 &&
-                          page >= index - trailingPageOffset - 0.001;
-                      final detailOpacity = isAtTrailingEdge
-                          ? 1.0
-                          : (1 - (page - index).abs()).clamp(0.0, 1.0);
-                      return Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          posterCard,
-                          IgnorePointer(
-                            ignoring: detailOpacity < 0.98,
-                            child: Opacity(
-                              opacity: detailOpacity,
-                              child: detailCard,
-                            ),
-                          ),
-                        ],
-                      );
-                    },
+                  child: _buildHeroCard(
+                    context,
+                    movies[index],
+                    posterHeight: sharedPosterHeight,
                   ),
                 );
               },
@@ -1302,20 +1345,23 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildCarouselDots(List<MovieShort> movies) {
     final count = movies.length.clamp(0, _maxHeroCarouselItems);
     if (count <= 1) return const SizedBox.shrink();
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(
-        count,
-        (i) => AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          margin: const EdgeInsets.symmetric(horizontal: 3),
-          width: i == _heroPage ? 20 : 6,
-          height: 6,
-          decoration: BoxDecoration(
-            color: i == _heroPage
-                ? FlixieColors.primary
-                : Colors.white.withValues(alpha: 0.3),
-            borderRadius: BorderRadius.circular(3),
+    return ValueListenableBuilder<int>(
+      valueListenable: _heroPage,
+      builder: (context, page, _) => Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(
+          count,
+          (index) => AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            margin: const EdgeInsets.symmetric(horizontal: 3),
+            width: index == page ? 20 : 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: index == page
+                  ? FlixieColors.primary
+                  : Colors.white.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(3),
+            ),
           ),
         ),
       ),
@@ -1650,33 +1696,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildInactiveHeroCard(BuildContext context, MovieShort movie) {
-    return Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      color: FlixieColors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: InkWell(
-        onTap: () => context.push(
-          movieDetailPath(movie.id, source: DetailSource.trending),
-        ),
-        child: movie.poster != null
-            ? CachedNetworkImage(
-                imageUrl: 'https://image.tmdb.org/t/p/w780${movie.poster}',
-                width: double.infinity,
-                height: double.infinity,
-                fit: BoxFit.cover,
-                alignment: Alignment.center,
-                errorWidget: (_, __, ___) => _heroFallback(),
-              )
-            : _heroFallback(),
-      ),
-    );
-  }
-
   Widget _heroFallback() {
     return Container(
       color: FlixieColors.tabBarBackgroundFocused,
@@ -1865,7 +1884,6 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_forYouMovies.isEmpty) return const SizedBox.shrink();
 
     final movies = _forYouMovies.take(10).toList(growable: false);
-    final activeIndex = _forYouPage.clamp(0, movies.length - 1);
 
     return Column(
       key: _forYouSectionKey,
@@ -1938,123 +1956,111 @@ class _HomeScreenState extends State<HomeScreen> {
           height: PersonalizedRecommendationCard.height,
           child: Padding(
             padding: const EdgeInsets.only(left: 16),
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 320),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              layoutBuilder: (currentChild, previousChildren) => Stack(
-                fit: StackFit.expand,
-                children: [
-                  ...previousChildren,
-                  if (currentChild != null) currentChild,
-                ],
-              ),
-              child: _isLoadingRecommendations
-                  ? const Padding(
-                      key: ValueKey('recommendations-generating'),
-                      padding: EdgeInsets.only(right: 10),
-                      child: _RecommendationGeneratingCard(),
-                    )
-                  : PageView.builder(
-                      key: const ValueKey('recommendation-cards'),
-                      controller: _forYouPageController,
-                      padEnds: false,
-                      itemCount: movies.length,
-                      onPageChanged: (index) {
-                        setState(() => _forYouPage = index);
-                        _trackRecommendationImpression(index);
-                      },
-                      itemBuilder: (context, index) {
-                        final movie = movies[index];
-                        final isBookmarked = _watchlistMovieIds.contains(
-                          movie.id,
-                        );
-                        final isPreviouslyWatched = movie.previouslyWatched ||
-                            (context
-                                    .read<AuthProvider>()
-                                    .dbUser
-                                    ?.isMovieWatched(movie.id) ??
-                                false);
-                        final reasons = isPreviouslyWatched &&
-                                !movie.recommendationReasons.any(
-                                  (reason) =>
-                                      reason.toLowerCase().contains('rewatch'),
-                                )
-                            ? [
-                                'You\'ve watched this before - it may be worth a rewatch',
-                                ...movie.recommendationReasons,
-                              ]
-                            : movie.recommendationReasons;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 10),
-                          child: PersonalizedRecommendationCard(
-                            movie: movie,
-                            reasons: reasons,
-                            isBookmarked: isBookmarked,
-                            isBookmarkUpdating:
-                                _watchlistUpdatesInFlight.contains(movie.id),
-                            isPreviouslyWatched: isPreviouslyWatched,
-                            onTap: () => _openRecommendation(movie, index),
-                            onBookmarkTap: () async {
-                              final analytics =
-                                  context.read<AnalyticsController>();
-                              await _toggleWatchlistState(
-                                context,
-                                movieId: movie.id,
-                                movieTitle: movie.name,
-                                posterPath: movie.poster,
-                                currentlyInWatchlist: isBookmarked,
-                              );
-                              if (!isBookmarked &&
-                                  _watchlistMovieIds.contains(movie.id) &&
-                                  mounted) {
-                                await analytics.recommendationSaved(
-                                  attribution: RecommendationAttribution
-                                      .forPersonalisedMovie(
-                                    movie,
-                                    position: index,
-                                  ),
-                                );
-                              }
-                            },
-                            onMarkWatched: () => _openQuickMarkWatchedSheet(
+            child: _isLoadingRecommendations
+                ? const Padding(
+                    padding: EdgeInsets.only(right: 10),
+                    child: _RecommendationGeneratingCard(),
+                  )
+                : PageView.builder(
+                    controller: _forYouPageController,
+                    padEnds: false,
+                    itemCount: movies.length,
+                    onPageChanged: (index) {
+                      _forYouPage.value = index;
+                      _trackRecommendationImpression(index);
+                    },
+                    itemBuilder: (context, index) {
+                      final movie = movies[index];
+                      final isBookmarked = _watchlistMovieIds.contains(
+                        movie.id,
+                      );
+                      final isPreviouslyWatched = movie.previouslyWatched ||
+                          (context
+                                  .read<AuthProvider>()
+                                  .dbUser
+                                  ?.isMovieWatched(movie.id) ??
+                              false);
+                      final reasons = isPreviouslyWatched &&
+                              !movie.recommendationReasons.any(
+                                (reason) =>
+                                    reason.toLowerCase().contains('rewatch'),
+                              )
+                          ? [
+                              'You\'ve watched this before - it may be worth a rewatch',
+                              ...movie.recommendationReasons,
+                            ]
+                          : movie.recommendationReasons;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 10),
+                        child: PersonalizedRecommendationCard(
+                          movie: movie,
+                          reasons: reasons,
+                          isBookmarked: isBookmarked,
+                          isBookmarkUpdating:
+                              _watchlistUpdatesInFlight.contains(movie.id),
+                          isPreviouslyWatched: isPreviouslyWatched,
+                          onTap: () => _openRecommendation(movie, index),
+                          onBookmarkTap: () async {
+                            final analytics =
+                                context.read<AnalyticsController>();
+                            await _toggleWatchlistState(
                               context,
                               movieId: movie.id,
                               movieTitle: movie.name,
                               posterPath: movie.poster,
-                              isInWatchlist: isBookmarked,
-                              isRewatch: isPreviouslyWatched,
-                              recommendation: RecommendationAttribution
-                                  .forPersonalisedMovie(
-                                movie,
-                                position: index,
-                              ),
+                              currentlyInWatchlist: isBookmarked,
+                            );
+                            if (!isBookmarked &&
+                                _watchlistMovieIds.contains(movie.id) &&
+                                mounted) {
+                              await analytics.recommendationSaved(
+                                attribution: RecommendationAttribution
+                                    .forPersonalisedMovie(
+                                  movie,
+                                  position: index,
+                                ),
+                              );
+                            }
+                          },
+                          onMarkWatched: () => _openQuickMarkWatchedSheet(
+                            context,
+                            movieId: movie.id,
+                            movieTitle: movie.name,
+                            posterPath: movie.poster,
+                            isInWatchlist: isBookmarked,
+                            isRewatch: isPreviouslyWatched,
+                            recommendation:
+                                RecommendationAttribution.forPersonalisedMovie(
+                              movie,
+                              position: index,
                             ),
-                            onNotInterested: () =>
-                                _markMovieNotInterested(movie),
                           ),
-                        );
-                      },
-                    ),
-            ),
+                          onNotInterested: () => _markMovieNotInterested(movie),
+                        ),
+                      );
+                    },
+                  ),
           ),
         ),
         if (!_isLoadingRecommendations && movies.length > 1) ...[
           const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(
-              movies.length,
-              (index) => AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: index == activeIndex ? 22 : 6,
-                height: 6,
-                margin: const EdgeInsets.symmetric(horizontal: 3),
-                decoration: BoxDecoration(
-                  color: index == activeIndex
-                      ? FlixieColors.primary
-                      : FlixieColors.mediumShade.withValues(alpha: 0.65),
-                  borderRadius: BorderRadius.circular(4),
+          ValueListenableBuilder<int>(
+            valueListenable: _forYouPage,
+            builder: (context, page, _) => Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                movies.length,
+                (index) => AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: index == page ? 22 : 6,
+                  height: 6,
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  decoration: BoxDecoration(
+                    color: index == page
+                        ? FlixieColors.primary
+                        : FlixieColors.mediumShade.withValues(alpha: 0.65),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
                 ),
               ),
             ),
@@ -2146,6 +2152,9 @@ class _HomeScreenState extends State<HomeScreen> {
           growable: false,
         );
     if (carouselStates.isEmpty) return const SizedBox.shrink();
+    if (_watchPlansPage.value >= carouselStates.length) {
+      _watchPlansPage.value = 0;
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2158,31 +2167,107 @@ class _HomeScreenState extends State<HomeScreen> {
           builder: (context, constraints) {
             // Every plan uses the current contextual card, with a next-card
             // preview that makes the horizontal carousel discoverable.
-            final cardWidth = constraints.maxWidth >= 600
-                ? 420.0
-                : constraints.maxWidth * .84;
-            return SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    for (var index = 0;
-                        index < carouselStates.length;
-                        index++) ...[
-                      if (index > 0) const SizedBox(width: 12),
-                      SizedBox(
-                        width: cardWidth,
-                        child: HomeWatchPlanCard(
-                          state: carouselStates[index],
-                          onOpen: () =>
-                              _openHomeWatchPlan(carouselStates[index], user),
+            final cardWidth = carouselStates.length == 1
+                ? constraints.maxWidth - 32
+                : constraints.maxWidth >= 600
+                    ? 420.0
+                    : constraints.maxWidth * .84;
+            final heightSignature = [
+              cardWidth.toStringAsFixed(1),
+              MediaQuery.textScalerOf(context).scale(1).toStringAsFixed(2),
+              ...carouselStates.map(
+                (state) => [
+                  state.plan.id,
+                  state.type.name,
+                  state.eyebrow,
+                  state.title,
+                  state.supportingText,
+                  state.actionLabel,
+                ].join('|'),
+              ),
+            ].join(':');
+            if (_watchPlansHeightSignature != heightSignature) {
+              _watchPlansHeightSignature = heightSignature;
+              _watchPlansCardHeight.value = null;
+            }
+            return ValueListenableBuilder<double?>(
+              valueListenable: _watchPlansCardHeight,
+              builder: (context, tallestCardHeight, _) => Column(
+                children: [
+                  NotificationListener<ScrollNotification>(
+                    onNotification: (notification) {
+                      if (notification is ScrollUpdateNotification &&
+                          carouselStates.length > 1) {
+                        final page =
+                            (notification.metrics.pixels / (cardWidth + 12))
+                                .round()
+                                .clamp(0, carouselStates.length - 1);
+                        if (_watchPlansPage.value != page) {
+                          _watchPlansPage.value = page;
+                        }
+                      }
+                      return false;
+                    },
+                    child: SingleChildScrollView(
+                      controller: _watchPlansScrollController,
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (var index = 0;
+                              index < carouselStates.length;
+                              index++) ...[
+                            if (index > 0) const SizedBox(width: 12),
+                            SizedBox(
+                              width: cardWidth,
+                              height: tallestCardHeight,
+                              child: _WatchPlanCardHeightReporter(
+                                onHeightChanged: (height) {
+                                  final current = _watchPlansCardHeight.value;
+                                  if (current == null || height > current) {
+                                    _watchPlansCardHeight.value = height;
+                                  }
+                                },
+                                child: HomeWatchPlanCard(
+                                  state: carouselStates[index],
+                                  onOpen: () => _openHomeWatchPlan(
+                                    carouselStates[index],
+                                    user,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (carouselStates.length > 1) ...[
+                    const SizedBox(height: 10),
+                    ValueListenableBuilder<int>(
+                      valueListenable: _watchPlansPage,
+                      builder: (context, page, _) => Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(
+                          carouselStates.length,
+                          (index) => AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            width: index == page ? 20 : 7,
+                            height: 7,
+                            margin: const EdgeInsets.symmetric(horizontal: 3),
+                            decoration: BoxDecoration(
+                              color: index == page
+                                  ? FlixieColors.primary
+                                  : FlixieColors.medium.withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
                         ),
                       ),
-                    ],
+                    ),
                   ],
-                ),
+                ],
               ),
             );
           },
@@ -2566,9 +2651,9 @@ class _HomeScreenState extends State<HomeScreen> {
               _forYouMovies.removeWhere((movie) => movie.id == movieId);
               _watchlistMovieIds.remove(movieId);
               if (_forYouMovies.isEmpty) {
-                _forYouPage = 0;
+                _forYouPage.value = 0;
               } else {
-                _forYouPage = _forYouPage.clamp(
+                _forYouPage.value = _forYouPage.value.clamp(
                   0,
                   _forYouMovies.length - 1,
                 );
@@ -2618,6 +2703,42 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
+  }
+}
+
+class _WatchPlanCardHeightReporter extends StatefulWidget {
+  const _WatchPlanCardHeightReporter({
+    required this.child,
+    required this.onHeightChanged,
+  });
+
+  final Widget child;
+  final ValueChanged<double> onHeightChanged;
+
+  @override
+  State<_WatchPlanCardHeightReporter> createState() =>
+      _WatchPlanCardHeightReporterState();
+}
+
+class _WatchPlanCardHeightReporterState
+    extends State<_WatchPlanCardHeightReporter> {
+  final GlobalKey _childKey = GlobalKey();
+  bool _reportScheduled = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_reportScheduled) {
+      _reportScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _reportScheduled = false;
+        if (!mounted) return;
+        final renderObject = _childKey.currentContext?.findRenderObject();
+        if (renderObject is RenderBox && renderObject.hasSize) {
+          widget.onHeightChanged(renderObject.size.height);
+        }
+      });
+    }
+    return KeyedSubtree(key: _childKey, child: widget.child);
   }
 }
 
@@ -2705,113 +2826,127 @@ class _RecommendationGeneratingCardState
         ),
         border: Border.all(color: FlixieColors.primary.withValues(alpha: 0.28)),
       ),
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, _) {
-          final movement = Curves.easeInOut.transform(_controller.value);
-          return Stack(
-            alignment: Alignment.center,
-            children: [
-              Positioned(
-                left: 34,
-                top: 68 - (movement * 8),
-                child: Transform.rotate(
-                  angle: -0.14 + (movement * 0.05),
-                  child: const _GeneratingPoster(
-                    color: FlixieColors.tertiary,
-                    icon: Icons.favorite_rounded,
-                  ),
-                ),
-              ),
-              Positioned(
-                right: 34,
-                top: 68 + (movement * 8),
-                child: Transform.rotate(
-                  angle: 0.14 - (movement * 0.05),
-                  child: const _GeneratingPoster(
-                    color: FlixieColors.success,
-                    icon: Icons.thumb_up_alt_rounded,
-                  ),
-                ),
-              ),
-              Transform.translate(
-                offset: Offset(0, -10 + (movement * 5)),
-                child: Container(
-                  width: 88,
-                  height: 112,
-                  decoration: BoxDecoration(
-                    color: FlixieColors.tabBarBackgroundFocused,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: FlixieColors.primary.withValues(alpha: 0.7),
-                      width: 1.5,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: FlixieColors.primary.withValues(
-                          alpha: 0.18 + movement * 0.12,
-                        ),
-                        blurRadius: 24,
-                        spreadRadius: 2,
+      child: ExcludeSemantics(
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            final movement = Curves.easeInOut.transform(_controller.value);
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                Positioned(
+                  left: 34,
+                  top: 68,
+                  child: Transform.translate(
+                    offset: Offset(0, -movement * 8),
+                    child: Transform.rotate(
+                      angle: -0.14 + (movement * 0.05),
+                      child: const _GeneratingPoster(
+                        color: FlixieColors.tertiary,
+                        icon: Icons.favorite_rounded,
                       ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.auto_awesome_rounded,
-                    color: FlixieColors.primary,
-                    size: 38,
+                    ),
                   ),
                 ),
-              ),
-              Positioned(
-                top: 46 + (movement * 5),
-                left: 112,
-                child: const Icon(
-                  Icons.star_rounded,
-                  color: FlixieColors.tertiary,
-                  size: 18,
-                ),
-              ),
-              Positioned(
-                top: 52 - (movement * 5),
-                right: 108,
-                child: const Icon(
-                  Icons.auto_awesome,
-                  color: FlixieColors.primary,
-                  size: 16,
-                ),
-              ),
-              const Positioned(
-                left: 20,
-                right: 20,
-                bottom: 52,
-                child: Text(
-                  'Mixing your movie magic…',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: FlixieColors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
+                Positioned(
+                  right: 34,
+                  top: 68,
+                  child: Transform.translate(
+                    offset: Offset(0, movement * 8),
+                    child: Transform.rotate(
+                      angle: 0.14 - (movement * 0.05),
+                      child: const _GeneratingPoster(
+                        color: FlixieColors.success,
+                        icon: Icons.thumb_up_alt_rounded,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-              const Positioned(
-                left: 20,
-                right: 20,
-                bottom: 30,
-                child: Text(
-                  'Taste, favourites and a little sparkle',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: FlixieColors.medium,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                Transform.translate(
+                  offset: Offset(0, -10 + (movement * 5)),
+                  child: Container(
+                    width: 88,
+                    height: 112,
+                    decoration: BoxDecoration(
+                      color: FlixieColors.tabBarBackgroundFocused,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: FlixieColors.primary.withValues(alpha: 0.7),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: FlixieColors.primary.withValues(
+                            alpha: 0.18 + movement * 0.12,
+                          ),
+                          blurRadius: 24,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.auto_awesome_rounded,
+                      color: FlixieColors.primary,
+                      size: 38,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          );
-        },
+                Positioned(
+                  top: 46,
+                  left: 112,
+                  child: Transform.translate(
+                    offset: Offset(0, movement * 5),
+                    child: const Icon(
+                      Icons.star_rounded,
+                      color: FlixieColors.tertiary,
+                      size: 18,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 52,
+                  right: 108,
+                  child: Transform.translate(
+                    offset: Offset(0, -movement * 5),
+                    child: const Icon(
+                      Icons.auto_awesome,
+                      color: FlixieColors.primary,
+                      size: 16,
+                    ),
+                  ),
+                ),
+                const Positioned(
+                  left: 20,
+                  right: 20,
+                  bottom: 52,
+                  child: Text(
+                    'Mixing your movie magic…',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: FlixieColors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const Positioned(
+                  left: 20,
+                  right: 20,
+                  bottom: 30,
+                  child: Text(
+                    'Taste, favourites and a little sparkle',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: FlixieColors.medium,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
