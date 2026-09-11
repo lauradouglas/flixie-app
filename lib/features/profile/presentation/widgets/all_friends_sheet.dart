@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:go_router/go_router.dart';
@@ -73,16 +74,19 @@ class _AllFriendsSheetState extends State<AllFriendsSheet>
             pendingFriends: List.unmodifiable(_pendingFriends),
           ),
         );
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.success,
               content: Text(
                   'Now friends with ${friendship.friendUser?.username ?? 'user'}')),
         );
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to accept friend request')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Failed to accept friend request')),
         );
       }
     }
@@ -103,8 +107,10 @@ class _AllFriendsSheetState extends State<AllFriendsSheet>
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to decline friend request')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Failed to decline friend request')),
         );
       }
     }

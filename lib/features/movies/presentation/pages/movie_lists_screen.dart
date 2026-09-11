@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -260,7 +261,8 @@ class _MovieListsViewState extends State<_MovieListsView> {
     }
     final ok = await provider.deleteList(list.id);
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+          type: FlixieToastType.error,
           content: Text(ok
               ? 'List deleted'
               : (provider.error ?? 'Failed to delete list'))));
@@ -650,16 +652,19 @@ class _MovieListsViewState extends State<_MovieListsView> {
                       if (name.isEmpty) return;
                       if (scope == ListScope.friends &&
                           selectedFriendIds.isEmpty) {
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                          const SnackBar(
-                            content: Text('Select at least one friend'),
+                        ScaffoldMessenger.of(ctx).showFlixieToast(
+                          FlixieToast(
+                            type: FlixieToastType.warning,
+                            content: const Text('Select at least one friend'),
                           ),
                         );
                         return;
                       }
                       if (scope == ListScope.group && selectedGroupId == null) {
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                          const SnackBar(content: Text('Choose a group')),
+                        ScaffoldMessenger.of(ctx).showFlixieToast(
+                          FlixieToast(
+                              type: FlixieToastType.warning,
+                              content: const Text('Choose a group')),
                         );
                         return;
                       }
@@ -711,8 +716,9 @@ class _MovieListsViewState extends State<_MovieListsView> {
                       }
                       if (ctx.mounted) Navigator.pop(ctx);
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
+                        ScaffoldMessenger.of(context).showFlixieToast(
+                          FlixieToast(
+                            type: FlixieToastType.error,
                             content: Text(ok
                                 ? (isEdit ? 'List renamed' : 'List created')
                                 : (provider.error ?? 'Unable to save list')),

@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:provider/provider.dart';
@@ -114,15 +115,19 @@ class _AddFriendSheetState extends State<AddFriendSheet> {
         ),
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Friend request sent to ${user.username}')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.success,
+              content: Text('Friend request sent to ${user.username}')),
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _sentRequests.remove(user.id));
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to send friend request')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Failed to send friend request')),
         );
       }
     }

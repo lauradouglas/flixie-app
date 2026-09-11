@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -145,8 +146,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final favouriteValidationError =
         validateFavouriteMovieCount(_favourites.length);
     if (favouriteValidationError != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+          type: FlixieToastType.error,
           content: Text(favouriteValidationError),
           backgroundColor: FlixieColors.danger,
         ),
@@ -189,9 +191,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       setState(() => _step = _OnboardingStep.success);
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Unable to finish onboarding right now.'),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+          type: FlixieToastType.error,
+          content: const Text('Unable to finish onboarding right now.'),
           backgroundColor: FlixieColors.danger,
         ),
       );

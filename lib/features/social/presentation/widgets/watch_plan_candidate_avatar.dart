@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -25,8 +26,8 @@ class WatchPlanCandidateAvatar extends StatelessWidget {
       child: Tooltip(
         message: label,
         child: InkResponse(
-          onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(label)),
+          onTap: () => ScaffoldMessenger.of(context).showFlixieToast(
+            FlixieToast(type: FlixieToastType.info, content: Text(label)),
           ),
           radius: 18,
           child: DecoratedBox(

@@ -223,7 +223,10 @@ class RequestService {
     );
   }
 
-  static Future<List<WatchRequest>> getWatchRequests(String userId) async {
+  static Future<List<WatchRequest>> getWatchRequests(
+    String userId, {
+    bool includeHomeState = false,
+  }) async {
     dynamic data;
     try {
       // Fetch both sides of every request in one call. In particular, a plan
@@ -234,9 +237,25 @@ class RequestService {
       if (e.statusCode == 404) return [];
       rethrow;
     }
-    return (data as List<dynamic>)
-        .map((e) => WatchRequest.fromJson(e as Map<String, dynamic>))
-        .where((request) => request.isWatchRequest)
-        .toList();
+    final requests = <Future<WatchRequest>>[];
+    for (final item in data as List<dynamic>) {
+      final json = item as Map<String, dynamic>;
+      final request = WatchRequest.fromJson(json);
+      if (!request.isWatchRequest) continue;
+      // New servers include the complete Home state in the list. Retain the
+      // detail fallback during rollout, including when proposals are empty.
+      if (includeHomeState &&
+          !(json['scheduleProposals'] is List &&
+              json['watchConfirmations'] is List &&
+              json['candidates'] is List)) {
+        requests.add(getWatchRequestState(
+          watchRequestId: request.id,
+          userId: userId,
+        ).then((state) => state.request).catchError((_) => request));
+      } else {
+        requests.add(Future.value(request));
+      }
+    }
+    return Future.wait(requests);
   }
 }

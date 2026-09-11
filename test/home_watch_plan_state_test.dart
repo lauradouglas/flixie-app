@@ -62,6 +62,35 @@ WatchPlanCandidate candidate(
 void main() {
   final now = DateTime(2026, 9, 2, 12);
 
+  test('saved group picks wait for the group rather than one named friend', () {
+    final selected = selectHomeWatchPlanState([
+      plan(groupId: 'group', groupName: 'Movie crew', candidates: [
+        candidate('one', selectedBy: ['me']),
+        candidate('two', selectedBy: ['me']),
+      ]),
+    ], 'me', now: now);
+    expect(selected?.type, HomeWatchPlanStateType.waitingForChoices);
+    expect(selected?.title, 'Waiting for the group’s picks');
+  });
+
+  test('a missed group screening is not labelled as a logged viewing', () {
+    final selected = selectHomeWatchPlanState([
+      plan(
+          groupName: 'Film club',
+          groupId: 'group',
+          selectedCandidateId: 'chosen',
+          scheduleStatus: 'AGREED',
+          scheduledFor: now.subtract(const Duration(hours: 2)),
+          location: 'Cinema',
+          confirmations: const [
+            WatchConfirmation(id: 'missed', userId: 'me', watched: false),
+          ]),
+    ], 'me', now: now);
+    expect(selected?.eyebrow, 'YOU DIDN’T MAKE IT');
+    expect(selected?.requiresAttention, isFalse);
+    expect(selected?.actionLabel, 'View plan');
+  });
+
   test('invitation outranks an upcoming plan', () {
     final selected = selectHomeWatchPlanState([
       plan(
@@ -227,6 +256,33 @@ void main() {
     expect(selected?.colorRole, WatchPlanColorRole.action);
   });
 
+  test('confirmed group slot ignores stale proposal with a declined invitee', () {
+    final slot = now.add(const Duration(days: 3));
+    final request = plan(
+      groupId: 'group', groupName: 'Friday films', status: 'scheduled',
+      scheduledFor: slot, scheduleStatus: 'AGREED', location: 'Cinema',
+      selectedCandidateId: 'one',
+      participants: const [
+        WatchRequestParticipant(user: me, response: 'ACCEPTED'),
+        WatchRequestParticipant(user: jamie, response: 'ACCEPTED'),
+        WatchRequestParticipant(user: WatchRequestUser(id: 'declined', username: 'Declined'), response: 'DECLINED'),
+      ],
+      proposals: [WatchScheduleProposal(id: 'old', proposerId: 'jamie',
+        proposedFor: slot, location: 'Cinema', status: 'PENDING', responses: const [
+          WatchScheduleProposalResponse(userId: 'me', status: 'ACCEPTED'),
+          WatchScheduleProposalResponse(userId: 'jamie', status: 'ACCEPTED'),
+          WatchScheduleProposalResponse(userId: 'declined', status: 'PENDING'),
+        ])],
+    );
+    expect(request.latestPendingProposal, isNull);
+    for (final userId in ['me', 'jamie']) {
+      final selected = selectHomeWatchPlanState([request], userId, now: now);
+      expect(selected?.type, isNot(HomeWatchPlanStateType.waitingForScheduleApproval));
+      expect(selected?.type, isNot(HomeWatchPlanStateType.reviewSchedule));
+      expect(selected?.requiresAttention, isFalse);
+    }
+  });
+
   test('group creator waits for approval after suggesting a time', () {
     final selected = selectHomeWatchPlanState([
       plan(
@@ -275,21 +331,28 @@ void main() {
 
   test('resolved group replies use green, amber, and red outcomes', () {
     WatchRequestParticipant response(String id, String status) =>
-        WatchRequestParticipant(user: WatchRequestUser(id: id, username: id), response: status);
+        WatchRequestParticipant(
+            user: WatchRequestUser(id: id, username: id), response: status);
 
     final everyoneIn = selectHomeWatchPlanState([
       plan(
         status: 'open',
         groupId: 'group',
         groupName: 'Friday films',
-        participants: [response('me', 'ACCEPTED'), response('jamie', 'ACCEPTED')],
+        participants: [
+          response('me', 'ACCEPTED'),
+          response('jamie', 'ACCEPTED')
+        ],
       ),
     ], 'me', now: now);
     final someIn = selectHomeWatchPlanState([
       plan(
         groupId: 'group',
         groupName: 'Friday films',
-        participants: [response('me', 'ACCEPTED'), response('jamie', 'DECLINED')],
+        participants: [
+          response('me', 'ACCEPTED'),
+          response('jamie', 'DECLINED')
+        ],
       ),
     ], 'me', now: now);
     final nobodyIn = selectHomeWatchPlanState([

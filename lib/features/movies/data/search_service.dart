@@ -5,19 +5,6 @@ import 'package:flixie_app/models/search_result.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 
 class SearchService {
-  // static Future<SearchResults> search(
-  //   String value, {
-  //   String type = 'all',
-  //   int page = 1,
-  // }) async {
-  //   final data = await ApiClient.get('/search', queryParams: {
-  //     'value': value,
-  //     'type': type,
-  //     'page': page.toString(),
-  //   });
-  //   return SearchResults.fromJson(data as Map<String, dynamic>);
-  // }
-
   static Future<SearchResults> search(
     String value, {
     String type = 'all',
@@ -28,29 +15,7 @@ class SearchService {
       'type': type,
       'page': page.toString(),
     });
-
-    final results = SearchResults.fromJson(data as Map<String, dynamic>);
-    if (type != 'all') return results;
-
-    final shows = await searchShows(value).catchError((_) => <TvShow>[]);
-    if (shows.isEmpty) return results;
-
-    final existingShowIds = results.results
-        .where((item) => item.isShow)
-        .map((item) => item.show?.id)
-        .whereType<int>()
-        .toSet();
-    final additionalShows = shows
-        .where((show) => !existingShowIds.contains(show.id))
-        .map(SearchResultItem.fromShow);
-    final merged = [...results.results, ...additionalShows];
-
-    return SearchResults(
-      page: results.page,
-      results: merged,
-      totalPages: results.totalPages,
-      totalResults: merged.length,
-    );
+    return SearchResults.fromJson(data as Map<String, dynamic>);
   }
 
   static Future<SearchEntityResults> searchCompany(

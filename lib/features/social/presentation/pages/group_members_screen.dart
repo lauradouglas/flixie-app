@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -105,8 +106,10 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
     } catch (e) {
       logger.e('Change role error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update role')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Failed to update role')),
         );
       }
     }
@@ -149,8 +152,10 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
     } catch (e) {
       logger.e('Transfer ownership error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to transfer ownership')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Failed to transfer ownership')),
         );
       }
     }
@@ -188,8 +193,10 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
     } catch (e) {
       logger.e('Remove member error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to remove member')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Failed to remove member')),
         );
       }
     }
@@ -677,8 +684,10 @@ class _InviteMembersSheetState extends State<_InviteMembersSheet> {
     } catch (e) {
       logger.e('Invite members error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to send invitations')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Failed to send invitations')),
         );
         setState(() => _inviting = false);
       }

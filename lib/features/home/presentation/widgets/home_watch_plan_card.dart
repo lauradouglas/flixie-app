@@ -1,4 +1,4 @@
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flixie_app/features/watch_plans/presentation/widgets/shared/watch_plan_components.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -17,7 +17,16 @@ class HomeWatchPlanCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final poster = state.plan.movie?.posterPath;
+    final plan = state.plan;
+    final chosen = plan.candidates
+        .where((candidate) => candidate.id ==
+            (plan.selectedCandidateId ?? plan.proposedCandidateId))
+        .firstOrNull;
+    final suggestions = chosen != null
+        ? [chosen]
+        : plan.selectedCandidateId != null
+            ? plan.candidates.where((c) => c.id == plan.selectedCandidateId).toList()
+            : plan.candidates.take(3).toList();
     final tone = state.colorRole.color;
     // The brand purple works for borders and controls, but compact status copy
     // needs the contrast-safe text token against this dark card surface.
@@ -97,22 +106,28 @@ class HomeWatchPlanCard extends StatelessWidget {
                     child: Text(state.actionLabel,
                         maxLines: 1, overflow: TextOverflow.ellipsis),
                   );
-                  final leading = ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: SizedBox(
-                      width: 58,
-                      height: 87,
-                      child: poster?.isNotEmpty == true
-                          ? CachedNetworkImage(
-                              imageUrl: poster!.startsWith('http')
-                                  ? poster
-                                  : 'https://image.tmdb.org/t/p/w185$poster',
-                              fit: BoxFit.cover,
-                              errorWidget: (_, __, ___) => _placeholder(tone),
-                            )
-                          : _placeholder(tone),
-                    ),
-                  );
+                  final leading = suggestions.isEmpty
+                      ? WatchPlanPoster(
+                          path: plan.movie?.posterPath,
+                          title: state.title,
+                          width: 58,
+                        )
+                      : SizedBox(
+                          width: 58 + (suggestions.length - 1) * 9.0,
+                          height: 87 + (suggestions.length - 1) * 9.0,
+                          child: Stack(children: [
+                            for (var i = suggestions.length - 1; i >= 0; i--)
+                              Positioned(
+                                left: i * 9.0,
+                                top: i * 9.0,
+                                child: WatchPlanPoster(
+                                  path: suggestions[i].posterPath,
+                                  title: suggestions[i].title,
+                                  width: 58,
+                                ),
+                              ),
+                          ]),
+                        );
                   if (narrow) {
                     return Column(children: [
                       Row(
@@ -142,10 +157,7 @@ class HomeWatchPlanCard extends StatelessWidget {
     );
   }
 
-  Widget _placeholder(Color tone) => ColoredBox(
-        color: tone.withValues(alpha: .14),
-        child: Icon(Icons.movie_filter_rounded, color: tone, size: 28),
-      );
+
 }
 
 class HomeWatchPlanEmptyCard extends StatelessWidget {

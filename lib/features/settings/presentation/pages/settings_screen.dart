@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -213,10 +214,11 @@ class SettingsScreen extends StatelessWidget {
   Future<void> _openStoreRating(BuildContext context) async {
     final opened = await AppReviewService.openStoreListing();
     if (!context.mounted || opened) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content:
-            Text('Ratings will be available when Flixie is in the App Store.'),
+    ScaffoldMessenger.of(context).showFlixieToast(
+      FlixieToast(
+        type: FlixieToastType.info,
+        content: const Text(
+            'Ratings will be available when Flixie is in the App Store.'),
       ),
     );
   }
@@ -261,9 +263,10 @@ class SettingsScreen extends StatelessWidget {
       mode: LaunchMode.externalApplication,
     );
     if (!opened && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not open the privacy policy.'),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+          type: FlixieToastType.error,
+          content: const Text('Could not open the privacy policy.'),
         ),
       );
     }
@@ -511,8 +514,9 @@ class _DeleteAccountButton extends StatelessWidget {
             rootNavigator.pop();
           }
           if (error != null && messenger.mounted) {
-            messenger.showSnackBar(
-              SnackBar(
+            messenger.showFlixieToast(
+              FlixieToast(
+                type: FlixieToastType.error,
                 content: Text(error),
                 backgroundColor: FlixieColors.danger,
               ),
@@ -863,14 +867,16 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
       if (!mounted) return;
       auth.updateCachedUser(updated);
       Navigator.pop(context);
-      messenger.showSnackBar(const SnackBar(
-        content: Text('Profile updated'),
+      messenger.showFlixieToast(FlixieToast(
+        type: FlixieToastType.success,
+        content: const Text('Profile updated'),
         backgroundColor: FlixieColors.surfaceElevated,
       ));
     } on ApiException catch (error) {
       if (!mounted) return;
       setState(() => _saving = false);
-      messenger.showSnackBar(SnackBar(
+      messenger.showFlixieToast(FlixieToast(
+        type: FlixieToastType.error,
         content: Text(error.code == 'USERNAME_NOT_AVAILABLE'
             ? error.message
             : 'Failed to update profile. Please try again.'),
@@ -879,8 +885,9 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
-      messenger.showSnackBar(const SnackBar(
-          content: Text('Failed to update profile. Please try again.'),
+      messenger.showFlixieToast(FlixieToast(
+          type: FlixieToastType.error,
+          content: const Text('Failed to update profile. Please try again.'),
           backgroundColor: FlixieColors.danger));
     }
   }

@@ -1,4 +1,8 @@
+import 'package:flixie_app/core/utils/app_logger.dart';
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'dart:async';
+import 'dart:convert';
+import 'package:flixie_app/core/navigation/tab_refresh_controller.dart';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -28,6 +32,7 @@ import 'package:flixie_app/features/movies/data/movie_service.dart';
 import 'package:flixie_app/features/movies/data/show_service.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/models/friend_recommendation.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_badges.dart';
 
 class WatchlistScreen extends StatefulWidget {
   const WatchlistScreen({super.key});
@@ -36,7 +41,8 @@ class WatchlistScreen extends StatefulWidget {
   State<WatchlistScreen> createState() => _WatchlistScreenState();
 }
 
-class _WatchlistScreenState extends State<WatchlistScreen> {
+class _WatchlistScreenState extends State<WatchlistScreen>
+    with WidgetsBindingObserver {
   final TextEditingController _searchController = TextEditingController();
 
   List<WatchlistMovie> _allWatchlist = [];
@@ -67,10 +73,15 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
   int _recommendationsRequest = 0;
 
   AuthProvider? _authProvider;
+  String? _watchlistSnapshot;
+  String? _recommendationSnapshot;
+  bool _refreshing = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    TabRefreshController.watchlist.addListener(_refreshWatchlist);
     _loadWatchlist();
     _searchController.addListener(_filterWatchlist);
   }
@@ -87,11 +98,47 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
   }
 
   void _onUserChanged() {
-    if (mounted) _loadWatchlist();
+    if (!mounted || _refreshing) return;
+    final auth = context.read<AuthProvider>();
+    if (_listSnapshot(auth) != _watchlistSnapshot) {
+      _loadWatchlist();
+    } else if (_friendSnapshot(auth) != _recommendationSnapshot) {
+      _loadFriendRecommendations(_allWatchlist);
+    }
+  }
+
+  String _listSnapshot(AuthProvider auth) => jsonEncode([
+        auth.dbUser?.id,
+        auth.dbUser?.movieWatchlist?.map((item) => item.toJson()).toList(),
+        auth.dbUser?.showWatchlist,
+        auth.dbUser?.watchedMovies?.map((item) => item.toJson()).toList(),
+        auth.dbUser?.watchedShows,
+        auth.dbUser?.watchProviderRegion,
+      ]);
+
+  String _friendSnapshot(AuthProvider auth) =>
+      '${auth.dbUser?.id}:${auth.activityVersion}:${auth.friendDataVersion}';
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshWatchlist();
+  }
+
+  Future<void> _refreshWatchlist() async {
+    if (_refreshing) return;
+    _refreshing = true;
+    try {
+      await context.read<AuthProvider>().refreshUserData();
+      if (mounted) _loadWatchlist();
+    } finally {
+      _refreshing = false;
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    TabRefreshController.watchlist.removeListener(_refreshWatchlist);
     _authProvider?.removeListener(_onUserChanged);
     _searchController.dispose();
     super.dispose();
@@ -99,11 +146,19 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
 
   void _loadWatchlist() {
     final authProvider = context.read<AuthProvider>();
+    _watchlistSnapshot = _listSnapshot(authProvider);
     final userWatchlist = authProvider.dbUser?.movieWatchlist;
     final userShowWatchlist = authProvider.dbUser?.showWatchlist;
 
     if (userWatchlist == null && userShowWatchlist == null) {
-      setState(() => _loading = false);
+      ++_recommendationsRequest;
+      setState(() {
+        _allWatchlist = [];
+        _allShowWatchlist = [];
+        _recommendationsByMovieId.clear();
+        _filterWatchlist();
+        _loading = false;
+      });
       return;
     }
 
@@ -149,31 +204,47 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
   Future<void> _loadFriendRecommendations(
       List<WatchlistMovie> watchlist) async {
     final request = ++_recommendationsRequest;
+    final snapshot = _friendSnapshot(context.read<AuthProvider>());
+    if (snapshot != _recommendationSnapshot) {
+      // Do not display a previous viewer's or former friend's recommendation.
+      _recommendationsByMovieId.clear();
+    }
+    _recommendationSnapshot = snapshot;
     if (watchlist.isEmpty) {
       if (mounted) setState(_recommendationsByMovieId.clear);
       return;
     }
 
-    final service = MovieService();
-    final entries = await Future.wait(watchlist.map((item) async {
-      try {
-        final response = await service.getFriendRecommendation(item.movieId);
-        return MapEntry(
-          item.movieId,
-          response.friends
-              .where((friend) => friend.recommends)
-              .toList(growable: false),
-        );
-      } catch (_) {
-        return MapEntry(item.movieId, const <FriendRecommendationItem>[]);
-      }
-    }));
+    // Drop removed films immediately, including while another batch is in flight.
+    final ids = watchlist.map((item) => item.movieId).toSet();
+    setState(() =>
+        _recommendationsByMovieId.removeWhere((id, _) => !ids.contains(id)));
+    Map<int, FriendRecommendationResponse> responses;
+    try {
+      responses = await MovieService().getFriendRecommendations(ids,
+          isCurrent: () => mounted && request == _recommendationsRequest);
+    } catch (_) {
+      responses = {};
+    }
     if (!mounted || request != _recommendationsRequest) return;
     setState(() {
       _recommendationsByMovieId
         ..clear()
-        ..addEntries(entries);
+        ..addEntries(responses.entries.map((entry) => MapEntry(
+            entry.key,
+            entry.value.friends
+                .where((friend) => friend.recommends)
+                .toList())));
     });
+    if (responses.length != ids.length) {
+      ScaffoldMessenger.of(context).showSnackBar(FlixieToast(
+        type: FlixieToastType.error,
+        content: const Text('Couldn’t load some friend recommendations'),
+        action: SnackBarAction(
+            label: 'Retry',
+            onPressed: () => _loadFriendRecommendations(_allWatchlist)),
+      ));
+    }
   }
 
   Future<void> _loadWatchProviderAvailability(
@@ -447,8 +518,9 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     if (!mounted || selected == null) return;
 
     if (existingMovieIds.contains(selected.id)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+            type: FlixieToastType.info,
             content: Text('${selected.name} is already in your watchlist')),
       );
       return;
@@ -477,8 +549,9 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       _loadWatchProviderAvailability(_allWatchlist);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.success,
             content: Text('${selected.name} added to watchlist'),
             backgroundColor: FlixieColors.surfaceElevated,
           ),
@@ -487,9 +560,10 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     } catch (e) {
       debugPrint('Error adding movie to watchlist: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to add movie to watchlist'),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+          type: FlixieToastType.error,
+          content: const Text('Failed to add movie to watchlist'),
           backgroundColor: FlixieColors.danger,
         ),
       );
@@ -631,8 +705,9 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.success,
             content: Text('${item.movie?.title ?? "Movie"} marked as watched'),
             backgroundColor: FlixieColors.surfaceElevated,
           ),
@@ -641,9 +716,10 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     } catch (e) {
       debugPrint('Error marking as watched: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to mark as watched'),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.error,
+            content: const Text('Failed to mark as watched'),
             backgroundColor: FlixieColors.danger,
           ),
         );
@@ -679,8 +755,9 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.success,
             content:
                 Text('${item.movie?.title ?? "Movie"} removed from watchlist'),
           ),
@@ -728,8 +805,9 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
           authProvider.updateUserList(watchedMovies: currentWatched);
           authProvider.markActivityChanged();
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
+            ScaffoldMessenger.of(context).showFlixieToast(
+              FlixieToast(
+                type: FlixieToastType.success,
                 content: Text(
                     '${item.movie?.title ?? "Movie"} added to watched list'),
                 backgroundColor: FlixieColors.surfaceElevated,
@@ -741,9 +819,10 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     } catch (e) {
       debugPrint('Error removing from watchlist: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to remove from watchlist'),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.error,
+            content: const Text('Failed to remove from watchlist'),
             backgroundColor: FlixieColors.danger,
           ),
         );
@@ -804,8 +883,9 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         _allWatchlist.removeWhere((item) => idsToRemove.contains(item.movieId));
         _filterWatchlist();
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+          type: FlixieToastType.success,
           content: Text(
             '${watchedItems.length} watched ${watchedItems.length == 1 ? 'movie' : 'movies'} removed from your watchlist',
           ),
@@ -814,9 +894,10 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to clear watched movies'),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+          type: FlixieToastType.error,
+          content: const Text('Failed to clear watched movies'),
           backgroundColor: FlixieColors.danger,
         ),
       );
@@ -832,8 +913,9 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     final movieId = item.movieId;
     if (user.isMovieFavorite(movieId)) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.info,
             content: Text(
               '${item.movie?.title ?? "Movie"} is already in favourites',
             ),
@@ -871,8 +953,9 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       authProvider.markActivityChanged();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.success,
             content:
                 Text('${item.movie?.title ?? "Movie"} added to favourites'),
             backgroundColor: FlixieColors.surfaceElevated,
@@ -889,9 +972,10 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
             onSpaceMade: () => _addToFavorites(item),
           );
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to add to favourites'),
+          ScaffoldMessenger.of(context).showFlixieToast(
+            FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Failed to add to favourites'),
               backgroundColor: FlixieColors.danger,
             ),
           );
@@ -928,15 +1012,19 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         friends: friends,
         onSuccess: () {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Watch Plan sent!')),
+            ScaffoldMessenger.of(context).showFlixieToast(
+              FlixieToast(
+                  type: FlixieToastType.success,
+                  content: const Text('Watch Plan sent!')),
             );
           }
         },
         onError: () {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Failed to send Watch Plan')),
+            ScaffoldMessenger.of(context).showFlixieToast(
+              FlixieToast(
+                  type: FlixieToastType.error,
+                  content: const Text('Failed to send Watch Plan')),
             );
           }
         },
@@ -1144,6 +1232,11 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Refresh watchlist',
+            onPressed: _refreshWatchlist,
+          ),
           IconButton(
             icon: const Icon(Icons.history_rounded, color: Colors.white),
             tooltip: 'Watch history',
@@ -1678,18 +1771,28 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
       authProvider.updateUserList(showWatchlist: updated);
       if (!mounted) return;
       setState(
-        () => _allShowWatchlist.removeWhere(
-          (show) => show.showId == item.showId,
-        ),
+        () => _allShowWatchlist = _allShowWatchlist
+            .where((show) => show.showId != item.showId)
+            .toList(growable: false),
       );
       _filterWatchlist();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${item.title} removed from watchlist')),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+            type: FlixieToastType.success,
+            content: Text('${item.title} removed from watchlist')),
       );
-    } catch (_) {
+    } catch (error) {
+      logger.w('[Watchlist] Show removal failed: $error');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not remove show from watchlist')),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+            type: FlixieToastType.error,
+            content: const Text('Couldn’t remove show from watchlist'),
+            action: SnackBarAction(
+                label: 'Retry',
+                onPressed: () {
+                  if (mounted) _removeShowFromWatchlist(item);
+                })),
       );
     }
   }
@@ -2490,7 +2593,7 @@ class _RecommendationAvatars extends StatelessWidget {
   Widget build(BuildContext context) {
     final visible = friends.take(3).toList(growable: false);
     final overflow = friends.length - visible.length;
-    const avatarSize = 27.0;
+    const avatarSize = 32.0;
     const overlap = 8.0;
     final stackWidth = visible.length * (avatarSize - overlap) +
         overlap +
@@ -2507,15 +2610,10 @@ class _RecommendationAvatars extends StatelessWidget {
               for (var i = 0; i < visible.length; i++)
                 Positioned(
                   left: i * (avatarSize - overlap),
-                  child: Container(
+                  child: SizedBox(
                     width: avatarSize,
                     height: avatarSize,
-                    padding: const EdgeInsets.all(1.5),
-                    decoration: const BoxDecoration(
-                      color: FlixieColors.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: ClipOval(child: _friendAvatar(visible[i])),
+                    child: _friendAvatar(visible[i]),
                   ),
                 ),
               if (overflow > 0)
@@ -2562,6 +2660,7 @@ class _RecommendationAvatars extends StatelessWidget {
     if (friend.avatar != null) {
       return ProfileAvatarView(
         avatar: friend.avatar,
+        profileBadges: friend.profileBadges,
         fallbackText: friend.username.isEmpty
             ? '?'
             : friend.username.characters.first.toUpperCase(),
@@ -2570,13 +2669,26 @@ class _RecommendationAvatars extends StatelessWidget {
       );
     }
     if (friend.avatarUrl?.isNotEmpty == true) {
-      return CachedNetworkImage(
-        imageUrl: friend.avatarUrl!,
-        fit: BoxFit.cover,
-        errorWidget: (_, __, ___) => _initial(friend),
-      );
+      return SpecialAvatarFrame(
+          badges: friend.profileBadges,
+          child: SizedBox(
+              width: 24,
+              height: 24,
+              child: ClipOval(
+                  child: CachedNetworkImage(
+                imageUrl: friend.avatarUrl!,
+                fit: BoxFit.cover,
+                errorWidget: (_, __, ___) => _initial(friend),
+              ))));
     }
-    return _initial(friend);
+    return ProfileAvatarView(
+        avatar: null,
+        profileBadges: friend.profileBadges,
+        fallbackText: friend.username.isEmpty
+            ? '?'
+            : friend.username.characters.first.toUpperCase(),
+        fallbackColor: FlixieColors.primary,
+        size: 24);
   }
 
   Widget _initial(FriendRecommendationItem friend) => Container(

@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -89,15 +90,16 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline, color: Colors.white, size: 18),
-                const SizedBox(width: 8),
-                Expanded(child: Text('Failed to submit review: $e')),
-              ],
-            ),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.error,
+            content: const Text(
+                'Couldn’t submit your review. Your draft is still here.'),
+            action: SnackBarAction(
+                label: 'Retry',
+                onPressed: () {
+                  if (mounted) _submit();
+                }),
             backgroundColor: Colors.red.shade700,
             behavior: SnackBarBehavior.floating,
           ),

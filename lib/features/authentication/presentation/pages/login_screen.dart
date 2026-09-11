@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -51,8 +52,9 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
     if (!success) {
-      messenger.showSnackBar(
-        SnackBar(
+      messenger.showFlixieToast(
+        FlixieToast(
+          type: FlixieToastType.error,
           content: Text(auth.errorMessage ?? 'Sign in failed.'),
           backgroundColor: FlixieColors.danger,
         ),

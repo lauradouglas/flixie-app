@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -17,8 +18,10 @@ class AboutCreditsScreen extends StatelessWidget {
   Future<void> _open(BuildContext context, Uri uri) async {
     final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!opened && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to open this link.')),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+            type: FlixieToastType.error,
+            content: const Text('Unable to open this link.')),
       );
     }
   }

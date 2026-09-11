@@ -3,6 +3,10 @@ import 'package:flutter/foundation.dart';
 class TabRefreshController {
   TabRefreshController._();
 
+  static final ValueNotifier<int> watchPlans = ValueNotifier<int>(0);
+
+  static final ValueNotifier<int> watchlist = ValueNotifier<int>(0);
+
   static final ValueNotifier<int> home = ValueNotifier<int>(0);
   static final ValueNotifier<int> social = ValueNotifier<int>(0);
 

@@ -13,6 +13,7 @@ class ProfileAvatarView extends StatefulWidget {
     required this.fallbackText,
     required this.fallbackColor,
     this.size = 44,
+    this.useFullSize = false,
     this.profileBadges = const [],
   });
 
@@ -20,6 +21,9 @@ class ProfileAvatarView extends StatefulWidget {
   final String fallbackText;
   final Color fallbackColor;
   final double size;
+
+  /// Selection flows always show the original, even in a compact grid.
+  final bool useFullSize;
   final List<String> profileBadges;
 
   @override
@@ -29,6 +33,14 @@ class ProfileAvatarView extends StatefulWidget {
 class _ProfileAvatarViewState extends State<ProfileAvatarView> {
   static final AvatarUrlResolver _resolver = AvatarUrlResolver();
   Future<String>? _url;
+  bool _iconFailed = false;
+
+  bool get _usesIcon =>
+      !widget.useFullSize &&
+      widget.size <= 48 &&
+      !_iconFailed &&
+      (widget.avatar?.iconImageUrl != null ||
+          widget.avatar?.iconStoragePath != null);
 
   @override
   void initState() {
@@ -39,16 +51,42 @@ class _ProfileAvatarViewState extends State<ProfileAvatarView> {
   @override
   void didUpdateWidget(covariant ProfileAvatarView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.avatar?.storagePath != widget.avatar?.storagePath) _load();
+    if (oldWidget.avatar?.storagePath != widget.avatar?.storagePath ||
+        oldWidget.avatar?.imageUrl != widget.avatar?.imageUrl ||
+        oldWidget.avatar?.iconStoragePath != widget.avatar?.iconStoragePath ||
+        oldWidget.avatar?.iconImageUrl != widget.avatar?.iconImageUrl ||
+        oldWidget.size != widget.size ||
+        oldWidget.useFullSize != widget.useFullSize) {
+      _iconFailed = false;
+      _load();
+    }
   }
 
   void _load({bool retry = false}) {
     final avatar = widget.avatar;
-    _url = avatar == null
-        ? null
-        : avatar.imageUrl != null
-            ? Future.value(avatar.imageUrl)
-            : _resolver.resolve(avatar.storagePath, retry: retry);
+    if (avatar == null) {
+      _url = null;
+      return;
+    }
+    final imageUrl = _usesIcon ? avatar.iconImageUrl : avatar.imageUrl;
+    final storagePath = _usesIcon
+        ? avatar.iconStoragePath ?? avatar.storagePath
+        : avatar.storagePath;
+    _url = imageUrl != null
+        ? Future.value(imageUrl)
+        : _resolver.resolve(storagePath, retry: retry);
+  }
+
+  void _fallBackToOriginal() {
+    if (!_usesIcon) return;
+    // Image errors arrive during build; change the source after this frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_usesIcon) return;
+      setState(() {
+        _iconFailed = true;
+        _load();
+      });
+    });
   }
 
   void _retry() {
@@ -80,6 +118,10 @@ class _ProfileAvatarViewState extends State<ProfileAvatarView> {
         future: _url,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
+            if (_usesIcon) {
+              _fallBackToOriginal();
+              return _fallback();
+            }
             logger.e(
               'Unable to load avatar ${widget.avatar!.storagePath}: '
               '${snapshot.error}',
@@ -127,7 +169,10 @@ class _ProfileAvatarViewState extends State<ProfileAvatarView> {
               fit: BoxFit.cover,
               fadeInDuration: const Duration(milliseconds: 120),
               placeholder: (_, __) => _fallback(),
-              errorWidget: (_, __, ___) => _fallback(),
+              errorWidget: (_, __, ___) {
+                _fallBackToOriginal();
+                return _fallback();
+              },
             ),
           );
         },

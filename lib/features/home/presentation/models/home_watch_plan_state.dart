@@ -282,7 +282,7 @@ HomeWatchPlanState? _stateFor(
         HomeWatchPlanStateType.waitingForChoices,
         10,
         'CHOICES SAVED',
-        'Waiting for @$other',
+        group ? 'Waiting for the group’s picks' : 'Waiting for @$other',
         'You would watch $selectedByMe of $options movies',
         'View plan',
         false);
@@ -340,10 +340,23 @@ HomeWatchPlanState? _stateFor(
         plan,
         HomeWatchPlanStateType.recap,
         9,
-        'EVERYONE WATCHED',
+        group ? 'PLAN COMPLETE' : 'EVERYONE WATCHED',
         'Your recap is ready',
         group ? '${plan.watchPlanTitle} · $companion' : plan.watchPlanTitle,
         'View recap',
+        false);
+  }
+  if (group &&
+      plan.watchConfirmations.any((confirmation) =>
+          confirmation.userId == userId && !confirmation.watched)) {
+    return _state(
+        plan,
+        HomeWatchPlanStateType.waitingForLogs,
+        11,
+        'YOU DIDN’T MAKE IT',
+        'Your response is saved',
+        'No watch entry was added. Waiting for the group to respond.',
+        'View plan',
         false);
   }
   if (logged && plan.scheduledFor != null) {

@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -178,8 +179,10 @@ class GroupChatTabState extends State<GroupChatTab> {
     } catch (e) {
       logger.e('Send message error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to send message')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Failed to send message')),
         );
       }
     } finally {
@@ -287,9 +290,10 @@ class GroupChatTabState extends State<GroupChatTab> {
     } catch (e) {
       if (mounted) {
         setState(() => _respondMap.remove(pgId));
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Failed to respond'),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Failed to respond'),
               backgroundColor: FlixieColors.danger),
         );
       }
@@ -325,7 +329,15 @@ class GroupChatTabState extends State<GroupChatTab> {
     final posterPath = req?.moviePosterPath ??
         payload?['moviePosterPath'] as String? ??
         payload?['posterPath'] as String?;
-    final requestMessage = req?.message ?? payload?['message'] as String?;
+    final requestMessage = [
+      req?.message,
+      payload?['message'] as String?,
+      (payload?['metadata'] as Map<String, dynamic>?)?['message'] as String?,
+    ]
+        .whereType<String>()
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .firstOrNull;
     final requesterUsername = req?.requesterUsername ??
         payload?['requesterUsername'] as String? ??
         msg.senderUsername;
@@ -663,9 +675,12 @@ class GroupChatTabState extends State<GroupChatTab> {
                                   }
                                 } catch (_) {
                                   if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                          content: Text('Failed to send reply'),
+                                    ScaffoldMessenger.of(context)
+                                        .showFlixieToast(
+                                      FlixieToast(
+                                          type: FlixieToastType.error,
+                                          content: const Text(
+                                              'Failed to send reply'),
                                           backgroundColor: FlixieColors.danger),
                                     );
                                   }
@@ -783,8 +798,15 @@ class GroupChatTabState extends State<GroupChatTab> {
                             respondKey, WatchResponseDecision.declined),
                         onMaybe: () => _respondInChat(
                             respondKey, WatchResponseDecision.maybe),
-                        onTap: () => _showWatchRequestDetail(
-                            context, msg, messages, cachedReq, currentUserId),
+                        onTap: () {
+                          if (cachedReq != null) {
+                            context.push(
+                                '/groups/${widget.groupId}?tab=requests&requestId=${cachedReq.databaseRequestId ?? cachedReq.id}');
+                          } else {
+                            _showWatchRequestDetail(context, msg, messages,
+                                cachedReq, currentUserId);
+                          }
+                        },
                         onLongPress: isMe
                             ? null
                             : () => SafetyActions.contentMenu(

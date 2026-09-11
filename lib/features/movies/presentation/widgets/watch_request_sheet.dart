@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
@@ -67,8 +68,9 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
   String? _selectedFriendId;
   String? _selectedGroupId;
   bool _isSending = false;
+  int get _maxMovieChoices => _isGroupMode ? 5 : 3;
   _WatchContext _watchContext = _WatchContext.home;
-  _ScheduleMode _scheduleMode = _ScheduleMode.dateAndTime;
+  _ScheduleMode _scheduleMode = _ScheduleMode.decideLater;
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
   late final List<MovieShort> _movieChoices;
@@ -105,6 +107,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
     _fetchGroups();
     if (widget.initialGroupMode || widget.initialGroupId != null) {
       _isGroupMode = true;
+      _scheduleMode = _ScheduleMode.dateAndTime;
     }
     if (widget.initialGroupId != null) {
       _selectedGroupId = widget.initialGroupId;
@@ -286,10 +289,18 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
     if (!canSend || _isSending || _movieChoices.isEmpty) {
       return;
     }
+    if (_movieChoices.length > _maxMovieChoices) {
+      ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+          type: FlixieToastType.warning,
+          content: Text(
+              'Choose up to $_maxMovieChoices films for this invitation.')));
+      return;
+    }
     if (!_hasValidSchedule) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Choose a date and time in the future.'),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+          type: FlixieToastType.warning,
+          content: const Text('Choose a date and time in the future.'),
           backgroundColor: FlixieColors.danger,
         ),
       );
@@ -355,7 +366,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
   }
 
   Future<void> _addMovieChoice() async {
-    if (_movieChoices.length >= 5) return;
+    if (_movieChoices.length >= _maxMovieChoices) return;
     final movie = await showModalBottomSheet<MovieShort>(
       context: context,
       isScrollControlled: true,
@@ -380,7 +391,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
   }
 
   Future<void> _browseCinemaReleases() async {
-    if (_movieChoices.length >= 5) return;
+    if (_movieChoices.length >= _maxMovieChoices) return;
     final region =
         context.read<AuthProvider>().dbUser?.watchProviderRegion ?? 'GB';
     final movie = await showModalBottomSheet<MovieShort>(
@@ -717,7 +728,26 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                     ),
                 ],
                 const SizedBox(height: 16),
-                const _PlanStepHeading(number: '2', title: 'Where?'),
+                _PlanStepHeading(
+                  number: '2',
+                  title: 'Movie options',
+                  trailing: 'ADD UP TO $_maxMovieChoices',
+                ),
+                const SizedBox(height: 10),
+                if (_movieChoices.isEmpty)
+                  _MovieOptionsEmptyCard(onTap: _browseCinemaReleases)
+                else
+                  _SelectedPlanTitle(
+                    choices: _movieChoices,
+                    selectedMovieId: _selectedMovieId,
+                    onSelect: _selectMovieChoice,
+                    onRemove: _removeMovieChoice,
+                    onAddOption: _movieChoices.length >= _maxMovieChoices
+                        ? null
+                        : _addMovieChoice,
+                  ),
+                const SizedBox(height: 16),
+                const _PlanStepHeading(number: '3', title: 'Where?'),
                 const SizedBox(height: 10),
                 Row(children: [
                   for (final contextOption in _WatchContext.values)
@@ -784,7 +814,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                   ),
                 const SizedBox(height: 14),
                 const _PlanStepHeading(
-                    number: '3', title: 'When?', trailing: 'CAN CHANGE LATER'),
+                    number: '4', title: 'When?', trailing: 'CAN CHANGE LATER'),
                 const SizedBox(height: 10),
                 _SchedulePicker(
                   label: _scheduleMode == _ScheduleMode.dateOnly
@@ -798,24 +828,6 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                           : '${MaterialLocalizations.of(context).formatMediumDate(_selectedDate!)} at ${_selectedTime?.format(context) ?? 'Choose time'}',
                   onTap: _pickSchedule,
                 ),
-                const SizedBox(height: 16),
-                const _PlanStepHeading(
-                  number: '4',
-                  title: 'Movie options',
-                  trailing: 'ADD UP TO 5',
-                ),
-                const SizedBox(height: 10),
-                if (_movieChoices.isEmpty)
-                  _MovieOptionsEmptyCard(onTap: _browseCinemaReleases)
-                else
-                  _SelectedPlanTitle(
-                    choices: _movieChoices,
-                    selectedMovieId: _selectedMovieId,
-                    onSelect: _selectMovieChoice,
-                    onRemove: _removeMovieChoice,
-                    onAddOption:
-                        _movieChoices.length >= 5 ? null : _addMovieChoice,
-                  ),
                 const SizedBox(height: 22),
                 const Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -871,6 +883,16 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: FlixieColors.primary,
+                      foregroundColor: Colors.black,
+                      disabledBackgroundColor: FlixieColors.surfaceElevated,
+                      disabledForegroundColor: FlixieColors.medium,
+                      minimumSize: const Size.fromHeight(48),
+                      side: const BorderSide(color: FlixieColors.primary),
+                      textStyle: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w700),
+                    ),
                     onPressed: _isSending ||
                             _movieChoices.isEmpty ||
                             (_isGroupMode
@@ -990,6 +1012,7 @@ class _SchedulePicker extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
         child: Container(
+          width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
               border: Border.all(color: FlixieColors.tabBarBorder),

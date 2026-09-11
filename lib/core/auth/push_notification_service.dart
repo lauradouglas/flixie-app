@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flixie_app/core/navigation/tab_refresh_controller.dart';
 import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -490,6 +491,9 @@ class PushNotificationService {
         logger.d('[FCM] Suppressing foreground message - not for current user');
         return;
       }
+
+      // Fetch newly agreed times on this device before iOS presentation returns.
+      TabRefreshController.watchPlans.value++;
 
       // On iOS, if this is a notification message, the OS can present it
       // directly because foreground presentation options are enabled.

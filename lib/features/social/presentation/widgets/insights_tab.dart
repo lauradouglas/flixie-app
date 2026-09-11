@@ -22,6 +22,7 @@ class GroupInsightsTab extends StatefulWidget {
 }
 
 class _GroupInsightsTabState extends State<GroupInsightsTab> {
+  int _loadGeneration = 0;
   bool _loading = true;
   bool _allTime = false;
   String? _error;
@@ -33,7 +34,14 @@ class _GroupInsightsTabState extends State<GroupInsightsTab> {
     _loadInsights();
   }
 
+  @override
+  void didUpdateWidget(covariant GroupInsightsTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.groupId != widget.groupId) _loadInsights();
+  }
+
   Future<void> _loadInsights() async {
+    final generation = ++_loadGeneration;
     if (mounted) {
       setState(() {
         _loading = true;
@@ -46,13 +54,13 @@ class _GroupInsightsTabState extends State<GroupInsightsTab> {
         widget.groupId,
         timeWindow: _allTime ? 'all' : 'month',
       );
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _insights = insights;
         _loading = false;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _loading = false;
         _error = 'Couldn\'t load group insights';

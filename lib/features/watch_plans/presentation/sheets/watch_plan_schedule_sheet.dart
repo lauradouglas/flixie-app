@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -182,9 +183,10 @@ class _WatchPlanScheduleSheetState extends State<WatchPlanScheduleSheet> {
 
   void _save() {
     if (!_selected.isAfter(DateTime.now())) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Choose a date and time in the future.'),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+          type: FlixieToastType.warning,
+          content: const Text('Choose a date and time in the future.'),
           backgroundColor: FlixieColors.danger,
         ),
       );

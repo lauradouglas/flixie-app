@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -20,10 +21,11 @@ class VideoCard extends StatelessWidget {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       } else {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Could not open video'),
-              backgroundColor: Color(0xFFEF4444),
+          ScaffoldMessenger.of(context).showFlixieToast(
+            FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Could not open video'),
+              backgroundColor: const Color(0xFFEF4444),
             ),
           );
         }
@@ -32,10 +34,11 @@ class VideoCard extends StatelessWidget {
     } catch (e) {
       logger.e('Error launching video', error: e);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Error opening video'),
-            backgroundColor: Color(0xFFEF4444),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.error,
+            content: const Text('Error opening video'),
+            backgroundColor: const Color(0xFFEF4444),
           ),
         );
       }

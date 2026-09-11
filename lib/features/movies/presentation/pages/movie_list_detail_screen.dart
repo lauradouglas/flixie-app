@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -190,8 +191,10 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
       if (mounted) context.go('/movie-lists');
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to delete this list.')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Unable to delete this list.')),
         );
       }
     }
@@ -229,8 +232,10 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
       if (mounted) context.go('/movie-lists');
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to leave this list.')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Unable to leave this list.')),
         );
       }
     }
@@ -249,8 +254,10 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
       if (mounted) Navigator.of(context).pop();
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unable to remove @${member.username}.')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: Text('Unable to remove @${member.username}.')),
         );
       }
     }
@@ -285,8 +292,10 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
       if (mounted) Navigator.of(context).pop();
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unable to add @${selected.username}.')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: Text('Unable to add @${selected.username}.')),
         );
       }
     }
@@ -503,7 +512,8 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                     SliverPadding(
                       padding: const EdgeInsets.fromLTRB(16, 6, 16, 120),
                       sliver: SliverGrid(
-                        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                        gridDelegate:
+                            const SliverGridDelegateWithMaxCrossAxisExtent(
                           maxCrossAxisExtent: 190,
                           // Each row deliberately reserves enough room for the
                           // two-line contributor/date attribution. Grid tiles
@@ -648,8 +658,9 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
           : analytics.showRemovedFromList());
     }
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+    ScaffoldMessenger.of(context).showFlixieToast(
+      FlixieToast(
+        type: FlixieToastType.error,
         content: Text(
           ok
               ? 'Removed from list'
@@ -846,7 +857,8 @@ class _AddMovieToListSheetState extends State<_AddMovieToListSheet> {
     if (ok) {
       final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop(true);
-      messenger.showSnackBar(SnackBar(content: Text('Added ${movie.name}')));
+      messenger.showFlixieToast(FlixieToast(
+          type: FlixieToastType.success, content: Text('Added ${movie.name}')));
     } else {
       setState(() {
         _error = provider.error ?? 'Unable to add movie.';
@@ -1328,7 +1340,7 @@ class _ListHeader extends StatelessWidget {
                                   child: Text(
                                     owner == null
                                         ? 'Loading creator…'
-                                        : 'Created by @${owner!.username} · ${_visibilityLabel(membership?.visibility)}',
+                                        : '@${owner!.username} · ${_visibilityLabel(membership?.visibility)}',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
@@ -1372,7 +1384,7 @@ class _ListHeader extends StatelessWidget {
                               child: Text(
                                 owner == null
                                     ? 'Loading owner…'
-                                    : 'Created by @${owner!.username} · ${_visibilityLabel(membership?.visibility)}',
+                                    : '@${owner!.username} · ${_visibilityLabel(membership?.visibility)}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(

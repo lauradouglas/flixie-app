@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -26,35 +27,20 @@ void showFavouriteLimitPrompt(
   final messenger = ScaffoldMessenger.of(context);
   final label = type == FavouriteLimitType.movie ? 'movies' : 'shows';
   messenger.hideCurrentSnackBar();
-  messenger.showSnackBar(
-    SnackBar(
+  messenger.showFlixieToast(
+    FlixieToast(
+      type: FlixieToastType.warning,
       behavior: SnackBarBehavior.floating,
       duration: const Duration(seconds: 6),
-      content: Row(
-        children: [
-          const Icon(Icons.favorite_rounded,
-              color: FlixieColors.tertiary, size: 19),
-          const SizedBox(width: 9),
-          Expanded(child: Text('You already have 25 favourite $label.')),
-          const SizedBox(width: 8),
-          TextButton(
-            style: TextButton.styleFrom(
-              foregroundColor: FlixieColors.white,
-              backgroundColor: FlixieColors.primary,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              minimumSize: const Size(0, 38),
-              textStyle: const TextStyle(fontWeight: FontWeight.w800),
-            ),
-            onPressed: () async {
-              messenger.hideCurrentSnackBar();
-              final removed =
-                  await showFavouriteManagerSheet(context, type: type);
-              if (removed && context.mounted) await onSpaceMade?.call();
-            },
-            child: const Text('Manage'),
-          ),
-        ],
-      ),
+      content: Text('You already have 25 favourite $label.'),
+      action: SnackBarAction(
+          label: 'Manage',
+          onPressed: () async {
+            if (!context.mounted) return;
+            final removed =
+                await showFavouriteManagerSheet(context, type: type);
+            if (removed && context.mounted) await onSpaceMade?.call();
+          }),
     ),
   );
 }
@@ -104,8 +90,9 @@ Future<bool> showFavouriteManagerSheet(
   }
   auth.markActivityChanged();
 
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
+  ScaffoldMessenger.of(context).showFlixieToast(
+    FlixieToast(
+      type: FlixieToastType.success,
       content: Text(
         removedIds.length == 1
             ? '1 favourite removed'

@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -14,6 +15,7 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
+import 'package:flixie_app/core/widgets/flixie_segmented_control.dart';
 import 'package:flixie_app/core/calendar/watch_calendar_service.dart';
 import 'package:flixie_app/core/reviews/app_review_service.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_sheet.dart';
@@ -21,19 +23,16 @@ import 'package:flixie_app/features/movies/presentation/widgets/watch_request_sh
 import 'package:flixie_app/features/movies/data/movie_service.dart';
 import 'package:flixie_app/features/movies/data/search_service.dart';
 import 'package:flixie_app/features/authentication/presentation/pages/auth_ui.dart';
-import 'package:flixie_app/features/social/presentation/widgets/group_watch_requests_overview.dart';
+import 'package:flixie_app/features/watch_plans/presentation/pages/group_watch_plan_v2_screen.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
-import 'package:flixie_app/core/analytics/detail_source.dart';
 import 'package:flixie_app/features/sharing/models/share_card_data.dart';
 import 'package:flixie_app/features/sharing/presentation/share_card_sheet.dart';
 import 'package:flixie_app/core/navigation/tab_refresh_controller.dart';
 import 'package:flixie_app/features/watch_plans/presentation/utils/watch_plan_display_state.dart';
 import 'package:flixie_app/features/watch_plans/presentation/utils/watch_plan_formatters.dart';
 import 'package:flixie_app/features/watch_plans/presentation/utils/watch_plan_section_builder.dart';
-import 'package:flixie_app/features/watch_plans/presentation/sheets/watch_plan_candidate_choices_sheet.dart';
-import 'package:flixie_app/features/watch_plans/presentation/sheets/watch_plan_location_sheet.dart';
 import 'package:flixie_app/features/watch_plans/presentation/sheets/watch_plan_schedule_sheet.dart';
-import 'package:flixie_app/features/watch_plans/presentation/widgets/friend_plan/friend_watch_plan_card.dart';
+import 'package:flixie_app/features/watch_plans/presentation/widgets/friend_plan/friend_watch_plan_flow.dart';
 import 'package:flixie_app/features/watch_plans/presentation/widgets/friend_plan/friend_watch_plan_types.dart';
 
 enum _RequestAudience { friends, groups }
@@ -116,7 +115,8 @@ class _WatchRequestDetailScreenState extends State<WatchRequestDetailScreen> {
   }
 }
 
-class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
+class _WatchRequestsScreenState extends State<WatchRequestsScreen>
+    with WidgetsBindingObserver {
   final _searchController = TextEditingController();
 
   List<WatchRequest> _all = [];
@@ -129,8 +129,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
   bool _loadingGroups = true;
   int _groupActiveCount = 0;
   _RequestAudience _audience = _RequestAudience.friends;
-  bool _showSearch = false;
-  final Map<String, FriendAcceptanceScheduleDraft> _acceptScheduleDrafts = {};
+  final bool _showSearch = false;
   final Map<String, Set<String>> _candidateChoiceDrafts = {};
   final Set<String> _dirtyCandidateChoiceDraftIds = <String>{};
   Set<String> _closedPlanIds = <String>{};
@@ -138,6 +137,9 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    TabRefreshController.social.addListener(_refreshCurrentPlan);
+    TabRefreshController.watchPlans.addListener(_refreshCurrentPlan);
     final auth = context.read<AuthProvider>();
     _groups = auth.cachedGroups ?? [];
     _loadingGroups = _groups.isEmpty;
@@ -162,6 +164,29 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     _searchController.addListener(_applyFilter);
   }
 
+  void _refreshCurrentPlan() {
+    if (!mounted) return;
+    final requestId = widget.initialRequestId;
+    if (requestId != null && requestId.isNotEmpty) {
+      _loadFocusedRequest(requestId);
+    } else {
+      _load();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshCurrentPlan();
+  }
+
+  @override
+  void didUpdateWidget(covariant WatchRequestsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialRequestId != widget.initialRequestId) {
+      _refreshCurrentPlan();
+    }
+  }
+
   Future<void> _loadFocusedRequest(String requestId) async {
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (userId == null || userId.isEmpty) return;
@@ -170,7 +195,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         watchRequestId: requestId,
         userId: userId,
       );
-      if (!mounted) return;
+      if (!mounted || widget.initialRequestId != requestId) return;
       setState(() {
         _all = [state.request];
         _loading = false;
@@ -187,13 +212,33 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
       }
       auth.updateCachedWatchRequests(replaced);
       _applyFilter();
+      await _syncFocusedReminder(state.request);
     } catch (error) {
       logger.w('[WatchRequestsScreen] focused state load failed: $error');
-      if (!mounted) return;
+      if (!mounted || widget.initialRequestId != requestId) return;
       // Preserve the normal list fallback for legacy links or transient
       // state-endpoint failures, but do not leave a detail page loading.
       await _load(showSpinner: true);
     }
+  }
+
+  Future<void> _syncFocusedReminder(WatchRequest request) async {
+    final scheduledFor = request.scheduledFor;
+    if (request.isTerminal ||
+        request.normalizedScheduleStatus != 'AGREED' ||
+        scheduledFor == null ||
+        !scheduledFor.isAfter(DateTime.now())) {
+      return;
+    }
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (userId == null) return;
+    await PushNotificationService.scheduleWatchPlanReminders(
+      planId: request.id,
+      scheduledFor: scheduledFor,
+      title: request.watchPlanTitle,
+      withName: request.otherUser(userId)?.username ?? 'your friend',
+      deepLink: '/watch-requests/${request.id}',
+    );
   }
 
   Future<void> _loadClosedPlans() async {
@@ -247,6 +292,9 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    TabRefreshController.social.removeListener(_refreshCurrentPlan);
+    TabRefreshController.watchPlans.removeListener(_refreshCurrentPlan);
     _searchController.dispose();
     super.dispose();
   }
@@ -321,7 +369,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     }
   }
 
-  Future<void> _startNewWatchPlan() async {
+  Future<void> _startNewWatchPlan({String? initialFriendId}) async {
     final auth = context.read<AuthProvider>();
     final userId = auth.dbUser?.id;
     if (userId == null || userId.isEmpty) return;
@@ -362,6 +410,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         requesterId: userId,
         friends: auth.cachedFriends?.friendships ?? const [],
         initialGroupMode: creatingGroupPlan,
+        initialFriendId: initialFriendId,
         onSuccess: () {
           if (!mounted) return;
           _load();
@@ -374,18 +423,20 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
           // refreshing the direct-plan list.
           TabRefreshController.requestSocialRefresh();
           TabRefreshController.requestHomeRefresh();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Watch Plan sent'),
+          ScaffoldMessenger.of(context).showFlixieToast(
+            FlixieToast(
+              type: FlixieToastType.success,
+              content: const Text('Watch Plan sent'),
               backgroundColor: FlixieColors.surfaceElevated,
             ),
           );
         },
         onError: () {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Could not send the Watch Plan'),
+          ScaffoldMessenger.of(context).showFlixieToast(
+            FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Could not send the Watch Plan'),
               backgroundColor: FlixieColors.danger,
             ),
           );
@@ -432,8 +483,6 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
 
   DateTime _parseDate(String? iso) =>
       DateTime.tryParse(iso ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
-
-  String _formatDate(String? iso) => formatWatchPlanDate(iso);
 
   String _formatFriendlyDateTime(DateTime? value) =>
       formatWatchPlanDateTime(value);
@@ -510,8 +559,10 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
           _filtered.removeWhere((item) => item.id == request.id);
         });
         auth.updateCachedWatchRequests(_all);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Watch Plan closed')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.info,
+              content: const Text('Watch Plan closed')),
         );
         if (widget.initialRequestId?.isNotEmpty == true) {
           if (context.canPop()) {
@@ -522,9 +573,10 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         }
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not delete the Watch Plan'),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.error,
+            content: const Text('Could not delete the Watch Plan'),
             backgroundColor: FlixieColors.danger,
           ),
         );
@@ -566,8 +618,10 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
       _closedPlanIds.add(request.id);
       _filtered.removeWhere((item) => item.id == request.id);
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('You’re no longer attending this plan')),
+    ScaffoldMessenger.of(context).showFlixieToast(
+      FlixieToast(
+          type: FlixieToastType.info,
+          content: const Text('You’re no longer attending this plan')),
     );
     if (widget.initialRequestId?.isNotEmpty == true) {
       if (context.canPop()) {
@@ -614,8 +668,9 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         }
         await _load();
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.success,
             content: Text(_responseSuccessMessage(response)),
             backgroundColor: FlixieColors.surfaceElevated,
           ),
@@ -623,8 +678,9 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         succeeded = true;
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.error,
             content: Text(_responseFailureMessage(response)),
             backgroundColor: FlixieColors.danger,
           ),
@@ -632,30 +688,6 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
       }
     });
     return succeeded;
-  }
-
-  Future<void> _acceptWithOptionalSchedule(WatchRequest request) async {
-    final scheduleDraft = _acceptScheduleDrafts[request.id];
-    final accepted = await _respond(request, 'ACCEPTED');
-    if (accepted && scheduleDraft != null && mounted) {
-      await _submitScheduleProposal(request, scheduleDraft);
-      if (mounted) setState(() => _acceptScheduleDrafts.remove(request.id));
-    }
-  }
-
-  Future<void> _chooseAcceptanceSchedule(WatchRequest request) async {
-    final selected = await _showScheduleProposalSheet(
-      initial: _acceptScheduleDrafts[request.id]?.proposedFor,
-      initialLocation: _acceptScheduleDrafts[request.id]?.location,
-    );
-    if (!mounted || selected == null) return;
-    setState(() {
-      _acceptScheduleDrafts[request.id] = FriendAcceptanceScheduleDraft(
-        proposedFor: selected.proposedFor,
-        message: selected.message,
-        location: selected.location,
-      );
-    });
   }
 
   Future<void> _suggestSchedule(WatchRequest request,
@@ -709,24 +741,11 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
           location: selected.location,
         );
         _replaceRequest(state.request);
-        if (selected.message == null) {
-          await PushNotificationService.scheduleWatchPlanReminders(
-            planId: state.request.id,
-            scheduledFor: selected.proposedFor,
-            title: state.request.watchPlanTitle,
-            withName: state.request.participants
-                    .map((participant) => participant.user)
-                    .whereType<WatchRequestUser>()
-                    .where((participant) => participant.id != userId)
-                    .firstOrNull
-                    ?.username ??
-                'your friend',
-            deepLink: '/watch-requests/${state.request.id}',
-          );
-        }
+        await _refreshRequestState(state.request, userId);
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.info,
             content: Text(request.scheduledFor == null
                 ? 'Suggested ${_formatFriendlyDateTime(selected.proposedFor)}'
                 : 'New time proposed - the current plan stays in place until they agree'),
@@ -735,51 +754,13 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         );
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to schedule watch. Please try again.'),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.error,
+            content: const Text('Failed to schedule watch. Please try again.'),
             backgroundColor: FlixieColors.danger,
           ),
         );
-      }
-    });
-  }
-
-  Future<void> _editLocation(WatchRequest request) async {
-    final userId = context.read<AuthProvider>().dbUser?.id;
-    if (userId == null || userId.isEmpty) return;
-    final location = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      useRootNavigator: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => WatchPlanLocationSheet(
-        initialLocation: request.location,
-      ),
-    );
-    if (!mounted || location == null || location.isEmpty) return;
-
-    await _withRequestAction(request, FriendWatchPlanAction.scheduling,
-        () async {
-      try {
-        final updated = await RequestService.updateWatchRequestLocation(
-          watchRequestId: request.id,
-          userId: userId,
-          location: location,
-        );
-        _replaceRequest(updated);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Location set to $location')),
-          );
-        }
-      } catch (_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not update the location')),
-          );
-        }
       }
     });
   }
@@ -795,9 +776,11 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     if (decision == 'accepted' &&
         proposal.proposedFor != null &&
         !proposal.proposedFor!.toLocal().isAfter(DateTime.now())) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('That proposed time has passed. Suggest a new time.'),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+          type: FlixieToastType.warning,
+          content:
+              const Text('That proposed time has passed. Suggest a new time.'),
           backgroundColor: FlixieColors.danger,
         ),
       );
@@ -814,6 +797,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
           decision: decision,
         );
         _replaceRequest(state.request);
+        await _refreshRequestState(state.request, userId);
         final agreedTime = state.request.scheduledFor ?? proposal.proposedFor;
         if (decision == 'accepted' && agreedTime != null) {
           await analytics.watchPlanScheduled(
@@ -857,8 +841,9 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
           }
         }
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.success,
             content: Text(decision == 'accepted'
                 ? 'Watch time agreed'
                 : request.scheduledFor != null
@@ -869,9 +854,11 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         );
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to update proposed time. Please try again.'),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.error,
+            content:
+                const Text('Failed to update proposed time. Please try again.'),
             backgroundColor: FlixieColors.danger,
           ),
         );
@@ -1039,6 +1026,8 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useRootNavigator: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (_) => RewatchLogSheet(
         showReviewOption: false,
@@ -1125,9 +1114,10 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
       ),
     );
     if (!mounted || !saved) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Watch entry saved to your plan'),
+    ScaffoldMessenger.of(context).showFlixieToast(
+      FlixieToast(
+        type: FlixieToastType.success,
+        content: const Text('Watch entry saved to your plan'),
         backgroundColor: FlixieColors.surfaceElevated,
       ),
     );
@@ -1197,8 +1187,10 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         });
         auth.updateCachedWatchRequests(_all);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Watch plan cancelled for everyone')),
+          ScaffoldMessenger.of(context).showFlixieToast(
+            FlixieToast(
+                type: FlixieToastType.success,
+                content: const Text('Watch plan cancelled for everyone')),
           );
           if (widget.initialRequestId?.isNotEmpty == true) {
             if (context.canPop()) {
@@ -1210,9 +1202,10 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         }
       } catch (_) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Could not cancel the watch plan'),
+          ScaffoldMessenger.of(context).showFlixieToast(
+            FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Could not cancel the watch plan'),
               backgroundColor: FlixieColors.danger,
             ),
           );
@@ -1256,15 +1249,35 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
                 ),
               ),
               if (_audience == _RequestAudience.friends) _buildFriendFilters(),
+              if (_audience == _RequestAudience.friends && !isFocused)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _startNewWatchPlan,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Make a Watch Plan'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: FlixieColors.primary,
+                        foregroundColor: Colors.black,
+                        minimumSize: const Size.fromHeight(44),
+                      ),
+                    ),
+                  ),
+                ),
               Expanded(
                 child: _audience == _RequestAudience.friends
                     ? directBody
                     : _loadingGroups
                         ? const Center(child: CircularProgressIndicator())
-                        : GroupWatchRequestsOverview(
-                            groups: _groups,
-                            currentUserId:
-                                context.read<AuthProvider>().dbUser?.id ?? '',
+                        : GroupWatchPlanV2Screen(
+                            embedded: true,
+                            onActiveCountChanged: (count) {
+                              if (mounted && count != _groupActiveCount) {
+                                setState(() => _groupActiveCount = count);
+                              }
+                            },
                           ),
               ),
             ],
@@ -1525,45 +1538,32 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     bool isFocused,
     String myUserId,
   ) {
-    return FriendWatchPlanCard(
+    return FriendWatchPlanFlow(
       request: request,
       compact: !isFocused,
       myUserId: myUserId,
-      formattedDate: _formatDate(request.createdAt),
+      myAvatar: context.read<AuthProvider>().dbUser?.avatar,
       scheduledLabel: _formatFriendlyDateTime(request.scheduledFor),
-      busyAction: _busyActions[request.id],
-      acceptanceScheduleDraft: _acceptScheduleDrafts[request.id],
-      onMovieTap: request.movieId != null
-          ? () => context.push(movieDetailPath(
-                request.movieId!,
-                source: DetailSource.watchPlan,
-              ))
-          : null,
-      onAccept: () => _acceptWithOptionalSchedule(request),
-      onChooseAcceptanceSchedule: () => _chooseAcceptanceSchedule(request),
+      busy: _busyActions.containsKey(request.id),
+      onAccept: () => _respond(request, 'ACCEPTED'),
       onDecline: () => _respond(request, 'DECLINED'),
-      onOpen: isFocused
-          ? () => _refreshRequestState(request, myUserId)
-          : () => context.push('/watch-requests/${request.id}'),
-      onSuggestSchedule: () => _suggestSchedule(request),
-      onSuggestDifferentTime: () =>
+      onOpen: () => context.push('/watch-requests/${request.id}'),
+      onSuggestSchedule: () =>
           _suggestSchedule(request, initial: request.scheduledFor),
-      onEditLocation: () => _editLocation(request),
       onRespondToProposal: (proposal, decision) =>
           _respondToProposal(request, proposal, decision),
       onConfirmWatched: () => _confirmWatched(request),
-      onCancelPlan: () => _cancelPlan(request),
       onClosePlan: () => _closeWatchPlan(request),
+      onNewPlan: () =>
+          _startNewWatchPlan(initialFriendId: request.otherUser(myUserId)?.id),
+      onCancelPlan: () => _cancelPlan(request),
       candidateChoiceDraft: _candidateChoiceDraftFor(request, myUserId),
-      onToggleCandidateChoice: (candidateId) =>
-          _toggleCandidateChoice(request, myUserId, candidateId),
+      onToggleCandidateChoice: (id) =>
+          _toggleCandidateChoice(request, myUserId, id),
       onSaveCandidateChoices: () => _saveCandidateChoices(request, myUserId),
-      onViewMovies: () => _viewMovieChoices(request, myUserId),
       onAddCandidate: () => _addCandidate(request, myUserId),
-      onRemoveCandidate: (candidateId) =>
-          _removeCandidate(request, myUserId, candidateId),
-      onSelectCandidate: (candidateId) =>
-          _selectFinalCandidate(request, candidateId),
+      onRemoveCandidate: (id) => _removeCandidate(request, myUserId, id),
+      onSelectCandidate: (id) => _selectFinalCandidate(request, id),
       onChangeMovie: () => _reopenMovieChoices(request, myUserId),
       onNotThisTime: () => _markNotThisTime(request),
     );
@@ -1611,7 +1611,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     });
   }
 
-  Future<void> _saveCandidateChoices(
+  Future<bool> _saveCandidateChoices(
     WatchRequest request,
     String userId, {
     bool showSuccessToast = true,
@@ -1619,16 +1619,17 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     if (request.requesterId != userId &&
         !request.isAccepted &&
         !request.isScheduled) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Accept this Watch Plan before choosing movies.'),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+          type: FlixieToastType.warning,
+          content: const Text('Accept this Watch Plan before choosing movies.'),
           backgroundColor: FlixieColors.warning,
         ),
       );
-      return;
+      return false;
     }
+    var saved = false;
     final candidateIds = _candidateChoiceDraftFor(request, userId).toList();
-    if (candidateIds.isEmpty) return;
     await _withRequestAction(request, FriendWatchPlanAction.savingMovieChoices,
         () async {
       try {
@@ -1640,52 +1641,51 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         _candidateChoiceDrafts.remove(request.id);
         _dirtyCandidateChoiceDraftIds.remove(request.id);
         _replaceRequest(state.request);
+        saved = true;
         if (!mounted) return;
         if (showSuccessToast) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Movie choices saved'),
+          ScaffoldMessenger.of(context).showFlixieToast(
+            FlixieToast(
+              type: FlixieToastType.success,
+              content: const Text('Movie choices saved'),
               backgroundColor: FlixieColors.surfaceElevated,
             ),
           );
         }
       } catch (_) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not save movie choices. Please try again.'),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.error,
+            content: const Text('Couldn’t save your picks'),
+            action: SnackBarAction(
+                label: 'Retry',
+                onPressed: () {
+                  if (mounted && !_busyActions.containsKey(request.id)) {
+                    _saveCandidateChoices(
+                        _all.where((r) => r.id == request.id).firstOrNull ??
+                            request,
+                        userId);
+                  }
+                }),
             backgroundColor: FlixieColors.danger,
           ),
         );
       }
     });
+    return saved;
   }
 
-  Future<void> _viewMovieChoices(WatchRequest request, String userId) async {
-    final selected = await showModalBottomSheet<List<String>>(
+  Future<void> _addCandidate(WatchRequest request, String userId) async {
+    if (request.candidates.where((c) => c.addedByUserId == userId).length >=
+        3) {
+      return;
+    }
+    final movie = await showModalBottomSheet<MovieShort>(
       context: context,
       isScrollControlled: true,
       useRootNavigator: true,
       useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => WatchPlanCandidateChoicesSheet(
-        request: request,
-        userId: userId,
-      ),
-    );
-    if (!mounted || selected == null) return;
-    setState(() {
-      _candidateChoiceDrafts[request.id] = selected.toSet();
-      _dirtyCandidateChoiceDraftIds.add(request.id);
-    });
-    await _saveCandidateChoices(request, userId, showSuccessToast: false);
-  }
-
-  Future<void> _addCandidate(WatchRequest request, String userId) async {
-    if (request.candidates.length >= 5) return;
-    final movie = await showModalBottomSheet<MovieShort>(
-      context: context,
-      isScrollControlled: true,
       backgroundColor: FlixieColors.surface,
       builder: (_) => MovieSearchSheet(
         title: 'Add another option',
@@ -1734,14 +1734,16 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         _dirtyCandidateChoiceDraftIds.remove(request.id);
         _replaceRequest(state.request);
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Movie option removed'),
+        ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+          type: FlixieToastType.success,
+          content: const Text('Movie option removed'),
           backgroundColor: FlixieColors.surfaceElevated,
         ));
       } catch (_) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Could not remove that movie option.'),
+        ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+          type: FlixieToastType.error,
+          content: const Text('Could not remove that movie option.'),
           backgroundColor: FlixieColors.danger,
         ));
       }
@@ -1757,71 +1759,6 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
     final candidate =
         request.candidates.where((item) => item.id == candidateId).firstOrNull;
     if (candidate == null) return;
-    final confirmed = await showModalBottomSheet<bool>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => SafeArea(
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-          decoration: const BoxDecoration(
-            color: FlixieColors.surface,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: FlixieColors.medium,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 22),
-              const Text(
-                'Make this the final movie?',
-                style: TextStyle(
-                  color: FlixieColors.textPrimary,
-                  fontSize: 21,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${candidate.title ?? 'This movie'} will be locked in for this Watch Plan. Everyone will be notified.',
-                style: const TextStyle(
-                  color: FlixieColors.medium,
-                  fontSize: 15,
-                  height: 1.35,
-                ),
-              ),
-              const SizedBox(height: 22),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: () => Navigator.pop(sheetContext, true),
-                  icon: const Icon(Icons.lock_rounded),
-                  label: const Text('Make final choice'),
-                ),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: TextButton(
-                  onPressed: () => Navigator.pop(sheetContext, false),
-                  child: const Text('Cancel'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (!mounted || confirmed != true) return;
     await _withRequestAction(request, FriendWatchPlanAction.selectingMovie,
         () async {
       try {
@@ -1832,18 +1769,22 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         );
         _replaceRequest(state.request);
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                '${candidate.title ?? 'Movie'} chosen for this Watch Plan'),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.success,
+            content: Text(state.request.selectedCandidateId != null
+                ? '${candidate.title ?? 'Movie'} finalised'
+                : 'Suggested ${candidate.title ?? 'movie'} — waiting for your friend'),
             backgroundColor: FlixieColors.surfaceElevated,
           ),
         );
       } catch (_) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not choose this movie. Please try again.'),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.error,
+            content:
+                const Text('Could not choose this movie. Please try again.'),
             backgroundColor: FlixieColors.danger,
           ),
         );
@@ -1861,42 +1802,24 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen> {
         );
         _replaceRequest(state.request);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Movie choices reopened')),
+          ScaffoldMessenger.of(context).showFlixieToast(
+            FlixieToast(
+                type: FlixieToastType.success,
+                content: const Text('Movie choices reopened')),
           );
         }
       } catch (_) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Could not reopen movie choices.'),
+          ScaffoldMessenger.of(context).showFlixieToast(
+            FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Could not reopen movie choices.'),
               backgroundColor: FlixieColors.danger,
             ),
           );
         }
       }
     });
-  }
-
-  String _filterLabel(WatchPlanFilter f) {
-    switch (f) {
-      case WatchPlanFilter.active:
-        return 'Active';
-      case WatchPlanFilter.needsResponse:
-        return 'Needs reply ${_countFor(WatchPlanFilter.needsResponse)}';
-      case WatchPlanFilter.planning:
-        return 'Planning';
-      case WatchPlanFilter.scheduled:
-        return 'Upcoming ${_countFor(WatchPlanFilter.scheduled)}';
-      case WatchPlanFilter.completed:
-        return 'Past';
-      case WatchPlanFilter.declined:
-        return 'Declined';
-      case WatchPlanFilter.cancelled:
-        return 'Cancelled';
-      case WatchPlanFilter.expired:
-        return 'Expired';
-    }
   }
 
   int _countFor(WatchPlanFilter filter) {
@@ -1970,73 +1893,27 @@ class _AudienceSwitcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 46,
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: FlixieColors.tabBarBackgroundFocused,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: FlixieColors.primary.withValues(alpha: 0.28),
+    return FlixieSegmentedControl<_RequestAudience>(
+      value: selected,
+      onChanged: onChanged,
+      segments: [
+        FlixieSegment(
+          value: _RequestAudience.friends,
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            const Icon(Icons.group_outlined),
+            const SizedBox(width: 8),
+            Flexible(child: Text('Friends · $friendActiveCount')),
+          ]),
         ),
-      ),
-      child: Row(
-        children: [
-          _item(
-            _RequestAudience.friends,
-            'Friends',
-            Icons.group_outlined,
-            friendActiveCount,
-          ),
-          _item(
-            _RequestAudience.groups,
-            'Groups',
-            Icons.groups_2_outlined,
-            groupActiveCount,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _item(
-    _RequestAudience value,
-    String label,
-    IconData icon,
-    int activeCount,
-  ) {
-    final isSelected = selected == value;
-    return Expanded(
-      child: InkWell(
-        onTap: () => onChanged(value),
-        borderRadius: BorderRadius.circular(11),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          curve: Curves.easeOut,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: isSelected ? FlixieColors.primary : Colors.transparent,
-            borderRadius: BorderRadius.circular(11),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon,
-                  size: 18,
-                  color: isSelected ? Colors.white : FlixieColors.medium),
-              const SizedBox(width: 8),
-              Text(
-                '$label · $activeCount',
-                style: TextStyle(
-                  color: isSelected ? Colors.white : FlixieColors.medium,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
+        FlixieSegment(
+          value: _RequestAudience.groups,
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            const Icon(Icons.groups_2_outlined),
+            const SizedBox(width: 8),
+            Flexible(child: Text('Groups · $groupActiveCount')),
+          ]),
         ),
-      ),
+      ],
     );
   }
 }

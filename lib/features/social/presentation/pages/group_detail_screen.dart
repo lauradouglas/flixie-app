@@ -1,8 +1,8 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/models/group.dart';
 import 'package:flixie_app/models/group_member.dart';
 import 'package:flixie_app/models/group_watch_request.dart'
@@ -17,7 +17,7 @@ import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/features/social/presentation/widgets/group_detail_activity_tab.dart';
 import 'package:flixie_app/features/social/presentation/widgets/chat_tab.dart';
 import 'package:flixie_app/features/social/presentation/widgets/insights_tab.dart';
-import 'package:flixie_app/features/social/presentation/widgets/requests_tab.dart';
+import 'package:flixie_app/features/watch_plans/presentation/pages/group_watch_plan_v2_screen.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/models/movie_list.dart';
 
@@ -50,7 +50,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
   int _memberCount = 0;
   List<GroupMember> _groupMembers = [];
   List<GroupWatchRequest> _watchRequests = [];
-  List<ActivityListItem> _memberActivity = [];
   List<MovieList> _groupLists = [];
   String? _conversationId;
   // Set by _RequestsTab when it refreshes - overrides the initial computed count.
@@ -110,7 +109,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
     final requestCache = context.read<WatchRequestCache>();
     final cachedRequests = requestCache.forGroup(widget.groupId);
     setState(() {
-      _loadingGroup = true;
+      _loadingGroup = _group == null;
       _loadError = null;
       if (cachedRequests.isNotEmpty) _watchRequests = cachedRequests;
     });
@@ -121,8 +120,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
         requestCache
             .refreshGroup(widget.groupId)
             .catchError((_) => <GroupWatchRequest>[]),
-        GroupService.getGroupActivity(widget.groupId)
-            .catchError((_) => <ActivityListItem>[]),
         if (currentUserId != null)
           UserService.getMovieLists(currentUserId)
               .then((lists) => lists
@@ -140,8 +137,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
           _memberCount = members.where((m) => m.isAccepted).length;
           _groupMembers = members;
           _watchRequests = results[2] as List<GroupWatchRequest>;
-          _memberActivity = results[3] as List<ActivityListItem>;
-          _groupLists = results[4] as List<MovieList>;
+          _groupLists = results[3] as List<MovieList>;
           _loadingGroup = false;
         });
         // Resolve the Firestore conversationId once group + members are known.
@@ -376,27 +372,15 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                             groupId: widget.groupId,
                             conversationId: _conversationId,
                             initialRequests: _watchRequests,
-                            initialActivity: _memberActivity,
+                            initialActivity: const [],
                             groupLists: _groupLists,
                             onRefresh: _loadGroup,
                           ),
-                          GroupRequestsTab(
+                          GroupWatchPlanV2Screen(
                             groupId: widget.groupId,
                             groupName: _group?.name,
-                            conversationId: _conversationId,
-                            initialRequests: _watchRequests,
                             initialRequestId: widget.initialRequestId,
-                            currentUserId:
-                                context.read<AuthProvider>().dbUser?.id ?? '',
-                            isAdmin: () {
-                              final uid =
-                                  context.read<AuthProvider>().dbUser?.id;
-                              if (uid == null) return false;
-                              if (_group?.ownerId == uid) return true;
-                              return _groupMembers.any((m) =>
-                                  m.memberId == uid &&
-                                  (m.isAdmin || m.isOwner));
-                            }(),
+                            embedded: true,
                             onCountChanged: (count) {
                               if (mounted) {
                                 setState(() => _pendingCountOverride = count);
@@ -548,9 +532,10 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
             .where((group) => group.id != widget.groupId)
             .toList(growable: false));
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Group deleted permanently.'),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+          type: FlixieToastType.success,
+          content: const Text('Group deleted permanently.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -559,9 +544,10 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
       logger.e('Delete group error: $e');
       if (mounted) {
         setState(() => _deletingGroup = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.error,
+            content: const Text(
               'Could not delete the group. Nothing was removed. Please try again.',
             ),
             behavior: SnackBarBehavior.floating,

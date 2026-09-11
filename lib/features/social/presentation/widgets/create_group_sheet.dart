@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -84,8 +85,10 @@ class _CreateGroupSheetState extends State<CreateGroupSheet> {
     } catch (e) {
       logger.e('Create group error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to create group')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Failed to create group')),
         );
         setState(() => _inviting = false);
         return;

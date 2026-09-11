@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'dart:typed_data';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -29,33 +30,17 @@ Future<void> showShareCardSheet(
 void promptShareCard(BuildContext context, ShareCardData data) {
   final messenger = ScaffoldMessenger.of(context);
   messenger.hideCurrentSnackBar();
-  messenger.showSnackBar(
-    SnackBar(
+  messenger.showFlixieToast(
+    FlixieToast(
+      type: FlixieToastType.success,
       behavior: SnackBarBehavior.floating,
       duration: const Duration(seconds: 5),
-      content: Row(
-        children: [
-          const Icon(Icons.auto_awesome_rounded,
-              color: FlixieColors.tertiary, size: 19),
-          const SizedBox(width: 9),
-          const Expanded(child: Text('Saved! Want to share your take?')),
-          const SizedBox(width: 8),
-          TextButton(
-            style: TextButton.styleFrom(
-              foregroundColor: FlixieColors.white,
-              backgroundColor: FlixieColors.primary,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              minimumSize: const Size(0, 38),
-              textStyle: const TextStyle(fontWeight: FontWeight.w800),
-            ),
-            onPressed: () {
-              messenger.hideCurrentSnackBar();
-              showShareCardSheet(context, data);
-            },
-            child: const Text('Share'),
-          ),
-        ],
-      ),
+      content: const Text('Saved! Want to share your take?'),
+      action: SnackBarAction(
+          label: 'Share',
+          onPressed: () {
+            if (context.mounted) showShareCardSheet(context, data);
+          }),
     ),
   );
 }
@@ -156,8 +141,10 @@ class _ShareCardSheetState extends State<ShareCardSheet> {
         } else {
           await _exportService.save(bytes: bytes, data: widget.data);
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Share image saved to your photos')),
+            ScaffoldMessenger.of(context).showFlixieToast(
+              FlixieToast(
+                  type: FlixieToastType.success,
+                  content: const Text('Share image saved to your photos')),
             );
           }
         }

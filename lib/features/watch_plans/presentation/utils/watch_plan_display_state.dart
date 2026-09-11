@@ -72,6 +72,11 @@ class WatchPlanDisplayState {
     final isIncoming = request.requesterId != currentUserId &&
         (request.recipientId == currentUserId ||
             request.participantFor(currentUserId) != null);
+    if (request.isAccepted &&
+        request.proposedCandidateId != null &&
+        request.selectedCandidateId == null) {
+      return request.movieProposedById != currentUserId;
+    }
     final proposal = request.latestPendingProposal;
     final accepted = request.hasCurrentUserAccepted == true ||
         request.participantFor(currentUserId)?.response.toUpperCase() ==

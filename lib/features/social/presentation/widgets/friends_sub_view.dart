@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -82,8 +83,9 @@ class _FriendsSubViewState extends State<FriendsSubView> {
           ],
         );
         setState(() => _friendsData = updated);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.success,
               content: Text(
                   'Now friends with ${friendship.friendUser?.username ?? 'user'}')),
         );
@@ -98,8 +100,10 @@ class _FriendsSubViewState extends State<FriendsSubView> {
     } catch (e) {
       logger.e('Accept request error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to accept friend request')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Failed to accept friend request')),
         );
       }
     }
@@ -120,8 +124,10 @@ class _FriendsSubViewState extends State<FriendsSubView> {
     } catch (e) {
       logger.e('Decline request error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to decline friend request')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Failed to decline friend request')),
         );
       }
     }

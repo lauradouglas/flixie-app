@@ -5,6 +5,7 @@ import 'package:flixie_app/models/group.dart';
 import 'package:flixie_app/models/group_member.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_badges.dart';
 import 'package:flixie_app/features/social/presentation/widgets/group_avatar.dart';
 
 class GroupCard extends StatelessWidget {
@@ -86,7 +87,7 @@ class GroupCard extends StatelessWidget {
                         ),
                       if (members.isNotEmpty) ...[
                         const SizedBox(height: 7),
-                        _MemberAvatars(members: members),
+                        _MemberAvatars(members: members, totalCount: count),
                       ],
                     ],
                   ),
@@ -135,41 +136,84 @@ class GroupCard extends StatelessWidget {
 }
 
 class _MemberAvatars extends StatelessWidget {
-  const _MemberAvatars({required this.members});
+  const _MemberAvatars({required this.members, this.totalCount});
 
   final List<GroupMember> members;
+  final int? totalCount;
+
+  Widget _avatar(GroupMember member) => SpecialAvatarFrame(
+        badges: member.profileBadges,
+        frameWidth: 3,
+        child: ProfileAvatarView(
+          avatar: member.avatar,
+          fallbackText: member.initials ??
+              (member.username?.isNotEmpty == true
+                  ? member.username![0].toUpperCase()
+                  : '?'),
+          fallbackColor: FlixieColors.primary,
+          size: 26,
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
-    final shown = members.where((member) => member.isAccepted).take(5).toList();
-    return SizedBox(
-      height: 34,
-      child: Stack(
-        children: [
-          for (var index = 0; index < shown.length; index++)
-            Positioned(
-              left: index * 20,
+    final accepted = members.where((member) => member.isAccepted).toList();
+    final total =
+        (totalCount ?? accepted.length).clamp(accepted.length, 1000000000);
+    if (total <= 3) {
+      return Wrap(
+          spacing: 8, runSpacing: 8, children: accepted.map(_avatar).toList());
+    }
+    return LayoutBuilder(builder: (context, constraints) {
+      const diameter = 32.0;
+      const step = 24.0;
+      // Reserve a full-size overflow circle; reduce the preview on narrow cards.
+      final slots = ((constraints.maxWidth - diameter) / step).floor() + 1;
+      var shownCount = accepted.length.clamp(0, 5);
+      if (total > shownCount) {
+        shownCount = shownCount.clamp(0, (slots - 1).clamp(0, 5));
+      } else if (shownCount > slots) {
+        shownCount = (slots - 1).clamp(0, shownCount);
+      }
+      final remaining = total - shownCount;
+      final children = <Widget>[
+        for (final member in accepted.take(shownCount)) _avatar(member),
+        if (remaining > 0)
+          Tooltip(
+            message: '$remaining more members',
+            child: Semantics(
+              label: '$remaining more members',
               child: Container(
-                padding: const EdgeInsets.all(1),
+                width: diameter,
+                height: diameter,
+                alignment: Alignment.center,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: FlixieColors.primary, width: 1.2),
+                  color: FlixieColors.tabBarBackgroundFocused,
+                  border: Border.all(color: FlixieColors.primary, width: 2),
                 ),
-                child: ProfileAvatarView(
-                  avatar: shown[index].avatar,
-                  fallbackText: shown[index].initials ??
-                      (shown[index].username?.isNotEmpty == true
-                          ? shown[index].username![0].toUpperCase()
-                          : '?'),
-                  fallbackColor: FlixieColors.primary,
-                  size: 26,
-                  profileBadges: shown[index].profileBadges,
-                ),
+                child: Padding(
+                    padding: const EdgeInsets.all(3),
+                    child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text('+$remaining',
+                            style: const TextStyle(
+                                color: FlixieColors.primaryText,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800)))),
               ),
             ),
-        ],
-      ),
-    );
+          ),
+      ];
+      return SizedBox(
+        width: children.isEmpty ? 0 : diameter + step * (children.length - 1),
+        height: diameter,
+        child: Stack(clipBehavior: Clip.none, children: [
+          for (var index = 0; index < children.length; index++)
+            Positioned(left: index * step, top: 0, child: children[index]),
+        ]),
+      );
+    });
   }
 }
 

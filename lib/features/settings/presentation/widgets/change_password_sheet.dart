@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -51,9 +52,10 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
     }
 
     Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Password updated successfully.'),
+    ScaffoldMessenger.of(context).showFlixieToast(
+      FlixieToast(
+        type: FlixieToastType.success,
+        content: const Text('Password updated successfully.'),
         backgroundColor: FlixieColors.surfaceElevated,
       ),
     );

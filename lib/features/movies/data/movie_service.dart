@@ -19,22 +19,31 @@ class MovieService {
 
   final _cache = MovieCacheService();
 
+  // A refresh must not join a request started before cache eviction.
+  Future<dynamic> _get(String path, {Map<String, String>? queryParams}) =>
+      ApiClient.get(path,
+          queryParams: queryParams,
+          requestScope: 'movie-metadata:${_cache.revision}');
+
   /// Update a movie in the cache with new data.
   void updateCachedMovie(Movie movie) {
     _cache.cacheMovie(movie);
   }
 
   Future<Movie> getMovieById(int id, {String? userId}) async {
+    final revision = _cache.revision;
     final cachedMovie = _cache.getMovie(id);
     if (cachedMovie != null) return cachedMovie;
 
     apiLogger.d('Fetching movie $id.');
-    final queryParams = userId != null ? {'userId': userId} : null;
+    // Shared cache contains metadata only; viewer data loads separately.
+    final queryParams = {'includeReviews': 'false'};
     try {
-      final data =
-          await ApiClient.get('/movies/id/$id', queryParams: queryParams);
+      final data = await _get('/movies/id/$id', queryParams: queryParams);
       final movie = Movie.fromJson(data as Map<String, dynamic>);
-      _cache.cacheMovie(movie);
+      if (revision == _cache.revision) {
+        _cache.cacheMovie(movie);
+      }
       return movie;
     } on ApiException catch (e) {
       // On a DATABASE_ERROR serve any stale cached copy so the UI doesn't
@@ -53,7 +62,7 @@ class MovieService {
   }
 
   Future<MovieImages> getMovieImages(int id) async {
-    final data = await ApiClient.get('/movies/$id/images');
+    final data = await _get('/movies/$id/images');
     return MovieImages.fromJson(data as Map<String, dynamic>);
   }
 
@@ -86,7 +95,9 @@ class MovieService {
           recommended: data['recommended'] as bool?,
         );
       }
-    } catch (_) {}
+    } catch (_) {
+      rethrow;
+    }
     return (rating: null, recommended: null);
   }
 
@@ -119,31 +130,38 @@ class MovieService {
   }
 
   Future<List<SimilarMovie>> getMovieRecommendations(int movieId) async {
+    final revision = _cache.revision;
     final cachedRecommendations = _cache.getRecommendations(movieId);
     if (cachedRecommendations != null) return cachedRecommendations;
 
     apiLogger.d('Fetching recommendations for movie $movieId.');
-    final data = await ApiClient.get('/movies/$movieId/recommendations');
+    final data = await _get('/movies/$movieId/recommendations');
     final recommendations = (data as List<dynamic>)
         .map((e) => SimilarMovie.fromJson(e as Map<String, dynamic>))
         .toList();
-    _cache.cacheRecommendations(movieId, recommendations);
+    if (revision == _cache.revision) {
+      _cache.cacheRecommendations(movieId, recommendations);
+    }
     return recommendations;
   }
 
   Future<MovieCredits> getMovieCredits(int movieId) async {
+    final revision = _cache.revision;
     final cachedCredits = _cache.getCredits(movieId);
     if (cachedCredits != null) return cachedCredits;
 
     apiLogger.d('Fetching credits for movie $movieId.');
-    final data = await ApiClient.get('/movies/$movieId/credits');
+    final data = await _get('/movies/$movieId/credits');
     final credits = MovieCredits.fromJson(data as Map<String, dynamic>);
-    _cache.cacheCredits(movieId, credits);
+    if (revision == _cache.revision) {
+      _cache.cacheCredits(movieId, credits);
+    }
     return credits;
   }
 
   Future<List<WatchProvider>> getMovieWatchProviders(
       int movieId, String region) async {
+    final revision = _cache.revision;
     final cached = _cache.getWatchProviders(movieId, region);
     if (cached != null) return cached;
 
@@ -177,28 +195,31 @@ class MovieService {
     }
 
     try {
-      final detailData =
-          await ApiClient.get('/movies/$movieId/$region/watch/providers');
+      final detailData = await _get('/movies/$movieId/$region/watch/providers');
       final providers = parseProviders(detailData);
-      _cache.cacheWatchProviders(movieId, region, providers);
+      if (revision == _cache.revision) {
+        _cache.cacheWatchProviders(movieId, region, providers);
+      }
       return providers;
     } catch (detailError) {
       apiLogger.w(
         'Detail watch-provider endpoint failed for movie $movieId/$region: $detailError. Trying cache endpoint.',
       );
-      final cacheData = await ApiClient.get(
+      final cacheData = await _get(
         '/movies/$movieId/watch-providers',
         queryParams: {'region': region},
       );
       final providers = parseProviders(cacheData);
-      _cache.cacheWatchProviders(movieId, region, providers);
+      if (revision == _cache.revision) {
+        _cache.cacheWatchProviders(movieId, region, providers);
+      }
       return providers;
     }
   }
 
   Future<List<Review>> getMovieReviews(int movieId, {String? userId}) async {
     apiLogger.d('Fetching reviews for movie $movieId from API');
-    final data = await ApiClient.get('/users/MOVIE/$movieId/reviews',
+    final data = await _get('/users/MOVIE/$movieId/reviews',
         queryParams: userId != null ? {'userId': userId} : null);
     return (data as List<dynamic>)
         .map((e) => Review.fromJson(e as Map<String, dynamic>))
@@ -207,7 +228,7 @@ class MovieService {
 
   Future<List<TopRatedMovie>> getTopRatedThisWeek({int limit = 10}) async {
     apiLogger.d('Fetching top rated movies this week');
-    final data = await ApiClient.get('/movies/top_rated/this_week',
+    final data = await _get('/movies/top_rated/this_week',
         queryParams: {'limit': '$limit'});
     return (data as List<dynamic>)
         .map((e) => TopRatedMovie.fromJson(e as Map<String, dynamic>))
@@ -217,7 +238,7 @@ class MovieService {
   Future<List<MovieFriendActivity>> getFriendsMovieActivity(
       int movieId, String userId) async {
     apiLogger.d('Fetching friends activity for movie $movieId');
-    final data = await ApiClient.get('/movies/id/$movieId/friends-activity',
+    final data = await _get('/movies/id/$movieId/friends-activity',
         queryParams: {'userId': userId});
     final activities = (data as List<dynamic>)
         .where(
@@ -229,8 +250,8 @@ class MovieService {
 
   Future<List<MovieShort>> getTopRatedMovies({String region = 'US'}) async {
     apiLogger.d('Fetching top rated movies for region $region');
-    final data = await ApiClient.get('/movies/top_rated',
-        queryParams: {'region': region});
+    final data =
+        await _get('/movies/top_rated', queryParams: {'region': region});
     return (data as List<dynamic>)
         .map((e) => MovieShort.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -238,8 +259,8 @@ class MovieService {
 
   Future<List<MovieShort>> getNowPlayingMovies({String region = 'US'}) async {
     apiLogger.d('Fetching now playing movies for region $region');
-    final data = await ApiClient.get('/movies/now_playing',
-        queryParams: {'region': region});
+    final data =
+        await _get('/movies/now_playing', queryParams: {'region': region});
     return (data as List<dynamic>)
         .map((e) => MovieShort.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -248,13 +269,48 @@ class MovieService {
   Future<FriendRecommendationResponse> getFriendRecommendation(
       int movieId) async {
     apiLogger.d('Fetching friend recommendation for movie $movieId');
-    final data = await ApiClient.get('/movies/$movieId/friend-recommendation');
+    final data = await _get('/movies/$movieId/friend-recommendation');
     return FriendRecommendationResponse.fromJson(data as Map<String, dynamic>);
+  }
+
+  /// Bounded sequential batches; failed chunks do not discard successful ones.
+  /// No cache: every call reads current friendships and recommendations.
+  Future<Map<int, FriendRecommendationResponse>> getFriendRecommendations(
+      Iterable<int> movieIds,
+      {bool Function()? isCurrent}) async {
+    final ids = movieIds.where((id) => id > 0).toSet().toList();
+    final results = <int, FriendRecommendationResponse>{};
+    for (var start = 0; start < ids.length; start += 25) {
+      if (isCurrent != null && !isCurrent()) break;
+      final chunk = ids.skip(start).take(25).toList();
+      try {
+        final data = await ApiClient.post('/movies/friend-recommendations',
+            body: {'movieIds': chunk});
+        for (final item in data['items'] as List) {
+          try {
+            final id = int.parse(item['movieId'].toString());
+            if (chunk.contains(id)) {
+              results[id] = FriendRecommendationResponse.fromJson(
+                  Map<String, dynamic>.from(item as Map));
+            }
+          } catch (_) {
+            // A malformed item must not hide other films in this batch.
+          }
+        }
+      } catch (error) {
+        if (error is ApiException &&
+            (error.statusCode == 401 || error.statusCode == 403)) {
+          rethrow;
+        }
+        apiLogger.w('Friend recommendation batch failed: $error');
+      }
+    }
+    return results;
   }
 
   Future<FriendSummaryResponse> getFriendSummary(int movieId) async {
     apiLogger.d('Fetching friend summary for movie $movieId');
-    final data = await ApiClient.get('/movies/$movieId/friend-summary');
+    final data = await _get('/movies/$movieId/friend-summary');
     return FriendSummaryResponse.fromJson(data as Map<String, dynamic>);
   }
 

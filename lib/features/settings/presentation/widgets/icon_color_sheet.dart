@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -67,9 +68,10 @@ class _IconColorSheetState extends State<IconColorSheet> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _savingId = null);
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Failed to update colour. Please try again.'),
+      messenger.showFlixieToast(
+        FlixieToast(
+          type: FlixieToastType.error,
+          content: const Text('Failed to update colour. Please try again.'),
           backgroundColor: FlixieColors.danger,
         ),
       );

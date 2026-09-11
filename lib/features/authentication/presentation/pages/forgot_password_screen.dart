@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -31,8 +32,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     if (success) {
       setState(() => _emailSent = true);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+          type: FlixieToastType.error,
           content: Text(auth.errorMessage ?? 'Could not send reset email.'),
           backgroundColor: FlixieColors.danger,
         ),

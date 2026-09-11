@@ -217,6 +217,7 @@ class WatchConfirmation {
   final String userId;
   final bool watched;
   final int? rating;
+  final bool? recommended;
   final String? reviewText;
   final String? createdAt;
 
@@ -225,6 +226,7 @@ class WatchConfirmation {
     required this.userId,
     required this.watched,
     this.rating,
+    this.recommended,
     this.reviewText,
     this.createdAt,
   });
@@ -235,6 +237,7 @@ class WatchConfirmation {
       userId: json['userId']?.toString() ?? '',
       watched: _boolValue(json['watched']) ?? false,
       rating: _intValue(json['rating']),
+      recommended: _boolValue(json['recommended']),
       reviewText: json['reviewText'] as String?,
       createdAt: json['createdAt'] as String?,
     );
@@ -352,6 +355,8 @@ class WatchRequest {
   final List<WatchConfirmation> watchConfirmations;
   final List<WatchPlanCandidate> candidates;
   final String? selectedCandidateId;
+  final String? proposedCandidateId;
+  final String? movieProposedById;
   final bool? needsWatchConfirmation;
   final bool? hasCurrentUserLoggedWatch;
   final DateTime? acceptedAt;
@@ -395,6 +400,8 @@ class WatchRequest {
     this.watchConfirmations = const [],
     this.candidates = const [],
     this.selectedCandidateId,
+    this.proposedCandidateId,
+    this.movieProposedById,
     this.needsWatchConfirmation,
     this.hasCurrentUserLoggedWatch,
     this.acceptedAt,
@@ -469,6 +476,8 @@ class WatchRequest {
           .toList(),
       candidates: candidates,
       selectedCandidateId: selectedCandidateId,
+      proposedCandidateId: json['proposedCandidateId']?.toString(),
+      movieProposedById: json['movieProposedById']?.toString(),
       needsWatchConfirmation: _boolValue(json['needsWatchConfirmation']),
       hasCurrentUserLoggedWatch: _boolValue(json['hasCurrentUserLoggedWatch']),
       acceptedAt: _dateTimeValue(json['acceptedAt']),
@@ -608,7 +617,16 @@ class WatchRequest {
       canCancel ?? (!isTerminal && requesterId == userId);
 
   WatchScheduleProposal? get latestPendingProposal {
-    final pending = scheduleProposals.where((p) => p.isPending).toList()
+    final pending = scheduleProposals.where((p) {
+      if (!p.isPending) return false;
+      final groupPlan = groupId != null || groupName?.trim().isNotEmpty == true;
+      final matchesConfirmedSlot = groupPlan &&
+          scheduledFor != null &&
+          p.proposedFor != null &&
+          scheduledFor!.isAtSameMomentAs(p.proposedFor!) &&
+          (p.location ?? location ?? '').trim() == (location ?? '').trim();
+      return !matchesConfirmedSlot;
+    }).toList()
       ..sort((a, b) => _dateTimeValue(b.createdAt)
           .compareNullable(_dateTimeValue(a.createdAt)));
     return pending.isEmpty ? null : pending.first;
@@ -620,6 +638,7 @@ class WatchRequest {
   bool get canProposeSchedule => isWatchRequest && (isAccepted || isScheduled);
 
   bool canRespondToProposal(String userId) {
+    if (candidates.isNotEmpty && selectedCandidateId == null) return false;
     final proposal = latestPendingProposal;
     return proposal != null && proposal.proposerId != userId;
   }
@@ -641,6 +660,13 @@ class WatchRequest {
 
     final isIncoming = requesterId != userId &&
         (recipientId == userId || participantFor(userId) != null);
+    if (isAccepted &&
+        selectedCandidateId == null &&
+        proposedCandidateId != null) {
+      return movieProposedById == userId
+          ? WatchPlanStage.waitingForReplies
+          : WatchPlanStage.needsReply;
+    }
     final proposal = latestPendingProposal;
     if ((isPending && isIncoming) ||
         (proposal != null && proposal.proposerId != userId)) {

@@ -1,3 +1,4 @@
+import 'package:flixie_app/models/activity_reaction.dart';
 import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/models/group.dart';
 import 'package:flixie_app/models/group_insights.dart';
@@ -6,6 +7,7 @@ import 'package:flixie_app/models/trending_groups.dart';
 import 'package:flixie_app/models/group_watch_request.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/api/api_client.dart';
+import 'package:flixie_app/features/social/data/chat_service.dart';
 
 export 'package:flixie_app/models/group_watch_request.dart'
     show WatchRequestFilter, WatchRequestStatus, WatchResponseDecision;
@@ -233,6 +235,19 @@ class GroupService {
     return GroupWatchRequest.fromJson(data as Map<String, dynamic>);
   }
 
+  static Future<GroupWatchRequest> finalizeWatchPlanSchedule(
+    String requestId,
+    String proposalId,
+    String userId,
+    String decision,
+  ) async {
+    final data = await ApiClient.post(
+      '/groups/request/$requestId/schedule-proposals/$proposalId/finalize',
+      body: {'userId': userId, 'decision': decision},
+    );
+    return GroupWatchRequest.fromJson(data as Map<String, dynamic>);
+  }
+
   static Future<GroupWatchRequest> acceptInitialWatchPlanSchedule(
     String requestId,
     String userId,
@@ -350,9 +365,24 @@ class GroupService {
     );
   }
 
-  static Future<List<GroupWatchRequest>> getGroupWatchRequests(
-      String groupId) async {
-    final data = await ApiClient.get('/groups/$groupId/requests');
+  static Future<List<HomeGroupWatchPlan>> getHomeGroupWatchPlans(
+      {String? requestScope}) async {
+    final data = await ApiClient.get('/groups/home/watch-plans',
+        requestScope: requestScope);
+    return (data['groups'] as List).expand((raw) {
+      final group = Group(
+          id: raw['id'] as String, name: raw['name'] as String, ownerId: '');
+      return (raw['watchRequests'] as List).map((request) => HomeGroupWatchPlan(
+          group,
+          GroupWatchRequest.fromJson(
+              Map<String, dynamic>.from(request as Map))));
+    }).toList(growable: false);
+  }
+
+  static Future<List<GroupWatchRequest>> getGroupWatchRequests(String groupId,
+      {String? requestScope}) async {
+    final data = await ApiClient.get('/groups/$groupId/requests',
+        requestScope: requestScope);
     return (data as List<dynamic>)
         .map((e) => GroupWatchRequest.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -400,11 +430,47 @@ class GroupService {
     );
   }
 
+  /// Log a group plan using its actual conversation, including plans loaded
+  /// from the Postgres group list rather than from a chat.
+  static Future<GroupWatchRequest> logGroupWatchPlan(
+    GroupWatchRequest request,
+    String userId, {
+    String? conversationId,
+    bool watched = true,
+    int? rating,
+    bool? recommended,
+    String? reviewText,
+    String? watchedAt,
+  }) async {
+    var resolvedId = conversationId ?? request.conversationId;
+    if (resolvedId == null || resolvedId.isEmpty) {
+      final conversation = await ChatService.getOrCreateGroupConversation(
+        creatorId: userId,
+        pgGroupId: request.groupId,
+        // The server uses the group's authoritative name and accepted members.
+        name: '',
+        memberIds: const [],
+      );
+      resolvedId = conversation.id;
+    }
+    return completeWatchRequest(
+      resolvedId,
+      request.id,
+      userId,
+      watched: watched,
+      rating: rating,
+      recommended: recommended,
+      reviewText: reviewText,
+      watchedAt: watchedAt,
+    );
+  }
+
   /// PATCH /conversations/:conversationId/watch-requests/:requestId/complete
   static Future<GroupWatchRequest> completeWatchRequest(
     String conversationId,
     String requestId,
     String userId, {
+    bool watched = true,
     int? rating,
     bool? recommended,
     String? reviewText,
@@ -414,11 +480,12 @@ class GroupService {
       '/conversations/$conversationId/watch-requests/$requestId/complete',
       body: {
         'userId': userId,
-        if (rating != null) 'rating': rating,
-        if (recommended != null) 'recommended': recommended,
-        if (reviewText != null && reviewText.isNotEmpty)
+        'watched': watched,
+        if (watched && rating != null) 'rating': rating,
+        if (watched && recommended != null) 'recommended': recommended,
+        if (watched && reviewText != null && reviewText.isNotEmpty)
           'reviewText': reviewText,
-        if (watchedAt != null) 'watchedAt': watchedAt,
+        if (watched && watchedAt != null) 'watchedAt': watchedAt,
       },
     );
     return GroupWatchRequest.fromJson(data as Map<String, dynamic>);
@@ -467,20 +534,50 @@ class GroupService {
     );
   }
 
+  static Future<Map<String, ActivityReactionSummary>> getActivityReactions(
+      String groupId) async {
+    final data =
+        await ApiClient.get('/groups/$groupId/activity/reactions') as Map;
+    return data.map((key, value) => MapEntry(
+        key.toString(),
+        ActivityReactionSummary.fromJson(
+            Map<String, dynamic>.from(value as Map))));
+  }
+
+  static Future<ActivityReactionSummary> setActivityReaction(
+      String groupId, ActivityListItem item, String? reaction) async {
+    final data =
+        await ApiClient.put('/groups/$groupId/activity/reactions', body: {
+      'activityId': item.id,
+      'activityType': item.type.value,
+      'reaction': reaction,
+    });
+    return ActivityReactionSummary.fromJson(
+        Map<String, dynamic>.from(data as Map));
+  }
+
+  static Future<GroupActivityFeed> getGroupActivityFeed(String groupId) async {
+    final data = await ApiClient.get('/groups/$groupId/activity/feed') as Map;
+    return GroupActivityFeed(
+      items: (data['items'] as List)
+          .map((item) =>
+              ActivityListItem.fromJson(Map<String, dynamic>.from(item as Map)))
+          .toList(),
+      reactions: (data['reactions'] as Map).map((key, value) => MapEntry(
+          key.toString(),
+          ActivityReactionSummary.fromJson(
+              Map<String, dynamic>.from(value as Map)))),
+      reactionsUnavailable: data['reactionsUnavailable'] == true,
+    );
+  }
+
   static Future<List<ActivityListItem>> getGroupActivity(String groupId) async {
     final data = await ApiClient.get('/groups/$groupId/activity');
-    final activities = (data as List<dynamic>)
-        .map((e) => ActivityListItem.fromJson(e as Map<String, dynamic>))
+    // Preserve the server's stable score ordering among equal timestamps.
+    return (data as List)
+        .map((item) =>
+            ActivityListItem.fromJson(Map<String, dynamic>.from(item as Map)))
         .toList();
-    activities.sort((left, right) {
-      final leftDate = DateTime.tryParse(left.timestamp);
-      final rightDate = DateTime.tryParse(right.timestamp);
-      if (leftDate == null && rightDate == null) return 0;
-      if (leftDate == null) return 1;
-      if (rightDate == null) return -1;
-      return rightDate.compareTo(leftDate);
-    });
-    return activities;
   }
 
   static Future<GroupInsightsResponse> getGroupInsights(
@@ -498,4 +595,21 @@ class GroupService {
     );
     return GroupInsightsResponse.fromJson(data as Map<String, dynamic>);
   }
+}
+
+class GroupActivityFeed {
+  const GroupActivityFeed(
+      {required this.items,
+      required this.reactions,
+      this.reactionsUnavailable = false});
+  final List<ActivityListItem> items;
+  final Map<String, ActivityReactionSummary> reactions;
+  final bool reactionsUnavailable;
+}
+
+/// Compact Home data must never be installed in the full-detail request cache.
+class HomeGroupWatchPlan {
+  const HomeGroupWatchPlan(this.group, this.request);
+  final Group group;
+  final GroupWatchRequest request;
 }

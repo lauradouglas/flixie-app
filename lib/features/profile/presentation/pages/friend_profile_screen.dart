@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -536,8 +537,9 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
           _friendshipStatus = _FriendshipStatus.requested;
           _actionLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.success,
               content:
                   Text('Friend request sent to ${_user?.username ?? 'user'}')),
         );
@@ -546,8 +548,10 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       logger.e('[FriendProfileScreen] send friend request error: $e');
       if (mounted) {
         setState(() => _actionLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to send friend request')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Failed to send friend request')),
         );
       }
     }
@@ -589,8 +593,9 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
           _friendshipId = null;
           _actionLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.success,
               content:
                   Text('${_user?.username ?? 'User'} removed from friends')),
         );
@@ -599,8 +604,10 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       logger.e('[FriendProfileScreen] remove friend error: $e');
       if (mounted) {
         setState(() => _actionLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to remove friend')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Failed to remove friend')),
         );
       }
     }
@@ -663,15 +670,19 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
         initialFriendId: user.id,
         onSuccess: () {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Watch invite sent!')),
+            ScaffoldMessenger.of(context).showFlixieToast(
+              FlixieToast(
+                  type: FlixieToastType.success,
+                  content: const Text('Watch invite sent!')),
             );
           }
         },
         onError: () {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Failed to send invite')),
+            ScaffoldMessenger.of(context).showFlixieToast(
+              FlixieToast(
+                  type: FlixieToastType.error,
+                  content: const Text('Failed to send invite')),
             );
           }
         },
@@ -689,8 +700,9 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
           _friendshipStatus = _FriendshipStatus.friends;
           _actionLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.success,
               content: Text(
                   'You are now friends with ${_user?.username ?? 'this user'}')),
         );
@@ -699,8 +711,10 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       logger.e('[FriendProfileScreen] accept request error: $e');
       if (mounted) {
         setState(() => _actionLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to accept friend request')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Failed to accept friend request')),
         );
       }
     }
@@ -722,8 +736,10 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       logger.e('[FriendProfileScreen] decline request error: $e');
       if (mounted) {
         setState(() => _actionLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to decline friend request')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Failed to decline friend request')),
         );
       }
     }

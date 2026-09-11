@@ -7,10 +7,14 @@ class SpecialAvatarFrame extends StatelessWidget {
     super.key,
     required this.badges,
     required this.child,
+    this.frameWidth,
   });
 
   final List<String> badges;
   final Widget child;
+
+  /// Optional consistent ring width for compact avatar rows.
+  final double? frameWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +23,15 @@ class SpecialAvatarFrame extends StatelessWidget {
         !badges.contains('VERIFIED') &&
         !badges.contains('EARLY_ADOPTER') &&
         !badges.contains('FOUNDING_FILM_FRIEND')) {
-      return child;
+      if (frameWidth == null) return child;
+      return Container(
+        padding: EdgeInsets.all(frameWidth!),
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: FlixieColors.primary,
+        ),
+        child: child,
+      );
     }
 
     final isFounder = badges.contains('FOUNDER');
@@ -35,7 +47,7 @@ class SpecialAvatarFrame extends StatelessWidget {
                     ? const [FlixieColors.primary, FlixieColors.secondary]
                     : const [Color(0xFF9B83CC), Color(0xFF6D5A96)];
     return Container(
-      padding: EdgeInsets.all(isFounder ? 4 : 3),
+      padding: EdgeInsets.all(frameWidth ?? (isFounder ? 4 : 3)),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: SweepGradient(colors: [...colors, colors.first]),

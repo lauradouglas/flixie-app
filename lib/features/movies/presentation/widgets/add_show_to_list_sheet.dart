@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -93,8 +94,10 @@ class _AddShowToListSheetState extends State<AddShowToListSheet> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to load lists')),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+            type: FlixieToastType.error,
+            content: const Text('Unable to load lists')),
       );
     }
   }
@@ -317,13 +320,15 @@ class _AddShowToListSheetState extends State<AddShowToListSheet> {
       }
       if (!mounted) return;
       Navigator.pop(context, true);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Lists updated')));
+      ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+          type: FlixieToastType.success, content: const Text('Lists updated')));
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to update lists')),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+            type: FlixieToastType.error,
+            content: const Text('Unable to update lists')),
       );
     }
   }
@@ -566,14 +571,18 @@ class _CreateShowListSheetState extends State<_CreateShowListSheet> {
     final name = _nameController.text.trim();
     if (userId == null) return;
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('List name is required')),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+            type: FlixieToastType.warning,
+            content: const Text('List name is required')),
       );
       return;
     }
     if (_scope == ListScope.friends && _selectedFriendIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select at least one friend')),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+            type: FlixieToastType.warning,
+            content: const Text('Select at least one friend')),
       );
       return;
     }
@@ -596,8 +605,10 @@ class _CreateShowListSheetState extends State<_CreateShowListSheet> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to create show list')),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+            type: FlixieToastType.error,
+            content: const Text('Unable to create show list')),
       );
     }
   }

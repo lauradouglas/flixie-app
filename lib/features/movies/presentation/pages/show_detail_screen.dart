@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -250,7 +251,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     return show.seasons.last.seasonNumber;
   }
 
-  Future<void> _toggleWatchlist() async {
+  Future<void> _toggleWatchlist({bool offerUndo = true}) async {
     final user = context.read<AuthProvider>().dbUser;
     final analytics = context.read<AnalyticsController>();
     final showId = _show?.id;
@@ -301,14 +302,39 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
           ),
         )
         ..markActivityChanged();
+      final savedState = _inWatchlist;
+      ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+        type: FlixieToastType.success,
+        content:
+            Text(savedState ? 'Added to watchlist' : 'Removed from watchlist'),
+        action: offerUndo
+            ? SnackBarAction(
+                label: 'Undo',
+                onPressed: () {
+                  if (mounted &&
+                      _updatingAction == null &&
+                      _inWatchlist == savedState) {
+                    _toggleWatchlist(offerUndo: false);
+                  }
+                })
+            : null,
+      ));
     } catch (e) {
       if (!mounted) return;
       setState(() => _updatingAction = null);
-      _showSnack('Unable to update watchlist');
+      ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+        type: FlixieToastType.error,
+        content: const Text('Couldn’t update your watchlist'),
+        action: SnackBarAction(
+            label: 'Retry',
+            onPressed: () {
+              if (mounted && _updatingAction == null) _toggleWatchlist();
+            }),
+      ));
     }
   }
 
-  Future<void> _toggleFavorite() async {
+  Future<void> _toggleFavorite({bool offerUndo = true}) async {
     final user = context.read<AuthProvider>().dbUser;
     final analytics = context.read<AnalyticsController>();
     final showId = _show?.id;
@@ -346,6 +372,23 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                 ),
         )
         ..markActivityChanged();
+      final savedState = _isFavorite;
+      ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+        type: FlixieToastType.success,
+        content: Text(
+            savedState ? 'Added to favourites' : 'Removed from favourites'),
+        action: offerUndo
+            ? SnackBarAction(
+                label: 'Undo',
+                onPressed: () {
+                  if (mounted &&
+                      _updatingAction == null &&
+                      _isFavorite == savedState) {
+                    _toggleFavorite(offerUndo: false);
+                  }
+                })
+            : null,
+      ));
     } catch (error) {
       if (!mounted) return;
       setState(() => _updatingAction = null);
@@ -356,7 +399,15 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
           onSpaceMade: _toggleFavorite,
         );
       } else {
-        _showSnack('Unable to update favourites');
+        ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+          type: FlixieToastType.error,
+          content: const Text('Couldn’t update your favourites'),
+          action: SnackBarAction(
+              label: 'Retry',
+              onPressed: () {
+                if (mounted && _updatingAction == null) _toggleFavorite();
+              }),
+        ));
       }
     }
   }
@@ -408,7 +459,10 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
             : 'Season ${season.seasonNumber} marked unwatched');
       }
     } catch (_) {
-      if (mounted) _showSnack('Unable to update season progress');
+      if (mounted) {
+        _showSnack('Unable to update season progress',
+            type: FlixieToastType.error);
+      }
     } finally {
       if (mounted) {
         setState(() => _updatingSeasonNumbers.remove(season.seasonNumber));
@@ -438,18 +492,23 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
             watched ? 'Episode marked watched' : 'Episode marked unwatched');
       }
     } catch (_) {
-      if (mounted) _showSnack('Unable to update episode progress');
+      if (mounted) {
+        _showSnack('Unable to update episode progress',
+            type: FlixieToastType.error);
+      }
     } finally {
       if (mounted) setState(() => _updatingEpisodeIds.remove(episode.id));
     }
   }
 
-  void _showSnack(String message) {
+  void _showSnack(String message,
+      {FlixieToastType type = FlixieToastType.success}) {
     ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+        .showFlixieToast(FlixieToast(type: type, content: Text(message)));
   }
 
-  Future<void> _setUserRating(int rating) async {
+  Future<void> _setUserRating(int rating, {bool offerUndo = true}) async {
+    final previousRating = _userRating;
     final user = context.read<AuthProvider>().dbUser;
     final analytics = context.read<AnalyticsController>();
     final showId = _show?.id;
@@ -512,10 +571,31 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         }
         _isRatingLoading = false;
       });
+      ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+        type: FlixieToastType.success,
+        content: const Text('Rating saved'),
+        action: offerUndo && previousRating != null
+            ? SnackBarAction(
+                label: 'Undo',
+                onPressed: () {
+                  if (mounted && !_isRatingLoading && _userRating == rating) {
+                    _setUserRating(previousRating, offerUndo: false);
+                  }
+                })
+            : null,
+      ));
     } catch (_) {
       if (!mounted) return;
       setState(() => _isRatingLoading = false);
-      _showSnack('Unable to save show rating');
+      ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+        type: FlixieToastType.error,
+        content: const Text('Couldn’t save your rating'),
+        action: SnackBarAction(
+            label: 'Retry',
+            onPressed: () {
+              if (mounted && !_isRatingLoading) _setUserRating(rating);
+            }),
+      ));
     }
   }
 
@@ -934,7 +1014,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                 right: 16,
                 child: _heroIconButton(
                   icon: Icons.ios_share_rounded,
-                  onTap: () => _showSnack('Show sharing is coming soon'),
+                  onTap: () => _showSnack('Show sharing is coming soon',
+                      type: FlixieToastType.info),
                 ),
               ),
             ],
@@ -2295,7 +2376,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
               isLoading: false,
               onTap: _updatingAction != null
                   ? null
-                  : () => _showSnack('Show invitations are coming soon'),
+                  : () => _showSnack('Show invitations are coming soon',
+                      type: FlixieToastType.info),
             ),
           ),
         ]),

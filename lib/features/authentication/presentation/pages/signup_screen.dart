@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -246,8 +247,9 @@ class _SignupScreenState extends State<SignupScreen> {
     await _checkUsernameAvailability();
     if (!mounted) return;
     if (_usernameAvailable != true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+          type: FlixieToastType.error,
           content: Text(
               _usernameCheckError ?? 'Please choose an available username.'),
           backgroundColor: FlixieColors.danger,
@@ -260,8 +262,9 @@ class _SignupScreenState extends State<SignupScreen> {
       await _checkReferralCode();
       if (!mounted) return;
       if (_referralCodeValid != true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.error,
             content: Text(
               _referralError ?? 'Enter a valid referral code.',
             ),
@@ -279,9 +282,11 @@ class _SignupScreenState extends State<SignupScreen> {
 
     if (!mounted) return;
     if (_selectedCountry == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select your country to show watch providers.'),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+          type: FlixieToastType.warning,
+          content:
+              const Text('Please select your country to show watch providers.'),
           backgroundColor: FlixieColors.danger,
         ),
       );
@@ -316,8 +321,9 @@ class _SignupScreenState extends State<SignupScreen> {
         auth.errorCode == 'VALIDATION_ERROR') {
       setState(() => _usernameCheckError = auth.errorMessage);
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+    ScaffoldMessenger.of(context).showFlixieToast(
+      FlixieToast(
+        type: FlixieToastType.error,
         content: Text(auth.errorMessage ?? 'Sign up failed.'),
         backgroundColor: FlixieColors.danger,
       ),
@@ -368,7 +374,8 @@ class _SignupScreenState extends State<SignupScreen> {
       }
     }
     if (!mounted || success) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+      type: FlixieToastType.error,
       content: Text(auth.errorMessage ?? 'Unable to assign avatar.'),
       backgroundColor: FlixieColors.danger,
     ));

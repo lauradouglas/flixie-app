@@ -41,14 +41,14 @@ ActivityListItem _item({
 }
 
 void main() {
-  testWidgets('renders watched activity sentence and status chip',
+  testWidgets('renders watched activity with shared card header',
       (tester) async {
     final item = _item(type: ActivityListType.movieWatched);
     await tester.pumpWidget(_wrap(ActivityTile(item: item)));
 
-    expect(find.textContaining('Doug watched'), findsOneWidget);
+    expect(find.text('Doug'), findsOneWidget);
     expect(find.text('Watchlist'), findsNothing);
-    expect(find.text('Watched'), findsOneWidget);
+    expect(find.textContaining('Watched a film'), findsOneWidget);
   });
 
   testWidgets('renders rating badge when media rating is available',
@@ -56,8 +56,8 @@ void main() {
     final item = _item(type: ActivityListType.movieRating, rating: 9);
     await tester.pumpWidget(_wrap(ActivityTile(item: item)));
 
-    expect(find.text('9.0/10'), findsOneWidget);
-    expect(find.text('Rated 9+/10'), findsOneWidget);
+    expect(find.text('★ 9 / 10'), findsOneWidget);
+    expect(find.textContaining('Rated a film'), findsOneWidget);
   });
 
   testWidgets('renders explicit do-not-recommend choice', (tester) async {
@@ -68,7 +68,7 @@ void main() {
     );
     await tester.pumpWidget(_wrap(ActivityTile(item: item)));
 
-    expect(find.text('Doesn\'t recommend'), findsOneWidget);
+    expect(find.text('Doesn’t recommend'), findsOneWidget);
   });
 
   testWidgets('renders compact watchlist activity with notes', (tester) async {
@@ -90,9 +90,8 @@ void main() {
     );
     await tester.pumpWidget(_wrap(ActivityTile(item: item)));
 
-    expect(find.textContaining('rewatched Jurassic Park (3 times)'),
-        findsOneWidget);
-    expect(find.text('Rewatched'), findsOneWidget);
+    expect(find.textContaining('Watched again · 3 times'), findsOneWidget);
+    expect(find.text('Jurassic Park'), findsOneWidget);
   });
 
   testWidgets('favourite person activity renders the person portrait',

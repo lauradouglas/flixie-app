@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:flixie_app/features/profile/data/avatar_service.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/avatar_picker.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/models/profile_avatar.dart';
 import 'package:flixie_app/models/user.dart';
 
@@ -14,7 +16,79 @@ const avatar = ProfileAvatar(
   imageUrl: 'https://example.com/spaniel.png',
 );
 
+const avatarWithIcon = ProfileAvatar(
+  id: 2,
+  key: 'astronaut',
+  displayName: 'Astronaut',
+  storagePath: 'avatars/astronaut_avatar.png',
+  imageUrl: 'https://example.com/astronaut.png',
+  iconStoragePath: 'avatar-icons/astronaut_avatar_sm.WebP',
+  iconImageUrl: 'https://example.com/astronaut.WebP',
+);
+
 void main() {
+  test('icon paths and URLs survive parsing, persistence and copyWith', () {
+    final parsed = ProfileAvatar.fromJson(avatarWithIcon.toJson());
+    expect(parsed.iconStoragePath, avatarWithIcon.iconStoragePath);
+    expect(parsed.iconImageUrl, avatarWithIcon.iconImageUrl);
+    expect(
+        parsed.copyWith(imageUrl: 'https://example.com/new.png').iconImageUrl,
+        avatarWithIcon.iconImageUrl);
+  });
+
+  testWidgets(
+      'small avatars use icons, larger avatars and selection use originals',
+      (tester) async {
+    Future<void> show(double size,
+        {bool fullSize = false, ProfileAvatar? value}) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: ProfileAvatarView(
+          avatar: value ?? avatarWithIcon,
+          fallbackText: 'A',
+          fallbackColor: Colors.purple,
+          size: size,
+          useFullSize: fullSize,
+        )),
+      ));
+      await tester.pump();
+    }
+
+    String imageUrl() => tester
+        .widget<CachedNetworkImage>(find.byType(CachedNetworkImage))
+        .imageUrl;
+    await show(44);
+    expect(imageUrl(), avatarWithIcon.iconImageUrl);
+    await show(76);
+    expect(imageUrl(), avatarWithIcon.imageUrl);
+    await show(44, fullSize: true);
+    expect(imageUrl(), avatarWithIcon.imageUrl);
+    await show(44, value: avatar);
+    expect(imageUrl(), avatar.imageUrl);
+  });
+
+  testWidgets('an icon download failure falls back to the original',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+        home: Scaffold(
+            body: ProfileAvatarView(
+      avatar: avatarWithIcon,
+      fallbackText: 'A',
+      fallbackColor: Colors.purple,
+    ))));
+    await tester.pump();
+    final finder = find.byType(CachedNetworkImage);
+    final icon = tester.widget<CachedNetworkImage>(finder);
+    expect(icon.imageUrl, avatarWithIcon.iconImageUrl);
+    icon.errorWidget!(
+        tester.element(finder), icon.imageUrl, Exception('Missing icon'));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+    expect(tester.widget<CachedNetworkImage>(finder).imageUrl,
+        avatarWithIcon.imageUrl);
+  });
+
   test('parses avatar JSON', () {
     final parsed = ProfileAvatar.fromJson({
       'id': 1,
@@ -112,6 +186,11 @@ void main() {
             widget.properties.selected == true &&
             widget.properties.label == 'Spaniel, selected');
     expect(selectedSemantics, isTrue);
+    expect(
+        tester
+            .widget<ProfileAvatarView>(find.byType(ProfileAvatarView))
+            .useFullSize,
+        isTrue);
   });
 }
 

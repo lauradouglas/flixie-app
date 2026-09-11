@@ -19,6 +19,7 @@ import 'package:flixie_app/features/movies/presentation/pages/show_detail_screen
 import 'package:flixie_app/features/movies/presentation/pages/search_screen.dart';
 import 'package:flixie_app/features/authentication/presentation/pages/splash_screen.dart';
 import 'package:flixie_app/features/watchlist/presentation/pages/watchlist_screen.dart';
+import 'package:flixie_app/features/watch_plans/presentation/pages/group_watch_plan_v2_screen.dart';
 import 'package:flixie_app/features/profile/presentation/pages/profile_screen.dart';
 import 'package:flixie_app/features/profile/presentation/pages/friend_profile_screen.dart';
 import 'package:flixie_app/features/movies/presentation/pages/my_reviews_screen.dart';
@@ -259,6 +260,17 @@ GoRouter buildRouter(
             path: '/watchlist',
             pageBuilder: (context, state) =>
                 _calmPage(state, const WatchlistScreen()),
+          ),
+          GoRoute(
+            path: '/group-watch-plans-v2',
+            pageBuilder: (context, state) => _calmPage(
+              state,
+              GroupWatchPlanV2Screen(
+                groupId: state.uri.queryParameters['groupId'],
+                groupName: state.uri.queryParameters['groupName'],
+                initialRequestId: state.uri.queryParameters['requestId'],
+              ),
+            ),
           ),
           GoRoute(
             path: '/social',
@@ -596,6 +608,7 @@ class MainNavigationShell extends StatelessWidget {
                 GoRouterState.of(context).uri.path == _routes[index];
             if (index == selectedIndex && isAtDestinationRoot) {
               if (index == 0) TabRefreshController.requestHomeRefresh();
+              if (index == 1) TabRefreshController.watchlist.value++;
               if (index == 3) TabRefreshController.requestSocialRefresh();
               return;
             }

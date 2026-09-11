@@ -1,3 +1,8 @@
+import 'package:flixie_app/features/home/presentation/models/home_watch_plan_visibility.dart';
+import 'package:flixie_app/core/api/api_client.dart';
+import 'package:flixie_app/features/social/data/watch_request_cache.dart';
+import 'package:flixie_app/features/home/presentation/models/home_group_watch_plan.dart';
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'dart:ui';
 
 import 'dart:async';
@@ -24,9 +29,6 @@ import 'package:flixie_app/core/auth/push_notification_service.dart';
 import 'package:flixie_app/features/movies/data/show_service.dart';
 import 'package:flixie_app/features/home/data/recommendation_service.dart';
 import 'package:flixie_app/features/social/data/request_service.dart';
-import 'package:flixie_app/features/social/data/group_service.dart';
-import 'package:flixie_app/models/group.dart';
-import 'package:flixie_app/models/group_watch_request.dart';
 import 'package:flixie_app/features/social/data/watch_plan_visibility_store.dart';
 import 'package:flixie_app/features/home/data/trending_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -61,7 +63,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   static _HomeSessionSnapshot? _sessionSnapshot;
   // Keep hero carousel concise so primary CTA and dots remain visible above fold.
   static const int _maxHeroCarouselItems = 12;
@@ -80,6 +82,8 @@ class _HomeScreenState extends State<HomeScreen> {
   // Start pending so an authenticated first frame cannot mistake the still
   // loading collection for a user who has never created a Watch Plan.
   bool _isLoadingWatchPlans = true;
+  bool _watchPlansLoadFailed = false;
+  int _watchPlansLoadGeneration = 0;
   bool _watchPlansIntroDismissed = false;
   bool _hasUsedWatchPlans = false;
   bool _isLoading = true;
@@ -124,6 +128,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    TabRefreshController.watchPlans.addListener(_refreshWatchPlanReminders);
     // Listen for dbUser becoming available after auth resolves
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _authProvider?.addListener(_onAuthChanged);
@@ -139,6 +145,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    TabRefreshController.watchPlans.removeListener(_refreshWatchPlanReminders);
     _storeSessionSnapshot();
     _authProvider?.removeListener(_onAuthChanged);
     TabRefreshController.home.removeListener(_onHomeTabRefresh);
@@ -161,6 +169,15 @@ class _HomeScreenState extends State<HomeScreen> {
       _lastActivityVersion = activityVersion;
       _loadAll();
     }
+  }
+
+  void _refreshWatchPlanReminders() {
+    if (mounted) unawaited(_preloadInitialWatchPlans(_authProvider?.dbUser));
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshWatchPlanReminders();
   }
 
   void _onHomeTabRefresh() {
@@ -196,7 +213,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _watchRequestsNeedingResponse = snapshot.watchRequestsNeedingResponse;
     _watchPlansToShow = List.of(snapshot.watchPlansToShow);
     _hasUsedWatchPlans = snapshot.hasUsedWatchPlans;
-    _isLoadingWatchPlans = false;
+    _isLoadingWatchPlans = true;
     _heroPage.value = 0;
     _forYouPage.value = 0;
     _loadedForUserId = userId;
@@ -251,11 +268,12 @@ class _HomeScreenState extends State<HomeScreen> {
     logger.d('[HomeScreen] loading, user=${user?.id}');
 
     _loadedForUserId = user?.id;
+    _lastActivityVersion = auth.activityVersion;
 
     // These are the two sections visible at the top of Home. Start them
     // together while the launch treatment is on screen; all other content is
     // deliberately deferred until the shell is usable.
-    final initialWatchPlansLoad = _preloadInitialWatchPlans(user);
+    unawaited(_preloadInitialWatchPlans(user));
     final secondaryLoad = _loadSecondaryContent(
       user,
       refreshRecommendations: refreshRecommendations,
@@ -269,8 +287,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ? Future.value(cachedTrending)
           : TrendingService.getTrendingMovies(refresh: refreshRecommendations);
       final trendingMovies = await trendingFuture;
-      await initialWatchPlansLoad;
-
       if (!mounted) return;
 
       // Trending is enough to make Home immediately useful. The remaining
@@ -416,86 +432,95 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _preloadInitialWatchPlans(models.User? user) async {
+    final generation = ++_watchPlansLoadGeneration;
     if (user == null) {
       _isLoadingWatchPlans = false;
       return;
     }
     if (mounted) setState(() => _isLoadingWatchPlans = true);
+    bool isCurrent() =>
+        mounted &&
+        _loadedForUserId == user.id &&
+        generation == _watchPlansLoadGeneration;
 
-    // The list endpoint is intentionally lightweight and can lag behind a
-    // newly-proposed schedule. Hydrate the direct plans before choosing the
-    // featured Home state so a reschedule never falls back to the old,
-    // already-passed appointment.
-    final directPlans = RequestService.getWatchRequests(user.id)
-        .then((plans) => _hydrateDirectWatchPlans(plans, user.id))
-        .catchError((_) => <WatchRequest>[]);
-    final closedPlanIds = WatchPlanVisibilityStore.closedPlanIds(user.id)
-        .catchError((_) => <String>{});
-    final groupPlans = _loadGroupWatchPlansForHome();
+    // Direct and group plans can appear independently. Retain the other
+    // source's existing cards while its request is pending or fails.
+    var direct = _watchPlansToShow
+        .where((plan) => plan.conversationId != '__group_home__')
+        .toList();
+    var groups = _watchPlansToShow
+        .where((plan) => plan.conversationId == '__group_home__')
+        .toList();
+    var failed = false;
+    final visibility = Future.wait<dynamic>([
+      WatchPlanVisibilityStore.closedPlanIds(user.id),
+      WatchPlanVisibilityStore.isIntroductionDismissed(user.id),
+    ]);
 
-    final results = await Future.wait<dynamic>([
-      directPlans,
-      closedPlanIds,
-      groupPlans,
-      WatchPlanVisibilityStore.isIntroductionDismissed(user.id)
-          .catchError((_) => false),
-    ]).timeout(
-      const Duration(seconds: 4),
-      onTimeout: () =>
-          const [<WatchRequest>[], <String>{}, <WatchRequest>[], false],
-    );
-    if (!mounted || _loadedForUserId != user.id) return;
-
-    final watchRequests = results[0] as List<WatchRequest>;
-    final groupWatchPlans = results[2] as List<WatchRequest>;
-    final allPlans = [...watchRequests, ...groupWatchPlans];
-    final nextPlans = _watchPlansForHome(
-      allPlans,
-      user: user,
-      closedPlanIds: results[1] as Set<String>,
-    );
-    final plansChanged = _watchPlansFingerprint(_watchPlansToShow) !=
-        _watchPlansFingerprint(nextPlans);
-    final hasCreatedOrAcceptedWatchPlan = allPlans.any(
-      (plan) => _hasCreatedOrAcceptedWatchPlan(plan, user.id),
-    );
-    unawaited(_syncLocalWatchPlanReminders(allPlans, userId: user.id));
-    // This is a first-use prompt, rather than a card to re-show when old
-    // plans are no longer returned by the lightweight list endpoint.
-    if (hasCreatedOrAcceptedWatchPlan) {
-      unawaited(WatchPlanVisibilityStore.dismissIntroduction(user.id));
+    void applyPlans(List<dynamic> preferences) {
+      if (!isCurrent()) return;
+      final allPlans = [...direct, ...groups];
+      final nextPlans = watchPlansForHome(allPlans,
+          userId: user.id, closedPlanIds: preferences[0] as Set<String>);
+      final hasUsed =
+          allPlans.any((plan) => _hasCreatedOrAcceptedWatchPlan(plan, user.id));
+      setState(() {
+        if (_watchPlansFingerprint(_watchPlansToShow) !=
+            _watchPlansFingerprint(nextPlans)) {
+          _watchPlansToShow = nextPlans;
+        }
+        _hasUsedWatchPlans = _hasUsedWatchPlans || hasUsed;
+        _watchPlansIntroDismissed =
+            _watchPlansIntroDismissed || (preferences[1] as bool) || hasUsed;
+      });
+      if (hasUsed) {
+        unawaited(WatchPlanVisibilityStore.dismissIntroduction(user.id));
+      }
     }
-    context.read<AuthProvider>().updateCachedWatchRequests(watchRequests);
+
+    Future<void> loadSource(Future<List<WatchRequest>> request,
+        {required bool isGroup}) async {
+      try {
+        final results = await Future.wait<dynamic>([request, visibility]);
+        if (!isCurrent()) return;
+        final plans = results[0] as List<WatchRequest>;
+        if (isGroup) {
+          groups = plans;
+        } else {
+          direct = plans;
+          _watchRequestsNeedingResponse =
+              _countWatchRequestsNeedingResponse(plans, user.id);
+        }
+        applyPlans(results[1] as List<dynamic>);
+        if (!isGroup && mounted) {
+          context.read<AuthProvider>().updateCachedWatchRequests(plans);
+        }
+        unawaited(_syncLocalWatchPlanReminders(plans, userId: user.id));
+      } catch (error) {
+        failed = true;
+        if (isGroup &&
+            isCurrent() &&
+            error is ApiException &&
+            (error.statusCode == 401 || error.statusCode == 403)) {
+          setState(() => _watchPlansToShow = _watchPlansToShow
+              .where((plan) => plan.conversationId != '__group_home__')
+              .toList());
+        }
+        logger.w('[HomeScreen] watch plans load failed: $error');
+      }
+    }
+
+    await Future.wait([
+      loadSource(
+          RequestService.getWatchRequests(user.id, includeHomeState: true),
+          isGroup: false),
+      loadSource(_loadGroupWatchPlansForHome(), isGroup: true),
+    ]);
+    if (!isCurrent()) return;
     setState(() {
-      _watchRequestsNeedingResponse =
-          _countWatchRequestsNeedingResponse(watchRequests, user.id);
-      if (plansChanged) _watchPlansToShow = nextPlans;
-      _watchPlansIntroDismissed =
-          (results[3] as bool) || hasCreatedOrAcceptedWatchPlan;
-      _hasUsedWatchPlans = hasCreatedOrAcceptedWatchPlan;
+      _watchPlansLoadFailed = failed;
       _isLoadingWatchPlans = false;
     });
-  }
-
-  Future<List<WatchRequest>> _hydrateDirectWatchPlans(
-    List<WatchRequest> plans,
-    String userId,
-  ) async {
-    final hydratedPlans = await Future.wait(
-      plans.map((plan) async {
-        try {
-          final state = await RequestService.getWatchRequestState(
-            watchRequestId: plan.id,
-            userId: userId,
-          );
-          return state.request;
-        } catch (_) {
-          // A single unavailable plan must not hide the rest of the carousel.
-          return plan;
-        }
-      }),
-    );
-    return List<WatchRequest>.from(hydratedPlans);
   }
 
   String _watchPlansFingerprint(Iterable<WatchRequest> plans) => plans
@@ -558,137 +583,20 @@ class _HomeScreenState extends State<HomeScreen> {
   /// direct plans. This keeps their ordering, due-state and card layout truly
   /// identical while preserving a marker for the correct deep link.
   Future<List<WatchRequest>> _loadGroupWatchPlansForHome() async {
-    try {
-      final groups = await GroupService.getUserGroups(_loadedForUserId ?? '');
-      final results =
-          await Future.wait(groups.where((group) => group.id != null).map(
-        (group) async {
-          try {
-            final requests =
-                await GroupService.getGroupWatchRequests(group.id!);
-            for (final request in requests) {
-              final canonicalId = request.databaseRequestId;
-              if (canonicalId != null && canonicalId != request.id) {
-                await PushNotificationService.cancelWatchPlanReminders(
-                  request.id,
-                  scope: 'GROUP',
-                );
-              }
-            }
-            return requests
-                .map((request) => _asHomeGroupWatchPlan(group, request))
-                .toList(growable: false);
-          } catch (_) {
-            return const <WatchRequest>[];
-          }
-        },
-      ));
-      return results.expand((plans) => plans).toList(growable: false);
-    } catch (_) {
-      return const <WatchRequest>[];
+    final cache = context.read<WatchRequestCache>();
+    cache.syncUser(_loadedForUserId);
+    final entries = await cache.refreshHome();
+    for (final entry in entries) {
+      final request = entry.request;
+      final canonicalId = request.databaseRequestId;
+      if (canonicalId != null && canonicalId != request.id) {
+        await PushNotificationService.cancelWatchPlanReminders(request.id,
+            scope: 'GROUP');
+      }
     }
-  }
-
-  WatchRequest _asHomeGroupWatchPlan(Group group, GroupWatchRequest request) {
-    final currentUserId = _loadedForUserId;
-    final currentUserLogged = request.hasCurrentUserCompleted == true ||
-        request.memberStatuses.any(
-          (member) =>
-              member.memberId == currentUserId && member.watchedAt != null,
-        );
-    final requester = WatchRequestUser(
-      id: request.userId,
-      username: request.requesterUsername ?? 'Group member',
-      avatar: request.requesterAvatar,
-    );
-    final participants = request.memberStatuses
-        .map((member) => WatchRequestParticipant(
-              user: WatchRequestUser(
-                id: member.memberId,
-                username: member.username ?? 'Group member',
-                avatar: member.avatar,
-              ),
-              response: member.status,
-            ))
+    return entries
+        .map((entry) => asHomeGroupWatchPlan(entry.group, entry.request))
         .toList(growable: false);
-    return WatchRequest(
-      // Use the canonical Postgres ID everywhere reminders are scheduled.
-      // The chat mirror ID may differ and previously created a duplicate set
-      // when Home and the group plan screen both refreshed the same plan.
-      id: request.databaseRequestId ?? request.id,
-      requesterId: request.userId,
-      recipientId: '',
-      status: request.status.apiValue,
-      type: request.mediaType?.toLowerCase() == 'show'
-          ? 'SHOW_WATCH_REQUEST'
-          : 'MOVIE_WATCH_REQUEST',
-      movieId:
-          request.mediaType?.toLowerCase() == 'show' ? null : request.mediaId,
-      showId:
-          request.mediaType?.toLowerCase() == 'show' ? request.mediaId : null,
-      createdAt: request.createdAt,
-      updatedAt: request.updatedAt,
-      scheduledFor: DateTime.tryParse(request.scheduledFor ?? ''),
-      location: request.location,
-      scheduleStatus: request.scheduledFor == null ? 'NONE' : 'AGREED',
-      groupId: group.id,
-      groupName: group.name,
-      // A private marker lets the shared card open the group plan, not the
-      // direct-plan detail route.
-      conversationId: '__group_home__',
-      selectedCandidateId: request.selectedCandidateId,
-      proposedDate: DateTime.tryParse(request.proposedDate ?? ''),
-      scheduleProposals: request.scheduleProposals
-          .map((proposal) => WatchScheduleProposal(
-                id: proposal.id,
-                proposerId: proposal.proposerId,
-                proposedFor: DateTime.tryParse(proposal.proposedFor ?? ''),
-                location: proposal.location,
-                status: proposal.status,
-                responses: proposal.responses
-                    .map((response) => WatchScheduleProposalResponse(
-                          userId: response.userId,
-                          status: response.status,
-                        ))
-                    .toList(growable: false),
-              ))
-          .toList(growable: false),
-      candidates: request.candidates
-          .map((candidate) => WatchPlanCandidate(
-                id: candidate.id,
-                movieId: candidate.movieId,
-                showId: candidate.showId,
-                mediaType: candidate.showId != null ? 'show' : 'movie',
-                addedByUserId: candidate.addedByUserId,
-                addedByUsername: candidate.addedByUsername,
-                addedByAvatar: candidate.addedByAvatar,
-                title: candidate.title,
-                posterPath: candidate.posterPath,
-                selectedByUserIds: candidate.selectedByUserIds,
-              ))
-          .toList(growable: false),
-      hasCurrentUserAccepted: request.hasCurrentUserAccepted,
-      hasCurrentUserCompleted: request.hasCurrentUserCompleted,
-      canSchedule: request.canSchedule,
-      canComplete: request.canComplete,
-      requester: requester,
-      createdBy: requester,
-      participants: participants,
-      watchConfirmations: currentUserLogged && currentUserId != null
-          ? [
-              WatchConfirmation(
-                id: 'group-${request.id}-$currentUserId',
-                userId: currentUserId,
-                watched: true,
-              ),
-            ]
-          : const [],
-      movie: WatchRequestMovieDetails(
-        id: request.mediaId ?? 0,
-        title: request.movieTitle ?? 'Watch plan',
-        posterPath: request.moviePosterPath,
-      ),
-    );
   }
 
   void _scheduleRecommendationVisibilityCheck() {
@@ -760,8 +668,9 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       messenger
         ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
+        ..showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.info,
             content: Text('We won\'t recommend ${movie.name} again.'),
             duration: const Duration(seconds: 4),
             persist: false,
@@ -799,8 +708,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
       }
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Couldn\'t update recommendations.')),
+      messenger.showFlixieToast(
+        FlixieToast(
+            type: FlixieToastType.error,
+            content: const Text('Couldn\'t update recommendations.')),
       );
     }
   }
@@ -832,9 +743,11 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (error) {
       logger.w('[HomeScreen] recommendation refresh failed: $error');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Couldn’t refresh your picks. Try again shortly.'),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.error,
+            content:
+                const Text('Couldn’t refresh your picks. Try again shortly.'),
           ),
         );
       }
@@ -868,68 +781,6 @@ class _HomeScreenState extends State<HomeScreen> {
     // accepting any Watch Plan retires the first-time prompt.
     return plan.hasCurrentUserAccepted == true ||
         plan.participantFor(userId)?.response.toUpperCase() == 'ACCEPTED';
-  }
-
-  List<WatchRequest> _watchPlansForHome(
-    List<WatchRequest> requests, {
-    required models.User user,
-    required Set<String> closedPlanIds,
-  }) {
-    final now = DateTime.now();
-    final plans = requests.where((request) {
-      final completedAt = request.completedAt ?? request.lastActivityAt;
-      final recentCompletion = completedAt == null ||
-          completedAt.isAfter(now.subtract(const Duration(days: 7)));
-      return request.isWatchRequest &&
-          !request.isCancelled &&
-          !request.isExpired &&
-          !request.isDeclined &&
-          !(request.groupId != null &&
-              request.participantFor(user.id)?.response.toUpperCase() ==
-                  'DECLINED') &&
-          !closedPlanIds.contains(request.id) &&
-          (!request.isCompleted || recentCompletion);
-    }).toList()
-      ..sort(
-        (left, right) {
-          final leftRank = _homeWatchPlanRank(left, user.id, now);
-          final rightRank = _homeWatchPlanRank(right, user.id, now);
-          if (leftRank != rightRank) return leftRank.compareTo(rightRank);
-
-          final leftTime = left.scheduledFor;
-          final rightTime = right.scheduledFor;
-          if (leftRank == 2) {
-            // Put the most recently missed log prompt first.
-            return (rightTime ?? now).compareTo(leftTime ?? now);
-          }
-          final leftFallback = DateTime.tryParse(left.createdAt ?? '') ?? now;
-          final rightFallback = DateTime.tryParse(right.createdAt ?? '') ?? now;
-          return (leftTime ?? leftFallback)
-              .compareTo(rightTime ?? rightFallback);
-        },
-      );
-    return plans;
-  }
-
-  bool _watchPlanNeedsResponse(WatchRequest request, String userId) {
-    if (request.isPending && request.requesterId != userId) return true;
-    final proposal = request.latestPendingProposal;
-    return request.normalizedScheduleStatus == 'PROPOSED' &&
-        proposal != null &&
-        proposal.proposerId != userId;
-  }
-
-  int _homeWatchPlanRank(WatchRequest request, String userId, DateTime now) {
-    final scheduledFor = request.scheduledFor?.toLocal();
-    if (scheduledFor != null && scheduledFor.isAfter(now)) {
-      final isToday = scheduledFor.year == now.year &&
-          scheduledFor.month == now.month &&
-          scheduledFor.day == now.day;
-      if (isToday) return 0;
-    }
-    if (_watchPlanNeedsResponse(request, userId)) return 1;
-    if (scheduledFor != null && !scheduledFor.isAfter(now)) return 2;
-    return 3;
   }
 
   Future<void> _openHomeWatchPlan(
@@ -1007,8 +858,9 @@ class _HomeScreenState extends State<HomeScreen> {
         final messenger = ScaffoldMessenger.of(context);
         messenger
           ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
+          ..showFlixieToast(
+            FlixieToast(
+              type: FlixieToastType.success,
               content: Text(
                 inWatchlist
                     ? '${movie.name} removed from your watchlist'
@@ -1056,8 +908,10 @@ class _HomeScreenState extends State<HomeScreen> {
       logger.w('[HomeScreen] trailer launch failed for ${movie.id}: $error');
     }
     if (!opened && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Couldn’t open this trailer.')),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+            type: FlixieToastType.error,
+            content: const Text('Couldn’t open this trailer.')),
       );
     }
   }
@@ -1089,8 +943,9 @@ class _HomeScreenState extends State<HomeScreen> {
         },
         onError: () {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Could not create the Watch Plan'),
+          ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+            type: FlixieToastType.error,
+            content: const Text('Could not create the Watch Plan'),
             backgroundColor: FlixieColors.danger,
           ));
         },
@@ -1144,6 +999,7 @@ class _HomeScreenState extends State<HomeScreen> {
         : homeWatchPlanAttentionCount(_watchPlansToShow, user.id);
     final showWatchPlansIntro = user != null &&
         !_isLoadingWatchPlans &&
+        !_watchPlansLoadFailed &&
         !_hasUsedWatchPlans &&
         !_watchPlansIntroDismissed;
 
@@ -1278,8 +1134,10 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       await ShowService.dismissContinueWatching(userId, show.showId);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${show.name} removed from Continue Watching')),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+            type: FlixieToastType.success,
+            content: Text('${show.name} removed from Continue Watching')),
       );
     } catch (_) {
       if (!mounted) return;
@@ -1287,8 +1145,10 @@ class _HomeScreenState extends State<HomeScreen> {
         final restoredIndex = index.clamp(0, _continueWatchingShows.length);
         _continueWatchingShows.insert(restoredIndex, show);
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not remove that show right now')),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+            type: FlixieToastType.error,
+            content: const Text('Could not remove that show right now')),
       );
     }
   }
@@ -2388,6 +2248,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required String movieTitle,
     required String? posterPath,
     required bool currentlyInWatchlist,
+    bool offerUndo = true,
   }) async {
     final auth = context.read<AuthProvider>();
     final analytics = context.read<AnalyticsController>();
@@ -2442,14 +2303,31 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
       if (mounted) {
-        messenger.showSnackBar(
-          SnackBar(
+        messenger.showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.success,
             content: Text(
               currentlyInWatchlist
                   ? '$movieTitle removed from watchlist'
                   : '$movieTitle added to watchlist',
             ),
-            duration: const Duration(seconds: 2),
+            action: offerUndo
+                ? SnackBarAction(
+                    label: 'Undo',
+                    onPressed: () {
+                      if (mounted &&
+                          !_watchlistUpdatesInFlight.contains(movieId) &&
+                          _watchlistMovieIds.contains(movieId) ==
+                              !currentlyInWatchlist) {
+                        _toggleWatchlistState(context,
+                            movieId: movieId,
+                            movieTitle: movieTitle,
+                            posterPath: posterPath,
+                            currentlyInWatchlist: !currentlyInWatchlist,
+                            offerUndo: false);
+                      }
+                    })
+                : null,
           ),
         );
       }
@@ -2463,8 +2341,10 @@ class _HomeScreenState extends State<HomeScreen> {
             _watchlistMovieIds.remove(movieId);
           }
         });
-        messenger.showSnackBar(
-          const SnackBar(content: Text('Could not update watchlist right now')),
+        messenger.showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Could not update watchlist right now')),
         );
       }
     } finally {
@@ -2659,8 +2539,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               }
             });
-            messenger.showSnackBar(
-              SnackBar(content: Text('$movieTitle marked as watched')),
+            messenger.showFlixieToast(
+              FlixieToast(
+                  type: FlixieToastType.success,
+                  content: Text('$movieTitle marked as watched')),
             );
           }
         },

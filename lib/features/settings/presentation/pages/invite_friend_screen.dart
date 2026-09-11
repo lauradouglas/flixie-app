@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -51,8 +52,10 @@ class _InviteFriendScreenState extends State<InviteFriendScreen> {
   Future<void> _copyCode(String code) async {
     await Clipboard.setData(ClipboardData(text: code));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Referral code copied')),
+    ScaffoldMessenger.of(context).showFlixieToast(
+      FlixieToast(
+          type: FlixieToastType.success,
+          content: const Text('Referral code copied')),
     );
   }
 

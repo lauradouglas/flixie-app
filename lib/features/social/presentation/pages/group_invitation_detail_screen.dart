@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -73,8 +74,9 @@ class _GroupInvitationDetailScreenState
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Could not update this group invitation.'),
+        ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+          type: FlixieToastType.error,
+          content: const Text('Could not update this group invitation.'),
           backgroundColor: FlixieColors.danger,
         ));
       }

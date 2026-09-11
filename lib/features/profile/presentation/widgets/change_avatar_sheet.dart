@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -53,8 +54,9 @@ class _ChangeAvatarSheetState extends State<ChangeAvatarSheet> {
       final user = auth.dbUser;
       if (user != null) auth.updateCachedUser(user.copyWith(avatar: avatar));
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Profile avatar updated'),
+      ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+        type: FlixieToastType.success,
+        content: const Text('Profile avatar updated'),
         backgroundColor: FlixieColors.surfaceElevated,
       ));
     } catch (_) {

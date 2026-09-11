@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -107,9 +108,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
         setState(() => _dismissingIds.remove(id));
         await _load();
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to dismiss notification.'),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.error,
+            content: const Text('Failed to dismiss notification.'),
             backgroundColor: FlixieColors.danger,
           ),
         );
@@ -327,8 +329,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 notification.type == FlixieNotification.showWatchRequest ||
                 notification.type == FlixieNotification.groupRequest;
         final subject = isWatchPlan ? 'Watch Plan' : 'Request';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.success,
             content: Text(
               action == FlixieNotification.actionAccepted
                   ? '$subject accepted successfully.'
@@ -341,8 +344,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
     } catch (e) {
       logger.e('[NotificationScreen] respond error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.error,
             content: Text(
               action == FlixieNotification.actionAccepted
                   ? 'Failed to accept. Please try again.'
@@ -396,8 +400,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
           source: 'notification',
         );
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.success,
             content: const Text('Watch time agreed'),
             backgroundColor: FlixieColors.surfaceElevated,
             duration: const Duration(seconds: 4),
@@ -420,8 +425,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
         );
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+          type: FlixieToastType.success,
           content: Text(
             decision == 'accepted' ? 'Watch time agreed' : 'Time declined',
           ),
@@ -431,9 +437,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
     } catch (e) {
       logger.e('[NotificationScreen] schedule proposal response error: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to update proposed time. Please try again.'),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+          type: FlixieToastType.error,
+          content:
+              const Text('Failed to update proposed time. Please try again.'),
           backgroundColor: FlixieColors.danger,
         ),
       );
@@ -475,18 +483,20 @@ class _NotificationScreenState extends State<NotificationScreen> {
       );
       await _load();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Suggested a new time'),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+          type: FlixieToastType.info,
+          content: const Text('Suggested a new time'),
           backgroundColor: FlixieColors.surfaceElevated,
         ),
       );
     } catch (e) {
       logger.e('[NotificationScreen] suggest schedule error: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to suggest a time. Please try again.'),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+          type: FlixieToastType.error,
+          content: const Text('Failed to suggest a time. Please try again.'),
           backgroundColor: FlixieColors.danger,
         ),
       );
@@ -943,4 +953,3 @@ class _NotificationScreenState extends State<NotificationScreen> {
     );
   }
 }
-

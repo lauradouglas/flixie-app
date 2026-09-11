@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -97,9 +98,11 @@ class _SocialScreenState extends State<SocialScreen> {
                 _showAddFriendSheet();
                 return;
               }
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Use Create on the Groups tab for groups.')),
+              ScaffoldMessenger.of(context).showFlixieToast(
+                FlixieToast(
+                    type: FlixieToastType.info,
+                    content:
+                        const Text('Use Create on the Groups tab for groups.')),
               );
             },
             icon: const Icon(Icons.person_add_alt_1_outlined),
@@ -239,8 +242,9 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
           ],
         );
         setState(() => _friendsData = updated);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.success,
               content: Text(
                   'Now friends with ${friendship.friendUser?.username ?? 'user'}')),
         );
@@ -255,8 +259,10 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
     } catch (e) {
       logger.e('Accept request error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to accept friend request')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Failed to accept friend request')),
         );
       }
     }
@@ -277,8 +283,10 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
     } catch (e) {
       logger.e('Decline request error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to decline friend request')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Failed to decline friend request')),
         );
       }
     }
@@ -443,8 +451,9 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
 
   // ignore: unused_element
   void _showRequestWatchHint(FriendshipUser friend) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+    ScaffoldMessenger.of(context).showFlixieToast(
+      FlixieToast(
+        type: FlixieToastType.info,
         content: Text(
           'Open a movie and create a Watch Plan with ${friend.shortName}.',
         ),
@@ -1228,9 +1237,10 @@ class _GroupsPreviewSection extends StatelessWidget {
             const Expanded(child: SocialSectionHeader(title: 'YOUR GROUPS')),
             TextButton(
               onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Switch to Groups to view all.')),
+                ScaffoldMessenger.of(context).showFlixieToast(
+                  FlixieToast(
+                      type: FlixieToastType.info,
+                      content: const Text('Switch to Groups to view all.')),
                 );
               },
               child: const Text('View all'),
@@ -1447,8 +1457,10 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
     } catch (e) {
       logger.e('Respond to invite error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update invitation')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Failed to update invitation')),
         );
       }
     }
@@ -2024,8 +2036,10 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
     } catch (e) {
       logger.e('Create group error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to create group')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Failed to create group')),
         );
         setState(() => _inviting = false);
         return;

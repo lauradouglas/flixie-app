@@ -19,16 +19,16 @@ class ApiException implements Exception {
 }
 
 class ApiClient {
-  // static const String baseUrl = String.fromEnvironment(
-  //   'API_BASE_URL',
-  //   defaultValue: 'http://localhost:3000',
-  // );
-
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue:
-        'https://flixie-api-fmcehvaecwdheccm.northeurope-01.azurewebsites.net',
+    defaultValue: 'http://localhost:3000',
   );
+
+  // static const String baseUrl = String.fromEnvironment(
+  //   'API_BASE_URL',
+  //   defaultValue:
+  //       'https://flixie-api-fmcehvaecwdheccm.northeurope-01.azurewebsites.net',
+  // );
 
   static const Duration _timeout = Duration(seconds: 15);
 
@@ -123,6 +123,9 @@ class ApiClient {
   /// the "N widgets all fetch the same endpoint on the same frame" pattern
   /// that overloads the Supabase database.
   ///
+  /// [requestScope] separates loads after explicit cache invalidation without
+  /// changing the request URL. Ordinary callers keep the default scope.
+  ///
   /// If the server responds with a 500 DATABASE_ERROR the request is retried
   /// up to [_maxRetries] times with exponential back-off before propagating
   /// the error to the caller.
@@ -130,9 +133,10 @@ class ApiClient {
     String path, {
     Map<String, String>? queryParams,
     bool authenticated = true,
+    Object? requestScope,
   }) {
     final uri = _buildUri(path, queryParams: queryParams);
-    final key = '${authenticated ? 'auth' : 'anon'}:$uri';
+    final key = '${authenticated ? 'auth' : 'anon'}:$uri:${requestScope ?? ''}';
 
     final existing = _inFlightGets[key];
     if (existing != null) {
@@ -146,8 +150,19 @@ class ApiClient {
       request: () => _fetchWithRetry(uri, authenticated: authenticated),
     );
     _inFlightGets[key] = future;
-    future.then<void>((_) => _inFlightGets.remove(key),
-        onError: (_) => _inFlightGets.remove(key));
+    void clearInFlight() {
+      if (identical(_inFlightGets[key], future)) {
+        _inFlightGets.remove(key);
+      }
+    }
+
+    // Do not return the removed Future from the error callback: doing so
+    // creates a second, unhandled copy of an otherwise handled failure.
+    future.then<void>((_) {
+      clearInFlight();
+    }, onError: (Object _) {
+      clearInFlight();
+    });
     return future;
   }
 

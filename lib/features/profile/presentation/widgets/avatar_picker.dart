@@ -81,6 +81,7 @@ class AvatarPicker extends StatelessWidget {
                   return Center(
                     child: ProfileAvatarView(
                       avatar: avatar,
+                      useFullSize: true,
                       fallbackText: avatar.displayName.substring(0, 1),
                       fallbackColor: FlixieColors.primary,
                       size: avatarSize,

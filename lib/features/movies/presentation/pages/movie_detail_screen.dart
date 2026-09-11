@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -476,7 +477,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   List<SimilarMovie> _similar = [];
   List<MovieCastMember> _cast = [];
   MovieImages _movieImages = const MovieImages();
-  bool _movieImagesLoading = false;
+  bool get _movieImagesLoading => _sectionStates['images'] == 'loading';
   List<WatchProvider> _watchProviders = [];
   Set<int> _userProviderIds = {};
   Set<String> _userProviderMatchKeys = {};
@@ -496,16 +497,18 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   ListUpdateType? _currentlyUpdating;
   List<MovieFriendActivity> _friendsActivity = [];
   FriendRecommendationResponse? _friendRecommendation;
-  bool _friendRecommendationLoading = false;
+  bool get _friendRecommendationLoading =>
+      _sectionStates['friend recommendations'] == 'loading';
   Object? _friendRecommendationError;
   FriendSummaryResponse? _friendSummary;
-  bool _friendSummaryLoading = false;
+  bool get _friendSummaryLoading =>
+      _sectionStates['friend summary'] == 'loading';
   Object? _friendSummaryError;
   List<MovieList> _myListsContainingMovie = [];
   List<MovieFriendListEntry> _friendsListsContainingMovie = [];
-  bool _listsContainingMovieLoading = false;
+  bool get _listsContainingMovieLoading => _sectionStates['lists'] == 'loading';
   List<MovieWatchEntry> _movieWatchHistory = [];
-  bool _watchHistoryLoading = false;
+  bool get _watchHistoryLoading => _sectionStates['history'] == 'loading';
   FriendActivityTab _friendsActivityTab = FriendActivityTab.all;
   bool _showFullSynopsis = false;
   String? _heroControlPosterPath;
@@ -547,250 +550,230 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     await _load();
   }
 
-  Future<void> _load() async {
-    final id = int.tryParse(widget.movieId);
-    if (id == null || id <= 0) {
-      if (mounted) {
-        setState(() {
-          _error = 'Invalid movie ID.';
-          _isLoading = false;
-        });
-      }
-      return;
-    }
+  int _loadGeneration = 0;
+  final Map<String, String> _sectionStates = {};
+  final Map<String, Future<void> Function()> _sectionRetries = {};
+  final Map<String, int> _sectionAttempts = {};
 
-    // Get userId from AuthProvider
-    final authProvider = context.read<AuthProvider>();
-    final userId = authProvider.dbUser?.id;
-
-    try {
-      final movieService = context.read<MovieService>();
-      final region = authProvider.dbUser?.watchProviderRegion ?? 'GB';
-
-      Future<T> withStep<T>(String step, Future<T> future) async {
-        try {
-          return await future;
-        } catch (e) {
-          apiLogger.e('Movie detail load failed at $step for movie $id: $e');
-          throw Exception('Movie detail step failed [$step]: $e');
-        }
-      }
-
-      final futures = <Future>[
-        withStep(
-          'GET /movies/id/$id',
-          movieService.getMovieById(id, userId: userId),
-        ),
-        withStep(
-          'GET /movies/$id/recommendations',
-          movieService.getMovieRecommendations(id),
-        ),
-        withStep(
-          'GET /movies/$id/credits',
-          movieService.getMovieCredits(id),
-        ),
-        withStep(
-          'GET /movies/$id/$region/watch/providers',
-          movieService.getMovieWatchProviders(id, region),
-        ),
-        if (userId != null)
-          withStep(
-            'GET user watch providers',
-            WatchlistActionsController.instance.getUserWatchProviders(userId),
-          )
-        else
-          Future.value(<WatchProvider>[]),
-      ];
-      if (userId != null) {
-        futures.add(withStep(
-          'POST /movies/$id/user/rating',
-          movieService.getUserMovieRating(id, userId),
-        ));
-        futures.add(withStep(
-          'GET /movies/id/$id/friends-activity',
-          movieService.getFriendsMovieActivity(id, userId),
-        ));
-      }
-      final results = await Future.wait(futures);
-      if (mounted) {
-        setState(() {
-          final loadedMovie = results[0] as Movie;
-          _movie = loadedMovie;
-          _similar = results[1] as List<SimilarMovie>;
-          final credits = results[2] as MovieCredits;
-          _cast = credits.castMembers;
-          _director = credits.crewMembers
-              .where((crew) => crew.job == 'Director')
-              .firstOrNull;
-          final execProducers = credits.crewMembers
-              .where((crew) => crew.job == 'Executive Producer')
-              .map((crew) => crew.name)
-              .toList();
-          final producers = credits.crewMembers
-              .where((crew) => crew.job == 'Producer')
-              .map((crew) => crew.name)
-              .toList();
-          _producers = <String>{...execProducers, ...producers}.toList();
-          _writers = credits.crewMembers
-              .where((crew) =>
-                  crew.job == 'Screenplay' || crew.job == 'Head of Story')
-              .map((crew) => crew.name)
-              .toSet()
-              .toList();
-          _watchProviders = results[3] as List<WatchProvider>;
-          final userProviders = results[4] as List<WatchProvider>;
-          _userProviderIds =
-              userProviders.map((provider) => provider.id).toSet();
-          _userProviderMatchKeys =
-              userProviders.map((provider) => provider.matchKey).toSet();
-          _reviews = (loadedMovie.reviews ?? []).toList();
-
-          // Check movie status in user's lists
-          final user = authProvider.dbUser;
-          if (user != null) {
-            _inWatchlist = user.isMovieInWatchlist(id);
-            _isWatched = user.isMovieWatched(id);
-            _isFavorite = user.isMovieFavorite(id);
-          }
-          // Load existing user rating from API
-          if (userId != null && results.length > 5) {
-            final userRating = results[5] as ({int? rating, bool? recommended});
-            _userRating = userRating.rating;
-            _userRecommends = userRating.recommended;
-            _friendsActivity = results[6] as List<MovieFriendActivity>? ?? [];
-          }
-
-          _isLoading = false;
-        });
-        _syncHeroControlContrast(results[0] as Movie);
-        _loadMovieImages(id);
-        if (userId != null) {
-          _loadWatchHistory(userId, id);
-          _loadListsContainingMovie(userId, id);
-          _loadFriendRecommendation(id);
-          _loadFriendSummary(id);
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _isLoading = false;
-        });
-      }
+  @override
+  void didUpdateWidget(covariant MovieDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.movieId != widget.movieId) {
+      _movie = null;
+      _isLoading = true;
+      _load();
     }
   }
 
-  Future<void> _loadMovieImages(int movieId) async {
+  Future<void> _optional<T>(
+      String key, Future<T> Function() fetch, void Function(T) apply) async {
+    final generation = _loadGeneration;
+    final viewer = context.read<AuthProvider>().dbUser?.id;
+    final attempt = (_sectionAttempts[key] ?? 0) + 1;
+    _sectionAttempts[key] = attempt;
+    bool current() =>
+        mounted &&
+        generation == _loadGeneration &&
+        attempt == _sectionAttempts[key] &&
+        viewer == context.read<AuthProvider>().dbUser?.id;
     if (!mounted) return;
-    setState(() => _movieImagesLoading = true);
+    setState(() {
+      _sectionStates[key] = 'loading';
+      _sectionRetries[key] = () => _optional(key, fetch, apply);
+    });
     try {
-      final images = await context.read<MovieService>().getMovieImages(movieId);
-      if (!mounted) return;
+      final value = await fetch();
+      if (!current()) return;
       setState(() {
-        _movieImages = images;
-        _movieImagesLoading = false;
+        apply(value);
+        _sectionStates.remove(key);
       });
     } catch (error) {
-      apiLogger.w('Unable to load images for movie $movieId: $error');
-      if (mounted) setState(() => _movieImagesLoading = false);
+      if (!current()) return;
+      apiLogger.w('Movie detail section $key failed: $error');
+      setState(() => _sectionStates[key] = 'error');
     }
   }
 
-  Future<void> _loadWatchHistory(String userId, int movieId) async {
-    if (!mounted) return;
-    setState(() => _watchHistoryLoading = true);
-    try {
-      final history = await WatchlistActionsController.instance
-          .getMovieWatchHistory(userId, movieId);
-      if (mounted) {
-        setState(() {
-          _movieWatchHistory = history;
-          _watchHistoryLoading = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() => _watchHistoryLoading = false);
-      }
-    }
+  Widget _optionalSection(String key, String label, Widget child) {
+    final state = _sectionStates[key];
+    if (state == null) return child;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(children: [
+        if (state == 'loading') ...[
+          SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, semanticsLabel: 'Loading $label')),
+          const SizedBox(width: 12),
+        ],
+        Expanded(
+            child: Text(
+                state == 'loading' ? 'Loading $label…' : 'Couldn’t load $label',
+                style: const TextStyle(color: FlixieColors.medium))),
+        if (state == 'error')
+          TextButton(
+              onPressed: _sectionRetries[key],
+              child:
+                  Semantics(label: 'Retry $label', child: const Text('Retry'))),
+      ]),
+    );
   }
 
-  Future<void> _loadFriendRecommendation(int movieId) async {
-    if (!mounted) return;
+  Future<void> _load() async {
+    final generation = ++_loadGeneration;
+    final id = int.tryParse(widget.movieId);
+    if (id == null || id <= 0) {
+      setState(() {
+        _error = 'Invalid movie ID.';
+        _isLoading = false;
+      });
+      return;
+    }
+    final auth = context.read<AuthProvider>();
+    final userId = auth.dbUser?.id;
+    final service = context.read<MovieService>();
     setState(() {
-      _friendRecommendationLoading = true;
-      _friendRecommendationError = null;
+      _error = null;
+      _sectionStates.clear();
+      _sectionRetries.clear();
+      _similar = [];
+      _cast = [];
+      _director = null;
+      _writers = [];
+      _producers = [];
+      _watchProviders = [];
+      _movieImages = const MovieImages();
+      _userRating = null;
+      _userRecommends = null;
+      _reviews = [];
+      _friendsActivity = [];
+      _friendSummary = null;
+      _friendRecommendation = null;
+      _movieWatchHistory = [];
+      _myListsContainingMovie = [];
+      _friendsListsContainingMovie = [];
+      _userProviderIds = {};
+      _userProviderMatchKeys = {};
     });
+    final core = service.getMovieById(id);
+    final optional = <Future<void>>[
+      _optional('similar', () => service.getMovieRecommendations(id),
+          (value) => _similar = value),
+      _optional('credits', () => service.getMovieCredits(id), (credits) {
+        _cast = credits.castMembers;
+        _director = credits.crewMembers
+            .where((crew) => crew.job == 'Director')
+            .firstOrNull;
+        _producers = <String>{
+          ...credits.crewMembers
+              .where((crew) => crew.job == 'Executive Producer')
+              .map((crew) => crew.name),
+          ...credits.crewMembers
+              .where((crew) => crew.job == 'Producer')
+              .map((crew) => crew.name),
+        }.toList();
+        _writers = credits.crewMembers
+            .where((crew) =>
+                crew.job == 'Screenplay' || crew.job == 'Head of Story')
+            .map((crew) => crew.name)
+            .toSet()
+            .toList();
+      }),
+      _optional(
+          'providers',
+          () => service.getMovieWatchProviders(
+              id, auth.dbUser?.watchProviderRegion ?? 'GB'),
+          (value) => _watchProviders = value),
+      _optional('reviews', () => service.getMovieReviews(id, userId: userId),
+          (value) => _reviews = value),
+      _loadMovieImages(id),
+      if (userId != null) ...[
+        _optional(
+            'your providers',
+            () => WatchlistActionsController.instance
+                .getUserWatchProviders(userId), (value) {
+          _userProviderIds = value.map((provider) => provider.id).toSet();
+          _userProviderMatchKeys =
+              value.map((provider) => provider.matchKey).toSet();
+        }),
+        _optional('rating', () => service.getUserMovieRating(id, userId),
+            (value) {
+          _userRating = value.rating;
+          _userRecommends = value.recommended;
+        }),
+        _optional('activity', () => service.getFriendsMovieActivity(id, userId),
+            (value) => _friendsActivity = value),
+        _loadWatchHistory(userId, id),
+        _loadListsContainingMovie(userId, id),
+        _loadFriendRecommendation(id),
+        _loadFriendSummary(id),
+      ],
+    ];
     try {
-      final result =
-          await context.read<MovieService>().getFriendRecommendation(movieId);
-      if (!mounted) return;
+      final movie = await core;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
-        _friendRecommendation = result;
-        _friendRecommendationLoading = false;
+        _movie = movie;
+        final user = auth.dbUser;
+        _inWatchlist = user?.isMovieInWatchlist(id) ?? false;
+        _isWatched = user?.isMovieWatched(id) ?? false;
+        _isFavorite = user?.isMovieFavorite(id) ?? false;
+        _isLoading = false;
       });
-    } catch (e) {
-      if (!mounted) return;
+      _syncHeroControlContrast(movie);
+    } catch (error) {
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
-        _friendRecommendationError = e;
-        _friendRecommendationLoading = false;
+        _error = error.toString();
+        _isLoading = false;
       });
     }
+    // Pull-to-refresh completes only once its optional work has settled.
+    // Rendering above does not wait for it.
+    await Future.wait(optional);
   }
 
-  Future<void> _loadFriendSummary(int movieId) async {
-    if (!mounted) return;
-    setState(() {
-      _friendSummaryLoading = true;
-      _friendSummaryError = null;
-    });
-    try {
-      final result =
-          await context.read<MovieService>().getFriendSummary(movieId);
-      if (!mounted) return;
-      setState(() {
-        _friendSummary = result;
-        _friendSummaryLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _friendSummaryError = e;
-        _friendSummaryLoading = false;
-      });
-    }
-  }
+  Future<void> _loadMovieImages(int id) => _optional(
+      'images',
+      () => context.read<MovieService>().getMovieImages(id),
+      (value) => _movieImages = value);
 
-  Future<void> _loadListsContainingMovie(String userId, int movieId) async {
-    if (!mounted) return;
-    setState(() => _listsContainingMovieLoading = true);
-    try {
-      final results = await Future.wait([
-        WatchlistActionsController.instance
-            .getMyListsContainingMovie(userId, movieId),
-        WatchlistActionsController.instance
-            .getFriendsListsContainingMovie(userId, movieId),
-      ]);
-      if (!mounted) return;
-      setState(() {
-        _myListsContainingMovie = results[0] as List<MovieList>;
-        _friendsListsContainingMovie = results[1] as List<MovieFriendListEntry>;
-        _listsContainingMovieLoading = false;
+  Future<void> _loadWatchHistory(String userId, int id) => _optional(
+      'history',
+      () =>
+          WatchlistActionsController.instance.getMovieWatchHistory(userId, id),
+      (value) => _movieWatchHistory = value);
+
+  Future<void> _loadFriendRecommendation(int id) => _optional(
+      'friend recommendations',
+      () => context.read<MovieService>().getFriendRecommendation(id),
+      (value) => _friendRecommendation = value);
+
+  Future<void> _loadFriendSummary(int id) => _optional(
+      'friend summary',
+      () => context.read<MovieService>().getFriendSummary(id),
+      (value) => _friendSummary = value);
+
+  Future<void> _loadListsContainingMovie(String userId, int id) =>
+      _optional('lists', () async {
+        final values = await Future.wait([
+          WatchlistActionsController.instance
+              .getMyListsContainingMovie(userId, id),
+          WatchlistActionsController.instance
+              .getFriendsListsContainingMovie(userId, id),
+        ]);
+        return values;
+      }, (value) {
+        _myListsContainingMovie = value[0] as List<MovieList>;
+        _friendsListsContainingMovie = value[1] as List<MovieFriendListEntry>;
       });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _myListsContainingMovie = const <MovieList>[];
-        _friendsListsContainingMovie = const <MovieFriendListEntry>[];
-        _listsContainingMovieLoading = false;
-      });
-    }
-  }
 
   // ---- List Management ------------------------------------------------------
 
-  Future<void> _toggleWatchlist() async {
+  Future<void> _toggleWatchlist({bool offerUndo = true}) async {
     final authProvider = context.read<AuthProvider>();
     final analytics = context.read<AnalyticsController>();
     final user = authProvider.dbUser;
@@ -853,7 +836,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           currentWatchlist.removeWhere((item) => item.movieId == movieId);
           authProvider.updateUserList(movieWatchlist: currentWatchlist);
           // Offer to mark as watched if not already
-          if (!_isWatched && mounted) {
+          if (offerUndo && !_isWatched && mounted) {
             final markWatched = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
@@ -883,19 +866,47 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             }
           }
         }
+        if (mounted) {
+          final savedState = _inWatchlist;
+          ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+            type: FlixieToastType.success,
+            content: Text(
+                savedState ? 'Added to watchlist' : 'Removed from watchlist'),
+            action: offerUndo
+                ? SnackBarAction(
+                    label: 'Undo',
+                    onPressed: () {
+                      if (mounted &&
+                          _currentlyUpdating == null &&
+                          _inWatchlist == savedState) {
+                        _toggleWatchlist(offerUndo: false);
+                      }
+                    })
+                : null,
+          ));
+        }
       }
     } catch (e) {
       logger.e('Error toggling watchlist: $e');
       if (mounted) {
         setState(() => _currentlyUpdating = null);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update watchlist: $e')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Couldn’t update your watchlist'),
+              action: SnackBarAction(
+                  label: 'Retry',
+                  onPressed: () {
+                    if (mounted && _currentlyUpdating == null) {
+                      _toggleWatchlist();
+                    }
+                  })),
         );
       }
     }
   }
 
-  Future<void> _toggleFavorite() async {
+  Future<void> _toggleFavorite({bool offerUndo = true}) async {
     final authProvider = context.read<AuthProvider>();
     final analytics = context.read<AnalyticsController>();
     final user = authProvider.dbUser;
@@ -955,6 +966,23 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               .toList();
         }
         authProvider.updateUserList(favoriteMovies: updatedFavorites);
+        final savedState = _isFavorite;
+        ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+          type: FlixieToastType.success,
+          content: Text(
+              savedState ? 'Added to favourites' : 'Removed from favourites'),
+          action: offerUndo
+              ? SnackBarAction(
+                  label: 'Undo',
+                  onPressed: () {
+                    if (mounted &&
+                        _currentlyUpdating == null &&
+                        _isFavorite == savedState) {
+                      _toggleFavorite(offerUndo: false);
+                    }
+                  })
+              : null,
+        ));
       }
     } catch (e) {
       logger.e('Error toggling favorite: $e');
@@ -967,8 +995,17 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             onSpaceMade: _toggleFavorite,
           );
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to update favorites: $e')),
+          ScaffoldMessenger.of(context).showFlixieToast(
+            FlixieToast(
+                type: FlixieToastType.error,
+                content: const Text('Couldn’t update your favourites'),
+                action: SnackBarAction(
+                    label: 'Retry',
+                    onPressed: () {
+                      if (mounted && _currentlyUpdating == null) {
+                        _toggleFavorite();
+                      }
+                    })),
           );
         }
       }
@@ -1165,8 +1202,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 _movie = updatedMovie;
                 if (rating != null) _userRating = rating.round();
               });
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
+              ScaffoldMessenger.of(context).showFlixieToast(
+                FlixieToast(
+                  type: FlixieToastType.success,
                   content: Text(
                       entry == null ? 'Watch logged' : 'Watch entry updated'),
                 ),
@@ -1174,8 +1212,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             }
           } catch (e) {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Unable to save watch entry: $e')));
+              ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+                  type: FlixieToastType.error,
+                  content: Text('Unable to save watch entry: $e')));
             }
           }
         },
@@ -1228,13 +1267,15 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           .deleteMovieWatch(userId, entry.id);
       await _loadWatchHistory(userId, movieId);
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Watch entry deleted')));
+        ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+            type: FlixieToastType.success,
+            content: const Text('Watch entry deleted')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Unable to delete watch entry: $e')));
+        ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+            type: FlixieToastType.error,
+            content: Text('Unable to delete watch entry: $e')));
       }
     }
   }
@@ -1398,9 +1439,19 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                           height: _MovieDetailHeroTokens.heroToWatchSectionGap),
                       _buildActionButtons(),
                       const SizedBox(height: 18),
-                      _buildWhereToWatchSection(context),
+                      _optionalSection('providers', 'watch providers',
+                          _buildWhereToWatchSection(context)),
+                      _optionalSection('your providers',
+                          'your streaming services', const SizedBox.shrink()),
+                      _optionalSection(
+                          'rating', 'your rating', const SizedBox.shrink()),
                       const SizedBox(height: 12),
-                      _buildFriendSummarySection(context),
+                      _optionalSection('friend summary', 'friend summary',
+                          _buildFriendSummarySection(context)),
+                      _optionalSection('activity', 'friend activity',
+                          const SizedBox.shrink()),
+                      _optionalSection('friend recommendations',
+                          'friend recommendations', const SizedBox.shrink()),
                       const SizedBox(height: 14),
                       _buildMovieDetailTabs(),
                       const SizedBox(height: 18),
@@ -2090,8 +2141,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       friends = await _loadSharableFriends(userId);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not load your friends')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Could not load your friends')),
         );
       }
       return;
@@ -2099,8 +2152,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
     if (!mounted) return;
     if (friends.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Add a friend to share there.')),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+            type: FlixieToastType.info,
+            content: const Text('Add a friend to share there.')),
       );
       return;
     }
@@ -2288,8 +2343,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                                 );
                                 if (!mounted) return;
                                 navigator.pop();
-                                messenger.showSnackBar(
-                                  SnackBar(
+                                messenger.showFlixieToast(
+                                  FlixieToast(
+                                    type: FlixieToastType.success,
                                     content: Text(
                                         'Shared to ${friendUser?.displayName ?? 'friend'}'),
                                   ),
@@ -2297,9 +2353,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                               } catch (_) {
                                 if (!mounted) return;
                                 setSheetState(() => sending = false);
-                                messenger.showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
+                                messenger.showFlixieToast(
+                                  FlixieToast(
+                                    type: FlixieToastType.error,
+                                    content: const Text(
                                         'Could not share to that friend yet'),
                                   ),
                                 );
@@ -2335,8 +2392,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       groups = await _loadSharableGroups(userId);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not load your groups')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Could not load your groups')),
         );
       }
       return;
@@ -2344,8 +2403,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
     if (!mounted) return;
     if (groups.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Join or create a group to share there.')),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+            type: FlixieToastType.info,
+            content: const Text('Join or create a group to share there.')),
       );
       return;
     }
@@ -2564,8 +2625,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                                 );
                                 if (!mounted) return;
                                 navigator.pop();
-                                messenger.showSnackBar(
-                                  SnackBar(
+                                messenger.showFlixieToast(
+                                  FlixieToast(
+                                    type: FlixieToastType.success,
                                     content: Text(
                                         'Shared to ${selectedGroup.name} chat'),
                                   ),
@@ -2573,9 +2635,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                               } catch (_) {
                                 if (!mounted) return;
                                 setSheetState(() => sending = false);
-                                messenger.showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
+                                messenger.showFlixieToast(
+                                  FlixieToast(
+                                    type: FlixieToastType.error,
+                                    content: const Text(
                                         'Could not share to that group yet'),
                                   ),
                                 );
@@ -2693,8 +2756,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     if (uri == null ||
         !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open this trailer')),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Could not open this trailer')),
         );
       }
     }
@@ -2725,7 +2790,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   // ---- User Rating ----------------------------------------------------------
 
-  Future<void> _setUserRating(int rating, bool? recommended) async {
+  Future<void> _setUserRating(int rating, bool? recommended,
+      {bool offerUndo = true}) async {
+    final previousRating = _userRating;
+    final previousRecommendation = _userRecommends;
     final authProvider = context.read<AuthProvider>();
     final analytics = context.read<AnalyticsController>();
     final user = authProvider.dbUser;
@@ -2770,26 +2838,58 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           _movie = updatedMovie;
           _isRatingLoading = false;
         });
-        promptShareCard(
-          context,
-          ShareCardData.rating(
-            mediaType: ShareCardMediaType.movie,
-            mediaId: movieId,
-            title: updatedMovie.title,
-            posterPath: updatedMovie.posterPath,
-            user: user,
-            rating: rating,
-            recommended: recommended,
-          ),
-        );
+        if (offerUndo && previousRating != null) {
+          ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+            type: FlixieToastType.success,
+            content: const Text('Rating saved'),
+            action: SnackBarAction(
+                label: 'Undo',
+                onPressed: () {
+                  if (mounted &&
+                      !_isRatingLoading &&
+                      _userRating == rating &&
+                      _userRecommends == recommended) {
+                    _setUserRating(previousRating, previousRecommendation,
+                        offerUndo: false);
+                  }
+                }),
+          ));
+        } else {
+          promptShareCard(
+            context,
+            ShareCardData.rating(
+              mediaType: ShareCardMediaType.movie,
+              mediaId: movieId,
+              title: updatedMovie.title,
+              posterPath: updatedMovie.posterPath,
+              user: user,
+              rating: rating,
+              recommended: recommended,
+            ),
+          );
+        }
       }
     } catch (e) {
       debugPrint('Failed to set rating: $e');
-      if (mounted) setState(() => _isRatingLoading = false);
+      if (mounted) {
+        setState(() => _isRatingLoading = false);
+        ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+          type: FlixieToastType.error,
+          content: const Text('Couldn’t save your rating'),
+          action: SnackBarAction(
+              label: 'Retry',
+              onPressed: () {
+                if (mounted && !_isRatingLoading) {
+                  _setUserRating(rating, recommended);
+                }
+              }),
+        ));
+      }
     }
   }
 
   void _showRatingSheet() {
+    if (_sectionStates.containsKey('rating')) return;
     var selectedRating = _userRating;
     bool? recommended = _userRecommends;
     showModalBottomSheet<void>(
@@ -3008,10 +3108,17 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 ),
                 _DashboardTile(
                   title: 'Your rating',
-                  value: _userRating != null ? '${_userRating!}/10' : '+ Rate',
+                  value: _sectionStates['rating'] == 'loading'
+                      ? 'Loading…'
+                      : _userRating != null
+                          ? '${_userRating!}/10'
+                          : '+ Rate',
                   icon: Icons.star_rounded,
                   color: FlixieColors.warning,
-                  onTap: _isRatingLoading ? null : _showRatingSheet,
+                  onTap:
+                      _isRatingLoading || _sectionStates.containsKey('rating')
+                          ? null
+                          : _showRatingSheet,
                 ),
                 _DashboardTile(
                   title: 'Your status',
@@ -3302,15 +3409,19 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         fromMovieMatch: widget.fromMovieMatch,
         onSuccess: () {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Watch plan sent!')),
+            ScaffoldMessenger.of(context).showFlixieToast(
+              FlixieToast(
+                  type: FlixieToastType.success,
+                  content: const Text('Watch plan sent!')),
             );
           }
         },
         onError: () {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Failed to send watch plan')),
+            ScaffoldMessenger.of(context).showFlixieToast(
+              FlixieToast(
+                  type: FlixieToastType.error,
+                  content: const Text('Failed to send watch plan')),
             );
           }
         },
@@ -4277,17 +4388,22 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     return switch (_movieDetailTab) {
       MovieDetailTab.overview => _tabContent([
           _buildSynopsis(context, movie),
-          _buildTopCastSection(context),
+          _optionalSection(
+              'credits', 'cast and crew', _buildTopCastSection(context)),
           _buildTrailersSection(context, movie),
-          _buildImagesSection(context, movie),
-          _buildMoreLikeThisSection(context),
+          _optionalSection(
+              'images', 'images', _buildImagesSection(context, movie)),
+          _optionalSection(
+              'similar', 'similar films', _buildMoreLikeThisSection(context)),
         ]),
       MovieDetailTab.reviews => _tabContent([
-          _buildUserReviewsSection(context),
+          _optionalSection(
+              'reviews', 'reviews', _buildUserReviewsSection(context)),
         ]),
       MovieDetailTab.activity => _tabContent([
-          _buildWatchHistorySection(context),
-          _buildListsSection(context),
+          _optionalSection(
+              'history', 'watch history', _buildWatchHistorySection(context)),
+          _optionalSection('lists', 'lists', _buildListsSection(context)),
         ]),
       MovieDetailTab.details => _tabContent([
           FilmInfoCard(

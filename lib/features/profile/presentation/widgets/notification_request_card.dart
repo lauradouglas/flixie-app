@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/watch_plans/presentation/widgets/shared/watch_plan_components.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
@@ -118,6 +119,10 @@ class NotificationRequestCard extends StatelessWidget {
         return 'Watch plan scheduled';
       case 'PLAN_RESCHEDULED':
         return 'Watch plan rescheduled';
+      case 'SCHEDULE_KEPT':
+        return 'Current time kept';
+      case 'TITLE_PROPOSED':
+        return 'Movie to confirm';
       case 'TITLE_SELECTED':
         return 'Movie selected';
       case 'PLAN_CANCELLED':
@@ -160,9 +165,13 @@ class NotificationRequestCard extends StatelessWidget {
         return WatchPlanColorRole.failed.color;
       case 'PLAN_SCHEDULED':
       case 'PLAN_RESCHEDULED':
-        return WatchPlanColorRole.waiting.color;
+      case 'SCHEDULE_KEPT':
+        return notification.watchPlanEvent == 'SCHEDULE_KEPT'
+            ? WatchPlanColorRole.complete.color
+            : WatchPlanColorRole.waiting.color;
       case 'PLAN_INVITED':
       case 'SCHEDULE_PROPOSED':
+      case 'TITLE_PROPOSED':
       case 'TITLE_SELECTED':
         return WatchPlanColorRole.action.color;
     }
@@ -194,10 +203,21 @@ class NotificationRequestCard extends StatelessWidget {
             height: 1.25,
           ),
           children: [
-            const TextSpan(text: 'Everyone logged '),
+            const TextSpan(
+                text: 'Everyone has responded to the Watch Plan for '),
             _linkedTitleSpan(context, title),
-            const TextSpan(text: '. View the group summary and ratings.'),
+            const TextSpan(text: '. View your summary.'),
           ],
+        ),
+      );
+    }
+    if (notification.watchPlanEvent == 'SCHEDULE_KEPT') {
+      return Text(
+        notification.message,
+        style: const TextStyle(
+          color: FlixieColors.light,
+          fontSize: 13,
+          height: 1.25,
         ),
       );
     }
@@ -664,7 +684,7 @@ class NotificationRequestCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = notification.senderName;
     final headline = _isEveryoneLogged
-        ? 'Everyone logged'
+        ? 'Your watch summary is ready'
         : name.isNotEmpty
             ? name
             : _requestKind;
@@ -693,6 +713,10 @@ class NotificationRequestCard extends StatelessWidget {
     final date = notification.receivedAt.isEmpty
         ? ''
         : formatDate(notification.receivedAt);
+    final linked = notification.link?['request'] ?? notification.link?['groupRequest'];
+    final options = linked is Map && linked['selectedCandidateId'] == null && linked['proposedCandidateId'] == null
+        ? (linked['candidates'] as List? ?? []).whereType<Map>().take(3).toList()
+        : <Map>[];
     final posterPath = notification.watchMediaPosterPath;
     final posterUrl = posterPath == null
         ? null
@@ -728,7 +752,17 @@ class NotificationRequestCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _RequestMediaPreview(
+                if (!_isFriendRequest && options.length > 1)
+                  WatchPlanPosterStack(posters: [
+                    for (final c in options)
+                      WatchPlanPoster(
+                        path: (c['movie']?['posterPath'] ?? c['show']?['posterPath'] ?? c['posterPath']) as String?,
+                        title: (c['movie']?['title'] ?? c['show']?['name'] ?? c['title']) as String?,
+                        width: 48,
+                      ),
+                  ])
+                else
+                  _RequestMediaPreview(
                   posterUrl: posterUrl,
                   accent: accent,
                   fallbackIcon: _typeIcon,

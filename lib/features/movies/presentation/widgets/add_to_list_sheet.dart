@@ -1,4 +1,6 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
+import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:provider/provider.dart';
 
 import 'package:flixie_app/models/movie_list.dart';
@@ -77,6 +79,8 @@ class _AddToListSheetBodyState extends State<_AddToListSheetBody> {
   final TextEditingController _searchController = TextEditingController();
   final Set<String> _selectedListIds = <String>{};
   final Set<String> _initialListIds = <String>{};
+  final Set<String> _committedAddedIds = {};
+  final Set<String> _committedRemovedIds = {};
   bool _saving = false;
   bool _loadingMembership = true;
 
@@ -326,6 +330,10 @@ class _AddToListSheetBodyState extends State<_AddToListSheetBody> {
     for (final listId in toAdd) {
       final ok = await provider.addMovieToList(listId, widget.movieId);
       if (ok) {
+        _initialListIds.add(listId);
+        if (!_committedRemovedIds.remove(listId)) {
+          _committedAddedIds.add(listId);
+        }
         await analytics.movieAddedToList();
       } else {
         failed.add(listId);
@@ -334,6 +342,10 @@ class _AddToListSheetBodyState extends State<_AddToListSheetBody> {
     for (final listId in toRemove) {
       final ok = await provider.removeMovieFromList(listId, widget.movieId);
       if (ok) {
+        _initialListIds.remove(listId);
+        if (!_committedAddedIds.remove(listId)) {
+          _committedRemovedIds.add(listId);
+        }
         await analytics.movieRemovedFromList();
       } else {
         failed.add(listId);
@@ -358,18 +370,66 @@ class _AddToListSheetBodyState extends State<_AddToListSheetBody> {
           )
           .toSet()
           .join(', ');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+          type: FlixieToastType.error,
           content: Text(
-            'Failed to update lists: $listNames. ${provider.error ?? 'Please try again.'}',
+            'Couldn’t update $listNames. Your selections are still here.',
           ),
+          action: SnackBarAction(
+              label: 'Retry',
+              onPressed: () {
+                if (mounted && !_saving) _applyChanges(provider);
+              }),
         ),
       );
       return;
     }
+    final messenger = ScaffoldMessenger.of(context);
+    final auth = context.read<AuthProvider>();
+    final userId = provider.userId;
+    final movieId = widget.movieId;
+    final restoreMembership = List<String>.of(_committedRemovedIds);
+    final removeMembership = List<String>.of(_committedAddedIds);
+    var undoRunning = false;
+    Future<void> undo() async {
+      if (undoRunning || auth.dbUser?.id != userId) return;
+      undoRunning = true;
+      try {
+        for (final id in List<String>.of(restoreMembership)) {
+          await UserService.addMovieToList(userId, id, movieId);
+          restoreMembership.remove(id);
+        }
+        for (final id in List<String>.of(removeMembership)) {
+          await UserService.removeMovieFromList(userId, id, movieId);
+          removeMembership.remove(id);
+        }
+        auth.markActivityChanged();
+        if (messenger.mounted) {
+          messenger.showFlixieToast(FlixieToast(
+              type: FlixieToastType.success,
+              content: const Text('List changes undone')));
+        }
+      } catch (_) {
+        if (messenger.mounted) {
+          messenger.showFlixieToast(FlixieToast(
+              type: FlixieToastType.error,
+              content: const Text('Couldn’t undo all list changes'),
+              action: SnackBarAction(label: 'Retry', onPressed: undo)));
+        }
+      } finally {
+        undoRunning = false;
+      }
+    }
+
     Navigator.pop(context, true);
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Lists updated')));
+    messenger.showFlixieToast(FlixieToast(
+      type: FlixieToastType.success,
+      content: const Text('Lists updated'),
+      action: restoreMembership.isEmpty && removeMembership.isEmpty
+          ? null
+          : SnackBarAction(label: 'Undo', onPressed: undo),
+    ));
   }
 
   Future<void> _openCreateListSheet() async {
@@ -618,14 +678,18 @@ class _CreateListFromMovieSheetState extends State<_CreateListFromMovieSheet> {
   Future<void> _createList() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('List name is required')),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+            type: FlixieToastType.warning,
+            content: const Text('List name is required')),
       );
       return;
     }
     if (_scope == ListScope.friends && _selectedFriendIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select at least one friend')),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+            type: FlixieToastType.warning,
+            content: const Text('Select at least one friend')),
       );
       return;
     }
@@ -644,8 +708,10 @@ class _CreateListFromMovieSheetState extends State<_CreateListFromMovieSheet> {
     setState(() => _submitting = false);
 
     if (created == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(provider.error ?? 'Unable to create list')),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+            type: FlixieToastType.error,
+            content: Text(provider.error ?? 'Unable to create list')),
       );
       return;
     }

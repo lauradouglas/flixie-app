@@ -206,7 +206,9 @@ class GroupRequestMemberStatus {
   final String status;
   final String? response;
   final String? watchedAt;
+  final String? missedAt;
   final int? rating;
+  final bool? recommended;
   final String? reviewText;
   final String? username;
   final ProfileAvatar? avatar;
@@ -217,7 +219,9 @@ class GroupRequestMemberStatus {
     required this.status,
     this.response,
     this.watchedAt,
+    this.missedAt,
     this.rating,
+    this.recommended,
     this.reviewText,
     this.username,
     this.avatar,
@@ -233,7 +237,9 @@ class GroupRequestMemberStatus {
       ),
       response: json['response']?.toString(),
       watchedAt: json['watchedAt']?.toString(),
+      missedAt: json['missedAt']?.toString(),
       rating: _intValue(json['rating']),
+      recommended: _boolValue(json['recommended']),
       reviewText: json['reviewText']?.toString(),
       username: (responder?['username'] ?? json['username']) as String?,
       avatar: (responder?['avatar'] ?? json['avatar']) == null
@@ -361,6 +367,9 @@ class GroupWatchRequest {
 
   /// Postgres group-request ID when [id] is the mirrored conversation ID.
   final String? databaseRequestId;
+
+  /// Firestore conversation ID; a Postgres group ID cannot be used in its place.
+  final String? conversationId;
   final String groupId;
   final String userId;
   final String? message;
@@ -404,6 +413,7 @@ class GroupWatchRequest {
     this.databaseRequestId,
     required this.groupId,
     required this.userId,
+    this.conversationId,
     this.message,
     this.mediaType,
     this.mediaId,
@@ -487,6 +497,7 @@ class GroupWatchRequest {
     return GroupWatchRequest(
       id: json['id']?.toString() ?? '',
       databaseRequestId: json['pgGroupRequestId']?.toString(),
+      conversationId: json['conversationId']?.toString(),
       groupId: (json['conversationId'] ?? json['groupId'])?.toString() ?? '',
       userId: (json['createdById'] ?? json['requesterId'] ?? json['userId'])
               ?.toString() ??
@@ -592,7 +603,17 @@ class GroupWatchRequest {
   bool get canRespond => isActive && !hasExpired;
 
   GroupScheduleProposal? get activeScheduleProposal => scheduleProposals
-      .where((proposal) => proposal.status.toUpperCase() == 'PENDING')
+      .where((proposal) {
+        if (proposal.status.toUpperCase() != 'PENDING') return false;
+        final current = DateTime.tryParse(scheduledFor ?? '');
+        final proposed = DateTime.tryParse(proposal.proposedFor ?? '');
+        // Old initial proposals can remain pending after the slot is confirmed.
+        // Only a different time or location is a reschedule to review.
+        final sameSlot = current != null && proposed != null &&
+            current.isAtSameMomentAs(proposed) &&
+            (proposal.location ?? location ?? '').trim() == (location ?? '').trim();
+        return !sameSlot;
+      })
       .firstOrNull;
 
   /// A group request is mirrored between Postgres and the conversation store.
@@ -606,12 +627,20 @@ class GroupWatchRequest {
               status == WatchRequestStatus.scheduled) &&
           !hasExpired);
 
+  bool hasMissedFor(String userId) => memberStatuses
+      .any((member) => member.memberId == userId && member.missedAt != null);
+
+  bool hasLoggedFor(String userId) => memberStatuses
+      .any((member) => member.memberId == userId && member.watchedAt != null);
+
   bool canCompleteFor(String userId) =>
-      canComplete ??
-      ((status == WatchRequestStatus.accepted ||
-              status == WatchRequestStatus.scheduled) &&
-          hasCurrentUserCompleted != true &&
-          _userAccepted(userId));
+      !hasMissedFor(userId) &&
+      !hasLoggedFor(userId) &&
+      (canComplete ??
+          ((status == WatchRequestStatus.accepted ||
+                  status == WatchRequestStatus.scheduled) &&
+              hasCurrentUserCompleted != true &&
+              _userAccepted(userId)));
 
   bool canCancelFor(String userId) =>
       canCancel ?? (isActive && this.userId == userId);
@@ -620,7 +649,8 @@ class GroupWatchRequest {
   String get statusLabel => status.statusLabel;
 
   bool _userAccepted(String userId) {
-    if (hasCurrentUserAccepted == true) return true;
+    // Creating the plan joins its creator without a separate RSVP row.
+    if (this.userId == userId || hasCurrentUserAccepted == true) return true;
     return currentUserResponse == WatchResponseDecision.accepted ||
         memberStatuses.any(
           (s) => s.memberId == userId && s.status == 'ACCEPTED',

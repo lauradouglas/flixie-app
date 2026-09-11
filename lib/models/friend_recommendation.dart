@@ -6,6 +6,7 @@ class FriendRecommendationItem {
   final String? displayName;
   final String? avatarUrl;
   final ProfileAvatar? avatar;
+  final List<String> profileBadges;
   final double? rating;
   final bool recommends;
   final bool watched;
@@ -17,6 +18,7 @@ class FriendRecommendationItem {
     this.displayName,
     this.avatarUrl,
     this.avatar,
+    this.profileBadges = const [],
     this.rating,
     required this.recommends,
     this.watched = true,
@@ -36,6 +38,9 @@ class FriendRecommendationItem {
       avatar: json['avatar'] is Map<String, dynamic>
           ? ProfileAvatar.fromJson(json['avatar'] as Map<String, dynamic>)
           : null,
+      profileBadges: (json['profileBadges'] as List? ?? const [])
+          .map((e) => e.toString())
+          .toList(),
       rating: rating,
       recommends: json['recommends'] as bool? ?? false,
       watched: watched,

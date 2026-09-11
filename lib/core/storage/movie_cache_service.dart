@@ -19,6 +19,9 @@ class MovieCacheService {
   final Map<String, _CachedTrendingMovies> _trendingMoviesCache = {};
   final Map<String, _CachedWatchProviders> _watchProvidersCache = {};
 
+  int _revision = 0;
+  int get revision => _revision;
+
   // ---- Movie Caching ----
 
   /// Get a movie from cache if it exists and was cached today
@@ -53,7 +56,7 @@ class MovieCacheService {
   void cacheMovie(Movie movie) {
     final now = DateTime.now();
     _movieCache[movie.id] = _CachedMovie(
-      movie: movie,
+      movie: movie.copyWith(reviews: const []),
       timestamp: now,
     );
     logger.d('Cached movie ${movie.id} (${movie.title})');
@@ -180,12 +183,15 @@ class MovieCacheService {
 
   /// Remove cached data for a single movie (movie, credits, recommendations).
   void evictMovie(int movieId) {
+    _revision++;
     _movieCache.remove(movieId);
     _creditsCache.remove(movieId);
     _recommendationsCache.remove(movieId);
+    _watchProvidersCache.removeWhere((key, _) => key.startsWith('$movieId:'));
   }
 
   void clearCache() {
+    _revision++;
     final movieCount = _movieCache.length;
     final creditsCount = _creditsCache.length;
     final recommendationsCount = _recommendationsCache.length;

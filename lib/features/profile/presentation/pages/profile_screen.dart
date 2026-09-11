@@ -1,3 +1,5 @@
+import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -254,8 +256,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       await ShowService.dismissContinueWatching(userId, show.showId);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${show.name} removed from Continue Watching')),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+            type: FlixieToastType.success,
+            content: Text('${show.name} removed from Continue Watching')),
       );
     } catch (_) {
       if (!mounted) return;
@@ -263,8 +267,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final restoredIndex = index.clamp(0, _continueWatching.length);
         _continueWatching.insert(restoredIndex, show);
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not remove that show right now')),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+            type: FlixieToastType.error,
+            content: const Text('Could not remove that show right now')),
       );
     }
   }
@@ -726,7 +732,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 10),
                 ...entry.value.map((item) => Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: _ProfileActivityCard(item: item),
+                      child: ActivityTile(item: item),
                     )),
                 const SizedBox(height: 4),
               ]),
@@ -1983,250 +1989,6 @@ String _activityDateLabel(String raw) {
   if (days == 1) return 'Yesterday';
   if (days < 7) return '$days days ago';
   return '${date.day}/${date.month}/${date.year}';
-}
-
-class _ProfileActivityCard extends StatelessWidget {
-  const _ProfileActivityCard({required this.item});
-
-  final ActivityListItem item;
-
-  bool get _isWatch =>
-      item.type == ActivityListType.movieWatched ||
-      item.type == ActivityListType.showWatched;
-  bool get _isRating =>
-      item.type == ActivityListType.movieRating ||
-      item.type == ActivityListType.showRating;
-  bool get _isReview =>
-      item.type == ActivityListType.movieReview ||
-      item.type == ActivityListType.showReview;
-  bool get _isFavourite =>
-      item.type == ActivityListType.favoriteMovie ||
-      item.type == ActivityListType.favoriteShow ||
-      item.type == ActivityListType.favoritePerson;
-  bool get _isPerson => item.type == ActivityListType.favoritePerson;
-
-  String get _action {
-    if (_isFavourite) return 'You added';
-    if (_isWatch) {
-      final count = item.watchCount ?? (item.isRewatch ? 2 : 1);
-      return count > 1 ? 'You logged watch #$count of' : 'You watched';
-    }
-    if (_isRating) return 'You rated';
-    if (_isReview) return 'You reviewed';
-    if (item.type == ActivityListType.movieWatchlist ||
-        item.type == ActivityListType.showWatchlist) {
-      return 'You added';
-    }
-    return 'You updated';
-  }
-
-  String? get _suffix {
-    if (_isFavourite) return 'to favourites';
-    if (item.type == ActivityListType.movieWatchlist ||
-        item.type == ActivityListType.showWatchlist) {
-      return 'to your watchlist';
-    }
-    return null;
-  }
-
-  Color get _accent {
-    if (_isFavourite) return Colors.redAccent;
-    if (_isWatch) return FlixieColors.success;
-    if (_isRating) return FlixieColors.warning;
-    if (_isReview) return FlixieColors.secondary;
-    return FlixieColors.primary;
-  }
-
-  IconData get _chipIcon {
-    if (_isFavourite) return Icons.favorite_rounded;
-    if (_isWatch) return Icons.check_rounded;
-    if (_isRating) return Icons.star_rounded;
-    if (_isReview) return Icons.rate_review_outlined;
-    return Icons.bookmark_outline_rounded;
-  }
-
-  String get _chipLabel {
-    if (_isFavourite) return 'Favourite';
-    if (_isWatch) return item.isRewatch ? 'Watched again' : 'Watched';
-    if (_isRating) return '${_rating(item.mediaRating)}/10';
-    if (_isReview) return 'Reviewed';
-    return 'Watchlist';
-  }
-
-  String _rating(double? value) {
-    if (value == null) return '–';
-    return value == value.roundToDouble()
-        ? value.toStringAsFixed(0)
-        : value.toStringAsFixed(1);
-  }
-
-  void _open(BuildContext context) {
-    if (item.movieId != null) context.push(movieDetailPath(item.movieId!));
-    if (item.showId != null) context.push(showDetailPath(item.showId!));
-    if (item.personId != null) context.push(personDetailPath(item.personId!));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final rawPoster = item.mediaPosterPath;
-    final poster = rawPoster == null || rawPoster.isEmpty
-        ? null
-        : rawPoster.startsWith('http')
-            ? rawPoster
-            : 'https://image.tmdb.org/t/p/w342$rawPoster';
-    final excerpt = item.reviewData?.body.trim().isNotEmpty == true
-        ? item.reviewData!.body.trim()
-        : item.notes?.trim();
-
-    return Material(
-      color: FlixieColors.surface.withValues(alpha: .72),
-      borderRadius: BorderRadius.circular(16),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => _open(context),
-        child: Container(
-          height: (excerpt ?? '').isNotEmpty ? 168 : 144,
-          decoration: BoxDecoration(
-            border: Border.all(color: FlixieColors.tabBarBorder),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(
-                width: 92,
-                child: poster == null
-                    ? Container(
-                        color: FlixieColors.surfaceElevated,
-                        child: Icon(
-                          _isPerson
-                              ? Icons.person_outline_rounded
-                              : Icons.movie_outlined,
-                          color: FlixieColors.medium,
-                        ),
-                      )
-                    : CachedNetworkImage(
-                        imageUrl: poster,
-                        fit: BoxFit.cover,
-                        errorWidget: (_, __, ___) => Container(
-                          color: FlixieColors.surfaceElevated,
-                          child: Icon(
-                            _isPerson
-                                ? Icons.person_outline_rounded
-                                : Icons.movie_outlined,
-                            color: FlixieColors.medium,
-                          ),
-                        ),
-                      ),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 14, 8, 14),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text.rich(
-                        TextSpan(
-                          style: const TextStyle(
-                              color: FlixieColors.light,
-                              fontSize: 14,
-                              height: 1.4),
-                          children: [
-                            TextSpan(text: '$_action '),
-                            TextSpan(
-                              text: item.mediaTitle ?? 'Untitled',
-                              style: const TextStyle(
-                                  color: FlixieColors.white,
-                                  fontWeight: FontWeight.w800),
-                            ),
-                            if (_suffix != null) TextSpan(text: ' $_suffix'),
-                          ],
-                        ),
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 9),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 7,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(99),
-                              border: Border.all(color: _accent),
-                              color: _accent.withValues(alpha: .1),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(_chipIcon, color: _accent, size: 14),
-                                const SizedBox(width: 5),
-                                Text(_chipLabel,
-                                    style: TextStyle(
-                                        color: _accent,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w800)),
-                              ],
-                            ),
-                          ),
-                          if (item.recommended != null)
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  item.recommended!
-                                      ? Icons.thumb_up_alt_outlined
-                                      : Icons.thumb_down_alt_outlined,
-                                  color: item.recommended!
-                                      ? FlixieColors.success
-                                      : FlixieColors.danger,
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  item.recommended!
-                                      ? 'Recommends'
-                                      : "Doesn't recommend",
-                                  style: TextStyle(
-                                      color: item.recommended!
-                                          ? FlixieColors.success
-                                          : FlixieColors.danger,
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w700),
-                                ),
-                              ],
-                            ),
-                        ],
-                      ),
-                      if ((excerpt ?? '').isNotEmpty) ...[
-                        const SizedBox(height: 9),
-                        Text('“$excerpt”',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                color: FlixieColors.medium,
-                                fontStyle: FontStyle.italic,
-                                fontSize: 12.5)),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              const Padding(
-                padding: EdgeInsets.only(right: 8),
-                child: Icon(Icons.chevron_right_rounded,
-                    color: FlixieColors.medium),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _ProfileContinueWatching extends StatelessWidget {

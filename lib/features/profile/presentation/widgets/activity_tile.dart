@@ -1,278 +1,154 @@
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flixie_app/core/api/api_client.dart';
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
+import 'package:flixie_app/models/activity_reaction.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/activity_reaction_bubble.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-
 import 'package:flixie_app/models/activity_list_item.dart';
-import 'package:flixie_app/models/review.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
-import 'package:flixie_app/app/theme/app_theme.dart';
-import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
-import 'package:flixie_app/features/movies/presentation/widgets/review_card.dart';
 import 'package:flixie_app/core/analytics/detail_source.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/review_card.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/activity_feed_card.dart';
 import 'package:flixie_app/features/social/presentation/utils/activity_reply_payload.dart';
 
-class ActivityTile extends StatelessWidget {
-  const ActivityTile({
-    super.key,
-    required this.item,
-    this.compact = false,
-    this.showMoviePreview = true,
-    this.detailSource = DetailSource.unknown,
-  });
-
+/// The shared activity presentation used by Home, friends and profile feeds.
+class ActivityTile extends StatefulWidget {
+  const ActivityTile(
+      {super.key,
+      required this.item,
+      this.compact = false,
+      this.showMoviePreview = true,
+      this.detailSource = DetailSource.unknown});
   final ActivityListItem item;
-  final bool compact;
-  final bool showMoviePreview;
+  final bool compact, showMoviePreview;
   final DetailSource detailSource;
 
-  static const String _posterBase = 'https://image.tmdb.org/t/p/w342';
+  @override
+  State<ActivityTile> createState() => _ActivityTileState();
+}
 
-  Color get _accentColor {
-    switch (item.type) {
-      case ActivityListType.movieWatched:
-      case ActivityListType.showWatched:
-        return FlixieColors.success;
-      case ActivityListType.movieWatchlist:
-      case ActivityListType.showWatchlist:
-        return FlixieColors.warning;
-      case ActivityListType.favoriteMovie:
-      case ActivityListType.favoriteShow:
-      case ActivityListType.favoritePerson:
-        return Colors.redAccent;
-      case ActivityListType.movieRating:
-      case ActivityListType.showRating:
-        return FlixieColors.primary;
-      case ActivityListType.movieReview:
-      case ActivityListType.showReview:
-        return FlixieColors.secondary;
-      case ActivityListType.watchRequestSent:
-      case ActivityListType.watchRequestAccepted:
-      case ActivityListType.watchRequest:
-        return FlixieColors.tertiary;
-      case ActivityListType.movieListAdded:
-        return FlixieColors.primary;
-      case ActivityListType.unknown:
-        return FlixieColors.medium;
+class _ActivityTileState extends State<ActivityTile>
+    with WidgetsBindingObserver {
+  ActivityListItem get item => widget.item;
+  DetailSource get detailSource => widget.detailSource;
+  ActivityReactionSummary _reactions = const ActivityReactionSummary();
+  bool _saving = false;
+  int _generation = 0;
+  static final _loads = <String, ({DateTime time, Future<dynamic> future})>{};
+  String get _key => '${item.type.value}:${item.id}';
+  String get _path => '/friends/activity-reactions/${item.userId}';
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _load();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant ActivityTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.item != item) {
+      if (oldWidget.item.id != item.id ||
+          oldWidget.item.type != item.type ||
+          oldWidget.item.userId != item.userId) {
+        ++_generation;
+        _reactions = const ActivityReactionSummary();
+        _saving = false;
+      }
+      _load();
     }
   }
 
-  String _formatDate(String iso) {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _load(force: true);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  Future<void> _load({bool force = false}) async {
+    final actor = context.read<AuthProvider?>()?.dbUser?.id;
+    if (actor == null || item.userId.isEmpty || _saving) return;
+    final generation = ++_generation;
+    final cacheKey = '$actor:${item.userId}';
+    final cached = _loads[cacheKey];
+    final future = !force &&
+            cached != null &&
+            DateTime.now().difference(cached.time).inSeconds < 20
+        ? cached.future
+        : ApiClient.get(_path);
+    if (_loads.length > 100) _loads.clear();
+    _loads[cacheKey] = (time: DateTime.now(), future: future);
     try {
-      final dt = DateTime.parse(iso);
-      final now = DateTime.now();
-      final diff = now.difference(dt);
-      if (diff.inMinutes < 1) return 'Just now';
-      if (diff.inHours < 1) return '${diff.inMinutes}m ago';
-      if (diff.inHours < 24) return '${diff.inHours}h ago';
-      if (diff.inDays == 1) return 'Yesterday';
-      if (diff.inDays < 7) return '${diff.inDays}d ago';
-      return '${dt.day}/${dt.month}/${dt.year}';
+      final data = await future as Map;
+      if (mounted && generation == _generation && !_saving) {
+        setState(() => _reactions = data[_key] is Map
+            ? ActivityReactionSummary.fromJson(
+                Map<String, dynamic>.from(data[_key]))
+            : const ActivityReactionSummary());
+      }
     } catch (_) {
-      return '';
+      _loads.remove(cacheKey);
     }
   }
 
-  String _displayName() {
-    final username = item.username.trim();
-    if (username.isNotEmpty) return username;
-    final fullName = '${item.firstName} ${item.lastName}'.trim();
-    if (fullName.isNotEmpty) return fullName;
-    return 'Friend';
-  }
-
-  String _statusLabel() {
-    switch (item.type) {
-      case ActivityListType.movieWatchlist:
-      case ActivityListType.showWatchlist:
-        return 'Watchlist';
-      case ActivityListType.movieWatched:
-      case ActivityListType.showWatched:
-        return item.isRewatch ? 'Rewatched' : 'Watched';
-      case ActivityListType.movieRating:
-      case ActivityListType.showRating:
-        return (item.mediaRating ?? 0) >= 9 ? 'Rated 9+/10' : 'Rated';
-      case ActivityListType.movieReview:
-      case ActivityListType.showReview:
-        return 'Review';
-      case ActivityListType.favoriteMovie:
-      case ActivityListType.favoriteShow:
-      case ActivityListType.favoritePerson:
-        return 'Favourites';
-      case ActivityListType.watchRequest:
-      case ActivityListType.watchRequestAccepted:
-      case ActivityListType.watchRequestSent:
-        return 'Request';
-      case ActivityListType.movieListAdded:
-        return 'List';
-      case ActivityListType.unknown:
-        return 'Activity';
+  Future<void> _save(String? emoji) async {
+    if (_saving) return;
+    final previous = _reactions;
+    final key = _key;
+    ++_generation;
+    setState(() {
+      _saving = true;
+      _reactions = previous.selecting(emoji);
+    });
+    try {
+      final data = await ApiClient.put(_path, body: {
+        'activityId': item.id,
+        'activityType': item.type.value,
+        'reaction': emoji
+      });
+      _loads.clear();
+      if (mounted && _key == key) {
+        setState(() => _reactions =
+            ActivityReactionSummary.fromJson(Map<String, dynamic>.from(data)));
+      }
+    } catch (_) {
+      if (mounted && _key == key) {
+        setState(() => _reactions = previous);
+        ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+            type: FlixieToastType.error,
+            content: const Text('Couldn’t save your reaction'),
+            action: SnackBarAction(
+                label: 'Retry',
+                onPressed: () {
+                  if (mounted && _key == key) _save(emoji);
+                })));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
-  String _formatRating(double? rating) {
-    if (rating == null) return '';
-    final rounded = rating.roundToDouble();
-    if (rounded == rating) return rounded.toStringAsFixed(0);
-    return rating.toStringAsFixed(1);
-  }
-
-  String _headlineText(String title) {
-    switch (item.type) {
-      case ActivityListType.movieRating:
-      case ActivityListType.showRating:
-        final rating = item.mediaRating;
-        if (rating != null) {
-          return 'rated $title ${_formatRating(rating)}/10';
-        }
-        return 'rated $title';
-      case ActivityListType.movieReview:
-      case ActivityListType.showReview:
-        return 'reviewed $title';
-      case ActivityListType.movieWatched:
-      case ActivityListType.showWatched:
-        if (item.isRewatch) {
-          final count = item.watchCount;
-          if (count != null && count > 1) {
-            return 'watched $title again · $count times';
-          }
-          return 'watched $title again';
-        }
-        return 'watched $title';
-      case ActivityListType.favoriteMovie:
-      case ActivityListType.favoriteShow:
-      case ActivityListType.favoritePerson:
-        return 'added $title to favourites';
-      case ActivityListType.movieWatchlist:
-      case ActivityListType.showWatchlist:
-        return 'added $title to their watchlist';
-      case ActivityListType.watchRequest:
-      case ActivityListType.watchRequestAccepted:
-      case ActivityListType.watchRequestSent:
-        return 'shared $title';
-      case ActivityListType.movieListAdded:
-        final extras = (item.listAdditionCount ?? 1) - 1;
-        final list = item.listName ?? 'a list';
-        return extras > 0
-            ? 'added $title and $extras other ${extras == 1 ? 'title' : 'titles'} to $list'
-            : 'added $title to $list';
-      case ActivityListType.unknown:
-        return 'activity on $title';
+  Future<void> _react(BuildContext anchor) async {
+    final chosen = await showActivityReactionBubble(context, anchor,
+        current: _reactions.mine,
+        canReply: item.userId != context.read<AuthProvider?>()?.dbUser?.id);
+    if (!mounted) return;
+    if (chosen == 'reply') {
+      final payload = ActivityReplyPayload.fromActivity(item);
+      context.push('/chat/${item.userId}',
+          extra: payload.isUsable ? payload : null);
     }
-  }
-
-  String? _reviewSnippet() {
-    final reviewBody = item.reviewData?.body.trim();
-    if (reviewBody != null && reviewBody.isNotEmpty) return reviewBody;
-    final noteBody = item.notes?.trim();
-    if (noteBody != null && noteBody.isNotEmpty) return noteBody;
-    return null;
-  }
-
-  Widget _buildAvatar() {
-    final initial = _displayName().substring(0, 1).toUpperCase();
-    return ProfileAvatarView(
-      avatar: item.avatar,
-      fallbackText: initial,
-      fallbackColor: FlixieColors.primary,
-      size: compact ? 38 : 44,
-      profileBadges: item.profileBadges,
-    );
-  }
-
-  String? _contextBadgeText(String? currentUserId) {
-    if (currentUserId != item.userId || item.userId.isEmpty) return null;
-    switch (item.type) {
-      case ActivityListType.movieWatchlist:
-      case ActivityListType.showWatchlist:
-        return 'In your watchlist';
-      case ActivityListType.favoriteMovie:
-      case ActivityListType.favoriteShow:
-      case ActivityListType.favoritePerson:
-        return 'One of your favourites';
-      case ActivityListType.movieWatched:
-      case ActivityListType.showWatched:
-        return null;
-      case ActivityListType.movieRating:
-      case ActivityListType.showRating:
-        if (item.mediaRating != null) {
-          return 'You rated this ${item.mediaRating!.toStringAsFixed(1)}/10';
-        }
-        return 'You rated this';
-      case ActivityListType.movieReview:
-      case ActivityListType.showReview:
-        return 'You reviewed this';
-      case ActivityListType.watchRequest:
-      case ActivityListType.watchRequestAccepted:
-      case ActivityListType.watchRequestSent:
-      case ActivityListType.movieListAdded:
-      case ActivityListType.unknown:
-        return null;
+    if (chosen is ActivityReaction) {
+      await _save(chosen.emoji == _reactions.mine ? null : chosen.emoji);
     }
-  }
-
-  Widget _buildChip({
-    required IconData icon,
-    required String label,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.35)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w700,
-              fontSize: 11,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _openReviewSheet(
-    BuildContext context,
-    Review review,
-    String? currentUserId,
-  ) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        decoration: const BoxDecoration(
-          color: FlixieColors.background,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: FlixieColors.medium,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            ReviewCard(review: review, currentUserId: currentUserId),
-          ],
-        ),
-      ),
-    );
   }
 
   String? _mediaRoute() {
@@ -299,326 +175,43 @@ class ActivityTile extends StatelessWidget {
     );
   }
 
-  void _replyToActivity(
-    BuildContext context,
-    ActivityReplyPayload payload,
-  ) {
-    if (item.userId.isEmpty) return;
-    context.push('/chat/${item.userId}', extra: payload);
-  }
-
   @override
   Widget build(BuildContext context) {
     final currentUserId = context.read<AuthProvider?>()?.dbUser?.id;
-    final displayName = _displayName();
-    final username = item.username.trim();
-    final title = item.mediaTitle ?? 'something';
-    final dateStr = _formatDate(item.timestamp);
-    final notes = (item.notes ?? '').trim();
-    final reviewSnippet = _reviewSnippet();
-    final isPerson = item.type == ActivityListType.favoritePerson;
-    final mediaRoute = _mediaRoute();
-    final isReview = item.type == ActivityListType.movieReview ||
-        item.type == ActivityListType.showReview;
-    final rawPoster = item.mediaPosterPath;
-    final posterUrl = rawPoster == null || rawPoster.isEmpty
-        ? null
-        : rawPoster.startsWith('http')
-            ? rawPoster
-            : '$_posterBase$rawPoster';
-    final contextText = _contextBadgeText(currentUserId);
-    final activityReply = ActivityReplyPayload.fromActivity(item);
-    final canReply = activityReply.isUsable &&
-        detailSource == DetailSource.friendActivity &&
-        item.userId.isNotEmpty &&
-        item.userId != currentUserId;
-
-    final tile = ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: FlixieColors.surface.withValues(alpha: 0.92),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              FlixieColors.surfaceElevated.withValues(alpha: 0.7),
-              FlixieColors.surface.withValues(alpha: 0.96),
-            ],
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: FlixieColors.primary.withValues(alpha: 0.08),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Padding(
-          padding: EdgeInsets.all(compact ? 10 : 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  GestureDetector(
-                    onTap: item.userId.isEmpty
-                        ? null
-                        : () => context.push('/friends/${item.userId}'),
-                    child: _buildAvatar(),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: item.userId.isEmpty
-                          ? null
-                          : () => context.push('/friends/${item.userId}'),
-                      child: Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              username.isNotEmpty ? username : displayName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: compact ? 14 : 16,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 7),
-                          const Text(
-                            '·',
-                            style: TextStyle(color: FlixieColors.medium),
-                          ),
-                          const SizedBox(width: 7),
-                          Flexible(
-                            child: Text(
-                              dateStr,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: FlixieColors.medium,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  if (canReply)
-                    TextButton.icon(
-                      onPressed: () => _replyToActivity(context, activityReply),
-                      icon: const Icon(Icons.reply_rounded, size: 16),
-                      label: const Text('Reply'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: FlixieColors.primaryTint,
-                        minimumSize: const Size(0, 34),
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                    )
-                  else
-                    const Icon(
-                      Icons.more_horiz_rounded,
-                      color: FlixieColors.medium,
-                      size: 21,
-                    ),
-                ],
+    final route = _mediaRoute();
+    final payload = ActivityReplyPayload.fromActivity(item);
+    return ActivityFeedCard(
+      item: item,
+      reactions: _reactions,
+      busy: _saving,
+      onReact: item.userId == currentUserId ? null : _react,
+      onReactionSelected: item.userId == currentUserId ? null : _save,
+      onOpen: route == null ? null : () => context.push(route),
+      onProfile: () => context.push(item.userId == currentUserId
+          ? '/profile'
+          : '/friends/${item.userId}'),
+      onReply: item.userId.isEmpty || item.userId == currentUserId
+          ? null
+          : () => context.push('/chat/${item.userId}',
+              extra: payload.isUsable ? payload : null),
+      onOpenList: item.listId == null || item.listOwnerId == null
+          ? null
+          : () => _openList(context),
+      onReview: item.reviewData == null
+          ? null
+          : () => showModalBottomSheet<void>(
+                context: context,
+                useRootNavigator: true,
+                useSafeArea: true,
+                isScrollControlled: true,
+                builder: (context) => SizedBox(
+                    height: MediaQuery.sizeOf(context).height * .8,
+                    child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: ReviewCard(
+                            review: item.reviewData!,
+                            currentUserId: currentUserId))),
               ),
-              const SizedBox(height: 6),
-              Text(
-                _headlineText(title),
-                style: TextStyle(
-                  color: FlixieColors.light,
-                  fontSize: compact ? 13 : 14,
-                  fontWeight: FontWeight.w500,
-                  height: 1.35,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              if (showMoviePreview) ...[
-                const SizedBox(height: 10),
-                InkWell(
-                  onTap: mediaRoute != null
-                      ? () => context.push(mediaRoute)
-                      : null,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: SizedBox(
-                          width: compact ? 72 : 86,
-                          height: compact ? 96 : 114,
-                          child: posterUrl == null
-                              ? Container(
-                                  color: FlixieColors.surfaceElevated,
-                                  alignment: Alignment.center,
-                                  child: Icon(
-                                    isPerson
-                                        ? Icons.person_outline_rounded
-                                        : Icons.movie_outlined,
-                                    color: FlixieColors.light,
-                                  ),
-                                )
-                              : CachedNetworkImage(
-                                  imageUrl: posterUrl,
-                                  fit: BoxFit.cover,
-                                  errorWidget: (_, __, ___) => Container(
-                                    color: FlixieColors.surfaceElevated,
-                                    alignment: Alignment.center,
-                                    child: Icon(
-                                      isPerson
-                                          ? Icons.person_outline_rounded
-                                          : Icons.movie_outlined,
-                                      color: FlixieColors.light,
-                                    ),
-                                  ),
-                                ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: compact ? 14 : 18,
-                                fontWeight: FontWeight.w700,
-                                height: 1.15,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 6,
-                              children: [
-                                if (item.type != ActivityListType.movieRating &&
-                                    item.type != ActivityListType.showRating)
-                                  _buildChip(
-                                    icon: Icons.local_activity_outlined,
-                                    label: _statusLabel(),
-                                    color: _accentColor,
-                                  ),
-                                if (item.mediaRating != null)
-                                  _buildChip(
-                                    icon: Icons.star_rounded,
-                                    label:
-                                        '${item.mediaRating!.toStringAsFixed(1)}/10',
-                                    color: FlixieColors.tertiary,
-                                  ),
-                                if (item.recommended != null)
-                                  _buildChip(
-                                    icon: item.recommended!
-                                        ? Icons.thumb_up_alt_rounded
-                                        : Icons.thumb_down_alt_rounded,
-                                    label: item.recommended!
-                                        ? 'Recommends'
-                                        : 'Doesn\'t recommend',
-                                    color: item.recommended!
-                                        ? FlixieColors.success
-                                        : FlixieColors.medium,
-                                  ),
-                              ],
-                            ),
-                            if (notes.isNotEmpty || reviewSnippet != null) ...[
-                              const SizedBox(height: 8),
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 9,
-                                  vertical: 7,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: FlixieColors.surface.withValues(
-                                    alpha: 0.8,
-                                  ),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.08),
-                                  ),
-                                ),
-                                child: Text(
-                                  reviewSnippet ?? notes,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: FlixieColors.light,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            ],
-                            if (item.type == ActivityListType.movieListAdded &&
-                                item.listId != null &&
-                                item.listOwnerId != null) ...[
-                              const SizedBox(height: 8),
-                              TextButton.icon(
-                                onPressed: () => _openList(context),
-                                icon: const Icon(
-                                  Icons.playlist_play_rounded,
-                                  size: 16,
-                                ),
-                                label: Text('Open ${item.listName ?? 'list'}'),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: FlixieColors.primaryTint,
-                                  padding: EdgeInsets.zero,
-                                  minimumSize: const Size(0, 28),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ] else if (notes.isNotEmpty || reviewSnippet != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  reviewSnippet ?? notes,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: FlixieColors.light,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-              if (contextText != null) ...[
-                const SizedBox(height: 10),
-                _buildChip(
-                  icon: Icons.person_outline_rounded,
-                  label: contextText,
-                  color: FlixieColors.primary,
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
     );
-
-    if (isReview && item.reviewData != null) {
-      return GestureDetector(
-        onTap: () => _openReviewSheet(context, item.reviewData!, currentUserId),
-        child: tile,
-      );
-    }
-
-    return tile;
   }
 }

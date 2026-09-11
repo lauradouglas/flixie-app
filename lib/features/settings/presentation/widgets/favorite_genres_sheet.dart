@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -68,18 +69,20 @@ class _FavoriteGenresSheetState extends State<FavoriteGenresSheet> {
       // Capture messenger before pop - context is deactivated after pop()
       final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop();
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Favourite genres updated.'),
+      messenger.showFlixieToast(
+        FlixieToast(
+          type: FlixieToastType.success,
+          content: const Text('Favourite genres updated.'),
           backgroundColor: FlixieColors.surfaceElevated,
         ),
       );
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to save genres. Please try again.'),
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+          type: FlixieToastType.error,
+          content: const Text('Failed to save genres. Please try again.'),
           backgroundColor: FlixieColors.danger,
         ),
       );

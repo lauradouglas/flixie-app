@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/scheduler.dart';
@@ -103,6 +104,8 @@ class AuthProvider extends ChangeNotifier {
   String? _errorMessage;
   String? _errorCode;
   int _activityVersion = 0;
+  int _friendDataVersion = 0;
+  int get friendDataVersion => _friendDataVersion;
   bool _pendingReferralQualification = false;
 
   // Prefetched at login - screens use these to skip spinners
@@ -237,6 +240,7 @@ class AuthProvider extends ChangeNotifier {
 
   /// Update the friends cache, e.g. after accepting/declining a request.
   void updateCachedFriends(FriendsData friends) {
+    _friendDataVersion++;
     _cachedFriends = friends;
     notifyListeners();
   }
@@ -248,6 +252,7 @@ class AuthProvider extends ChangeNotifier {
     required List<Group> groups,
   }) {
     _cachedFriends = friends;
+    _friendDataVersion++;
     _cachedFriendsActivity = activity;
     _cachedGroups = groups;
     notifyListeners();
@@ -269,6 +274,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   void invalidateCachedFriends() {
+    _friendDataVersion++;
     _cachedFriends = null;
     notifyListeners();
   }
@@ -509,8 +515,32 @@ class AuthProvider extends ChangeNotifier {
     });
   }
 
+  String _friendIdentitySnapshot(FriendsData? data) =>
+      jsonEncode(data?.friendships
+          .map((friendship) => [
+                friendship.id,
+                friendship.friendId,
+                for (final user in [
+                  friendship.friend,
+                  friendship.recipient,
+                  friendship.requester
+                ])
+                  [
+                    user?.id,
+                    user?.username,
+                    user?.avatar?.toJson(),
+                    user?.profileBadges
+                  ],
+              ])
+          .toList());
+
   void _applyPrefetchSnapshot(AuthPrefetchSnapshot snapshot) {
     _cachedActivity = snapshot.activity ?? _cachedActivity;
+    if (snapshot.friends != null &&
+        _friendIdentitySnapshot(snapshot.friends) !=
+            _friendIdentitySnapshot(_cachedFriends)) {
+      _friendDataVersion++;
+    }
     _cachedFriends = snapshot.friends ?? _cachedFriends;
     _cachedFriendsActivity = snapshot.friendsActivity ?? _cachedFriendsActivity;
     _cachedGroups = snapshot.groups ?? _cachedGroups;

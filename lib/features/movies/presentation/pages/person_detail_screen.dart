@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -372,8 +373,9 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
           _isFavorite = !_isFavorite;
           _isFavoriteLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.success,
             content: Text(
               _isFavorite
                   ? 'Added to favourite people'
@@ -385,9 +387,10 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isFavoriteLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not update favourite person.'),
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.error,
+            content: const Text('Could not update favourite person.'),
             backgroundColor: FlixieColors.danger,
           ),
         );

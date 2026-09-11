@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -109,9 +110,10 @@ class _WatchProvidersSheetState extends State<WatchProvidersSheet> {
 
       Navigator.pop(context);
 
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Watch providers updated'),
+      messenger.showFlixieToast(
+        FlixieToast(
+          type: FlixieToastType.success,
+          content: const Text('Watch providers updated'),
           backgroundColor: FlixieColors.surfaceElevated,
         ),
       );
@@ -120,9 +122,10 @@ class _WatchProvidersSheetState extends State<WatchProvidersSheet> {
 
       setState(() => _saving = false);
 
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Failed to update watch providers'),
+      messenger.showFlixieToast(
+        FlixieToast(
+          type: FlixieToastType.error,
+          content: const Text('Failed to update watch providers'),
           backgroundColor: FlixieColors.danger,
         ),
       );
