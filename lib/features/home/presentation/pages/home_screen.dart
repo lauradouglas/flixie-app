@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/core/auth/startup_trace.dart';
 import 'package:flixie_app/features/home/presentation/models/home_watch_plan_visibility.dart';
 import 'package:flixie_app/core/api/api_client.dart';
@@ -1002,9 +1003,9 @@ class _HomeScreenState extends State<HomeScreen> {
     await WatchPlanVisibilityStore.dismissIntroduction(userId);
   }
 
-  Future<void> _showWatchPlansExplanation() => showDialog<void>(
+  Future<void> _showWatchPlansExplanation() => showFlixiePromptSheet<void>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
+        builder: (dialogContext) => FlixiePromptSheetContent(
           title: const Text('Choose together'),
           content: const Text(
             'Add a few movie options, invite a friend or group, then choose the final movie and arrange when and where to watch.',
@@ -1872,9 +1873,19 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Padding(
             padding: const EdgeInsets.only(left: 16),
             child: _isLoadingRecommendations
-                ? const Padding(
-                    padding: EdgeInsets.only(right: 10),
-                    child: _RecommendationGeneratingCard(),
+                ? LayoutBuilder(
+                    builder: (context, constraints) => Align(
+                      alignment: Alignment.centerLeft,
+                      child: SizedBox(
+                        width: constraints.maxWidth *
+                            _forYouPageController.viewportFraction,
+                        height: PersonalizedRecommendationCard.height,
+                        child: const Padding(
+                          padding: EdgeInsets.only(right: 10),
+                          child: _RecommendationGeneratingCard(),
+                        ),
+                      ),
+                    ),
                   )
                 : PageView.builder(
                     controller: _forYouPageController,
@@ -2769,6 +2780,7 @@ class _RecommendationGeneratingCardState
           builder: (context, _) {
             final movement = Curves.easeInOut.transform(_controller.value);
             return Stack(
+              fit: StackFit.expand,
               alignment: Alignment.center,
               children: [
                 Positioned(
@@ -2799,7 +2811,8 @@ class _RecommendationGeneratingCardState
                     ),
                   ),
                 ),
-                Transform.translate(
+                Center(
+                    child: Transform.translate(
                   offset: Offset(0, -10 + (movement * 5)),
                   child: Container(
                     width: 88,
@@ -2827,7 +2840,7 @@ class _RecommendationGeneratingCardState
                       size: 38,
                     ),
                   ),
-                ),
+                )),
                 Positioned(
                   top: 46,
                   left: 112,
@@ -2855,30 +2868,22 @@ class _RecommendationGeneratingCardState
                 const Positioned(
                   left: 20,
                   right: 20,
-                  bottom: 52,
-                  child: Text(
-                    'Mixing your movie magic…',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: FlixieColors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-                const Positioned(
-                  left: 20,
-                  right: 20,
-                  bottom: 30,
-                  child: Text(
-                    'Taste, favourites and a little sparkle',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: FlixieColors.medium,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  bottom: 24,
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Text('Mixing your movie magic…',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            color: FlixieColors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900)),
+                    SizedBox(height: 6),
+                    Text('Taste, favourites and a little sparkle',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            color: FlixieColors.medium,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600)),
+                  ]),
                 ),
               ],
             );

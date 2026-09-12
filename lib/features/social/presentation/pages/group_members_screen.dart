@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -116,9 +117,9 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
   }
 
   Future<void> _transferOwnership(GroupMember member) async {
-    final confirm = await showDialog<bool>(
+    final confirm = await showFlixiePromptSheet<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => FlixiePromptSheetContent(
         title: const Text('Transfer Ownership',
             style: TextStyle(color: FlixieColors.light)),
         content: Text(
@@ -162,9 +163,9 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
   }
 
   Future<void> _removeMember(GroupMember member) async {
-    final confirm = await showDialog<bool>(
+    final confirm = await showFlixiePromptSheet<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => FlixiePromptSheetContent(
         title: const Text('Remove Member',
             style: TextStyle(color: FlixieColors.light)),
         content: Text(

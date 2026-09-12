@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
@@ -44,9 +45,9 @@ class ContinueWatchingCarousel extends StatelessWidget {
     BuildContext context,
     ContinueWatchingShow show,
   ) async {
-    final remove = await showDialog<bool>(
+    final remove = await showFlixiePromptSheet<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => FlixiePromptSheetContent(
         title: const Text('Remove from Continue Watching?'),
         content: Text(
           '${show.name} will be hidden here. Your watched episodes and '

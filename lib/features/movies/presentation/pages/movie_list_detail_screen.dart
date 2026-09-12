@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'dart:async';
 
@@ -163,9 +164,9 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
   }
 
   Future<void> _deleteList() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showFlixiePromptSheet<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => FlixiePromptSheetContent(
         title: const Text('Delete this list?'),
         content: const Text(
           'The collection will be removed for everyone. This cannot be undone.',
@@ -203,9 +204,9 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
   Future<void> _leaveList() async {
     final currentUserId = context.read<AuthProvider>().dbUser?.id;
     if (currentUserId == null) return;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showFlixiePromptSheet<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => FlixiePromptSheetContent(
         title: const Text('Leave this list?'),
         content: const Text(
           'It will disappear from your lists, but everyone else keeps access.',
@@ -625,9 +626,9 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
     final showId = _entryShowId(entry);
     if (movieId <= 0 && showId <= 0) return;
     final title = _entryTitle(entry);
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showFlixiePromptSheet<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => FlixiePromptSheetContent(
         title: const Text('Remove from list?'),
         content: Text(
           entry.addedBy != null &&

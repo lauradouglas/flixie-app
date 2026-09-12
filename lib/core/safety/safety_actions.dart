@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 
@@ -136,9 +137,9 @@ class SafetyActions {
     required String userId,
     required String username,
   }) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showFlixiePromptSheet<bool>(
           context: context,
-          builder: (context) => AlertDialog(
+          builder: (context) => FlixiePromptSheetContent(
             title: Text('Block @$username?'),
             content: const Text(
               'You will be unfriended. They will no longer be able to interact '

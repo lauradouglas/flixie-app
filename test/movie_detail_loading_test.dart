@@ -91,6 +91,9 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(movies.creditCalls, 2);
+    // The title can be disposed by the sliver while the credits are visible.
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 3000));
+    await tester.pumpAndSettle();
     expect(find.text('Useful movie'), findsWidgets);
     expect(tester.takeException(), isNull);
     debugPrint(

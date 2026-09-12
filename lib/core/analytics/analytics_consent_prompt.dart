@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -50,11 +51,10 @@ class _AnalyticsConsentPromptState extends State<AnalyticsConsentPrompt> {
       return;
     }
 
-    await showDialog<void>(
+    await showFlixiePromptSheet<void>(
       context: navigatorContext,
-      useRootNavigator: true,
-      barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
+      isDismissible: false,
+      builder: (dialogContext) => FlixiePromptSheetContent(
         title: const Text('Share anonymous analytics?'),
         content: const SingleChildScrollView(
           child: Text(
@@ -77,8 +77,10 @@ class _AnalyticsConsentPromptState extends State<AnalyticsConsentPrompt> {
           ),
         ),
         actions: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 10,
+            runSpacing: 8,
             children: [
               OutlinedButton(
                 onPressed: () async {
@@ -88,7 +90,7 @@ class _AnalyticsConsentPromptState extends State<AnalyticsConsentPrompt> {
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                 ),
-                child: const Text('Decline', maxLines: 1, softWrap: false),
+                child: const Text('Decline'),
               ),
               const SizedBox(width: 10),
               FilledButton(

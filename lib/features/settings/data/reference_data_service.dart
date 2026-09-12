@@ -17,7 +17,10 @@ class ReferenceDataService {
 
   static Future<List<Country>> getCountries() async {
     final data = await ApiClient.get('/utils/countries');
-    return (data as List<dynamic>)
+    final entries =
+        data is List ? data : (data as Map<String, dynamic>)['countries'];
+    if (entries is! List) throw const FormatException('Invalid country list');
+    return entries
         .map((e) => Country.fromJson(e as Map<String, dynamic>))
         .toList();
   }

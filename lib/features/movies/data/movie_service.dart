@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/movies/data/media_review_service.dart';
 import 'package:flixie_app/models/friend_recommendation.dart';
 import 'package:flixie_app/models/friend_summary.dart';
 import 'package:flixie_app/models/movie.dart';
@@ -168,35 +169,9 @@ class MovieService {
     apiLogger
         .d('Fetching watch providers for movie $movieId in region $region.');
 
-    List<WatchProvider> parseProviders(dynamic data) {
-      Iterable<dynamic> typedList(String type, dynamic value) {
-        if (value is! Iterable) return const [];
-        return value.whereType<Map<String, dynamic>>().map(
-              (provider) => {
-                ...provider,
-                'availabilityType': type,
-              },
-            );
-      }
-
-      final rawList = data is Map<String, dynamic>
-          ? [
-              ...typedList('stream', data['stream'] ?? data['flatrate']),
-              ...typedList('buy', data['buy']),
-              ...typedList('rent', data['rent']),
-              ...typedList('stream', data['watchProviders']),
-              ...typedList('stream', data['providers']),
-              ...typedList('stream', data['results']),
-            ]
-          : (data as List<dynamic>? ?? const []);
-      return rawList
-          .map((e) => WatchProvider.fromJson(e as Map<String, dynamic>))
-          .toList();
-    }
-
     try {
       final detailData = await _get('/movies/$movieId/$region/watch/providers');
-      final providers = parseProviders(detailData);
+      final providers = parseWatchProviderOffers(detailData);
       if (revision == _cache.revision) {
         _cache.cacheWatchProviders(movieId, region, providers);
       }
@@ -207,9 +182,9 @@ class MovieService {
       );
       final cacheData = await _get(
         '/movies/$movieId/watch-providers',
-        queryParams: {'region': region},
+        queryParams: {'countryCode': region},
       );
-      final providers = parseProviders(cacheData);
+      final providers = parseWatchProviderOffers(cacheData);
       if (revision == _cache.revision) {
         _cache.cacheWatchProviders(movieId, region, providers);
       }
@@ -217,14 +192,9 @@ class MovieService {
     }
   }
 
-  Future<List<Review>> getMovieReviews(int movieId, {String? userId}) async {
-    apiLogger.d('Fetching reviews for movie $movieId from API');
-    final data = await _get('/users/MOVIE/$movieId/reviews',
-        queryParams: userId != null ? {'userId': userId} : null);
-    return (data as List<dynamic>)
-        .map((e) => Review.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
+  Future<List<Review>> getMovieReviews(int movieId, {String? userId}) =>
+      MediaReviewService.getReviews(ReviewMediaType.movie, movieId,
+          userId: userId);
 
   Future<List<TopRatedMovie>> getTopRatedThisWeek({int limit = 10}) async {
     apiLogger.d('Fetching top rated movies this week');

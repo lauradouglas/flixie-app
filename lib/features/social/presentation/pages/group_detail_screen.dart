@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -494,9 +495,9 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
     }
     if (action != 'delete') return;
 
-    final confirm = await showDialog<bool>(
+    final confirm = await showFlixiePromptSheet<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => FlixiePromptSheetContent(
         title: const Text('Delete Group',
             style: TextStyle(color: FlixieColors.light)),
         content: const Text(

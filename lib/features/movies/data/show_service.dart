@@ -1,3 +1,5 @@
+import 'package:flixie_app/features/movies/data/media_review_service.dart';
+import 'package:flixie_app/models/friend_recommendation.dart';
 import 'package:flixie_app/models/show.dart';
 import 'package:flixie_app/models/continue_watching_show.dart';
 import 'package:flixie_app/models/review.dart';
@@ -130,12 +132,45 @@ class ShowService {
     await ApiClient.delete('/users/$userId/show/favorite/$showId');
   }
 
-  static Future<List<Review>> getShowReviews(int showId) async {
-    final data = await ApiClient.get('/shows/$showId/reviews');
-    return (data as List<dynamic>)
-        .map((e) => Review.fromJson(e as Map<String, dynamic>))
-        .toList();
+  static Future<List<Review>> getShowReviews(int showId, {String? userId}) =>
+      MediaReviewService.getReviews(ReviewMediaType.show, showId,
+          userId: userId);
+
+  static Future<Map<int, FriendRecommendationResponse>>
+      getFriendRecommendations(Iterable<int> showIds,
+          {bool Function()? isCurrent}) async {
+    final ids = showIds.where((id) => id > 0).toSet().toList();
+    final results = <int, FriendRecommendationResponse>{};
+    for (var start = 0; start < ids.length; start += 25) {
+      if (isCurrent != null && !isCurrent()) break;
+      final chunk = ids.skip(start).take(25).toList();
+      try {
+        final data = await ApiClient.post('/shows/friend-recommendations',
+            body: {'showIds': chunk});
+        for (final item in data['items'] as List) {
+          try {
+            final id =
+                int.parse((item['showId'] ?? item['movieId']).toString());
+            if (chunk.contains(id)) {
+              results[id] = FriendRecommendationResponse.fromJson(
+                  Map<String, dynamic>.from(item as Map));
+            }
+          } catch (_) {
+            /* Keep valid titles in a partially malformed response. */
+          }
+        }
+      } catch (error) {
+        if (error is ApiException &&
+            (error.statusCode == 401 || error.statusCode == 403)) {
+          rethrow;
+        }
+      }
+    }
+    return results;
   }
+
+  static final _providerCache =
+      <String, ({DateTime fetchedAt, List<WatchProvider> providers})>{};
 
   static Future<TvShowFriendSummary?> getFriendSummary(int showId) async {
     final data = await ApiClient.get('/shows/$showId/friend-summary');
@@ -148,34 +183,21 @@ class ShowService {
     int showId,
     String region,
   ) async {
-    List<WatchProvider> parseProviders(dynamic data) {
-      Iterable<dynamic> typedList(String type, dynamic value) {
-        if (value is! Iterable) return const [];
-        return value.whereType<Map<String, dynamic>>().map(
-              (provider) => {
-                ...provider,
-                'availabilityType': type,
-              },
-            );
-      }
-
-      final source = data is Map<String, dynamic>
-          ? [
-              ...typedList('stream', data['stream'] ?? data['flatrate']),
-              ...typedList('buy', data['buy']),
-              ...typedList('rent', data['rent']),
-              ...typedList('stream', data['providers']),
-              ...typedList('stream', data['results']),
-              ...typedList('stream', data['streaming']),
-              ...typedList('stream', data['watchProviders']),
-            ]
-          : (data as List<dynamic>? ?? const []);
-      return source
-          .map((e) => WatchProvider.fromJson(e as Map<String, dynamic>))
-          .toList();
+    final cacheKey = '$region:$showId';
+    final cached = _providerCache[cacheKey];
+    if (cached != null &&
+        DateTime.now().difference(cached.fetchedAt) <
+            const Duration(hours: 1)) {
+      return cached.providers;
     }
 
     final data = await ApiClient.get('/shows/$showId/$region/watch/providers');
-    return parseProviders(data);
+    final providers = parseWatchProviderOffers(data);
+    if (_providerCache.length >= 256) {
+      _providerCache.remove(_providerCache.keys.first);
+    }
+    _providerCache[cacheKey] =
+        (fetchedAt: DateTime.now(), providers: providers);
+    return providers;
   }
 }

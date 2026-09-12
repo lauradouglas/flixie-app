@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -513,9 +514,9 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (userId == null || userId.isEmpty) return;
     final isCreator = request.requesterId == userId;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showFlixiePromptSheet<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => FlixiePromptSheetContent(
         title: Text(isCreator ? 'Close Watch Plan?' : 'Leave Watch Plan?'),
         content: const Text(
           'This permanently closes the shared plan, its schedule and related notifications for everyone.',
@@ -587,9 +588,9 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
   Future<void> _closeWatchPlan(WatchRequest request) async {
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (userId == null || userId.isEmpty) return;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showFlixiePromptSheet<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => FlixiePromptSheetContent(
         title: const Text('Can’t make it?'),
         content: const Text(
           'This removes the Watch Plan from your list. It stays scheduled for everyone else.',
@@ -1143,9 +1144,9 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
   Future<void> _cancelPlan(WatchRequest request) async {
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (userId == null || userId.isEmpty) return;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showFlixiePromptSheet<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => FlixiePromptSheetContent(
         title: const Text('Cancel this watch plan?'),
         content: const Text(
           'This removes the watch plan and its related notifications for everyone taking part.',

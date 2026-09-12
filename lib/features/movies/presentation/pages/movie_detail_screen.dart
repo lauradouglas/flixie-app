@@ -1,3 +1,8 @@
+import 'package:flixie_app/features/movies/presentation/widgets/media_friend_activity_row.dart';
+import 'package:flixie_app/features/settings/presentation/pages/settings_screen.dart'
+    show showSettingsEditDetailsSheet;
+import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/watch_provider_link.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:ui';
@@ -39,7 +44,7 @@ import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_
 import 'package:flixie_app/features/movies/presentation/widgets/genre_chip.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/add_to_list_sheet.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_sheet.dart';
-import 'package:flixie_app/features/movies/presentation/widgets/review_card.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/media_reviews_section.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/similar_card.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/video_card.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/media_lists_section.dart';
@@ -837,9 +842,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           authProvider.updateUserList(movieWatchlist: currentWatchlist);
           // Offer to mark as watched if not already
           if (offerUndo && !_isWatched && mounted) {
-            final markWatched = await showDialog<bool>(
+            final markWatched = await showFlixiePromptSheet<bool>(
               context: context,
-              builder: (ctx) => AlertDialog(
+              builder: (ctx) => FlixiePromptSheetContent(
                 title: const Text('Did you watch it?',
                     style: TextStyle(color: FlixieColors.light)),
                 content: const Text('Want to add this to your watched list?',
@@ -1101,9 +1106,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               didSubmit = true;
               // Offer watchlist removal if applicable
               if (_inWatchlist && mounted) {
-                final remove = await showDialog<bool>(
+                final remove = await showFlixiePromptSheet<bool>(
                   context: context,
-                  builder: (ctx) => AlertDialog(
+                  builder: (ctx) => FlixiePromptSheetContent(
                     title: const Text('Remove from Watchlist?',
                         style: TextStyle(color: FlixieColors.light)),
                     content: const Text(
@@ -1439,19 +1444,21 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                           height: _MovieDetailHeroTokens.heroToWatchSectionGap),
                       _buildActionButtons(),
                       const SizedBox(height: 18),
-                      _optionalSection('providers', 'watch providers',
-                          _buildWhereToWatchSection(context)),
-                      _optionalSection('your providers',
-                          'your streaming services', const SizedBox.shrink()),
-                      _optionalSection(
-                          'rating', 'your rating', const SizedBox.shrink()),
-                      const SizedBox(height: 12),
+                      _buildSynopsis(context, movie),
+                      const SizedBox(height: 18),
                       _optionalSection('friend summary', 'friend summary',
                           _buildFriendSummarySection(context)),
                       _optionalSection('activity', 'friend activity',
                           const SizedBox.shrink()),
                       _optionalSection('friend recommendations',
                           'friend recommendations', const SizedBox.shrink()),
+                      const SizedBox(height: 18),
+                      _optionalSection('providers', 'watch providers',
+                          _buildWhereToWatchSection(context)),
+                      _optionalSection('your providers',
+                          'your streaming services', const SizedBox.shrink()),
+                      _optionalSection(
+                          'rating', 'your rating', const SizedBox.shrink()),
                       const SizedBox(height: 14),
                       _buildMovieDetailTabs(),
                       const SizedBox(height: 18),
@@ -3178,9 +3185,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   }
 
   void _showFlixScoreInfo(BuildContext context) {
-    showDialog(
+    showFlixiePromptSheet<void>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => FlixiePromptSheetContent(
         title: const Text(
           'FLIXSCORE',
           style: TextStyle(
@@ -3274,7 +3281,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   Widget _buildSynopsis(BuildContext context, Movie movie) {
     final text = movie.overview;
     if (text == null || text.isEmpty) return const SizedBox.shrink();
-    final showToggle = text.length > 250;
+    final sentenceEnd = RegExp(r'[.!?](?:\s|$)').firstMatch(text);
+    final preview =
+        sentenceEnd == null ? text : text.substring(0, sentenceEnd.start + 1);
+    final showToggle = preview.length < text.length;
     final metadata = <String>[
       _formatReadableDate(movie.releaseDate),
       _formatRuntime(movie.runtime),
@@ -3287,10 +3297,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         _buildSectionHeader(context, 'Story'),
         const SizedBox(height: 8),
         Text(
-          text,
-          maxLines: _showFullSynopsis ? null : 4,
-          overflow:
-              _showFullSynopsis ? TextOverflow.visible : TextOverflow.ellipsis,
+          _showFullSynopsis ? text : preview,
           style: const TextStyle(
             color: FlixieColors.light,
             fontSize: 14,
@@ -4098,7 +4105,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 ),
               ),
             ),
-            if (activities.length > 3)
+            if (activities.length > 1)
               TextButton.icon(
                 onPressed: () => _showAllFriendsActivity(context, activities),
                 iconAlignment: IconAlignment.end,
@@ -4153,7 +4160,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           ),
         ),
         const SizedBox(height: 7),
-        ...activities.take(3).map(_compactFriendRow),
+        ...activities.take(1).map(_compactFriendRow),
       ],
     );
   }
@@ -4205,139 +4212,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     );
   }
 
-  Widget _compactFriendRow(MovieFriendActivity activity) {
-    final chips = <Widget>[
-      if (activity.watched)
-        _compactFriendChip(
-          (activity.watchCount ?? 0) > 2
-              ? 'Watched ${activity.watchCount} times'
-              : activity.isRewatch || activity.watchCount == 2
-                  ? 'Watched twice'
-                  : 'Watched',
-          Icons.check_rounded,
-          FlixieColors.success,
-        ),
-      if (activity.onWatchlist)
-        _compactFriendChip(
-          'In watchlist',
-          Icons.bookmark_outline_rounded,
-          FlixieColors.primary,
-        ),
-      if (activity.favorited)
-        _compactFriendChip(
-          'Favourite',
-          Icons.favorite_rounded,
-          FlixieColors.danger,
-        ),
-      if (activity.reviewed)
-        _compactFriendChip(
-          'Reviewed',
-          Icons.check_box_rounded,
-          const Color(0xFF70A7FF),
-        ),
-    ];
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: InkWell(
-        onTap: () => context.push('/friends/${activity.userId}'),
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
-          decoration: _friendPanelDecoration(),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              _compactFriendAvatar(activity, size: 38),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      activity.username,
-                      style: const TextStyle(
-                        color: FlixieColors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    if (chips.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 5,
-                        runSpacing: 5,
-                        children: chips,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              if (activity.recommended != null) ...[
-                const SizedBox(width: 7),
-                Tooltip(
-                  message: activity.recommended!
-                      ? 'Recommends'
-                      : "Doesn't recommend",
-                  child: Icon(
-                    activity.recommended!
-                        ? Icons.thumb_up_alt_rounded
-                        : Icons.thumb_down_alt_rounded,
-                    color: activity.recommended!
-                        ? FlixieColors.success
-                        : FlixieColors.danger,
-                    size: 17,
-                  ),
-                ),
-              ],
-              if (activity.rating != null) ...[
-                const SizedBox(width: 9),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.star_rounded,
-                        color: FlixieColors.warning, size: 16),
-                    const SizedBox(width: 2),
-                    Text(
-                      '${activity.rating}/10',
-                      style: const TextStyle(
-                        color: FlixieColors.light,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: FlixieColors.primary,
-                size: 18,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _compactFriendChip(String label, IconData icon, Color color) =>
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: color.withValues(alpha: 0.65)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 10),
-            const SizedBox(width: 3),
-            Text(label,
-                style: TextStyle(
-                    color: color, fontSize: 9, fontWeight: FontWeight.w600)),
-          ],
-        ),
-      );
+  Widget _compactFriendRow(MovieFriendActivity activity) =>
+      MediaFriendActivityRow(
+          activity: activity,
+          onTap: () => context.push('/friends/${activity.userId}'));
 
   Widget _buildMovieDetailTabs() {
     return Container(
@@ -4387,10 +4265,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   Widget _buildSelectedMovieTab(BuildContext context, Movie movie) {
     return switch (_movieDetailTab) {
       MovieDetailTab.overview => _tabContent([
-          _buildSynopsis(context, movie),
+          _buildTrailersSection(context, movie),
           _optionalSection(
               'credits', 'cast and crew', _buildTopCastSection(context)),
-          _buildTrailersSection(context, movie),
           _optionalSection(
               'images', 'images', _buildImagesSection(context, movie)),
           _optionalSection(
@@ -4418,13 +4295,19 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   }
 
   Widget _tabContent(List<Widget> sections) {
+    final visibleSections = sections
+        .where((section) => !(section is SizedBox &&
+            section.child == null &&
+            section.width == 0 &&
+            section.height == 0))
+        .toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (var index = 0; index < sections.length; index++) ...[
-          sections[index],
-          if (index != sections.length - 1)
+        for (var index = 0; index < visibleSections.length; index++) ...[
+          if (index > 0)
             const SizedBox(height: _MovieDetailHeroTokens._sectionSpacing),
+          visibleSections[index],
         ],
       ],
     );
@@ -5276,97 +5159,73 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   // ---- Where to watch ------------------------------------------------------
 
   Widget _buildWhereToWatchSection(BuildContext context) {
-    if (_watchProviders.isEmpty) return const SizedBox.shrink();
     final providers = _providersForTab(_watchProviderTab);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionHeader(context, 'Where to watch'),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(3),
-          decoration: BoxDecoration(
-            color: FlixieColors.surface.withValues(alpha: 0.58),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-          ),
-          child: Row(
-            children: WatchProviderTab.values
-                .map(
-                  (tab) => Expanded(
-                    child: _watchProviderTabButton(tab),
-                  ),
-                )
-                .toList(growable: false),
-          ),
-        ),
-        const SizedBox(height: 8),
-        if (providers.isNotEmpty)
-          SizedBox(
-            height: 58,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: providers.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (_, index) =>
-                  _buildCompactProviderCard(providers[index]),
-            ),
-          )
-        else
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 18),
-            alignment: Alignment.center,
+    final region =
+        context.watch<AuthProvider>().dbUser?.watchProviderRegion ?? 'GB';
+    final country = switch (region) {
+      'GB' => 'United Kingdom',
+      'US' => 'United States',
+      _ => region
+    };
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _buildSectionHeader(context, 'Where to watch'),
+      Row(children: [
+        Expanded(
+            child: Text(country,
+                style: const TextStyle(color: FlixieColors.light))),
+        TextButton(
+            onPressed: () async {
+              await showSettingsEditDetailsSheet(context);
+              if (mounted) {
+                await _load();
+              }
+            },
+            child: const Text('Change')),
+      ]),
+      Row(
+          children: WatchProviderTab.values
+              .map((tab) => Expanded(child: _watchProviderTabButton(tab)))
+              .toList()),
+      for (final provider in providers.take(3))
+        _buildCompactProviderCard(provider),
+      if (providers.isEmpty)
+        Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
             child: Text(
-              'No ${_providerTabLabel(_watchProviderTab).toLowerCase()} options in your region yet.',
-              style: const TextStyle(
-                color: FlixieColors.medium,
-                fontSize: 12,
-              ),
-            ),
-          ),
-        if (providers.length > 3)
-          SizedBox(
-            height: 30,
-            child: TextButton(
-              onPressed: () => _showAllProviderOptions(providers),
-              style: TextButton.styleFrom(
-                foregroundColor: FlixieColors.primary,
-                padding: EdgeInsets.zero,
-                minimumSize: const Size(0, 30),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: Text('All ${providers.length} options'),
-            ),
-          ),
-      ],
-    );
+                'No ${_providerTabLabel(_watchProviderTab).toLowerCase()} options in this country.',
+                style: const TextStyle(color: FlixieColors.light))),
+      if (providers.isNotEmpty)
+        TextButton(
+            onPressed: () => _showAllProviderOptions(providers),
+            child: const Text('See all watch options →')),
+    ]);
   }
 
   Widget _watchProviderTabButton(WatchProviderTab tab) {
     final selected = _watchProviderTab == tab;
-    return InkWell(
-      onTap: () => setState(() => _watchProviderTab = tab),
-      borderRadius: BorderRadius.circular(11),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(vertical: 9),
-        decoration: BoxDecoration(
-          color: selected ? FlixieColors.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(11),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          _providerTabLabel(tab),
-          style: TextStyle(
-            color: selected ? FlixieColors.white : FlixieColors.light,
-            fontSize: 12,
-            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+    return Semantics(
+        selected: selected,
+        button: true,
+        child: InkWell(
+          onTap: () => setState(() => _watchProviderTab = tab),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+                border: Border(
+                    bottom: BorderSide(
+                        color: selected
+                            ? FlixieColors.primaryText
+                            : FlixieColors.tabBarBorder,
+                        width: selected ? 3 : 1))),
+            alignment: Alignment.center,
+            child: Text(_providerTabLabel(tab),
+                style: TextStyle(
+                    color: selected
+                        ? FlixieColors.primaryText
+                        : FlixieColors.light,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500)),
           ),
-        ),
-      ),
-    );
+        ));
   }
 
   String _providerTabLabel(WatchProviderTab tab) => switch (tab) {
@@ -5391,125 +5250,114 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   }
 
   Widget _buildCompactProviderCard(WatchProvider provider) {
-    final isUserProvider = _isUserProvider(provider);
-    final availabilityLabel = switch (_watchProviderTab) {
-      WatchProviderTab.stream => isUserProvider ? 'Included' : 'Subscription',
-      WatchProviderTab.rent => 'Available to rent',
-      WatchProviderTab.buy => 'Available to buy',
-    };
-    return Container(
-      width: 150,
-      height: 58,
-      padding: const EdgeInsets.all(6),
-      decoration: BoxDecoration(
-        color: isUserProvider && _watchProviderTab == WatchProviderTab.stream
-            ? FlixieColors.success.withValues(alpha: 0.12)
-            : FlixieColors.surface.withValues(alpha: 0.58),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isUserProvider && _watchProviderTab == WatchProviderTab.stream
-              ? FlixieColors.success
-              : Colors.white.withValues(alpha: 0.1),
-          width: isUserProvider && _watchProviderTab == WatchProviderTab.stream
-              ? 2
-              : 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(9),
-            child: SizedBox(
-              width: 34,
-              height: 34,
-              child: provider.logoPath.isEmpty
-                  ? const ColoredBox(
-                      color: FlixieColors.surfaceElevated,
-                      child: Icon(Icons.play_circle_outline_rounded,
-                          color: FlixieColors.medium),
-                    )
-                  : CachedNetworkImage(
-                      imageUrl: provider.logoUrl,
-                      fit: BoxFit.cover,
-                      errorWidget: (_, __, ___) => const ColoredBox(
-                        color: FlixieColors.surfaceElevated,
-                        child: Icon(Icons.play_circle_outline_rounded,
-                            color: FlixieColors.medium),
-                      ),
-                    ),
-            ),
-          ),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  provider.providerName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: FlixieColors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  availabilityLabel,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: FlixieColors.success,
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (isUserProvider && _watchProviderTab == WatchProviderTab.stream)
-            const Padding(
-              padding: EdgeInsets.only(left: 3),
-              child: Icon(
-                Icons.check_circle_rounded,
-                color: FlixieColors.success,
-                size: 14,
-              ),
-            ),
-        ],
-      ),
-    );
+    final owned = _isUserProvider(provider) &&
+        _watchProviderTab == WatchProviderTab.stream;
+    final label = _watchProviderTab == WatchProviderTab.rent
+        ? 'Available to rent'
+        : _watchProviderTab == WatchProviderTab.buy
+            ? 'Available to buy'
+            : owned
+                ? 'Your subscription'
+                : provider.isAddOn
+                    ? 'Separate add-on required'
+                    : 'Subscription required';
+    return WatchProviderLink(
+        provider: provider,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: const BoxDecoration(
+              border:
+                  Border(bottom: BorderSide(color: FlixieColors.tabBarBorder))),
+          child: Row(children: [
+            Container(
+                width: 46,
+                height: 46,
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(7),
+                    border: Border.all(
+                        color: owned
+                            ? FlixieColors.success
+                            : FlixieColors.tabBarBorder,
+                        width: owned ? 2 : 1)),
+                child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: provider.logoPath.isEmpty
+                        ? const Icon(Icons.tv, color: FlixieColors.light)
+                        : CachedNetworkImage(
+                            imageUrl: provider.logoUrl,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => const Icon(Icons.tv,
+                                color: FlixieColors.light)))),
+            const SizedBox(width: 12),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(provider.providerName,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14)),
+                  const SizedBox(height: 4),
+                  Text(label,
+                      style: TextStyle(
+                          color:
+                              owned ? FlixieColors.success : FlixieColors.light,
+                          fontSize: 12)),
+                ])),
+            if (owned)
+              const Padding(
+                  padding: EdgeInsets.only(left: 10),
+                  child: Icon(Icons.check_circle,
+                      color: FlixieColors.success, size: 20)),
+            if (provider.verifiedWatchUri != null)
+              const Padding(
+                  padding: EdgeInsets.only(left: 12),
+                  child: Icon(Icons.open_in_new,
+                      color: FlixieColors.primaryText, size: 18)),
+          ]),
+        ));
   }
 
   void _showAllProviderOptions(List<WatchProvider> providers) {
     showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
+      isScrollControlled: true,
+      constraints:
+          BoxConstraints.tightFor(width: MediaQuery.sizeOf(context).width),
       backgroundColor: FlixieColors.background,
       showDragHandle: true,
-      builder: (_) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${_providerTabLabel(_watchProviderTab)} options',
-                style: const TextStyle(
-                  color: FlixieColors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
+      builder: (sheetContext) => ConstrainedBox(
+        constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(sheetContext).height * .8),
+        child: SizedBox(
+          width: double.infinity,
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+                16, 4, 16, 24 + MediaQuery.paddingOf(sheetContext).bottom),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${_providerTabLabel(_watchProviderTab)} options',
+                    style: const TextStyle(
+                        color: FlixieColors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800)),
+                const SizedBox(height: 12),
+                Column(
+                  children: providers.map(_buildCompactProviderCard).toList(),
                 ),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: providers.map(_buildCompactProviderCard).toList(),
-              ),
-            ],
+                const Padding(
+                    padding: EdgeInsets.only(top: 12),
+                    child: Text('Availability by JustWatch · Opens TMDB',
+                        style: TextStyle(
+                            color: FlixieColors.light, fontSize: 12))),
+              ],
+            ),
           ),
         ),
       ),
@@ -5641,154 +5489,11 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   // ---- User reviews --------------------------------------------------------
 
-  void _showAllReviews(BuildContext context) {
-    final currentUserId = context.read<AuthProvider>().dbUser?.id;
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => DraggableScrollableSheet(
-        initialChildSize: 0.9,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        builder: (ctx, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: FlixieColors.background,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            children: [
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: FlixieColors.medium,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'All Reviews (${_reviews.length})',
-                      style: const TextStyle(
-                        color: FlixieColors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, color: FlixieColors.light),
-                      onPressed: () => Navigator.pop(ctx),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(color: FlixieColors.tabBarBorder, height: 1),
-              Expanded(
-                child: ListView.builder(
-                  controller: scrollController,
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _reviews.length,
-                  itemBuilder: (_, i) => ReviewCard(
-                    review: _reviews[i],
-                    currentUserId: currentUserId,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildUserReviewsSection(BuildContext context) {
-    const previewCount = 4;
-    final preview = _reviews.take(previewCount).toList();
-    final hasMore = _reviews.length > previewCount;
-    final currentUserId = context.read<AuthProvider>().dbUser?.id;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Expanded(
-              child: Text(
-                'Reviews',
-                style: TextStyle(
-                  color: FlixieColors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-            if (_reviews.isNotEmpty)
-              TextButton(
-                onPressed: () => _showAllReviews(context),
-                style: TextButton.styleFrom(
-                  foregroundColor: FlixieColors.primary,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                ),
-                child: Text(
-                  'See all ${_reviews.length}',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            const SizedBox(width: 4),
-            OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: FlixieColors.primary,
-                side: const BorderSide(color: FlixieColors.primary),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              onPressed: () => _showWriteReviewSheet(context),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.edit_rounded, size: 16),
-                  SizedBox(width: 6),
-                  Text(
-                    'Write review',
-                    style:
-                        TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        if (_reviews.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
-            child: Text(
-              'No reviews yet. Be the first to write one!',
-              style: TextStyle(color: FlixieColors.medium, fontSize: 13),
-            ),
-          )
-        else ...[
-          ...preview.map((r) => ReviewCard(
-                review: r,
-                currentUserId: currentUserId,
-              )),
-          if (hasMore) const SizedBox.shrink(),
-        ],
-      ],
-    );
-  }
+  Widget _buildUserReviewsSection(BuildContext context) => MediaReviewsSection(
+        reviews: _reviews,
+        currentUserId: context.read<AuthProvider>().dbUser?.id,
+        onWriteReview: () => _showWriteReviewSheet(context),
+      );
 
   // ---- More like this ------------------------------------------------------
 

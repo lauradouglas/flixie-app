@@ -1,4 +1,5 @@
 class WatchProvider {
+  final String? watchUrl;
   final int id;
   final String providerName;
   final int displayPriority;
@@ -11,6 +12,7 @@ class WatchProvider {
   final Set<String> availabilityTypes;
 
   const WatchProvider({
+    this.watchUrl,
     required this.id,
     required this.providerName,
     required this.displayPriority,
@@ -25,6 +27,7 @@ class WatchProvider {
 
   factory WatchProvider.fromJson(Map<String, dynamic> json) {
     return WatchProvider(
+      watchUrl: _stringValue(json['watchUrl']),
       id: _intValue(json['id'] ?? json['providerId'] ?? json['provider_id']) ??
           0,
       providerName:
@@ -41,6 +44,28 @@ class WatchProvider {
       availabilityTypes: _parseAvailabilityTypes(json),
     );
   }
+
+  /// Only a destination supplied by the availability source is actionable.
+  /// TMDB supplies a title/country watch page, not individual service deep links.
+  Uri? get verifiedWatchUri {
+    final uri = Uri.tryParse(watchUrl ?? '');
+    if (uri == null ||
+        uri.scheme != 'https' ||
+        uri.userInfo.isNotEmpty ||
+        !{'www.themoviedb.org', 'themoviedb.org'}.contains(uri.host) ||
+        !RegExp(r'^/(movie|tv)/[^/]+/watch(?:/|$)').hasMatch(uri.path)) {
+      return null;
+    }
+    return uri;
+  }
+
+  bool get isIncludedOffer => availabilityTypes.any((type) =>
+      {'stream', 'streaming', 'flatrate', 'free', 'ads'}.contains(type));
+  bool get isFree =>
+      availabilityTypes.contains('free') || availabilityTypes.contains('ads');
+  bool get isAddOn =>
+      RegExp(r'channel|amazon channel|apple tv channel', caseSensitive: false)
+          .hasMatch(providerName);
 
   String get logoUrl => logoPath.startsWith('http')
       ? logoPath
@@ -107,4 +132,58 @@ Set<String> _parseAvailabilityTypes(Map<String, dynamic> json) {
       .map((value) => value.trim().toLowerCase())
       .where((value) => value.isNotEmpty)
       .toSet();
+}
+
+/// Reject malformed responses so a failed lookup never becomes “no offers”.
+List<WatchProvider> parseWatchProviderOffers(dynamic data) {
+  if (data is Map<String, dynamic> &&
+      data['watchProviders'] is Map<String, dynamic>) {
+    return parseWatchProviderOffers(data['watchProviders']);
+  }
+  final rows = <Map<String, dynamic>>[];
+  if (data is List) {
+    for (final row in data) {
+      if (row is! Map<String, dynamic>) {
+        throw const FormatException('Invalid provider');
+      }
+      rows.add(row);
+    }
+  } else if (data is Map<String, dynamic>) {
+    const groups = {
+      'stream': 'stream',
+      'flatrate': 'flatrate',
+      'free': 'free',
+      'ads': 'ads',
+      'buy': 'buy',
+      'rent': 'rent',
+      'providers': 'stream',
+      'results': 'stream',
+      'streaming': 'stream',
+      'watchProviders': 'stream'
+    };
+    if (!groups.keys.any(data.containsKey)) {
+      throw const FormatException('Missing offer groups');
+    }
+    for (final group in groups.entries) {
+      if (!data.containsKey(group.key)) continue;
+      final values = data[group.key];
+      if (values is! List) throw const FormatException('Invalid offer group');
+      for (final row in values) {
+        if (row is! Map<String, dynamic>) {
+          throw const FormatException('Invalid provider');
+        }
+        rows.add({
+          ...row,
+          'availabilityType': row['availabilityType'] ?? group.value
+        });
+      }
+    }
+  } else {
+    throw const FormatException('Missing availability response');
+  }
+  final offers = rows.map(WatchProvider.fromJson).toList();
+  if (offers.any((p) => p.id <= 0 || p.providerName == 'Provider')) {
+    throw const FormatException('Invalid provider identity');
+  }
+  return offers;
 }

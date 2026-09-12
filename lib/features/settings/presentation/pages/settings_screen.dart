@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -21,6 +22,27 @@ import 'package:flixie_app/core/safety/safety_service.dart';
 import 'package:flixie_app/core/analytics/analytics_consent.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/core/reviews/app_review_service.dart';
+
+Future<void> showSettingsEditDetailsSheet(BuildContext context) async {
+  final user = context.read<AuthProvider>().dbUser;
+  if (user == null) return;
+  await showModalBottomSheet<void>(
+    context: context,
+    useRootNavigator: true,
+    useSafeArea: true,
+    isScrollControlled: true,
+    backgroundColor: FlixieColors.surface,
+    shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    clipBehavior: Clip.antiAlias,
+    builder: (context) => ConstrainedBox(
+      constraints:
+          BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .85),
+      child:
+          SingleChildScrollView(child: _SettingsEditProfileSheet(user: user)),
+    ),
+  );
+}
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -46,7 +68,7 @@ class SettingsScreen extends StatelessWidget {
             children: [
               SettingsTile(
                 icon: Icons.person_outline,
-                label: 'Edit Profile',
+                label: 'Edit details',
                 onTap: () => _showEditProfileSheet(context),
               ),
               SettingsTile(
@@ -201,14 +223,7 @@ class SettingsScreen extends StatelessWidget {
   }
 
   void _showEditProfileSheet(BuildContext context) {
-    final dbUser = context.read<AuthProvider>().dbUser;
-    if (dbUser == null) return;
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _SettingsEditProfileSheet(user: dbUser),
-    );
+    showSettingsEditDetailsSheet(context);
   }
 
   Future<void> _openStoreRating(BuildContext context) async {
@@ -418,9 +433,9 @@ class _LogOutButton extends StatelessWidget {
           ),
         ),
         onTap: () async {
-          final confirmed = await showDialog<bool>(
+          final confirmed = await showFlixiePromptSheet<bool>(
             context: context,
-            builder: (ctx) => AlertDialog(
+            builder: (ctx) => FlixiePromptSheetContent(
               title: const Text(
                 'Log Out',
                 style: TextStyle(color: Colors.white),
@@ -485,9 +500,9 @@ class _DeleteAccountButton extends StatelessWidget {
           style: TextStyle(color: FlixieColors.medium, fontSize: 12),
         ),
         onTap: () async {
-          final password = await showDialog<String>(
+          final password = await showFlixiePromptSheet<String>(
             context: context,
-            barrierDismissible: false,
+            isDismissible: false,
             builder: (_) => const _DeleteAccountDialog(),
           );
           if (password == null || !context.mounted) return;
@@ -662,7 +677,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    return FlixiePromptSheetContent(
       title: const Text(
         'Delete your account?',
         style: TextStyle(color: Colors.white),
@@ -761,6 +776,9 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
 
   List<Country> _countries = [];
   Country? _selectedCountry;
+  bool _loadingCountries = true;
+  bool _countryLoadFailed = false;
+  bool _countryChanged = false;
 
   @override
   void initState() {
@@ -771,6 +789,10 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
   }
 
   Future<void> _loadCountries() async {
+    setState(() {
+      _loadingCountries = true;
+      _countryLoadFailed = false;
+    });
     try {
       final countries = await ReferenceDataService.getCountries();
       if (!mounted) return;
@@ -783,9 +805,16 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
       setState(() {
         _countries = countries;
         _selectedCountry = current;
+        _loadingCountries = false;
+        _countryLoadFailed = countries.isEmpty;
       });
     } catch (_) {
-      // Country list is optional; silently ignore load failures
+      if (mounted) {
+        setState(() {
+          _loadingCountries = false;
+          _countryLoadFailed = true;
+        });
+      }
     }
   }
 
@@ -793,14 +822,27 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
     final country = await showModalBottomSheet<Country>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _SettingsCountryPickerSheet(
-        countries: _countries,
-        selected: _selectedCountry,
+      backgroundColor: FlixieColors.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      clipBehavior: Clip.antiAlias,
+      useRootNavigator: true,
+      useSafeArea: true,
+      builder: (context) => ConstrainedBox(
+        constraints:
+            BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .85),
+        child: SingleChildScrollView(
+            child: _SettingsCountryPickerSheet(
+          countries: _countries,
+          selected: _selectedCountry,
+        )),
       ),
     );
     if (!mounted || country == null) return;
-    setState(() => _selectedCountry = country);
+    setState(() {
+      _selectedCountry = country;
+      _countryChanged = country.id != widget.user.countryId;
+    });
   }
 
   @override
@@ -859,9 +901,12 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
       if (bio != (widget.user.bio ?? '')) {
         updated = await _settingsController.updateUserField(userId, 'bio', bio);
       }
-      if (_selectedCountry?.id != widget.user.countryId) {
+      if (_countryChanged && _selectedCountry != null) {
         updated = await _settingsController.updateUserField(
-            userId, 'countryId', _selectedCountry?.id);
+            userId, 'countryId', _selectedCountry!.id);
+        updated = updated.copyWith(
+            countryId: _selectedCountry!.id,
+            country: _selectedCountry!.toJson());
       }
 
       if (!mounted) return;
@@ -897,7 +942,7 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
     final unchanged = _usernameCtrl.text.trim() == widget.user.username &&
         _bioCtrl.text.trim() == (widget.user.bio ?? '') &&
-        _selectedCountry?.id == widget.user.countryId;
+        !_countryChanged;
 
     return Container(
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
@@ -923,7 +968,7 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
             ),
             const SizedBox(height: 16),
             const Text(
-              'Edit Profile',
+              'Edit details',
               style: TextStyle(
                   color: Colors.white,
                   fontSize: 18,
@@ -990,39 +1035,47 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
               ),
             ),
             const SizedBox(height: 14),
-            // Country
-            if (_countries.isNotEmpty)
-              GestureDetector(
-                onTap: _pickCountry,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: FlixieColors.tabBarBackgroundFocused,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.location_on_outlined,
-                          color: FlixieColors.medium, size: 20),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          _selectedCountry?.name ?? 'Country (optional)',
-                          style: TextStyle(
-                            color: _selectedCountry != null
-                                ? Colors.white
-                                : FlixieColors.medium,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                      const Icon(Icons.expand_more_rounded,
-                          color: FlixieColors.medium),
-                    ],
-                  ),
+            Material(
+              color: Colors.transparent,
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                tileColor: FlixieColors.tabBarBackgroundFocused,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                leading: const Icon(Icons.location_on_outlined,
+                    color: FlixieColors.light),
+                title: const Text('Country',
+                    style: TextStyle(color: Colors.white)),
+                subtitle: Text(
+                  _loadingCountries
+                      ? 'Loading countries…'
+                      : _countryLoadFailed
+                          ? 'Couldn’t load countries. Tap to retry.'
+                          : _selectedCountry?.name ??
+                              widget.user.country?['name']?.toString() ??
+                              'Select your country',
+                  style: const TextStyle(color: FlixieColors.light),
                 ),
+                trailing: _loadingCountries
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : Icon(
+                        _countryLoadFailed ? Icons.refresh : Icons.expand_more,
+                        color: FlixieColors.light),
+                onTap: _loadingCountries || _saving
+                    ? null
+                    : _countryLoadFailed
+                        ? _loadCountries
+                        : _pickCountry,
               ),
+            ),
+            const Padding(
+              padding: EdgeInsets.only(top: 8, left: 12, right: 12),
+              child: Text('Used to find where you can watch movies and shows.',
+                  style: TextStyle(color: FlixieColors.light, fontSize: 12)),
+            ),
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
@@ -1156,22 +1209,25 @@ class _SettingsCountryPickerSheetState
                 itemBuilder: (context, index) {
                   final country = _filtered[index];
                   final isSelected = country.id == widget.selected?.id;
-                  return ListTile(
-                    title: Text(
-                      country.name,
-                      style: TextStyle(
-                        color: isSelected
-                            ? FlixieColors.primaryTint
-                            : FlixieColors.textPrimary,
-                        fontWeight:
-                            isSelected ? FontWeight.w700 : FontWeight.normal,
+                  return Material(
+                    color: Colors.transparent,
+                    child: ListTile(
+                      title: Text(
+                        country.name,
+                        style: TextStyle(
+                          color: isSelected
+                              ? FlixieColors.primaryTint
+                              : FlixieColors.textPrimary,
+                          fontWeight:
+                              isSelected ? FontWeight.w700 : FontWeight.normal,
+                        ),
                       ),
+                      trailing: isSelected
+                          ? const Icon(Icons.check_rounded,
+                              color: FlixieColors.primaryTint)
+                          : null,
+                      onTap: () => Navigator.of(context).pop(country),
                     ),
-                    trailing: isSelected
-                        ? const Icon(Icons.check_rounded,
-                            color: FlixieColors.primaryTint)
-                        : null,
-                    onTap: () => Navigator.of(context).pop(country),
                   );
                 },
               ),

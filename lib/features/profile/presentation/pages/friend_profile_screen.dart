@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'dart:ui';
 
@@ -563,9 +564,9 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     final myId = auth.dbUser?.id;
     if (myId == null) return;
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showFlixiePromptSheet<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => FlixiePromptSheetContent(
         title: const Text('Remove Friend'),
         content:
             Text('Remove ${_user?.username ?? 'this user'} from your friends?'),

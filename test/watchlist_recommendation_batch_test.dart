@@ -49,6 +49,8 @@ class TestAuth extends ChangeNotifier implements AuthProvider {
   @override
   Set<int> get cachedUserWatchProviderIds => {};
   @override
+  Future<void> ensureWatchProviderCache({Iterable<int>? movieIds}) async {}
+  @override
   Future<void> refreshUserData() async {
     notifyListeners();
   }

@@ -10,6 +10,7 @@ class FriendRecommendationItem {
   final double? rating;
   final bool recommends;
   final bool watched;
+  final String ratingScope;
   final String? reviewSnippet;
 
   const FriendRecommendationItem({
@@ -22,6 +23,7 @@ class FriendRecommendationItem {
     this.rating,
     required this.recommends,
     this.watched = true,
+    this.ratingScope = 'movie',
     this.reviewSnippet,
   });
 
@@ -44,6 +46,7 @@ class FriendRecommendationItem {
       rating: rating,
       recommends: json['recommends'] as bool? ?? false,
       watched: watched,
+      ratingScope: json['ratingScope'] as String? ?? 'movie',
       reviewSnippet: json['reviewSnippet'] as String?,
     );
   }

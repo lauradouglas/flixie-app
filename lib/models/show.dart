@@ -129,10 +129,12 @@ class TvShow {
         json['friendRecommendPercent'] ?? json['friendsRecommendPercent'],
       ),
       voteCount: _intValue(json['voteCount'] ?? json['vote_count']),
-      numberOfSeasons:
-          _intValue(json['numberOfSeasons'] ?? json['seasonCount']),
-      numberOfEpisodes:
-          _intValue(json['numberOfEpisodes'] ?? json['episodeCount']),
+      numberOfSeasons: _intValue(json['numberOfSeasons'] ??
+          json['number_of_seasons'] ??
+          json['seasonCount']),
+      numberOfEpisodes: _intValue(json['numberOfEpisodes'] ??
+          json['number_of_episodes'] ??
+          json['episodeCount']),
       tagline: _stringValue(json['tagline']),
       status: _stringValue(json['status']),
       originalLanguage: _stringValue(
@@ -207,6 +209,7 @@ class TvShow {
       'popularity': popularity,
       'voteAverage': voteAverage,
       'voteCount': voteCount,
+      'genres': genres,
       'numberOfSeasons': numberOfSeasons,
       'numberOfEpisodes': numberOfEpisodes,
       'tagline': tagline,
@@ -548,6 +551,7 @@ class TvShowFriendSummary {
 }
 
 class TvShowFriend {
+  final List<String> profileBadges;
   final String userId;
   final String username;
   final ProfileAvatar? avatar;
@@ -559,6 +563,7 @@ class TvShowFriend {
   final bool recommends;
 
   const TvShowFriend({
+    this.profileBadges = const [],
     required this.userId,
     required this.username,
     this.avatar,
@@ -571,6 +576,11 @@ class TvShowFriend {
   });
 
   factory TvShowFriend.fromJson(Map<String, dynamic> json) => TvShowFriend(
+        profileBadges: ((json['profileBadges'] ??
+                    json['user']?['profileBadges']) as List<dynamic>? ??
+                const [])
+            .map((badge) => badge.toString())
+            .toList(),
         userId: _stringValue(json['userId']) ?? '',
         username: _stringValue(
               json['username'] ?? json['displayName'],
