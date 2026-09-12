@@ -5,6 +5,31 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 
 void main() {
+  testWidgets('messages and actions expire without invoking the action',
+      (tester) async {
+    final key = GlobalKey<ScaffoldMessengerState>();
+    var actions = 0;
+    await tester.pumpWidget(MaterialApp(
+        scaffoldMessengerKey: key,
+        home: const Scaffold(body: SizedBox.expand())));
+    for (final label in <String?>[null, 'Undo', 'Retry']) {
+      key.currentState!.showFlixieToast(FlixieToast(
+          type: FlixieToastType.success,
+          content: const Text('Saved'),
+          action: label == null
+              ? null
+              : SnackBarAction(label: label, onPressed: () => actions++)));
+      await tester.pumpAndSettle();
+      expect(tester.widget<SnackBar>(find.byType(SnackBar)).margin,
+          const EdgeInsets.all(8));
+      await tester.pump(const Duration(seconds: 3));
+      expect(find.text('Saved'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+      expect(find.text('Saved'), findsNothing);
+      expect(actions, 0);
+    }
+  });
   setUpAll(() async {
     await (FontLoader('Manrope')
           ..addFont(
@@ -54,17 +79,22 @@ void main() {
       expect(count, 1);
     }
   });
-  testWidgets('new feedback replaces a pending undo without running it', (tester) async {
+  testWidgets('new feedback replaces a pending undo without running it',
+      (tester) async {
     final key = GlobalKey<ScaffoldMessengerState>();
     var undos = 0;
-    await tester.pumpWidget(MaterialApp(theme: AppTheme.darkTheme, scaffoldMessengerKey: key,
-      home: const Scaffold(body: SizedBox.expand())));
-    key.currentState!.showFlixieToast(FlixieToast(type: FlixieToastType.success,
-      content: const Text('Added to watchlist'),
-      action: SnackBarAction(label: 'Undo', onPressed: () => undos++)));
+    await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.darkTheme,
+        scaffoldMessengerKey: key,
+        home: const Scaffold(body: SizedBox.expand())));
+    key.currentState!.showFlixieToast(FlixieToast(
+        type: FlixieToastType.success,
+        content: const Text('Added to watchlist'),
+        action: SnackBarAction(label: 'Undo', onPressed: () => undos++)));
     await tester.pumpAndSettle();
-    key.currentState!.showFlixieToast(FlixieToast(type: FlixieToastType.error,
-      content: const Text('Couldn’t save your picks')));
+    key.currentState!.showFlixieToast(FlixieToast(
+        type: FlixieToastType.error,
+        content: const Text('Couldn’t save your picks')));
     await tester.pumpAndSettle();
     expect(find.text('Undo'), findsNothing);
     expect(find.text('Couldn’t save your picks'), findsOneWidget);

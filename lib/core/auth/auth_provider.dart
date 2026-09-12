@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flixie_app/core/auth/startup_trace.dart';
 
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/scheduler.dart';
@@ -45,7 +46,7 @@ typedef AvatarSelector = Future<ProfileAvatar> Function(int avatarId);
 ///
 /// Screens can read [status], [firebaseUser], [dbUser], [isLoading] and [errorMessage] and call
 /// [signIn], [signUp], [signOut] and [sendPasswordResetEmail].
-class AuthProvider extends ChangeNotifier {
+class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
   // Prefetched friends activity for home screen
   List<ActivityListItem>? _cachedFriendsActivity;
   List<ActivityListItem>? get cachedFriendsActivity => _cachedFriendsActivity;
@@ -63,7 +64,14 @@ class AuthProvider extends ChangeNotifier {
     _profileLoader = profileLoader ?? UserService.getUserByExternalId;
     _prefetchAfterAuth = prefetchAfterAuth;
     _avatarSelector = avatarSelector ?? AvatarService.selectAvatar;
+    WidgetsBinding.instance.addObserver(this);
     ApiClient.setAuthTokenRefresher(_authService.refreshIdToken);
+    _authBootstrapTimer = Timer(_initialTokenTimeout, () {
+      if (_disposed || _status != AuthStatus.unknown) return;
+      _recoveryError =
+          'Couldn’t restore your session. Check your connection and retry.';
+      notifyListeners();
+    });
     _authStateSubscription = _authService.authStateChanges.listen(
       (user) {
         unawaited(
@@ -83,6 +91,10 @@ class AuthProvider extends ChangeNotifier {
           error: error,
           stackTrace: stack,
         );
+        if (!_disposed) {
+          _recoveryError = 'Couldn’t check your session. Please retry.';
+          notifyListeners();
+        }
       },
     );
   }
@@ -96,6 +108,7 @@ class AuthProvider extends ChangeNotifier {
   final AuthNotificationPoller _notificationPoller = AuthNotificationPoller();
   final _authStatusNotifier = _AuthStatusNotifier();
   StreamSubscription<firebase_auth.User?>? _authStateSubscription;
+  Timer? _authBootstrapTimer;
 
   AuthStatus _status = AuthStatus.unknown;
   firebase_auth.User? _firebaseUser;
@@ -297,42 +310,131 @@ class AuthProvider extends ChangeNotifier {
   Map<String, dynamic>? _pendingSignupProfile;
   String? _pendingSignupEmail;
   int? _pendingAvatarId;
-  bool _isHandlingAuthState = false;
   Future<void>? _authStateChangeFuture;
+  int _sessionGeneration = 0;
+  int _prefetchGeneration = 0;
+  int _profileGeneration = 0;
+  Future<bool>? _profileRefreshFuture;
+  bool _disposed = false;
+  bool _foreground = true;
+  Timer? _recoveryTimer;
+  int _recoveryAttempts = 0;
+  String? _recoveryError;
+  String? get recoveryError => _recoveryError;
   DateTime? _lastResumeRefreshAt;
   Future<void>? _resumeRefreshFuture;
   static const Duration _resumeRefreshThrottle = Duration(minutes: 2);
   static const Duration _initialTokenTimeout = Duration(seconds: 8);
-  static const Duration _cachedTokenTimeout = Duration(seconds: 2);
   static const Duration _initialProfileTimeout = Duration(seconds: 10);
 
-  Future<void> _onAuthStateChanged(firebase_auth.User? user) async {
-    // During sign-up the flow is managed directly in signUp(); skip here.
-    if (_isSigningUp) return;
-    if (_isHandlingAuthState && _authStateChangeFuture != null) {
+  Future<void> _onAuthStateChanged(firebase_auth.User? user,
+      {bool retry = false}) async {
+    if (_isSigningUp || _disposed) return;
+    _authBootstrapTimer?.cancel();
+    final sameUser = _firebaseUser?.uid == user?.uid;
+    if (sameUser && _authStateChangeFuture != null) {
       return _authStateChangeFuture;
     }
-    _isHandlingAuthState = true;
-    _authStateChangeFuture = _handleAuthStateChanged(user);
-    try {
-      await _authStateChangeFuture;
-    } catch (error, stackTrace) {
-      logger.e(
-        'Unhandled auth state transition error',
-        error: error,
-        stackTrace: stackTrace,
-      );
-      if (_status == AuthStatus.unknown) {
-        _status = AuthStatus.unauthenticated;
-        notifyListeners();
+    if (sameUser && !retry && _status == AuthStatus.authenticated) return;
+    if (!sameUser || user == null) {
+      _sessionGeneration++;
+      _prefetchGeneration++;
+      _resumeRefreshFuture = null;
+      _profileRefreshFuture = null;
+      _lastResumeRefreshAt = null;
+      _recoveryTimer?.cancel();
+      _recoveryAttempts = 0;
+      _isPrefetching = false;
+      _dismissedNotificationIds.clear();
+      _cachedWatchProviderRegion = null;
+      _watchProviderCacheFuture = null;
+      ApiClient.setToken(null);
+      if (user != null) {
+        _dbUser = null;
+        _cachedFriendsActivity = null;
+        _cachedActivity = null;
+        _cachedFriends = null;
+        _cachedGroups = null;
+        _cachedRatings = null;
+        _cachedReviews = null;
+        _cachedTrending = null;
+        _cachedNowPlaying = null;
+        _cachedMovieLists = null;
+        _cachedNotifications = null;
+        _cachedWatchRequests = null;
+        _cachedWatchProvidersByMovieId.clear();
+        _cachedUserWatchProviderIds = null;
+        _notificationPoller.stop();
+        _status = AuthStatus.unknown;
       }
+    }
+    _firebaseUser = user;
+    _recoveryError = null;
+    _errorMessage = null;
+    notifyListeners();
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!_disposed) _authStatusNotifier.notify();
+    });
+    final generation = _sessionGeneration;
+    final future = _handleAuthStateChanged(user, generation);
+    _authStateChangeFuture = future;
+    try {
+      await future;
     } finally {
-      _authStateChangeFuture = null;
-      _isHandlingAuthState = false;
+      if (identical(_authStateChangeFuture, future)) {
+        _authStateChangeFuture = null;
+      }
     }
   }
 
-  Future<void> _handleAuthStateChanged(firebase_auth.User? user) async {
+  Future<void> retrySession() async {
+    _recoveryTimer?.cancel();
+    _recoveryAttempts = 0;
+    if (_dbUser == null) {
+      await _onAuthStateChanged(_authService.currentUser, retry: true);
+    } else {
+      await handleAppResumed(force: true);
+    }
+  }
+
+  void _scheduleRecovery() {
+    if (_disposed ||
+        !_foreground ||
+        _recoveryAttempts >= 3 ||
+        _recoveryTimer?.isActive == true) {
+      return;
+    }
+    final generation = _sessionGeneration;
+    final delay = [5, 15, 30][_recoveryAttempts++];
+    _recoveryTimer = Timer(Duration(seconds: delay), () {
+      if (_disposed || generation != _sessionGeneration || !_foreground) return;
+      if (_dbUser == null) {
+        unawaited(_onAuthStateChanged(_authService.currentUser, retry: true));
+      } else {
+        unawaited(handleAppResumed(force: true));
+      }
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+    if (!_foreground) {
+      _notificationPoller.stop();
+      _recoveryTimer?.cancel();
+      return;
+    }
+    _recoveryAttempts = 0;
+    if (_dbUser == null && _firebaseUser != null) {
+      unawaited(_onAuthStateChanged(_firebaseUser, retry: true));
+    } else {
+      unawaited(handleAppResumed());
+    }
+  }
+
+  Future<void> _handleAuthStateChanged(
+      firebase_auth.User? user, int generation) async {
+    bool current() => !_disposed && generation == _sessionGeneration;
     logger.i('Auth state changed');
     logger.d(
         'Firebase user: ${user?.email ?? "null"} (uid: ${user?.uid ?? "null"})');
@@ -342,54 +444,49 @@ class AuthProvider extends ChangeNotifier {
 
     if (user != null) {
       _hasResetAppBadgeThisSession = false;
-      // FIRST: Get Firebase ID token and set it in ApiClient.
-      // Try a forced refresh first; on network failure fall back to the cached
-      // token so the app stays authenticated on a flaky connection.
       try {
-        final idToken =
-            await user.getIdToken(true).timeout(_initialTokenTimeout);
-        if (idToken != null) {
-          logger.d('Got Firebase ID token (fresh), setting in ApiClient');
-          ApiClient.setToken(idToken);
-        } else {
-          logger.w('ID token is null');
+        // Firebase reuses a valid token and refreshes expired tokens itself.
+        // API 401 responses still use the shared forced-refresh path.
+        final tokenRevision = ApiClient.tokenRevision;
+        final token = await StartupTrace.run('session-token',
+            () => user.getIdToken(false).timeout(_initialTokenTimeout));
+        if (!current()) return;
+        if (token == null) {
+          throw StateError('No authentication token available');
         }
-      } catch (e) {
-        logger.w('Failed to get fresh ID token: $e - trying cached token');
-        try {
-          final cachedToken =
-              await user.getIdToken(false).timeout(_cachedTokenTimeout);
-          if (cachedToken != null) {
-            logger.d('Got Firebase ID token (cached), setting in ApiClient');
-            ApiClient.setToken(cachedToken);
-          } else {
-            logger.w(
-                'Cached ID token is also null - API calls will be unauthorized');
-          }
-        } catch (e2) {
-          logger.w('Failed to get cached ID token: $e2');
-        }
-      }
-
-      // THEN: Fetch the database user using Firebase UID as externalId
-      logger.d('Fetching database user with externalId: ${user.uid}');
-      try {
-        _dbUser =
-            await _profileLoader(user.uid).timeout(_initialProfileTimeout);
-        logger.i(
-            'Database user fetched: ${_dbUser?.username} (id: ${_dbUser?.id})');
-        logger.d('Email: ${_dbUser?.email}');
-        logger.d('Name: ${_dbUser?.firstName} ${_dbUser?.lastName}');
+        if (tokenRevision == ApiClient.tokenRevision) ApiClient.setToken(token);
+        final profile = await StartupTrace.run('profile',
+            () => _profileLoader(user.uid).timeout(_initialProfileTimeout));
+        if (!current()) return;
+        if (profile == null) throw StateError('Profile unavailable');
+        _dbUser = profile;
         _status = AuthStatus.authenticated;
-        // Kick off background prefetch so screens have data ready immediately
-        if (_prefetchAfterAuth && _dbUser?.id != null) {
-          _prefetch(_dbUser!.id);
+        _recoveryError = null;
+        _recoveryAttempts = 0;
+        _recoveryTimer?.cancel();
+        if (_prefetchAfterAuth) _prefetch(profile.id);
+      } catch (error) {
+        if (!current()) return;
+        final invalid = error is firebase_auth.FirebaseAuthException &&
+            [
+              'user-disabled',
+              'user-not-found',
+              'user-token-expired',
+              'invalid-user-token'
+            ].contains(error.code);
+        if (invalid) {
+          ApiClient.setToken(null);
+          _dbUser = null;
+          _status = AuthStatus.unauthenticated;
+          _errorMessage = 'Your session expired. Please sign in again.';
+        } else {
+          _status =
+              _dbUser == null ? AuthStatus.unknown : AuthStatus.authenticated;
+          _recoveryError =
+              'Couldn’t connect to Flixie. Check your connection and retry.';
+          _errorMessage = _recoveryError;
+          _scheduleRecovery();
         }
-      } catch (e, stackTrace) {
-        logger.e('Error fetching database user: $e',
-            error: e, stackTrace: stackTrace);
-        _dbUser = null;
-        _status = AuthStatus.unauthenticated;
       }
     } else {
       logger.i('User signed out, clearing database user');
@@ -406,6 +503,7 @@ class AuthProvider extends ChangeNotifier {
       _status = AuthStatus.unauthenticated;
       _isPrefetching = false;
       _cachedActivity = null;
+      _cachedFriendsActivity = null;
       _cachedFriends = null;
       _cachedGroups = null;
       _cachedRatings = null;
@@ -425,6 +523,7 @@ class AuthProvider extends ChangeNotifier {
       _hasResetAppBadgeThisSession = false;
     }
 
+    if (!current()) return;
     logger.d('Final status: $_status');
 
     // Notify auth status listener only if status actually changed
@@ -441,9 +540,11 @@ class AuthProvider extends ChangeNotifier {
       //   Post-frame B – notifyListeners() fires; screen is already inactive so
       //                  markNeedsBuild() returns early with no crash.
       SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (_disposed) return;
         _authStatusNotifier.notify();
-        SchedulerBinding.instance
-            .addPostFrameCallback((_) => notifyListeners());
+        SchedulerBinding.instance.addPostFrameCallback((_) {
+          if (!_disposed) notifyListeners();
+        });
       });
     } else {
       notifyListeners();
@@ -452,6 +553,13 @@ class AuthProvider extends ChangeNotifier {
 
   /// Fetches profile/friend/home cache in parallel right after login.
   void _prefetch(String userId, {String? region}) {
+    final session = _sessionGeneration;
+    final generation = ++_prefetchGeneration;
+    bool current() =>
+        !_disposed &&
+        session == _sessionGeneration &&
+        generation == _prefetchGeneration &&
+        _dbUser?.id == userId;
     final providerRegion = region ?? _dbUser?.watchProviderRegion ?? 'GB';
     if (_cachedWatchProviderRegion != null &&
         _cachedWatchProviderRegion != providerRegion) {
@@ -478,28 +586,31 @@ class AuthProvider extends ChangeNotifier {
       watchlistMovieIds: watchlistMovieIds,
     )
         .then((snapshot) {
+      if (!current()) return;
       _applyPrefetchSnapshot(snapshot);
       logger.i('[AuthProvider] Prefetch complete for $userId');
       _isPrefetching = false;
-      _notificationPoller.start(
-        interval: const Duration(seconds: 30),
-        onTick: refreshNotificationCount,
-      );
+      _startNotificationPoller();
 
       // Defer navigation trigger to avoid mid-frame widget tree mutations
       // (same pattern used in _onAuthStateChanged).
       SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (_disposed) return;
         _authStatusNotifier.notify();
-        SchedulerBinding.instance
-            .addPostFrameCallback((_) => notifyListeners());
+        SchedulerBinding.instance.addPostFrameCallback((_) {
+          if (!_disposed) notifyListeners();
+        });
       });
     }).catchError((e) {
+      if (!current()) return;
       logger.w('[AuthProvider] Prefetch error: $e');
       _isPrefetching = false;
       SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (_disposed) return;
         _authStatusNotifier.notify();
-        SchedulerBinding.instance
-            .addPostFrameCallback((_) => notifyListeners());
+        SchedulerBinding.instance.addPostFrameCallback((_) {
+          if (!_disposed) notifyListeners();
+        });
       });
     });
   }
@@ -596,13 +707,21 @@ class AuthProvider extends ChangeNotifier {
       return ensureWatchProviderCache(movieIds: requestedIds);
     }
 
+    final session = _sessionGeneration;
     final future = _prefetchCoordinator
         .fetchWatchProviders(
-      user.id,
-      missing,
-      region: providerRegion,
-    )
+          user.id,
+          missing,
+          region: providerRegion,
+        )
+        .timeout(const Duration(seconds: 20))
         .then((value) {
+      if (_disposed ||
+          session != _sessionGeneration ||
+          _dbUser?.id != user.id ||
+          _cachedWatchProviderRegion != providerRegion) {
+        return;
+      }
       _cachedWatchProvidersByMovieId.addAll(value.providersByMovieId);
       _cachedUserWatchProviderIds = value.userProviderIds;
       notifyListeners();
@@ -611,7 +730,9 @@ class AuthProvider extends ChangeNotifier {
     try {
       await future;
     } finally {
-      _watchProviderCacheFuture = null;
+      if (identical(_watchProviderCacheFuture, future)) {
+        _watchProviderCacheFuture = null;
+      }
     }
   }
 
@@ -626,61 +747,146 @@ class AuthProvider extends ChangeNotifier {
   Future<void> refreshNotificationCount() async {
     final userId = _dbUser?.id;
     if (userId == null) return;
+    final session = _sessionGeneration;
     final count = await _prefetchCoordinator.fetchUnreadCount(userId);
-    if (count != null) {
+    if (!_disposed &&
+        session == _sessionGeneration &&
+        _dbUser?.id == userId &&
+        count != null) {
       _syncUnreadNotificationCount(count);
       notifyListeners();
     }
   }
 
-  /// Re-fetches the db user and re-runs the full prefetch (user data, notifications,
-  /// friends, reviews, trending, now playing). Call on manual pull-to-refresh.
+  /// Refreshes the profile without restarting startup prefetch. The requesting
+  /// screen owns its secondary data refresh and can retain existing content.
   Future<void> refreshUserData() async {
-    final firebaseUid = _firebaseUser?.uid;
-    if (firebaseUid == null) return;
-    try {
-      _dbUser = await UserService.getUserByExternalId(firebaseUid);
-      notifyListeners();
-      if (_dbUser?.id != null) _prefetch(_dbUser!.id);
-    } catch (e) {
-      logger.w('[AuthProvider] refreshUserData error: $e');
-    }
+    await _refreshProfile();
   }
 
-  /// Runs a lightweight auth + data refresh after long background periods.
-  Future<void> handleAppResumed() async {
-    if (_status != AuthStatus.authenticated || _firebaseUser == null) return;
-    final inFlight = _resumeRefreshFuture;
-    if (inFlight != null) {
-      await inFlight;
-      return;
-    }
-    final now = DateTime.now();
-    final lastRefresh = _lastResumeRefreshAt;
-    if (lastRefresh != null &&
-        now.difference(lastRefresh) < _resumeRefreshThrottle) {
-      return;
-    }
-    final refreshFuture = _refreshAfterResume();
-    _resumeRefreshFuture = refreshFuture;
+  Future<bool> _refreshProfile() async {
+    final existing = _profileRefreshFuture;
+    if (existing != null) return existing;
+    final future = _loadProfileRefresh();
+    _profileRefreshFuture = future;
     try {
-      await refreshFuture;
+      return await future;
     } finally {
-      if (identical(_resumeRefreshFuture, refreshFuture)) {
-        _resumeRefreshFuture = null;
+      if (identical(_profileRefreshFuture, future)) {
+        _profileRefreshFuture = null;
       }
     }
   }
 
-  Future<void> _refreshAfterResume() async {
-    _lastResumeRefreshAt = DateTime.now();
+  Future<bool> _loadProfileRefresh() async {
+    final user = _firebaseUser;
+    if (user == null) return false;
+    final session = _sessionGeneration;
+    final request = ++_profileGeneration;
     try {
-      await _authService.refreshIdToken();
-    } catch (e) {
-      logger.w('[AuthProvider] token refresh on resume failed: $e');
+      final profile = await StartupTrace.run('profile',
+          () => _profileLoader(user.uid).timeout(_initialProfileTimeout));
+      if (_disposed ||
+          session != _sessionGeneration ||
+          request != _profileGeneration) {
+        return false;
+      }
+      if (profile == null) throw StateError('Profile unavailable');
+      _dbUser = profile;
+      _recoveryError = null;
+      notifyListeners();
+      return true;
+    } catch (error) {
+      if (!_disposed &&
+          session == _sessionGeneration &&
+          request == _profileGeneration) {
+        if (error is firebase_auth.FirebaseAuthException &&
+            [
+              'user-disabled',
+              'user-not-found',
+              'user-token-expired',
+              'invalid-user-token'
+            ].contains(error.code)) {
+          await _onAuthStateChanged(null);
+          return false;
+        }
+        _recoveryError =
+            'Couldn’t refresh. Your saved content is still available.';
+        notifyListeners();
+      }
+      return false;
     }
-    await refreshUserData();
-    await refreshNotificationCount();
+  }
+
+  Future<void> handleAppResumed({bool force = false}) async {
+    if (_disposed ||
+        _status != AuthStatus.authenticated ||
+        _firebaseUser == null) {
+      return;
+    }
+    if (_resumeRefreshFuture != null) return _resumeRefreshFuture;
+    if (!force &&
+        _lastResumeRefreshAt != null &&
+        DateTime.now().difference(_lastResumeRefreshAt!) <
+            _resumeRefreshThrottle) {
+      _startNotificationPoller();
+      return;
+    }
+    final future = StartupTrace.run('resume-recovery', _refreshAfterResume);
+    _resumeRefreshFuture = future;
+    try {
+      await future;
+    } finally {
+      if (identical(_resumeRefreshFuture, future)) _resumeRefreshFuture = null;
+    }
+  }
+
+  void _startNotificationPoller() {
+    if (_foreground && !_disposed && _dbUser != null) {
+      _notificationPoller.start(
+          interval: const Duration(seconds: 30),
+          onTick: refreshNotificationCount);
+    }
+  }
+
+  Future<void> _refreshAfterResume() async {
+    final session = _sessionGeneration;
+    final user = _firebaseUser!;
+    bool current() => !_disposed && session == _sessionGeneration;
+    try {
+      final tokenRevision = ApiClient.tokenRevision;
+      final token = await StartupTrace.run('session-token',
+          () => user.getIdToken(false).timeout(_initialTokenTimeout));
+      if (!current()) return;
+      if (token == null) throw StateError('No authentication token available');
+      if (tokenRevision == ApiClient.tokenRevision) ApiClient.setToken(token);
+      if (!await _refreshProfile()) throw StateError('Profile refresh failed');
+      if (!current()) return;
+      _lastResumeRefreshAt = DateTime.now();
+      _activityVersion++;
+      _cachedFriendsActivity = null;
+      _recoveryError = null;
+      _recoveryAttempts = 0;
+      _recoveryTimer?.cancel();
+      _startNotificationPoller();
+      unawaited(refreshNotificationCount());
+      notifyListeners();
+    } catch (error) {
+      if (!current()) return;
+      if (error is firebase_auth.FirebaseAuthException &&
+          [
+            'user-disabled',
+            'user-not-found',
+            'user-token-expired',
+            'invalid-user-token'
+          ].contains(error.code)) {
+        await _onAuthStateChanged(null);
+        return;
+      }
+      _recoveryError = 'Couldn’t refresh. Check your connection and retry.';
+      notifyListeners();
+      _scheduleRecovery();
+    }
   }
 
   /// Replaces the cached db user with [user] and notifies listeners.
@@ -760,7 +966,11 @@ class AuthProvider extends ChangeNotifier {
       }
 
       final email = await _resolveSignInEmail(identifier);
-      await _authService.signIn(email, password);
+      await StartupTrace.run(
+          'sign-in',
+          () => _authService
+              .signIn(email, password)
+              .timeout(const Duration(seconds: 15)));
 
       // Force a one-time sync of auth-dependent state right after sign-in.
       // This avoids a stuck loading/login screen if authStateChanges callback
@@ -774,7 +984,7 @@ class AuthProvider extends ChangeNotifier {
         _isLoading = false;
         notifyListeners();
       }
-      return true;
+      return _status == AuthStatus.authenticated;
     } on ApiException {
       _setLoading(false);
       return false;
@@ -857,9 +1067,11 @@ class AuthProvider extends ChangeNotifier {
       // Defer router notification so GoRouter navigates *after* the current
       // frame builds cleanly (same pattern as _onAuthStateChanged).
       SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (_disposed) return;
         _authStatusNotifier.notify();
-        SchedulerBinding.instance
-            .addPostFrameCallback((_) => notifyListeners());
+        SchedulerBinding.instance.addPostFrameCallback((_) {
+          if (!_disposed) notifyListeners();
+        });
       });
       succeeded = true;
       return true;
@@ -1007,7 +1219,7 @@ class AuthProvider extends ChangeNotifier {
     } on ApiException catch (error) {
       if (error.statusCode != 401) rethrow;
       try {
-        await _authService.refreshIdToken();
+        await ApiClient.refreshAuthToken();
       } catch (_) {
         throw const ApiException(
           statusCode: 401,
@@ -1038,7 +1250,8 @@ class AuthProvider extends ChangeNotifier {
   Future<void> signOut() async {
     _setLoading(true);
     try {
-      await _authService.signOut();
+      await _onAuthStateChanged(null);
+      await _authService.signOut().timeout(_initialTokenTimeout);
     } finally {
       _setLoading(false);
     }
@@ -1175,24 +1388,17 @@ class AuthProvider extends ChangeNotifier {
 
   /// Refreshes the database user from the backend.
   Future<void> refreshDbUser() async {
-    logger.d('Manually refreshing database user');
-    if (_firebaseUser == null) {
-      logger.w('Cannot refresh - no Firebase user');
-      return;
-    }
-    try {
-      logger.d('Fetching user with externalId: ${_firebaseUser!.uid}');
-      _dbUser = await _profileLoader(_firebaseUser!.uid);
-      logger.i('Database user refreshed: ${_dbUser?.username}');
-      notifyListeners();
-    } catch (e, stackTrace) {
-      logger.e('Error refreshing database user: $e',
-          error: e, stackTrace: stackTrace);
-    }
+    await _refreshProfile();
   }
 
   @override
   void dispose() {
+    _disposed = true;
+    _sessionGeneration++;
+    _prefetchGeneration++;
+    _recoveryTimer?.cancel();
+    _authBootstrapTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _notificationPoller.stop();
     ApiClient.setAuthTokenRefresher(null);
     _authStateSubscription?.cancel();

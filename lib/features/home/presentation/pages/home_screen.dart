@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/auth/startup_trace.dart';
 import 'package:flixie_app/features/home/presentation/models/home_watch_plan_visibility.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 import 'package:flixie_app/features/social/data/watch_request_cache.dart';
@@ -63,7 +64,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+class _HomeScreenState extends State<HomeScreen> {
   static _HomeSessionSnapshot? _sessionSnapshot;
   // Keep hero carousel concise so primary CTA and dots remain visible above fold.
   static const int _maxHeroCarouselItems = 12;
@@ -128,7 +129,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     TabRefreshController.watchPlans.addListener(_refreshWatchPlanReminders);
     // Listen for dbUser becoming available after auth resolves
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -145,7 +145,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     TabRefreshController.watchPlans.removeListener(_refreshWatchPlanReminders);
     _storeSessionSnapshot();
     _authProvider?.removeListener(_onAuthChanged);
@@ -163,21 +162,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   void _onAuthChanged() {
     final userId = _authProvider?.dbUser?.id;
-    if (userId == null) return;
+    if (userId == null) {
+      _homeLoadGeneration++;
+      _watchPlansLoadGeneration++;
+      return;
+    }
     final activityVersion = _authProvider?.activityVersion ?? -1;
     if (userId != _loadedForUserId || activityVersion != _lastActivityVersion) {
       _lastActivityVersion = activityVersion;
-      _loadAll();
+      _loadAll(showFullLoading: userId != _loadedForUserId);
     }
   }
 
   void _refreshWatchPlanReminders() {
     if (mounted) unawaited(_preloadInitialWatchPlans(_authProvider?.dbUser));
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _refreshWatchPlanReminders();
   }
 
   void _onHomeTabRefresh() {
@@ -246,6 +244,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  int _homeLoadGeneration = 0;
+  String? _secondaryError;
+  final Set<String> _loadingHomeSections = {};
+
   Future<void> _refreshAll() =>
       _loadAll(refreshRecommendations: true, showFullLoading: false);
 
@@ -253,6 +255,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     bool refreshRecommendations = false,
     bool showFullLoading = true,
   }) async {
+    final generation = ++_homeLoadGeneration;
+    bool current() => mounted && generation == _homeLoadGeneration;
     if (showFullLoading) {
       setState(() {
         _isLoading = true;
@@ -262,7 +266,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final auth = context.read<AuthProvider>();
     if (refreshRecommendations) {
       await auth.refreshUserData();
-      if (!mounted) return;
+      if (!current()) return;
     }
     final user = auth.dbUser;
     logger.d('[HomeScreen] loading, user=${user?.id}');
@@ -274,10 +278,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // together while the launch treatment is on screen; all other content is
     // deliberately deferred until the shell is usable.
     unawaited(_preloadInitialWatchPlans(user));
-    final secondaryLoad = _loadSecondaryContent(
-      user,
-      refreshRecommendations: refreshRecommendations,
-    );
 
     try {
       final cachedTrending = auth.cachedTrending;
@@ -287,7 +287,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ? Future.value(cachedTrending)
           : TrendingService.getTrendingMovies(refresh: refreshRecommendations);
       final trendingMovies = await trendingFuture;
-      if (!mounted) return;
+      if (!current() || auth.dbUser?.id != user?.id) return;
 
       // Trending is enough to make Home immediately useful. The remaining
       // sections load in place, rather than holding the whole app on launch.
@@ -296,8 +296,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           _featuredMovies = trendingMovies;
           _isLoading = false;
         });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (current()) StartupTrace.mark('usable-home-frame');
+        });
       }
-      unawaited(secondaryLoad.catchError((error) {
+      unawaited(_loadSecondaryContent(
+        user,
+        refreshRecommendations: refreshRecommendations,
+        generation: generation,
+      ).catchError((error) {
         logger.w('[HomeScreen] secondary load error: $error');
       }));
       unawaited(_precacheInitialHomeImages(trendingMovies));
@@ -306,10 +313,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
     } catch (e) {
       logger.e('[HomeScreen] load error: $e');
-      if (mounted) {
+      if (current()) {
         setState(() {
           _isLoading = false;
-          _error = 'Couldn\'t load content. Check your connection.';
+          if (_featuredMovies.isNotEmpty) {
+            _secondaryError = 'Couldn’t refresh Home.';
+          }
+          _error = _featuredMovies.isEmpty
+              ? 'Couldn\'t load content. Check your connection.'
+              : null;
         });
       }
     }
@@ -348,6 +360,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     List<MovieShort> movies,
     String userId,
   ) async {
+    final generation = _homeLoadGeneration;
     final visibleMovies = movies.take(_maxHeroCarouselItems).toList();
     final results = await Future.wait(
       visibleMovies.map((movie) async {
@@ -370,7 +383,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           .map((movie) => MapEntry(movie.id, <FriendMediaInteraction>[]))
           .toList(),
     );
-    if (!mounted || _loadedForUserId != userId) return;
+    if (!mounted ||
+        _loadedForUserId != userId ||
+        generation != _homeLoadGeneration) {
+      return;
+    }
     setState(() {
       _heroFriendInteractions
         ..clear()
@@ -381,7 +398,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _loadSecondaryContent(
     models.User? user, {
     bool refreshRecommendations = false,
+    required int generation,
   }) async {
+    bool current() =>
+        mounted &&
+        _loadedForUserId == user?.id &&
+        generation == _homeLoadGeneration;
     if (user == null) {
       if (!mounted) return;
       setState(() {
@@ -399,35 +421,55 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     if (mounted) setState(() => _isLoadingRecommendations = true);
 
-    final results = await Future.wait([
-      FriendService.getFriendsActivityLists(
-        user.id,
-        days: 30,
-        limit: 200,
-      ).catchError((_) => <ActivityListItem>[]),
-      RecommendationService.getUserRecommendations(
-        user.id,
-        refresh: refreshRecommendations,
-      ).catchError((_) => <MovieShort>[]),
-      _watchlistActions
-          .getUserWatchlist(user.id)
-          .catchError((_) => <WatchlistMovie>[]),
-      ShowService.getContinueWatching(
-        user.id,
-      ).catchError((_) => <ContinueWatchingShow>[]),
-    ]);
-    if (!mounted || _loadedForUserId != user.id) return;
+    _secondaryError = null;
+    _loadingHomeSections
+        .addAll(['friends', 'recommendations', 'watchlist', 'continue']);
+    Future<void> section<T>(
+        String key, Future<T> request, void Function(T) apply) async {
+      try {
+        final value = await request;
+        if (current()) setState(() => apply(value));
+      } catch (_) {
+        if (current()) {
+          setState(
+              () => _secondaryError = 'Some Home sections couldn’t refresh.');
+        }
+      } finally {
+        if (current()) {
+          setState(() {
+            _loadingHomeSections.remove(key);
+            _isLoadingRecommendations =
+                _loadingHomeSections.contains('recommendations');
+          });
+        }
+      }
+    }
 
-    final personalisedForYou = results[1] as List<MovieShort>;
-    setState(() {
-      _friendsActivity = results[0] as List<ActivityListItem>;
-      _forYouMovies = personalisedForYou.take(20).toList();
-      _watchlistMovieIds = (results[2] as List<WatchlistMovie>)
-          .map((item) => item.movieId)
-          .toSet();
-      _continueWatchingShows = results[3] as List<ContinueWatchingShow>;
-      _isLoadingRecommendations = false;
-    });
+    final cachedFriends = context.read<AuthProvider>().cachedFriendsActivity;
+    await Future.wait([
+      section(
+          'friends',
+          !refreshRecommendations && cachedFriends != null
+              ? Future.value(cachedFriends)
+              : FriendService.getFriendsActivityLists(user.id,
+                  days: 30, limit: 200),
+          (value) => _friendsActivity = value),
+      section(
+          'recommendations',
+          RecommendationService.getUserRecommendations(user.id,
+              refresh: refreshRecommendations),
+          (value) => _forYouMovies = value.take(20).toList()),
+      section(
+          'watchlist',
+          _watchlistActions.getUserWatchlist(user.id),
+          (value) =>
+              _watchlistMovieIds = value.map((item) => item.movieId).toSet()),
+      section('continue', ShowService.getContinueWatching(user.id),
+          (value) => _continueWatchingShows = value),
+    ]);
+    if (!current()) return;
+    setState(() => _isLoadingRecommendations = false);
+    StartupTrace.mark('home-secondary-complete');
     _scheduleRecommendationVisibilityCheck();
   }
 
@@ -985,7 +1027,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final unreadCount = context.watch<AuthProvider>().unreadNotificationCount;
+    final auth = context.watch<AuthProvider>();
+    final unreadCount = auth.unreadNotificationCount;
     final user = context.watch<AuthProvider>().dbUser;
     final greetingName = (user?.firstName?.trim().isNotEmpty ?? false)
         ? user!.firstName!.trim()
@@ -1051,6 +1094,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        if (_secondaryError != null ||
+                            auth.recoveryError != null)
+                          ListTile(
+                            title: Text(auth.recoveryError ?? _secondaryError!),
+                            trailing: TextButton(
+                                onPressed: () async {
+                                  await auth.retrySession();
+                                  if (mounted) await _refreshAll();
+                                },
+                                child: const Text('Retry')),
+                          ),
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: GreetingHeader(
@@ -1102,7 +1156,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildContinueWatchingSection(BuildContext context) {
-    if (_isLoadingRecommendations && _continueWatchingShows.isEmpty) {
+    if (_loadingHomeSections.contains('continue') &&
+        _continueWatchingShows.isEmpty) {
       return _buildPosterRailLoadingState('Continue Watching');
     }
     if (_continueWatchingShows.isEmpty) return const SizedBox.shrink();
@@ -2138,7 +2193,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildFriendActivitySection(BuildContext context) {
-    if (_isLoadingRecommendations && _friendsActivity.isEmpty) {
+    if (_loadingHomeSections.contains('friends') && _friendsActivity.isEmpty) {
       return _buildActivityLoadingState();
     }
     if (_friendsActivity.isEmpty) return const SizedBox.shrink();

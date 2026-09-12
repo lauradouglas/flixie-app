@@ -33,18 +33,18 @@ class FlixieToast extends SnackBar {
   }) : super(
           backgroundColor: const Color(0xFF261B40),
           elevation: 0,
-          persist: persist ?? action != null,
+          persist: persist ?? false,
           behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          margin: const EdgeInsets.all(8),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
             side: BorderSide(color: type.colour, width: 1.5),
           ),
-          duration: action != null
-              ? const Duration(seconds: 8)
-              : duration ??
-                  Duration(seconds: type == FlixieToastType.error ? 6 : 4),
+          duration: duration ??
+              Duration(
+                  seconds:
+                      action != null || type == FlixieToastType.error ? 5 : 4),
           content: _ToastBody(content: content, type: type, action: action),
         );
 }

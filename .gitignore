@@ -83,3 +83,4 @@ android/.gradle/
 # Build outputs
 build/
 android/build/
+/.impeccable

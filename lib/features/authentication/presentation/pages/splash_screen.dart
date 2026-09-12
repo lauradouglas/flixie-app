@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:flixie_app/core/auth/auth_provider.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
 
@@ -32,6 +34,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
     return Scaffold(
       backgroundColor: FlixieColors.background,
       body: FadeTransition(
@@ -55,21 +58,30 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
               ),
             ),
-            const SafeArea(
+            SafeArea(
               child: Padding(
-                padding: EdgeInsets.only(bottom: 30),
+                padding: const EdgeInsets.only(bottom: 30),
                 child: Align(
                   alignment: Alignment.bottomCenter,
-                  child: SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        FlixieColors.primary,
-                      ),
-                    ),
-                  ),
+                  child: auth.recoveryError != null
+                      ? Column(mainAxisSize: MainAxisSize.min, children: [
+                          Text(auth.recoveryError!,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: Colors.white)),
+                          TextButton(
+                              onPressed: auth.retrySession,
+                              child: const Text('Retry')),
+                        ])
+                      : const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              FlixieColors.primary,
+                            ),
+                          ),
+                        ),
                 ),
               ),
             ),

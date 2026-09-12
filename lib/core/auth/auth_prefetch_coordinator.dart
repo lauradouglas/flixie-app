@@ -18,6 +18,7 @@ import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/utils/notification_visibility.dart';
 import 'package:flixie_app/features/social/presentation/controllers/friend_actions_controller.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
+import 'package:flixie_app/features/social/data/friend_service.dart';
 import 'package:flixie_app/features/social/data/request_service.dart';
 import 'package:flixie_app/features/profile/presentation/controllers/profile_lookup_controller.dart';
 import 'package:flixie_app/core/auth/auth_prefetch_snapshot.dart';
@@ -57,6 +58,10 @@ class AuthPrefetchCoordinator {
     Set<int>? userWatchProviderIds;
     List<WatchRequest>? watchRequests;
 
+    // Give the essential Home hero request priority. Home shares this GET.
+    try {
+      trending = await TrendingService.getTrendingMovies();
+    } catch (_) {}
     await Future.wait([
       _profileLookupController.getUserActivity(userId).then<void>((v) {
         activity = v;
@@ -64,7 +69,8 @@ class AuthPrefetchCoordinator {
       _friendActionsController.getFriends(userId).then<void>((v) {
         friends = v;
       }, onError: (_, __) {}),
-      _friendActionsController.getFriendsActivityLists(userId).then<void>((v) {
+      FriendService.getFriendsActivityLists(userId, days: 30, limit: 200)
+          .then<void>((v) {
         friendsActivity = v;
       }, onError: (_, __) {}),
       GroupService.getUserGroups(userId).then<void>((v) {
@@ -78,9 +84,6 @@ class AuthPrefetchCoordinator {
       }, onError: (_, __) {}),
       _profileLookupController.getUserMovieReviews(userId).then<void>((v) {
         reviews = v;
-      }, onError: (_, __) {}),
-      TrendingService.getTrendingMovies().then<void>((v) {
-        trending = v;
       }, onError: (_, __) {}),
       _movieService.getNowPlayingMovies(region: region).then<void>((v) {
         nowPlaying = v;
@@ -128,11 +131,13 @@ class AuthPrefetchCoordinator {
     Iterable<int> movieIds, {
     required String region,
   }) async {
+    final deadline = DateTime.now().add(const Duration(seconds: 10));
     final ids = movieIds.toSet().toList(growable: false);
     final userProviders = await UserService.getUserWatchProviders(userId);
     final providersByMovieId = <int, List<WatchProvider>>{};
 
     for (var start = 0; start < ids.length; start += 5) {
+      if (DateTime.now().isAfter(deadline)) break;
       final end = (start + 5).clamp(0, ids.length);
       final results = await Future.wait(
         ids.sublist(start, end).map((movieId) async {
@@ -142,11 +147,12 @@ class AuthPrefetchCoordinator {
               await _movieService.getMovieWatchProviders(movieId, region),
             );
           } catch (_) {
-            return MapEntry(movieId, <WatchProvider>[]);
+            return null; // Failure is not a successfully cached empty result.
           }
         }),
       );
-      providersByMovieId.addEntries(results);
+      providersByMovieId
+          .addEntries(results.whereType<MapEntry<int, List<WatchProvider>>>());
     }
 
     return (

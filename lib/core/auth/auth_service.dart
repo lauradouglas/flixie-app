@@ -26,13 +26,8 @@ class AuthService {
       password: password,
     );
 
-    // Get the ID token and set it in ApiClient
-    final idToken = await credential.user?.getIdToken();
-    if (idToken != null) {
-      apiLogger.d('Got Firebase ID token, setting in ApiClient');
-      ApiClient.setToken(idToken);
-    }
-
+    // AuthProvider owns token installation and profile loading for both sign-in
+    // and restored sessions, avoiding a duplicate Firebase token read here.
     return credential;
   }
 
@@ -69,7 +64,6 @@ class AuthService {
     if (token == null) {
       throw FirebaseAuthException(code: 'missing-id-token');
     }
-    ApiClient.setToken(token);
     return token;
   }
 

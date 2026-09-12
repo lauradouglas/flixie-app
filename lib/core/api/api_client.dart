@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:flixie_app/core/utils/app_logger.dart';
 
@@ -48,11 +49,19 @@ class ApiClient {
   /// same frame" pattern that puts unnecessary load on Supabase.
   static final Map<String, Future<dynamic>> _inFlightGets = {};
 
+  static int _sessionGeneration = 0;
+  static int _tokenRevision = 0;
+  static int get tokenRevision => _tokenRevision;
   static String? _token;
   static Future<String> Function()? _authTokenRefresher;
   static Future<String>? _tokenRefreshInFlight;
 
   static void setToken(String? token) {
+    _tokenRevision++;
+    if (token == null) {
+      _sessionGeneration++;
+      _tokenRefreshInFlight = null;
+    }
     _token = token;
     if (token != null) {
       apiLogger.d('Token set');
@@ -65,6 +74,9 @@ class ApiClient {
   }
 
   static void setAuthTokenRefresher(Future<String> Function()? refresher) {
+    _sessionGeneration++;
+    _inFlightGets.clear();
+    _tokenRefreshInFlight = null;
     _authTokenRefresher = refresher;
   }
 
@@ -136,7 +148,8 @@ class ApiClient {
     Object? requestScope,
   }) {
     final uri = _buildUri(path, queryParams: queryParams);
-    final key = '${authenticated ? 'auth' : 'anon'}:$uri:${requestScope ?? ''}';
+    final key =
+        '${authenticated ? _sessionGeneration : 'anon'}:$uri:${requestScope ?? ''}';
 
     final existing = _inFlightGets[key];
     if (existing != null) {
@@ -171,9 +184,19 @@ class ApiClient {
     required String requestLabel,
     required Future<T> Function() request,
   }) async {
+    final session = _sessionGeneration;
+    void checkSession() {
+      if (authenticated && session != _sessionGeneration) {
+        throw StateError('Session changed while request was pending');
+      }
+    }
+
     try {
-      return await request();
+      final result = await request();
+      checkSession();
+      return result;
     } on ApiException catch (error) {
+      checkSession();
       if (!authenticated ||
           error.statusCode != 401 ||
           _authTokenRefresher == null) {
@@ -182,23 +205,28 @@ class ApiClient {
       apiLogger.w(
         '$requestLabel returned 401 - refreshing auth token and retrying once',
       );
-      await _refreshAuthToken();
-      return request();
+      await refreshAuthToken();
+      checkSession();
+      final result = await request();
+      checkSession();
+      return result;
     }
   }
 
-  static Future<void> _refreshAuthToken() async {
+  /// One bounded forced refresh shared by 401 retries and explicit recovery.
+  /// The refresher returns a token; only this guarded owner may install it.
+  static Future<void> refreshAuthToken() async {
     final refresher = _authTokenRefresher;
     if (refresher == null) return;
-    final inFlight = _tokenRefreshInFlight;
-    if (inFlight != null) {
-      await inFlight;
-      return;
-    }
-    final refreshFuture = refresher();
-    _tokenRefreshInFlight = refreshFuture;
+    final session = _sessionGeneration;
+    final refreshFuture = _tokenRefreshInFlight ??=
+        Future<String>.sync(refresher).timeout(const Duration(seconds: 8));
     try {
-      await refreshFuture;
+      final token = await refreshFuture;
+      if (session == _sessionGeneration &&
+          identical(_tokenRefreshInFlight, refreshFuture)) {
+        setToken(token);
+      }
     } finally {
       if (identical(_tokenRefreshInFlight, refreshFuture)) {
         _tokenRefreshInFlight = null;
@@ -320,8 +348,10 @@ class ApiClient {
         if (body != null) {
           request.body = jsonEncode(body);
         }
-        final streamedResponse = await request.send().timeout(_timeout);
-        final response = await http.Response.fromStream(streamedResponse);
+        final response = await request
+            .send()
+            .then(http.Response.fromStream)
+            .timeout(_timeout);
         return _parseResponse(response);
       },
     );

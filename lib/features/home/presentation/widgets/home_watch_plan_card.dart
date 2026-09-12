@@ -90,7 +90,7 @@ class HomeWatchPlanCard extends StatelessWidget {
                           maxLines: narrow ? 3 : 2,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                              color: FlixieColors.medium,
+                              color: FlixieColors.light,
                               fontSize: 13,
                               height: 1.25)),
                     ],
@@ -215,7 +215,7 @@ class HomeWatchPlanEmptyCard extends StatelessWidget {
                         SizedBox(height: 4),
                         Text('Pick movies and decide with friends.',
                             style: TextStyle(
-                                color: FlixieColors.medium,
+                                color: FlixieColors.light,
                                 fontSize: 13,
                                 height: 1.25)),
                       ],
