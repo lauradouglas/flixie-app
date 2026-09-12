@@ -65,6 +65,13 @@ String notificationDeepLinkPath(Map<String, dynamic> data) {
     return '/groups/$groupId?tab=requests';
   }
 
+  if (type == 'LIST_SHARED' && data['listId'] != null) {
+    return '/movie-lists/${Uri.encodeComponent(data['listId'].toString())}';
+  }
+  if (type == 'REFERRAL_JOINED' && (friendId ?? senderId) != null) {
+    return '/friends/${Uri.encodeComponent((friendId ?? senderId)!)}';
+  }
+
   if (type == 'FRIEND_REQUEST' && friendId != null && friendId.isNotEmpty) {
     return '/friends/$friendId';
   }

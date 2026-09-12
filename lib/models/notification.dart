@@ -146,6 +146,9 @@ class FlixieNotification {
   String get receivedAt => notificationReceived ?? createdAt ?? updatedAt ?? '';
 
   Map<String, dynamic>? get _linkOtherUser {
+    // Lifecycle events carry their actor; the requester is not always the
+    // person who proposed a time or responded to a group plan.
+    if (senderUser != null) return senderUser;
     final l = link;
     if (l == null) return senderUser;
     final request =
@@ -186,6 +189,13 @@ class FlixieNotification {
 
   Map<String, dynamic>? get senderIconColor =>
       (_linkOtherUser)?['iconColor'] as Map<String, dynamic>?;
+
+  List<String> get senderProfileBadges =>
+      ((_linkOtherUser?['profileBadges'] ?? senderUser?['profileBadges'])
+                  as List? ??
+              const [])
+          .whereType<String>()
+          .toList();
 
   ProfileAvatar? get senderAvatar {
     final value = _linkOtherUser?['avatar'];
@@ -431,7 +441,8 @@ class FlixieNotification {
       notificationReceived: json['notificationReceived'] as String?,
       createdAt: json['createdAt'] as String?,
       updatedAt: json['updatedAt'] as String?,
-      senderUser: (json['data'] as Map<String, dynamic>?)?['sender']
+      senderUser: json['senderUser'] as Map<String, dynamic>? ??
+          (json['data'] as Map<String, dynamic>?)?['sender']
               as Map<String, dynamic>? ??
           json['user'] as Map<String, dynamic>?,
       link: json['link'] as Map<String, dynamic>?,

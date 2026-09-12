@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/notification_profile_badges.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'dart:async';
 
@@ -8,7 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:flixie_app/models/notification.dart';
 import 'package:flixie_app/features/social/presentation/controllers/friend_actions_controller.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
-import 'package:flixie_app/core/auth/notification_deep_link.dart';
+import 'package:flixie_app/core/utils/notification_destination.dart';
 import 'package:flixie_app/features/profile/data/notification_service.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/features/social/data/request_service.dart';
@@ -17,10 +18,7 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/utils/notification_visibility.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
-import 'package:flixie_app/core/calendar/watch_calendar_service.dart';
-import 'package:flixie_app/features/profile/presentation/widgets/notification_activity_card.dart';
-import 'package:flixie_app/features/profile/presentation/widgets/notification_request_card.dart';
-import 'package:flixie_app/features/watch_plans/presentation/sheets/watch_plan_schedule_sheet.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/notification_inbox_card.dart';
 
 /// How often the screen silently re-fetches notifications in the background.
 const Duration _kPollInterval = Duration(seconds: 60);
@@ -229,16 +227,16 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
   Future<void> _respond(FlixieNotification notification, String action) async {
     final id = notification.id;
-    if (id == null) return;
+    if (id == null || _processingIds.contains(id)) return;
     setState(() => _processingIds.add(id));
     final analytics = context.read<AnalyticsController>();
     try {
       final auth = context.read<AuthProvider>();
       final userId = auth.dbUser?.id;
       final requestId = notification.linkedRequestId;
+      if (requestId == null) throw StateError('Missing invitation request');
 
-      if (notification.type == FlixieNotification.friendRequest &&
-          requestId != null) {
+      if (notification.type == FlixieNotification.friendRequest) {
         if (action == FlixieNotification.actionAccepted) {
           await _friendActions.acceptRequest(requestId);
         } else {
@@ -249,7 +247,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
       // For watch requests, also update the underlying request record.
       if (notification.type == FlixieNotification.movieWatchRequest ||
           notification.type == FlixieNotification.showWatchRequest) {
-        if (requestId != null) {
+        {
           final status = action == FlixieNotification.actionAccepted
               ? 'ACCEPTED'
               : 'DECLINED';
@@ -260,7 +258,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
       // For group invites and group requests, also update the underlying request record.
       if (notification.type == FlixieNotification.groupInvite ||
           notification.type == FlixieNotification.groupRequest) {
-        if (requestId != null) {
+        {
           final status = action == FlixieNotification.actionAccepted
               ? 'ACCEPTED'
               : 'DECLINED';
@@ -297,8 +295,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
         setState(() {
           _notifications.removeWhere((n) => n.id == id);
         });
-        auth.setUnreadNotificationCount(
-            _notifications.where((n) => !n.isRead).length);
+        auth.updateCachedNotifications(_notifications);
         if (userId != null &&
             notification.type == FlixieNotification.friendRequest) {
           final friends = await _friendActions.getFriends(userId);
@@ -361,158 +358,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
     }
   }
 
-  Future<void> _respondToScheduleProposal(
-    FlixieNotification notification,
-    String decision,
-  ) async {
-    final requestId = notification.linkedRequestId;
-    final proposalId =
-        notification.latestWatchScheduleProposal?['id']?.toString();
-    final userId = context.read<AuthProvider>().dbUser?.id;
-    final analytics = context.read<AnalyticsController>();
-    final notificationId = notification.id;
-    if (requestId == null ||
-        proposalId == null ||
-        proposalId.isEmpty ||
-        userId == null) {
-      return;
-    }
-    if (notificationId != null) {
-      setState(() => _processingIds.add(notificationId));
-    }
-    try {
-      final state = await RequestService.respondToWatchScheduleProposal(
-        watchRequestId: requestId,
-        proposalId: proposalId,
-        userId: userId,
-        decision: decision,
-      );
-      await _load();
-      if (!mounted) return;
-      final scheduledFor = state.request.scheduledFor;
-      if (decision == 'accepted' && scheduledFor != null) {
-        await analytics.watchPlanScheduled(
-          watchPlanId: state.request.id,
-          contentId: state.request.analyticsContentId,
-          contentType: state.request.analyticsContentType,
-          planType: state.request.analyticsPlanType,
-          participantCount: state.request.analyticsParticipantCount,
-          source: 'notification',
-        );
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showFlixieToast(
-          FlixieToast(
-            type: FlixieToastType.success,
-            content: const Text('Watch time agreed'),
-            backgroundColor: FlixieColors.surfaceElevated,
-            duration: const Duration(seconds: 4),
-            persist: false,
-            action: SnackBarAction(
-              label: 'Add to calendar',
-              textColor: FlixieColors.background,
-              onPressed: () => WatchCalendarService.addScheduledWatch(
-                title: state.request.movie?.title ??
-                    notification.watchMediaTitle ??
-                    'Watch together',
-                scheduledFor: scheduledFor,
-                runtimeMinutes: state.request.movie?.runtimeMinutes,
-                note: state.request.message,
-                location:
-                    state.request.location ?? notification.watchRequestLocation,
-              ),
-            ),
-          ),
-        );
-        return;
-      }
-      ScaffoldMessenger.of(context).showFlixieToast(
-        FlixieToast(
-          type: FlixieToastType.success,
-          content: Text(
-            decision == 'accepted' ? 'Watch time agreed' : 'Time declined',
-          ),
-          backgroundColor: FlixieColors.surfaceElevated,
-        ),
-      );
-    } catch (e) {
-      logger.e('[NotificationScreen] schedule proposal response error: $e');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showFlixieToast(
-        FlixieToast(
-          type: FlixieToastType.error,
-          content:
-              const Text('Failed to update proposed time. Please try again.'),
-          backgroundColor: FlixieColors.danger,
-        ),
-      );
-    } finally {
-      if (mounted && notificationId != null) {
-        setState(() => _processingIds.remove(notificationId));
-      }
-    }
-  }
-
-  Future<void> _suggestSchedule(FlixieNotification notification) async {
-    final requestId = notification.linkedRequestId;
-    final userId = context.read<AuthProvider>().dbUser?.id;
-    if (requestId == null || userId == null) return;
-
-    final selected = await showModalBottomSheet<
-        ({DateTime proposedFor, String? message, String? location})>(
-      context: context,
-      isScrollControlled: true,
-      useRootNavigator: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => WatchPlanScheduleSheet(
-        initial: notification.watchRequestScheduledFor,
-      ),
-    );
-    if (!mounted || selected == null) return;
-
-    final notificationId = notification.id;
-    if (notificationId != null) {
-      setState(() => _processingIds.add(notificationId));
-    }
-    try {
-      await RequestService.proposeWatchSchedule(
-        watchRequestId: requestId,
-        userId: userId,
-        proposedFor: selected.proposedFor,
-        message: selected.message,
-      );
-      await _load();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showFlixieToast(
-        FlixieToast(
-          type: FlixieToastType.info,
-          content: const Text('Suggested a new time'),
-          backgroundColor: FlixieColors.surfaceElevated,
-        ),
-      );
-    } catch (e) {
-      logger.e('[NotificationScreen] suggest schedule error: $e');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showFlixieToast(
-        FlixieToast(
-          type: FlixieToastType.error,
-          content: const Text('Failed to suggest a time. Please try again.'),
-          backgroundColor: FlixieColors.danger,
-        ),
-      );
-    } finally {
-      if (mounted && notificationId != null) {
-        setState(() => _processingIds.remove(notificationId));
-      }
-    }
-  }
-
   // ---- Filter helpers -------------------------------------------------------
 
-  bool _isRequestType(FlixieNotification n) => n.isRequest;
+  bool _isRequestType(FlixieNotification n) => notificationNeedsResponse(n);
 
-  bool _isActivityType(FlixieNotification n) =>
-      !n.isRequest && n.type != 'ALERT';
+  bool _isActivityType(FlixieNotification n) => !notificationNeedsResponse(n);
 
   /// One source of truth for both cards and section headings. This protects
   /// the headings from a stale refresh during a dismiss animation.
@@ -531,25 +381,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
         return _visibleNotifications.where(_isActivityType).toList();
     }
   }
-
-  // ---- Sections for "All" view ----------------------------------------------
-
-  /// Pending requests that still need a response.
-  List<FlixieNotification> get _pendingRequests => _visibleNotifications
-      .where((n) => _isRequestType(n) && n.isPending)
-      .toList();
-
-  /// Unread non-request notifications.
-  List<FlixieNotification> get _newNotifications => _visibleNotifications
-      .where((n) => !_isRequestType(n) && !n.isRead)
-      .toList();
-
-  /// Read non-request notifications + resolved requests.
-  List<FlixieNotification> get _earlierNotifications => _visibleNotifications
-      .where((n) =>
-          (!_isRequestType(n) && n.isRead) ||
-          (_isRequestType(n) && !n.isPending))
-      .toList();
 
   int _countForFilter(_NotificationFilter filter) {
     return switch (filter) {
@@ -652,17 +483,15 @@ class _NotificationScreenState extends State<NotificationScreen> {
   Widget _buildFilterChips() {
     final filters = [
       (_NotificationFilter.all, 'All'),
-      (_NotificationFilter.requests, 'Requests'),
+      (_NotificationFilter.requests, 'Needs you'),
       (_NotificationFilter.activity, 'Activity'),
     ];
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: Container(
-        decoration: BoxDecoration(
-          color: FlixieColors.tabBarBackgroundFocused,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: FlixieColors.tabBarBorder)),
         ),
         child: Row(
           children: filters.map((entry) {
@@ -683,13 +512,17 @@ class _NotificationScreenState extends State<NotificationScreen> {
                       constraints: const BoxConstraints(minHeight: 44),
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: selected
-                            ? FlixieColors.primary.withValues(alpha: 0.25)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(8),
+                        border: Border(
+                            bottom: BorderSide(
+                                width: 3,
+                                color: selected
+                                    ? FlixieColors.primaryText
+                                    : Colors.transparent)),
                       ),
                       child: Text(
-                        '$label $count',
+                        f == _NotificationFilter.requests && count > 0
+                            ? '$label $count'
+                            : label,
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: selected
@@ -726,87 +559,119 @@ class _NotificationScreenState extends State<NotificationScreen> {
     );
   }
 
-  Widget _buildAllSections() {
-    final pending = _pendingRequests;
-    final newItems = _newNotifications;
-    final earlier = _earlierNotifications;
-
-    if (pending.isEmpty && newItems.isEmpty && earlier.isEmpty) {
-      return _buildEmptyState();
+  List<Widget> _buildGroupedByDate(List<FlixieNotification> items) {
+    final sorted = [...items]
+      ..sort((a, b) => b.receivedAt.compareTo(a.receivedAt));
+    final result = <Widget>[];
+    String? previous;
+    var first = true;
+    for (final n in sorted) {
+      final label = _dateSectionLabel(n);
+      if (label != previous) {
+        result.add(Padding(
+            padding: const EdgeInsets.only(top: 4, bottom: 4),
+            child: Row(children: [
+              Expanded(child: _buildSectionHeader(label.toUpperCase())),
+              if (first && _filter == _NotificationFilter.all)
+                TextButton(
+                    onPressed: _notifications.any((n) => !n.isRead)
+                        ? _markAllRead
+                        : null,
+                    child: const Text('Mark all read',
+                        style: TextStyle(fontSize: 12))),
+            ])));
+        previous = label;
+        first = false;
+      }
+      result.add(Padding(
+          padding: const EdgeInsets.only(bottom: 8), child: _buildCard(n)));
     }
+    return result;
+  }
 
+  Widget _buildAllSections() {
+    if (_visibleNotifications.isEmpty) return _buildEmptyState();
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
       children: [
-        if (pending.isNotEmpty) ...[
-          _buildInboxSummary(pending.length),
-          const SizedBox(height: 12),
-          _buildSectionHeader('NEEDS RESPONSE'),
-          const SizedBox(height: 10),
-          ...pending.map((n) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _buildCard(n),
-              )),
-          const SizedBox(height: 16),
-        ],
-        if (newItems.isNotEmpty) ...[
-          _buildSectionHeader('NEW ACTIVITY'),
-          const SizedBox(height: 10),
-          ...newItems.map((n) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _buildCard(n),
-              )),
-          const SizedBox(height: 16),
-        ],
-        ..._buildGroupedByDate(earlier),
+        ..._buildGroupedByDate(_visibleNotifications),
       ],
     );
   }
 
-  Widget _buildInboxSummary(int pendingCount) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: FlixieColors.primary.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: FlixieColors.primary.withValues(alpha: 0.25)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.inbox_rounded, color: FlixieColors.primary),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              '$pendingCount ${pendingCount == 1 ? 'request needs' : 'requests need'} your response',
-              style: const TextStyle(
-                color: FlixieColors.light,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+  Future<void> _setRead(FlixieNotification notification, bool read) async {
+    if (notification.id == null) return;
+    try {
+      await NotificationService.updateNotification(notification.id!,
+          read: read);
+      if (!mounted) return;
+      setState(() {
+        _notifications = _notifications
+            .map((n) => n.id == notification.id ? n.copyWith(read: read) : n)
+            .toList();
+      });
+      context.read<AuthProvider>().updateCachedNotifications(_notifications);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+            type: FlixieToastType.error,
+            content: const Text('Could not update notification. Try again.')));
+      }
+    }
   }
 
-  List<Widget> _buildGroupedByDate(List<FlixieNotification> items) {
-    final grouped = <String, List<FlixieNotification>>{};
-    for (final item in items) {
-      grouped.putIfAbsent(_dateSectionLabel(item), () => []).add(item);
+  Future<void> _markAllRead() async {
+    for (final notification in List<FlixieNotification>.of(_notifications)) {
+      if (!notification.isRead) await _setRead(notification, true);
     }
-    final widgets = <Widget>[];
-    for (final label in ['Today', 'Yesterday', 'Earlier']) {
-      final sectionItems = grouped[label];
-      if (sectionItems == null || sectionItems.isEmpty) continue;
-      widgets.add(_buildSectionHeader(label.toUpperCase()));
-      widgets.add(const SizedBox(height: 10));
-      widgets.addAll(sectionItems.map((n) => Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: _buildCard(n),
-          )));
-      widgets.add(const SizedBox(height: 8));
-    }
-    return widgets;
+  }
+
+  void _showOptions(FlixieNotification notification) {
+    showModalBottomSheet<void>(
+        context: context,
+        useRootNavigator: true,
+        useSafeArea: true,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (sheetContext) => ConstrainedBox(
+              constraints: BoxConstraints(
+                  maxHeight: MediaQuery.sizeOf(sheetContext).height * .6),
+              child: SingleChildScrollView(
+                  child: SafeArea(
+                      top: false,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                        child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Notification options',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w600)),
+                              const SizedBox(height: 12),
+                              ListTile(
+                                  leading: const Icon(
+                                      Icons.mark_email_unread_outlined),
+                                  title: Text(notification.isRead
+                                      ? 'Mark as unread'
+                                      : 'Mark as read'),
+                                  onTap: () {
+                                    Navigator.pop(sheetContext);
+                                    _setRead(
+                                        notification, !notification.isRead);
+                                  }),
+                              ListTile(
+                                  leading: const Icon(Icons.delete_outline),
+                                  title: const Text('Remove notification'),
+                                  onTap: () {
+                                    Navigator.pop(sheetContext);
+                                    _closeNotification(notification);
+                                  }),
+                            ]),
+                      ))),
+            ));
   }
 
   Widget _buildEmptyState() {
@@ -816,34 +681,43 @@ class _NotificationScreenState extends State<NotificationScreen> {
       builder: (context, constraints) {
         return SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          child: SizedBox(
-            height: constraints.maxHeight,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
             child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.notifications_none,
-                      size: 64,
-                      color: FlixieColors.medium.withValues(alpha: 0.6)),
-                  const SizedBox(height: 16),
-                  Text(
-                    _emptyTitle,
-                    style: const TextStyle(
-                      color: FlixieColors.light,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 360),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.notifications_none,
+                          size: 64,
+                          color: FlixieColors.medium.withValues(alpha: 0.6)),
+                      const SizedBox(height: 16),
+                      Text(
+                        _emptyTitle,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: FlixieColors.light,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        _emptyBody,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: FlixieColors.medium,
+                          fontSize: 13,
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    _emptyBody,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: FlixieColors.medium,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -854,7 +728,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
   String get _emptyTitle {
     return switch (_filter) {
-      _NotificationFilter.requests => 'No pending requests',
+      _NotificationFilter.requests => 'Nothing needs you right now',
       _NotificationFilter.activity => 'No activity yet',
       _NotificationFilter.all => 'No notifications',
     };
@@ -897,58 +771,35 @@ class _NotificationScreenState extends State<NotificationScreen> {
           color: FlixieColors.danger,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Icon(Icons.close_rounded, color: Colors.white),
+        child: const Icon(Icons.delete_outline, color: Colors.white),
       ),
       child: card,
     );
   }
 
   Widget _buildNotificationCard(FlixieNotification notification) {
-    final currentUserId = context.read<AuthProvider>().dbUser?.id;
-    if (notification.isRequest) {
-      return NotificationRequestCard(
-        notification: notification,
-        isProcessing: _processingIds.contains(notification.id),
-        formatDate: _formatDate,
-        currentUserId: currentUserId,
-        onAccept: () =>
-            _respond(notification, FlixieNotification.actionAccepted),
-        onDecline: () =>
-            _respond(notification, FlixieNotification.actionDeclined),
-        onAcceptSchedule: () =>
-            _respondToScheduleProposal(notification, 'accepted'),
-        onDeclineSchedule: () =>
-            _respondToScheduleProposal(notification, 'declined'),
-        onSuggestSchedule: () => _suggestSchedule(notification),
-        onClose: () => _closeNotification(notification),
-        onWatchSummaryViewed: () {
-          // Viewing the final summary consumes this notification. Removal is
-          // optimistic so the card is already gone when the user navigates
-          // back, while the server deletion completes in the background.
-          unawaited(_closeNotification(notification));
-        },
-      );
-    }
-    final deepLink = notificationDeepLinkPath({
-      ...?notification.data,
-      'type': notification.type,
-      if (notification.route != null) 'route': notification.route!,
-      if (notification.relatedId != null) 'relatedId': notification.relatedId!,
-      if (notification.senderUser?['id'] != null)
-        'friendId': notification.senderUser!['id'].toString(),
-    });
-    return NotificationActivityCard(
-      notification: notification,
-      formatDate: _formatDate,
-      onClose: () => _closeNotification(notification),
-      onOpen: deepLink == '/notifications'
+    final n = notification;
+    final route = notificationDestination(n);
+    final friends = context.watch<AuthProvider>().cachedFriends;
+    final badges = notificationProfileBadges(n, friends);
+    return NotificationInboxCard(
+      profileBadges: badges,
+      notification: n,
+      date: _formatDate(n.receivedAt),
+      processing: _processingIds.contains(n.id),
+      onOptions: () => _showOptions(n),
+      onAccept: (n.type == FlixieNotification.friendRequest ||
+                  (n.type == FlixieNotification.groupInvite &&
+                      route == '/notifications')) &&
+              notificationNeedsResponse(n)
+          ? () => _respond(n, FlixieNotification.actionAccepted)
+          : null,
+      onDecline: () => _respond(n, FlixieNotification.actionDeclined),
+      onOpen: route == '/notifications'
           ? null
-          : () async {
-              final id = notification.id;
-              if (id != null && !notification.isRead) {
-                await NotificationService.updateNotification(id, read: true);
-              }
-              if (mounted) context.push(deepLink);
+          : () {
+              if (!n.isRead) unawaited(_setRead(n, true));
+              context.push(route);
             },
     );
   }
