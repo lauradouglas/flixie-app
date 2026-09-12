@@ -84,3 +84,6 @@ android/.gradle/
 build/
 android/build/
 /.impeccable
+
+# Local Google Play credential path
+/.play-store.env

@@ -76,6 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<ContinueWatchingShow> _continueWatchingShows = [];
   List<ActivityListItem> _friendsActivity = [];
   final Map<int, List<FriendMediaInteraction>> _heroFriendInteractions = {};
+  final Set<int> _heroFriendErrors = {};
   bool _showMoreFriendActivity = false;
   final Set<int> _watchlistUpdatesInFlight = <int>{};
   Set<int> _watchlistMovieIds = {};
@@ -363,37 +364,37 @@ class _HomeScreenState extends State<HomeScreen> {
   ) async {
     final generation = _homeLoadGeneration;
     final visibleMovies = movies.take(_maxHeroCarouselItems).toList();
-    final results = await Future.wait(
-      visibleMovies.map((movie) async {
-        try {
-          final interactions = await FriendService.getFriendsMovieInteractions(
-            userId,
-            movie.id,
-          );
-          return MapEntry(movie.id, interactions);
-        } catch (error) {
-          logger.w(
-            '[HomeScreen] friend interactions unavailable for ${movie.id}: $error',
-          );
-          return MapEntry(movie.id, <FriendMediaInteraction>[]);
-        }
-      }),
-    ).timeout(
-      const Duration(seconds: 4),
-      onTimeout: () => visibleMovies
-          .map((movie) => MapEntry(movie.id, <FriendMediaInteraction>[]))
-          .toList(),
-    );
-    if (!mounted ||
-        _loadedForUserId != userId ||
-        generation != _homeLoadGeneration) {
-      return;
+    bool current() =>
+        mounted &&
+        _loadedForUserId == userId &&
+        generation == _homeLoadGeneration;
+    if (current()) {
+      setState(() =>
+          _heroFriendErrors.removeAll(visibleMovies.map((movie) => movie.id)));
     }
-    setState(() {
-      _heroFriendInteractions
-        ..clear()
-        ..addEntries(results);
-    });
+    await Future.wait(visibleMovies.map((movie) async {
+      for (var attempt = 0; attempt < 2; attempt++) {
+        try {
+          final interactions =
+              await FriendService.getFriendsMovieInteractions(userId, movie.id)
+                  .timeout(const Duration(seconds: 15));
+          if (current()) {
+            setState(() {
+              _heroFriendInteractions[movie.id] = interactions;
+              _heroFriendErrors.remove(movie.id);
+            });
+          }
+          return;
+        } catch (error) {
+          if (!current()) return;
+          if (attempt == 1) {
+            logger.w(
+                '[HomeScreen] friend interactions unavailable for ${movie.id}: $error');
+            setState(() => _heroFriendErrors.add(movie.id));
+          }
+        }
+      }
+    }));
   }
 
   Future<void> _loadSecondaryContent(
@@ -1560,6 +1561,18 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ],
                         ],
+                      )
+                    else if (_heroFriendErrors.contains(movie.id))
+                      TextButton.icon(
+                        onPressed: () {
+                          final userId =
+                              context.read<AuthProvider>().dbUser?.id;
+                          if (userId != null) {
+                            _loadHeroFriendInteractions([movie], userId);
+                          }
+                        },
+                        icon: const Icon(Icons.refresh, size: 16),
+                        label: const Text('Retry friends’ activity'),
                       )
                     else if (friendActivityLoading)
                       const SizedBox(
