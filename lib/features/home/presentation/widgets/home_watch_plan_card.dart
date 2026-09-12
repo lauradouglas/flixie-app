@@ -18,15 +18,11 @@ class HomeWatchPlanCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final plan = state.plan;
-    final chosen = plan.candidates
-        .where((candidate) => candidate.id ==
-            (plan.selectedCandidateId ?? plan.proposedCandidateId))
+    final selected = plan.candidates
+        .where((candidate) => candidate.id == plan.selectedCandidateId)
         .firstOrNull;
-    final suggestions = chosen != null
-        ? [chosen]
-        : plan.selectedCandidateId != null
-            ? plan.candidates.where((c) => c.id == plan.selectedCandidateId).toList()
-            : plan.candidates.take(3).toList();
+    final suggestions =
+        selected != null ? [selected] : plan.candidates.take(3).toList();
     final tone = state.colorRole.color;
     // The brand purple works for borders and controls, but compact status copy
     // needs the contrast-safe text token against this dark card surface.
@@ -43,20 +39,23 @@ class HomeWatchPlanCard extends StatelessWidget {
             color: Colors.transparent,
             child: InkWell(
               onTap: onOpen,
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(12),
               child: Ink(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: Color.alphaBlend(
-                    tone.withValues(alpha: .10),
-                    FlixieColors.surfaceElevated,
+                    tone.withValues(alpha: .08),
+                    FlixieColors.surface,
                   ),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: tone.withValues(alpha: .75)),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: tone.withValues(alpha: .25)),
                 ),
                 child: LayoutBuilder(builder: (context, constraints) {
-                  final narrow = constraints.maxWidth < 390 ||
+                  final narrow = constraints.maxWidth < 300 ||
                       MediaQuery.textScalerOf(context).scale(1) > 1.15;
+                  final status = state.eyebrow.isEmpty
+                      ? ''
+                      : '${state.eyebrow[0].toUpperCase()}${state.eyebrow.substring(1).toLowerCase()}';
                   final details = Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
@@ -64,68 +63,77 @@ class HomeWatchPlanCard extends StatelessWidget {
                       Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(state.statusIcon,
-                                color: statusTextColor, size: 16),
-                            const SizedBox(width: 6),
+                            Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                    color: statusTextColor,
+                                    shape: BoxShape.circle),
+                                child: Icon(state.statusIcon,
+                                    color: FlixieColors.background, size: 17)),
+                            const SizedBox(width: 8),
                             Expanded(
-                              child: Text(state.eyebrow,
-                                  maxLines: 2,
-                                  style: TextStyle(
-                                      color: statusTextColor,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: .8)),
-                            ),
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                  Text(status,
+                                      style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          height: 1.2)),
+                                  const SizedBox(height: 4),
+                                  Text(state.title,
+                                      style: const TextStyle(
+                                          color: FlixieColors.light,
+                                          fontSize: 12,
+                                          height: 1.25)),
+                                ])),
                           ]),
-                      const SizedBox(height: 5),
-                      Text(state.title,
-                          maxLines: narrow ? 3 : 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 17,
-                              fontWeight: FontWeight.w800)),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 8),
                       Text(state.supportingText,
-                          maxLines: narrow ? 3 : 2,
-                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                               color: FlixieColors.light,
-                              fontSize: 13,
-                              height: 1.25)),
+                              fontSize: 12,
+                              height: 1.35)),
                     ],
                   );
                   final button = FilledButton(
                     onPressed: onOpen,
                     style: FilledButton.styleFrom(
-                      backgroundColor: tone,
-                      foregroundColor: state.colorRole.foreground,
+                      backgroundColor: state.requiresAttention
+                          ? statusTextColor
+                          : tone.withValues(alpha: .24),
+                      foregroundColor: state.requiresAttention
+                          ? FlixieColors.background
+                          : Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                      textStyle: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w700),
                       minimumSize: const Size(0, 44),
                       padding: const EdgeInsets.symmetric(horizontal: 14),
                     ),
-                    child: Text(state.actionLabel,
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                    child: Text(state.actionLabel),
                   );
                   final leading = suggestions.isEmpty
                       ? WatchPlanPoster(
                           path: plan.movie?.posterPath,
                           title: state.title,
-                          width: 58,
-                        )
+                          width: 68)
                       : SizedBox(
-                          width: 58 + (suggestions.length - 1) * 9.0,
-                          height: 87 + (suggestions.length - 1) * 9.0,
+                          width: 68 + (suggestions.length - 1) * 6.0,
+                          height: 102 + (suggestions.length - 1) * 6.0,
                           child: Stack(children: [
                             for (var i = suggestions.length - 1; i >= 0; i--)
                               Positioned(
-                                left: i * 9.0,
-                                top: i * 9.0,
-                                child: WatchPlanPoster(
-                                  path: suggestions[i].posterPath,
-                                  title: suggestions[i].title,
-                                  width: 58,
-                                ),
-                              ),
+                                  left: i * 6.0,
+                                  top: i * 6.0,
+                                  child: WatchPlanPoster(
+                                      path: suggestions[i].posterPath,
+                                      title: suggestions[i].title,
+                                      width: 68)),
                           ]),
                         );
                   if (narrow) {
@@ -141,13 +149,20 @@ class HomeWatchPlanCard extends StatelessWidget {
                       SizedBox(width: double.infinity, child: button),
                     ]);
                   }
-                  return Row(children: [
-                    leading,
-                    const SizedBox(width: 12),
-                    Expanded(child: details),
-                    const SizedBox(width: 12),
-                    button,
-                  ]);
+                  return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        leading,
+                        const SizedBox(width: 12),
+                        Expanded(
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                              details,
+                              const SizedBox(height: 12),
+                              SizedBox(width: double.infinity, child: button),
+                            ])),
+                      ]);
                 }),
               ),
             ),
@@ -156,8 +171,6 @@ class HomeWatchPlanCard extends StatelessWidget {
       ),
     );
   }
-
-
 }
 
 class HomeWatchPlanEmptyCard extends StatelessWidget {
@@ -175,7 +188,7 @@ class HomeWatchPlanEmptyCard extends StatelessWidget {
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: FlixieColors.surfaceElevated.withValues(alpha: .65),
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: FlixieColors.primary.withValues(alpha: .55),
               ),

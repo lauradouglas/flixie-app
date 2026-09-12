@@ -2096,8 +2096,8 @@ class _HomeScreenState extends State<HomeScreen> {
             final cardWidth = carouselStates.length == 1
                 ? constraints.maxWidth - 32
                 : constraints.maxWidth >= 600
-                    ? 420.0
-                    : constraints.maxWidth * .84;
+                    ? 460.0
+                    : constraints.maxWidth * .90;
             final heightSignature = [
               cardWidth.toStringAsFixed(1),
               MediaQuery.textScalerOf(context).scale(1).toStringAsFixed(2),
@@ -2136,8 +2136,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                     child: SingleChildScrollView(
                       controller: _watchPlansScrollController,
+                      physics: WatchPlanSnapPhysics(itemExtent: cardWidth + 12),
                       scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: (constraints.maxWidth - cardWidth) / 2),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -3209,4 +3211,39 @@ class _SpinningActionIconState extends State<_SpinningActionIcon>
       child: Icon(widget.icon, color: widget.color, size: 22),
     );
   }
+}
+
+/// Settles each plan at the viewport centre while retaining intrinsic card height.
+class WatchPlanSnapPhysics extends ScrollPhysics {
+  const WatchPlanSnapPhysics({required this.itemExtent, super.parent});
+  final double itemExtent;
+
+  @override
+  WatchPlanSnapPhysics applyTo(ScrollPhysics? ancestor) => WatchPlanSnapPhysics(
+      itemExtent: itemExtent, parent: buildParent(ancestor));
+
+  @override
+  Simulation? createBallisticSimulation(
+      ScrollMetrics position, double velocity) {
+    if ((velocity <= 0 && position.pixels <= position.minScrollExtent) ||
+        (velocity >= 0 && position.pixels >= position.maxScrollExtent)) {
+      return super.createBallisticSimulation(position, velocity);
+    }
+    final tolerance = toleranceFor(position);
+    var page = position.pixels / itemExtent;
+    if (velocity < -tolerance.velocity) {
+      page -= 0.5;
+    } else if (velocity > tolerance.velocity) {
+      page += 0.5;
+    }
+    final target = (page.round() * itemExtent)
+        .clamp(position.minScrollExtent, position.maxScrollExtent)
+        .toDouble();
+    if ((target - position.pixels).abs() < tolerance.distance) return null;
+    return ScrollSpringSimulation(spring, position.pixels, target, velocity,
+        tolerance: tolerance);
+  }
+
+  @override
+  bool get allowImplicitScrolling => false;
 }

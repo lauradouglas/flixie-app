@@ -48,7 +48,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('missing poster uses a meaningful placeholder', (tester) async {
+  testWidgets('compact card identifies planning without needing a poster', (tester) async {
     const request = WatchRequest(
       id: 'plan',
       requesterId: 'friend',
@@ -71,7 +71,7 @@ void main() {
       home: Scaffold(body: HomeWatchPlanCard(state: state, onOpen: () {})),
     ));
 
-    expect(find.byIcon(Icons.movie_filter_rounded), findsOneWidget);
+    expect(find.byIcon(state.statusIcon), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 

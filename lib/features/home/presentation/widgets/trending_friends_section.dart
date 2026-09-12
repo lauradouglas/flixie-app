@@ -29,133 +29,78 @@ class FriendsWatchingSection extends StatelessWidget {
         }
         return right.timestamp.compareTo(left.timestamp);
       });
-    final recent = items.take(12).toList(growable: false);
+    final recent = items.take(3).toList(growable: false);
     if (recent.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        HomeSectionHeader(
-          title: 'Friends watching',
-          onSeeAll: () => context.push('/friends-activity'),
-        ),
-        const SizedBox(height: 6),
-        SizedBox(
-          height: 180,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(children: [
+            const Expanded(
+                child: Text('Friends are watching',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700))),
+            TextButton(
+                onPressed: () => context.push('/friends-activity'),
+                child: const Text('View all →')),
+          ])),
+      for (final item in recent)
+        Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: recent.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
-            itemBuilder: (context, index) {
-              final item = recent[index];
-              final rawPoster = item.mediaPosterPath;
-              final posterUrl = rawPoster == null || rawPoster.isEmpty
-                  ? null
-                  : rawPoster.startsWith('http')
-                      ? rawPoster
-                      : 'https://image.tmdb.org/t/p/w342$rawPoster';
-              return GestureDetector(
-                onTap: () => context.push(movieDetailPath(
-                  item.movieId!,
-                  source: DetailSource.friendsWatching,
-                )),
-                child: SizedBox(
-                  width: 110,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(11),
-                            child: SizedBox(
-                              width: 110,
-                              height: 148,
-                              child: posterUrl == null
-                                  ? _friendPosterFallback()
-                                  : CachedNetworkImage(
-                                      imageUrl: posterUrl,
-                                      fit: BoxFit.cover,
-                                      errorWidget: (_, __, ___) =>
-                                          _friendPosterFallback(),
-                                    ),
-                            ),
-                          ),
-                          Positioned(
-                            left: 7,
-                            bottom: 7,
-                            child: Container(
-                              padding: const EdgeInsets.all(1.5),
-                              decoration: const BoxDecoration(
-                                color: FlixieColors.primary,
-                                shape: BoxShape.circle,
-                              ),
-                              child: ProfileAvatarView(
-                                avatar: item.avatar,
-                                fallbackText: item.username.isEmpty
-                                    ? '?'
-                                    : item.username[0].toUpperCase(),
-                                fallbackColor: FlixieColors.surfaceElevated,
-                                size: 27,
-                                profileBadges: item.profileBadges,
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            right: 7,
-                            bottom: 7,
-                            child: Container(
-                              width: 28,
-                              height: 28,
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.68),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.visibility_rounded,
+            child: InkWell(
+              onTap: () => context.push(movieDetailPath(item.movieId!,
+                  source: DetailSource.friendsWatching)),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: const BoxDecoration(
+                    border: Border(
+                        bottom: BorderSide(color: FlixieColors.tabBarBorder))),
+                child: Row(children: [
+                  Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: ProfileAvatarView(
+                          avatar: item.avatar,
+                          profileBadges: item.profileBadges,
+                          fallbackText: item.username.isEmpty
+                              ? '?'
+                              : item.username[0].toUpperCase(),
+                          fallbackColor: FlixieColors.surfaceElevated,
+                          size: 38)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Text(
+                            '${item.username} ${item.mediaRating != null ? 'rated' : 'watched'} ${item.mediaTitle ?? 'a movie'}',
+                            style: const TextStyle(
                                 color: Colors.white,
-                                size: 16,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        item.mediaTitle ?? 'Movie',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: FlixieColors.light,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 14),
-      ],
-    );
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 6),
+                        if (item.mediaRating != null)
+                          Row(children: [
+                            const Icon(Icons.star_rounded,
+                                color: FlixieColors.warning, size: 18),
+                            const SizedBox(width: 4),
+                            Text('${item.mediaRating}/10',
+                                style:
+                                    const TextStyle(color: FlixieColors.light)),
+                          ])
+                        else
+                          const Text('Watched',
+                              style: TextStyle(color: FlixieColors.success)),
+                      ])),
+                  const SizedBox(width: 10),
+                  const Icon(Icons.chevron_right,
+                      color: FlixieColors.light, size: 18),
+                ]),
+              ),
+            )),
+      const SizedBox(height: 14),
+    ]);
   }
-}
-
-Widget _friendPosterFallback() {
-  return Container(
-    color: FlixieColors.tabBarBackgroundFocused,
-    alignment: Alignment.center,
-    child: const Icon(
-      Icons.movie_outlined,
-      color: FlixieColors.medium,
-      size: 30,
-    ),
-  );
 }
 
 class TrendingEntry {
