@@ -366,7 +366,14 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                     : TabBarView(
                         controller: _tabController,
                         children: [
-                          GroupChatTab(groupId: widget.groupId),
+                          ListenableBuilder(
+                            listenable: _tabController,
+                            builder: (context, child) => GroupChatTab(
+                              groupId: widget.groupId,
+                              active: _tabController.index == 0 &&
+                                  !_tabController.indexIsChanging,
+                            ),
+                          ),
                           GroupActivityTab(
                             group: _group,
                             memberCount: _memberCount,

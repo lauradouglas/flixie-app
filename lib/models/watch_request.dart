@@ -638,7 +638,7 @@ class WatchRequest {
   bool get canProposeSchedule => isWatchRequest && (isAccepted || isScheduled);
 
   bool canRespondToProposal(String userId) {
-    if (candidates.isNotEmpty && selectedCandidateId == null) return false;
+    if (candidates.length > 1 && selectedCandidateId == null) return false;
     final proposal = latestPendingProposal;
     return proposal != null && proposal.proposerId != userId;
   }

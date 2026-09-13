@@ -3,6 +3,7 @@ import 'package:flixie_app/models/activity_list_item.dart';
 class ActivityReplyPayload {
   const ActivityReplyPayload({
     required this.username,
+    this.userId,
     required this.activityLabel,
     required this.title,
     required this.link,
@@ -36,6 +37,7 @@ class ActivityReplyPayload {
             : '';
     final poster = item.mediaPosterPath?.trim() ?? '';
     return ActivityReplyPayload(
+      userId: item.userId,
       username: item.username.trim().isNotEmpty
           ? item.username.trim()
           : '${item.firstName} ${item.lastName}'.trim(),
@@ -60,6 +62,7 @@ class ActivityReplyPayload {
     );
   }
 
+  final String? userId;
   final String username;
   final String activityLabel;
   final String title;
@@ -83,6 +86,7 @@ class ActivityReplyPayload {
       '[FLIXIE_ACTIVITY_REPLY]',
       field('message', value),
       field('username', username),
+      if (userId != null) field('userId', userId),
       field('activity', activityLabel),
       field('title', title),
       field('link', link),
@@ -121,6 +125,7 @@ ActivityReplyPayload? parseActivityReplyPayload(String text) {
   }
 
   final payload = ActivityReplyPayload(
+    userId: _nonEmpty(values['userId']),
     username: values['username']?.trim() ?? '',
     activityLabel: values['activity']?.trim() ?? 'activity',
     title: values['title']?.trim() ?? '',

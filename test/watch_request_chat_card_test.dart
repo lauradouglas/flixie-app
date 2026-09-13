@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,7 +17,11 @@ void main() {
         .load();
   });
   Widget card(String status,
-          {VoidCallback? open, VoidCallback? decline, bool multiple = false}) =>
+          {VoidCallback? open,
+          VoidCallback? decline,
+          VoidCallback? accept,
+          bool mine = false,
+          bool multiple = false}) =>
       WatchRequestChatCard(
           msg: ChatMessage(
               id: 'message',
@@ -64,10 +69,11 @@ void main() {
               },
             ],
           }),
-          currentUserId: 'me',
+          currentUserId: mine ? 'laura' : 'me',
           myStatus: status == 'OPEN' ? 'PENDING' : 'ACCEPTED',
           isResponding: false,
           onTap: open ?? () {},
+          onAccept: accept,
           onDecline: decline ?? () {});
   Widget app(Widget child, {double scale = 1}) => MaterialApp(
       theme: ThemeData(fontFamily: 'Manrope'),
@@ -76,6 +82,30 @@ void main() {
           body: MediaQuery(
               data: MediaQueryData(textScaler: TextScaler.linear(scale)),
               child: SingleChildScrollView(child: child))));
+
+  testWidgets('missing plan explains how to find current progress',
+      (tester) async {
+    await tester.pumpWidget(app(WatchRequestChatCard(
+      msg: ChatMessage(
+          id: 'missing',
+          senderId: 'laura',
+          text: 'Watch Plan: Interstellar',
+          createdAt: DateTime(2026)),
+      isResponding: false,
+      onTap: () {},
+    )));
+    expect(find.text('Plan details unavailable'), findsOneWidget);
+    expect(find.text('Open the plan to check its latest progress.'),
+        findsOneWidget);
+    expect(find.text('Waiting for replies'), findsNothing);
+  });
+
+  testWidgets('outgoing open plan explains the next stage', (tester) async {
+    await tester.pumpWidget(app(card('OPEN', mine: true)));
+    expect(find.text('Waiting for replies'), findsOneWidget);
+    expect(
+        find.text('Once replies are in, agree when to watch.'), findsOneWidget);
+  });
 
   testWidgets('invitation actions and message stay accessible', (tester) async {
     var opened = 0;
@@ -89,6 +119,29 @@ void main() {
     await tester.tap(find.text('Can’t make it'));
     expect(opened, 1);
     expect(declined, 1);
+  });
+  testWidgets('option B accepts without opening and preserves plan navigation',
+      (tester) async {
+    var accepted = 0;
+    var opened = 0;
+    await tester.pumpWidget(
+        app(card('OPEN', accept: () => accepted++, open: () => opened++)));
+    await tester.tap(find.text("I'm in"));
+    expect(accepted, 1);
+    expect(opened, 0);
+    await tester.tap(find.text('View plan'));
+    expect(opened, 1);
+  });
+  testWidgets('outgoing plan sender sits above the card on the right',
+      (tester) async {
+    await tester.pumpWidget(app(card('OPEN', mine: true)));
+    final avatar = tester.getRect(find.byType(ProfileAvatarView));
+    final name = tester.getRect(find.text('You'));
+    final title = tester.getRect(find.text('Inception'));
+    expect(avatar.bottom, lessThan(title.top));
+    expect(name.right, lessThan(avatar.left));
+    expect(avatar.center.dx,
+        greaterThan(tester.getSize(find.byType(Scaffold)).width / 2));
   });
   testWidgets('summary separates missed attendance from watched',
       (tester) async {
@@ -136,8 +189,11 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(app(Column(
-        children: [card('OPEN'), card('SCHEDULED'), card('COMPLETED')])));
+    await tester.pumpWidget(app(Column(children: [
+      card('OPEN', accept: () {}),
+      card('SCHEDULED'),
+      card('COMPLETED')
+    ])));
     await tester.pumpAndSettle();
     await expectLater(find.byType(Scaffold),
         matchesGoldenFile('goldens/watch_request_chat_cards.png'));

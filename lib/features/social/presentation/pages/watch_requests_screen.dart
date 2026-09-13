@@ -646,7 +646,8 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
     }
   }
 
-  Future<bool> _respond(WatchRequest request, String response) async {
+  Future<bool> _respond(WatchRequest request, String response,
+      {bool acceptProposedTime = true}) async {
     final analytics = context.read<AnalyticsController>();
     var succeeded = false;
     final action = switch (response) {
@@ -656,7 +657,8 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
     };
     await _withRequestAction(request, action, () async {
       try {
-        await RequestService.updateRequest(request.id, response);
+        await RequestService.updateRequest(request.id, response,
+            acceptProposedTime: acceptProposedTime);
         if (response == 'ACCEPTED') {
           await analytics.watchPlanAccepted(
             watchPlanId: request.id,
@@ -698,6 +700,11 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
       initialLocation: request.location,
     );
     if (!mounted || selected == null) return;
+    if (request.isPending &&
+        !await _respond(request, 'ACCEPTED', acceptProposedTime: false)) {
+      return;
+    }
+    if (!mounted) return;
     await _submitScheduleProposal(
       request,
       FriendAcceptanceScheduleDraft(

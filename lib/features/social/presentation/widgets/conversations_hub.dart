@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/social/data/chat_unread_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -246,11 +247,9 @@ class _ConversationRow extends StatelessWidget {
         ? '$senderPrefix${conversationMessagePreview(conversation.lastMessage)}'
         : 'Start the conversation';
 
-    return StreamBuilder<int>(
-      stream: ChatService.unreadCountStream(conversation.id, currentUserId),
-      initialData: 0,
-      builder: (context, unreadSnapshot) {
-        final unread = unreadSnapshot.data ?? 0;
+    return Consumer<ChatUnreadController?>(
+      builder: (context, controller, _) {
+        final unread = controller?.countFor(conversation.id) ?? 0;
         return InkWell(
           onTap: onTap,
           child: Container(

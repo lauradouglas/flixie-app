@@ -51,6 +51,24 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('single title invitation offers an alternative time before joining', (tester) async {
+    await show(tester, fixture({'status': 'PENDING', 'proposedDate': '2027-01-01T19:00:00Z', 'candidates': [
+      {'id': 'moana', 'movieId': 1, 'movie': {'id': 1, 'title': 'Moana'}}
+    ]}));
+    expect(find.text('Accept to confirm this film and time.'), findsOneWidget);
+    expect(find.text('Suggest another time'), findsOneWidget);
+    expect(find.text('I’m in'), findsOneWidget);
+  });
+
+  testWidgets('one movie skips preference saving and offers scheduling', (tester) async {
+    await show(tester, fixture({'candidates': [
+      {'id': 'moana', 'movieId': 1, 'movie': {'id': 1, 'title': 'Moana'}, 'choices': []}
+    ]}));
+    expect(find.text('Save my picks'), findsNothing);
+    expect(find.text('What could you watch?'), findsNothing);
+    expect(find.text('Suggest a time'), findsOneWidget);
+  });
+
   testWidgets('joining an invite does not select a movie', (tester) async {
     var accepted = 0;
     var selected = 0;

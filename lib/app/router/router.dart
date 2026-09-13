@@ -1,3 +1,5 @@
+import 'package:provider/provider.dart';
+import 'package:flixie_app/features/social/data/chat_unread_controller.dart';
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
@@ -749,10 +751,22 @@ class _NavItem extends StatelessWidget {
                         ],
                       )
                     : null,
-                child: Icon(
-                  isSelected ? dest.activeIcon : dest.icon,
-                  size: 22,
-                  color: isSelected ? Colors.white : FlixieColors.medium,
+                child: Badge(
+                  isLabelVisible: dest.label == 'Social' &&
+                      (context.watch<ChatUnreadController?>()?.total ?? 0) > 0,
+                  backgroundColor: const Color(0xFFFFAD66),
+                  smallSize: 8,
+                  child: Icon(
+                    isSelected ? dest.activeIcon : dest.icon,
+                    semanticLabel: dest.label == 'Social' &&
+                            (context.watch<ChatUnreadController?>()?.total ??
+                                    0) >
+                                0
+                        ? 'Social, unread messages'
+                        : null,
+                    size: 22,
+                    color: isSelected ? Colors.white : FlixieColors.medium,
+                  ),
                 ),
               ),
               const SizedBox(height: 2),

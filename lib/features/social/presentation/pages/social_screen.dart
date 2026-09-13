@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/social/data/chat_unread_controller.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -115,6 +116,7 @@ class _SocialScreenState extends State<SocialScreen> {
           SocialSegmentedToggle(
             selectedIndex: _selectedTab,
             labels: const ['Friends', 'Chats', 'Groups'],
+            counts: {1: context.watch<ChatUnreadController?>()?.total ?? 0},
             onChanged: (i) => setState(() => _selectedTab = i),
           ),
           Expanded(

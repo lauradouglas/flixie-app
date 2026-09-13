@@ -1,3 +1,8 @@
+import 'package:flixie_app/features/social/data/request_service.dart';
+import 'package:flixie_app/features/social/data/group_service.dart';
+import 'package:flixie_app/models/group_watch_request.dart';
+import 'package:flixie_app/features/social/presentation/widgets/watch_request_chat_card.dart';
+import 'package:flixie_app/features/social/presentation/widgets/chat_read_observer.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -40,6 +45,91 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
   User? _otherUser;
   Map<String, String> _memberUsernames = {};
   ActivityReplyPayload? _activityReply;
+  final Map<String, GroupWatchRequest> _watchPlans = {};
+  final Set<String> _friendPlanIds = {};
+  final Map<String, String> _messagePlanIds = {};
+  final Set<String> _requestedPlanIds = {};
+  final Set<String> _respondingPlanIds = {};
+  bool _loadingPlans = false;
+  bool _plansRefreshQueued = false;
+
+  Future<void> _loadWatchPlans() async {
+    final conversationId = _conversationId;
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (conversationId == null || userId == null) return;
+    if (_loadingPlans) {
+      _plansRefreshQueued = true;
+      return;
+    }
+    _loadingPlans = true;
+    try {
+      final plans = <GroupWatchRequest>[];
+      try {
+        plans.addAll(await GroupService.getConversationWatchRequests(
+            conversationId,
+            filter: WatchRequestFilter.all,
+            userId: userId));
+      } catch (error) {
+        logger.w('Could not load conversation watch plans: $error');
+      }
+      for (final id in _friendPlanIds.toList()) {
+        try {
+          plans.add(await RequestService.getChatWatchPlan(id, userId));
+        } catch (error) {
+          logger.w('Could not load direct watch plan $id: $error');
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        for (final plan in plans) {
+          _watchPlans[plan.id] = plan;
+          if (plan.linkedMessageId != null) {
+            _messagePlanIds[plan.linkedMessageId!] = plan.id;
+          }
+          if (plan.databaseRequestId != null) {
+            _watchPlans[plan.databaseRequestId!] = plan;
+          }
+        }
+      });
+    } catch (error) {
+      logger.w('Could not refresh chat watch plans: $error');
+    } finally {
+      _loadingPlans = false;
+      if (_plansRefreshQueued && mounted) {
+        _plansRefreshQueued = false;
+        _loadWatchPlans();
+      }
+    }
+  }
+
+  Future<void> _respondToPlan(
+      GroupWatchRequest plan, WatchResponseDecision decision) async {
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    final conversationId = _conversationId;
+    if (userId == null ||
+        conversationId == null ||
+        _respondingPlanIds.contains(plan.id)) {
+      return;
+    }
+    setState(() => _respondingPlanIds.add(plan.id));
+    try {
+      if (_friendPlanIds.contains(plan.id)) {
+        await RequestService.updateRequest(
+            plan.id, decision.apiValue.toLowerCase());
+      } else {
+        await GroupService.respondToWatchRequest(
+            conversationId, plan.id, userId, decision);
+      }
+      await _loadWatchPlans();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Could not save your reply. Try again.')));
+      }
+    } finally {
+      if (mounted) setState(() => _respondingPlanIds.remove(plan.id));
+    }
+  }
 
   @override
   void initState() {
@@ -86,7 +176,6 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
         _error = null;
       });
 
-      ChatService.markRead(conversation.id, currentUserId).catchError((_) {});
       if (_activityReply != null) {
         _messageFocusNode.requestFocus();
       }
@@ -231,47 +320,109 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
                     ),
                   );
                 }
-                return ListView.builder(
-                  reverse: true,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 0,
-                    vertical: 8,
-                  ),
-                  itemCount: messages.length,
-                  itemBuilder: (_, index) {
-                    final msg = messages[index];
-                    final isMe = msg.senderId == currentUserId;
-                    // The list is reverse-rendered, so the visually first
-                    // bubble in a sender run is the next item in data order.
-                    final startsSenderRun = index == messages.length - 1 ||
-                        messages[index + 1].senderId != msg.senderId;
-                    if (!isMe && SafetyService.isBlocked(msg.senderId)) {
-                      return const SizedBox.shrink();
-                    }
-                    return ChatBubble(
-                      message: msg.text,
-                      senderUsername: msg.senderUsername ??
-                          _memberUsernames[msg.senderId] ??
-                          (isMe ? 'You' : title),
-                      isMe: isMe,
-                      sentAt: msg.createdAt,
-                      avatar: isMe ? null : otherUser?.avatar,
-                      initials: isMe
-                          ? null
-                          : (otherUser?.initials ??
-                              (otherUser?.username.isNotEmpty == true
-                                  ? otherUser!.username[0].toUpperCase()
-                                  : '?')),
-                      profileBadges: isMe
-                          ? const []
-                          : (otherUser?.profileBadges ?? const []),
-                      showSenderLabel: !isMe && startsSenderRun,
-                      onSenderTap: isMe
-                          ? null
-                          : () => context.push('/friends/${msg.senderId}'),
-                    );
-                  },
-                );
+                return ChatReadObserver(
+                    conversationId: conversationId,
+                    child: ListView.builder(
+                      reverse: true,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 0,
+                        vertical: 8,
+                      ),
+                      itemCount: messages.length,
+                      itemBuilder: (_, index) {
+                        final msg = messages[index];
+                        final isMe = msg.senderId == currentUserId;
+                        // The list is reverse-rendered, so the visually first
+                        // bubble in a sender run is the next item in data order.
+                        final startsSenderRun = index == messages.length - 1 ||
+                            messages[index + 1].senderId != msg.senderId;
+                        if (!isMe && SafetyService.isBlocked(msg.senderId)) {
+                          return const SizedBox.shrink();
+                        }
+                        if (msg.type == 'watch_request') {
+                          final metadata = msg.watchRequestPayload?['metadata'];
+                          if (metadata is Map &&
+                              metadata['requestType'] != null &&
+                              msg.watchRequestId != null) {
+                            _friendPlanIds.add(msg.watchRequestId!);
+                          }
+                          final planId =
+                              msg.watchRequestId ?? _messagePlanIds[msg.id];
+                          final plan = _watchPlans[planId] ??
+                              _watchPlans[_messagePlanIds[msg.id]];
+                          if (_requestedPlanIds.add(planId ?? msg.id)) {
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (mounted) _loadWatchPlans();
+                            });
+                          }
+                          return WatchRequestChatCard(
+                            msg: msg,
+                            senderAvatar: isMe
+                                ? context.read<AuthProvider>().dbUser?.avatar
+                                : otherUser?.avatar,
+                            senderProfileBadges: isMe
+                                ? context
+                                        .read<AuthProvider>()
+                                        .dbUser
+                                        ?.profileBadges ??
+                                    const []
+                                : otherUser?.profileBadges ?? const [],
+                            cachedRequest: plan,
+                            currentUserId: currentUserId,
+                            memberUsernames: _memberUsernames,
+                            isResponding: _respondingPlanIds.contains(plan?.id),
+                            onAccept: plan == null
+                                ? null
+                                : () => _respondToPlan(
+                                    plan, WatchResponseDecision.accepted),
+                            onDecline: plan == null
+                                ? null
+                                : () => _respondToPlan(
+                                    plan, WatchResponseDecision.declined),
+                            onTap: () async {
+                              if (planId != null) {
+                                await context.push(
+                                    '/watch-requests/${Uri.encodeComponent(plan?.databaseRequestId ?? planId)}');
+                              } else {
+                                await context.push('/watch-requests');
+                              }
+                              if (mounted) await _loadWatchPlans();
+                            },
+                          );
+                        }
+                        return ChatBubble(
+                          currentUserId: currentUserId,
+                          currentUsername:
+                              context.read<AuthProvider>().dbUser?.username,
+                          message: msg.text,
+                          senderUsername: msg.senderUsername ??
+                              _memberUsernames[msg.senderId] ??
+                              (isMe ? 'You' : title),
+                          isMe: isMe,
+                          sentAt: msg.createdAt,
+                          avatar: isMe
+                              ? context.read<AuthProvider>().dbUser?.avatar
+                              : otherUser?.avatar,
+                          initials: isMe
+                              ? context.read<AuthProvider>().dbUser?.initials
+                              : (otherUser?.initials ??
+                                  (otherUser?.username.isNotEmpty == true
+                                      ? otherUser!.username[0].toUpperCase()
+                                      : '?')),
+                          profileBadges: isMe
+                              ? context
+                                      .read<AuthProvider>()
+                                      .dbUser
+                                      ?.profileBadges ??
+                                  const []
+                              : (otherUser?.profileBadges ?? const []),
+                          showSenderLabel: !isMe && startsSenderRun,
+                          onSenderTap: isMe
+                              ? null
+                              : () => context.push('/friends/${msg.senderId}'),
+                        );
+                      },
+                    ));
               },
             ),
           ),

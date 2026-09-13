@@ -8,6 +8,8 @@ class MovieSharePayload {
     required this.prompt,
   });
 
+  bool get isShow => Uri.tryParse(link)?.host == 'shows';
+
   final String title;
   final String link;
   final String posterUrl;
@@ -16,13 +18,13 @@ class MovieSharePayload {
 
 MovieSharePayload? parseMovieSharePayload(String text) {
   final match = RegExp(
-    r'\[FLIXIE_MOVIE_SHARE\]([\s\S]*?)\[/FLIXIE_MOVIE_SHARE\]',
+    r'\[FLIXIE_(MOVIE|SHOW)_SHARE\]([\s\S]*?)\[/FLIXIE_\1_SHARE\]',
     multiLine: true,
   ).firstMatch(text);
   if (match == null) return null;
 
   final data = <String, String>{};
-  for (final rawLine in (match.group(1) ?? '').split('\n')) {
+  for (final rawLine in (match.group(2) ?? '').split('\n')) {
     final line = rawLine.trim();
     if (line.isEmpty) continue;
     final separator = line.indexOf('=');

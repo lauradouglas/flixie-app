@@ -20,6 +20,27 @@ void main() {
     iconColor: {'hexCode': '#00D1C7'},
   );
 
+  test('neutral recommendation stays distinct from no recommendation', () {
+    final neutral = ShareCardData.rating(
+        mediaType: ShareCardMediaType.show,
+        mediaId: 7,
+        title: 'Show',
+        posterPath: null,
+        user: user,
+        rating: 6,
+        neutralRecommendation: true);
+    final unanswered = ShareCardData.rating(
+        mediaType: ShareCardMediaType.show,
+        mediaId: 7,
+        title: 'Show',
+        posterPath: null,
+        user: user,
+        rating: 6);
+    expect(neutral.neutralRecommendation, isTrue);
+    expect(neutral.recommended, isNull);
+    expect(unanswered.neutralRecommendation, isFalse);
+  });
+
   test('rating mapping normalises identity, poster and deep link', () {
     final data = ShareCardData.rating(
       mediaType: ShareCardMediaType.movie,

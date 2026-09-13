@@ -91,7 +91,7 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
           r.scheduledFor != null &&
           !r.scheduledFor!.isAfter(DateTime.now()));
   bool get needsMovie =>
-      r.candidates.isNotEmpty && r.selectedCandidateId == null;
+      r.candidates.length > 1 && r.selectedCandidateId == null;
   String get stage {
     if (complete) return 'Your recap';
     if (r.isDeclined || r.isCancelled || r.isExpired) return 'Plan closed';
@@ -299,8 +299,15 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
               '${r.candidates.length} starting suggestions. You can both add films after joining.',
               style: _body)
         else
-          const Text('A starting suggestion. Pick a film and time together.',
+          Text(
+              r.proposedDate != null
+                  ? 'Accept to confirm this film and time.'
+                  : 'Join the plan, then find a time together.',
               style: _body),
+        if (r.proposedDate != null) ...[
+          const SizedBox(height: 12),
+          Text(_date(r.proposedDate!), style: _title),
+        ],
         const SizedBox(height: 24),
         Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
           Column(children: [
@@ -322,6 +329,10 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
             style: _title),
         if (r.requesterId != widget.myUserId) ...[
           _button('I’m in', Icons.check, widget.onAccept),
+          if (!needsMovie && r.proposedDate != null)
+            _button('Suggest another time', Icons.schedule,
+                widget.onSuggestSchedule,
+                primary: false),
           _button('Not this time', Icons.close, widget.onDecline,
               primary: false),
         ] else
@@ -539,7 +550,7 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
                 content: const Text('Could not open your calendar.')));
           }
         }),
-        _button('Propose a new time', Icons.schedule, widget.onSuggestSchedule,
+        _button('Reschedule', Icons.schedule, widget.onSuggestSchedule,
             primary: false),
       ]);
 
@@ -694,11 +705,15 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
               ? FilledButton.icon(
                   onPressed: widget.busy ? null : action,
                   icon: Icon(icon),
-                  label: Text(label))
+                  label: Text(label,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 16)))
               : OutlinedButton.icon(
                   onPressed: widget.busy ? null : action,
                   icon: Icon(icon),
-                  label: Text(label)),
+                  label: Text(label,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 16))),
         ),
       );
   Widget _badge(String label, Color color) => Container(

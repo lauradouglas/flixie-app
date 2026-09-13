@@ -77,11 +77,13 @@ class RatingShareCardContent extends StatelessWidget {
         : data.recommended == false
             ? FlixieColors.danger
             : FlixieColors.medium;
-    final recommendationLabel = data.recommended == true
-        ? 'recommends this'
-        : data.recommended == false
-            ? "doesn't recommend this"
-            : 'rated this';
+    final recommendationLabel = data.neutralRecommendation
+        ? 'has no recommendation'
+        : data.recommended == true
+            ? 'recommends this'
+            : data.recommended == false
+                ? "doesn't recommend this"
+                : 'rated this';
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -157,14 +159,18 @@ class RatingShareCardContent extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            Center(
-              child: SizedBox(
-                width: posterHeight * (2 / 3),
-                height: posterHeight,
-                child: _TallPoster(data: data, accent: posterAccent),
+            Expanded(
+              child: Center(
+                child: FittedBox(
+                  fit: BoxFit.contain,
+                  child: SizedBox(
+                    width: posterHeight * (2 / 3),
+                    height: posterHeight,
+                    child: _TallPoster(data: data, accent: posterAccent),
+                  ),
+                ),
               ),
             ),
-            const Spacer(),
             Divider(color: FlixieColors.light.withValues(alpha: .2)),
             const SizedBox(height: 12),
             Row(
@@ -184,11 +190,14 @@ class RatingShareCardContent extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          if (data.recommended != null) ...[
+                          if (data.recommended != null ||
+                              data.neutralRecommendation) ...[
                             Icon(
-                              data.recommended!
-                                  ? Icons.thumb_up_alt_rounded
-                                  : Icons.thumb_down_alt_rounded,
+                              data.neutralRecommendation
+                                  ? Icons.remove_rounded
+                                  : data.recommended!
+                                      ? Icons.thumb_up_alt_rounded
+                                      : Icons.thumb_down_alt_rounded,
                               color: recommendationColor,
                               size: 16,
                             ),
@@ -292,11 +301,13 @@ class ReviewShareCardContent extends StatelessWidget {
         : data.recommended == false
             ? FlixieColors.danger
             : FlixieColors.medium;
-    final recommendationLabel = data.recommended == true
-        ? 'recommends this'
-        : data.recommended == false
-            ? "doesn't recommend this"
-            : 'rated this';
+    final recommendationLabel = data.neutralRecommendation
+        ? 'has no recommendation'
+        : data.recommended == true
+            ? 'recommends this'
+            : data.recommended == false
+                ? "doesn't recommend this"
+                : 'rated this';
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -399,11 +410,14 @@ class ReviewShareCardContent extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          if (data.recommended != null) ...[
+                          if (data.recommended != null ||
+                              data.neutralRecommendation) ...[
                             Icon(
-                              data.recommended!
-                                  ? Icons.thumb_up_alt_rounded
-                                  : Icons.thumb_down_alt_rounded,
+                              data.neutralRecommendation
+                                  ? Icons.remove_rounded
+                                  : data.recommended!
+                                      ? Icons.thumb_up_alt_rounded
+                                      : Icons.thumb_down_alt_rounded,
                               color: recommendationColor,
                               size: 16,
                             ),

@@ -368,6 +368,9 @@ class GroupWatchRequest {
   /// Postgres group-request ID when [id] is the mirrored conversation ID.
   final String? databaseRequestId;
 
+  /// Timeline message associated with this plan, including legacy messages.
+  final String? linkedMessageId;
+
   /// Firestore conversation ID; a Postgres group ID cannot be used in its place.
   final String? conversationId;
   final String groupId;
@@ -411,6 +414,7 @@ class GroupWatchRequest {
   const GroupWatchRequest({
     required this.id,
     this.databaseRequestId,
+    this.linkedMessageId,
     required this.groupId,
     required this.userId,
     this.conversationId,
@@ -497,9 +501,13 @@ class GroupWatchRequest {
     return GroupWatchRequest(
       id: json['id']?.toString() ?? '',
       databaseRequestId: json['pgGroupRequestId']?.toString(),
+      linkedMessageId: json['linkedMessageId']?.toString(),
       conversationId: json['conversationId']?.toString(),
       groupId: (json['conversationId'] ?? json['groupId'])?.toString() ?? '',
-      userId: (json['createdById'] ?? json['requesterId'] ?? json['userId'])
+      userId: (json['createdById'] ??
+                  json['requesterId'] ??
+                  json['createdBy'] ??
+                  json['userId'])
               ?.toString() ??
           '',
       message: json['message'] as String?,
@@ -602,19 +610,20 @@ class GroupWatchRequest {
   /// True when members can still respond (request is active and not expired).
   bool get canRespond => isActive && !hasExpired;
 
-  GroupScheduleProposal? get activeScheduleProposal => scheduleProposals
-      .where((proposal) {
+  GroupScheduleProposal? get activeScheduleProposal =>
+      scheduleProposals.where((proposal) {
         if (proposal.status.toUpperCase() != 'PENDING') return false;
         final current = DateTime.tryParse(scheduledFor ?? '');
         final proposed = DateTime.tryParse(proposal.proposedFor ?? '');
         // Old initial proposals can remain pending after the slot is confirmed.
         // Only a different time or location is a reschedule to review.
-        final sameSlot = current != null && proposed != null &&
+        final sameSlot = current != null &&
+            proposed != null &&
             current.isAtSameMomentAs(proposed) &&
-            (proposal.location ?? location ?? '').trim() == (location ?? '').trim();
+            (proposal.location ?? location ?? '').trim() ==
+                (location ?? '').trim();
         return !sameSlot;
-      })
-      .firstOrNull;
+      }).firstOrNull;
 
   /// A group request is mirrored between Postgres and the conversation store.
   /// Deep links may contain either identifier depending on where they began.

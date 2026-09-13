@@ -8,8 +8,10 @@ class SocialSegmentedToggle extends StatelessWidget {
     required this.selectedIndex,
     required this.labels,
     required this.onChanged,
+    this.counts = const {},
   });
 
+  final Map<int, int> counts;
   final int selectedIndex;
   final List<String> labels;
   final ValueChanged<int> onChanged;
@@ -18,33 +20,72 @@ class SocialSegmentedToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      child: Container(
-        height: 44,
-        decoration: BoxDecoration(
-          color: FlixieColors.tabBarBackgroundFocused,
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: FlixieColors.tabBarBorder),
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: FlixieColors.tabBarBorder)),
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: List.generate(labels.length, (i) {
             final selected = i == selectedIndex;
+            final count = counts[i] ?? 0;
             return Expanded(
-              child: GestureDetector(
-                onTap: () => onChanged(i),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  margin: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    color: selected ? FlixieColors.primary : Colors.transparent,
-                    borderRadius: BorderRadius.circular(27),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    labels[i],
-                    style: TextStyle(
-                      color: selected ? Colors.black : FlixieColors.medium,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
+              child: Semantics(
+                button: true,
+                selected: selected,
+                label: count > 0
+                    ? '${labels[i]}, $count unread messages'
+                    : labels[i],
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => onChanged(i),
+                    child: Container(
+                      constraints: const BoxConstraints(minHeight: 48),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 13, horizontal: 4),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(
+                            color: selected
+                                ? FlixieColors.primaryTint
+                                : Colors.transparent,
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                      child: ExcludeSemantics(
+                        child: Wrap(
+                          alignment: WrapAlignment.center,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 6,
+                          runSpacing: 2,
+                          children: [
+                            Text(
+                              labels[i],
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: selected
+                                    ? FlixieColors.textPrimary
+                                    : FlixieColors.light,
+                                fontWeight: selected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                fontSize: 14,
+                              ),
+                            ),
+                            if (count > 0)
+                              Text(
+                                count > 99 ? '99+' : '$count',
+                                style: const TextStyle(
+                                  color: FlixieColors.primaryTint,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),

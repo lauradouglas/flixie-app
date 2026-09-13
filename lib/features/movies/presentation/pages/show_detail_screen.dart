@@ -1,3 +1,6 @@
+import 'package:flixie_app/features/sharing/models/share_card_data.dart';
+import 'package:flixie_app/features/sharing/presentation/share_card_sheet.dart';
+import 'package:flixie_app/features/sharing/presentation/media_chat_share.dart';
 import 'package:flixie_app/models/movie_friend_activity.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/media_friend_activity_row.dart';
 import 'package:flixie_app/features/settings/presentation/pages/settings_screen.dart'
@@ -71,6 +74,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
   bool _isWatched = false;
   bool _isFavorite = false;
   int? _userRating;
+  String? _userRecommendation;
   bool _isRatingLoading = false;
   bool _listsContainingShowLoading = false;
   bool _showFullOverview = false;
@@ -131,7 +135,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         if (user != null)
           ShowService.getUserShowRating(id, user.id).catchError((_) => null)
         else
-          Future<int?>.value(null),
+          Future<Map<String, dynamic>?>.value(null),
         _fetchReviews(id, user?.id),
         if (user != null)
           ShowService.getFriendSummary(id).catchError((_) => null)
@@ -144,7 +148,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       final providersFromEndpoint = results[1] as List<WatchProvider>;
       final credits = results[2] as TvShowCredits;
       final userProviders = results[3] as List<WatchProvider>;
-      final userRating = results.length > 4 ? results[4] as int? : null;
+      final ratingData = results[4] as Map<String, dynamic>?;
+      final userRating = (ratingData?['rating'] as num?)?.toInt();
       final reviews = results[5] as List<Review>;
       final friendSummary = results[6] as TvShowFriendSummary?;
       final totalEpisodes = show.resolvedEpisodeCount;
@@ -160,6 +165,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         _userProviderMatchKeys =
             userProviders.map((provider) => provider.matchKey).toSet();
         _userRating = userRating;
+        _userRecommendation = ratingData?['recommendation'] as String?;
         _reviews = reviews;
         _friendSummary = friendSummary ?? show.friendSummary;
         _selectedSeasonNumber = _resolveSelectedSeasonNumber(show);
@@ -573,8 +579,10 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         .showFlixieToast(FlixieToast(type: type, content: Text(message)));
   }
 
-  Future<void> _setUserRating(int rating, {bool offerUndo = true}) async {
+  Future<void> _setUserRating(int rating,
+      {bool offerUndo = true, String? recommendation}) async {
     final previousRating = _userRating;
+    final previousRecommendation = _userRecommendation;
     final user = context.read<AuthProvider>().dbUser;
     final analytics = context.read<AnalyticsController>();
     final showId = _show?.id;
@@ -582,7 +590,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
 
     setState(() => _isRatingLoading = true);
     try {
-      final response = await ShowService.addShowRating(showId, user.id, rating);
+      final response = await ShowService.addShowRating(showId, user.id, rating,
+          recommendation: recommendation);
       await analytics.ratingAdded(
         contentType: 'show',
         contentId: showId,
@@ -594,6 +603,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       HapticFeedback.lightImpact();
       setState(() {
         _userRating = rating;
+        _userRecommendation = recommendation;
         if (updatedVoteAverage != null || updatedVoteCount != null) {
           final current = _show!;
           _show = TvShow(
@@ -637,6 +647,25 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         }
         _isRatingLoading = false;
       });
+      if (offerUndo && previousRating == null) {
+        promptShareCard(
+            context,
+            ShareCardData.rating(
+              mediaType: ShareCardMediaType.show,
+              mediaId: showId,
+              title: _show!.name,
+              posterPath: _show!.posterPath,
+              user: user,
+              rating: rating,
+              neutralRecommendation: recommendation == 'neutral',
+              recommended: recommendation == 'recommend'
+                  ? true
+                  : recommendation == 'avoid'
+                      ? false
+                      : null,
+            ));
+        return;
+      }
       ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
         type: FlixieToastType.success,
         content: const Text('Rating saved'),
@@ -645,7 +674,9 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                 label: 'Undo',
                 onPressed: () {
                   if (mounted && !_isRatingLoading && _userRating == rating) {
-                    _setUserRating(previousRating, offerUndo: false);
+                    _setUserRating(previousRating,
+                        offerUndo: false,
+                        recommendation: previousRecommendation);
                   }
                 })
             : null,
@@ -659,7 +690,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         action: SnackBarAction(
             label: 'Retry',
             onPressed: () {
-              if (mounted && !_isRatingLoading) _setUserRating(rating);
+              if (mounted && !_isRatingLoading)
+                _setUserRating(rating, recommendation: recommendation);
             }),
       ));
     }
@@ -667,14 +699,20 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
 
   void _showRatingSheet() {
     var selectedRating = _userRating;
+    var selectedRecommendation = _userRecommendation;
     showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
+      isScrollControlled: true,
       clipBehavior: Clip.antiAlias,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setSheetState) => Container(
+          constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * .85),
           color: FlixieColors.tabBarBackgroundFocused,
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
@@ -690,39 +728,49 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                   style: TextStyle(color: FlixieColors.medium, fontSize: 13),
                 ),
                 const SizedBox(height: 20),
-                GridView.count(
-                  crossAxisCount: 5,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  mainAxisSpacing: 10,
-                  crossAxisSpacing: 10,
-                  children: List.generate(10, (index) {
-                    final rating = index + 1;
-                    final selected = selectedRating == rating;
-                    return InkWell(
-                      onTap: () => setSheetState(() => selectedRating = rating),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? FlixieColors.primary
-                              : FlixieColors.primary.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '$rating',
-                          style: TextStyle(
-                            color:
-                                selected ? Colors.white : FlixieColors.medium,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
-                ),
+                Wrap(spacing: 8, runSpacing: 8, children: [
+                  for (var rating = 1; rating <= 10; rating++)
+                    ChoiceChip(
+                      side: BorderSide.none,
+                      backgroundColor: FlixieColors.surfaceElevated,
+                      selectedColor: FlixieColors.primary,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      avatar: const Icon(Icons.star_outline_rounded, size: 18),
+                      label: Text('$rating'),
+                      selected: selectedRating == rating,
+                      showCheckmark: false,
+                      onSelected: (_) =>
+                          setSheetState(() => selectedRating = rating),
+                    ),
+                ]),
+                const SizedBox(height: 20),
+                const Text('Would you recommend it? (optional)',
+                    style: TextStyle(
+                        color: FlixieColors.light,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600)),
+                const SizedBox(height: 10),
+                Wrap(spacing: 8, runSpacing: 8, children: [
+                  for (final option in [
+                    ('recommend', 'Yes', Icons.thumb_up_alt_outlined),
+                    ('neutral', 'No opinion', Icons.remove_rounded),
+                    ('avoid', 'No', Icons.thumb_down_alt_outlined),
+                  ])
+                    ChoiceChip(
+                      side: BorderSide.none,
+                      backgroundColor: FlixieColors.surfaceElevated,
+                      selectedColor: FlixieColors.primary,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      avatar: Icon(option.$3, size: 20),
+                      label: Text(option.$2),
+                      selected: selectedRecommendation == option.$1,
+                      showCheckmark: false,
+                      onSelected: (selected) => setSheetState(() =>
+                          selectedRecommendation = selected ? option.$1 : null),
+                    ),
+                ]),
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
@@ -732,7 +780,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                         : () {
                             final rating = selectedRating!;
                             Navigator.pop(sheetContext);
-                            _setUserRating(rating);
+                            _setUserRating(rating,
+                                recommendation: selectedRecommendation);
                           },
                     child: const Text('Save rating'),
                   ),
@@ -1003,8 +1052,11 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                 right: 16,
                 child: _heroIconButton(
                   icon: Icons.ios_share_rounded,
-                  onTap: () => _showSnack('Show sharing is coming soon',
-                      type: FlixieToastType.info),
+                  onTap: () => MediaChatShare(context).show(ChatShareMedia(
+                      id: show.id,
+                      title: show.name,
+                      posterPath: show.posterPath,
+                      isShow: true)),
                 ),
               ),
             ],
@@ -2669,6 +2721,34 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                   color: FlixieColors.warning,
                   onTap: _isRatingLoading ? null : _showRatingSheet,
                 ),
+                if (_userRating != null)
+                  _DashboardTile(
+                    title: 'Share your rating',
+                    value: '${_userRating!}/10',
+                    icon: Icons.ios_share_rounded,
+                    color: FlixieColors.primaryText,
+                    onTap: () {
+                      final user = context.read<AuthProvider>().dbUser;
+                      if (user == null) return;
+                      showShareCardSheet(
+                          context,
+                          ShareCardData.rating(
+                            mediaType: ShareCardMediaType.show,
+                            mediaId: show.id,
+                            title: show.name,
+                            posterPath: show.posterPath,
+                            user: user,
+                            rating: _userRating!,
+                            recommended: _userRecommendation == 'recommend'
+                                ? true
+                                : _userRecommendation == 'avoid'
+                                    ? false
+                                    : null,
+                            neutralRecommendation:
+                                _userRecommendation == 'neutral',
+                          ));
+                    },
+                  ),
                 _DashboardTile(
                   title: 'Your status',
                   value: statusLabel,

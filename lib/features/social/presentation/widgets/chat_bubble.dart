@@ -18,6 +18,8 @@ class ChatBubble extends StatelessWidget {
     required this.isMe,
     required this.sentAt,
     this.avatar,
+    this.currentUserId,
+    this.currentUsername,
     this.initials,
     this.profileBadges = const [],
     this.showSenderLabel = true,
@@ -26,6 +28,8 @@ class ChatBubble extends StatelessWidget {
     this.onSenderTap,
   });
 
+  final String? currentUserId;
+  final String? currentUsername;
   final String message;
   final String senderUsername;
   final bool isMe;
@@ -40,7 +44,8 @@ class ChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasActivityReply = parseActivityReplyPayload(message) != null;
+    final hasRichContent = parseActivityReplyPayload(message) != null ||
+        parseMovieSharePayload(message) != null;
     return GestureDetector(
       onLongPress: onLongPress,
       child: Padding(
@@ -62,7 +67,29 @@ class ChatBubble extends StatelessWidget {
                   ),
                 ),
               ),
-            if (!isMe && showSenderLabel)
+            if (hasRichContent)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  mainAxisAlignment:
+                      isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+                  children: [
+                    if (!isMe) ...[_senderAvatar(), const SizedBox(width: 9)],
+                    Flexible(
+                        child: GestureDetector(
+                            onTap: onSenderTap,
+                            child: Text(isMe ? 'You' : senderUsername,
+                                textAlign:
+                                    isMe ? TextAlign.right : TextAlign.left,
+                                style: const TextStyle(
+                                    color: FlixieColors.primaryTint,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700)))),
+                    if (isMe) ...[const SizedBox(width: 9), _senderAvatar()],
+                  ],
+                ),
+              ),
+            if (!hasRichContent && !isMe && showSenderLabel)
               Padding(
                 padding: const EdgeInsets.only(left: 46, bottom: 4),
                 child: Semantics(
@@ -94,7 +121,7 @@ class ChatBubble extends StatelessWidget {
                   isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                if (!isMe) ...[
+                if (!hasRichContent && !isMe) ...[
                   ProfileAvatarView(
                     avatar: avatar,
                     fallbackText: initials?.isNotEmpty == true
@@ -112,12 +139,16 @@ class ChatBubble extends StatelessWidget {
                   child: Container(
                     constraints: BoxConstraints(
                       maxWidth: MediaQuery.of(context).size.width *
-                          (hasActivityReply ? 0.78 : 0.62),
+                          (hasRichContent ? 0.86 : 0.62),
                     ),
                     padding: const EdgeInsets.symmetric(
                         horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: isMe ? FlixieColors.primary : FlixieColors.surface,
+                      color: hasRichContent
+                          ? FlixieColors.surface
+                          : isMe
+                              ? FlixieColors.primary
+                              : FlixieColors.surface,
                       borderRadius: BorderRadius.only(
                         topLeft: const Radius.circular(16),
                         topRight: const Radius.circular(16),
@@ -128,21 +159,40 @@ class ChatBubble extends StatelessWidget {
                     child: _buildMessageBody(context),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  _timeLabel(sentAt),
-                  style: const TextStyle(
-                    color: FlixieColors.medium,
-                    fontSize: 11,
+                if (!hasRichContent) const SizedBox(width: 8),
+                if (!hasRichContent)
+                  Text(
+                    _timeLabel(sentAt),
+                    style: const TextStyle(
+                      color: FlixieColors.medium,
+                      fontSize: 11,
+                    ),
                   ),
-                ),
               ],
             ),
+            if (hasRichContent)
+              Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(_timeLabel(sentAt),
+                      style: const TextStyle(
+                          color: FlixieColors.medium, fontSize: 12))),
           ],
         ),
       ),
     );
   }
+
+  Widget _senderAvatar() => ProfileAvatarView(
+        avatar: avatar,
+        fallbackText: initials?.isNotEmpty == true
+            ? initials!
+            : senderUsername.isNotEmpty
+                ? senderUsername[0].toUpperCase()
+                : '?',
+        fallbackColor: FlixieColors.primary,
+        size: 32,
+        profileBadges: profileBadges,
+      );
 
   String _timeLabel(DateTime value) {
     final local = value.toLocal();
@@ -222,349 +272,215 @@ class ChatBubble extends StatelessWidget {
     BuildContext context,
     ActivityReplyPayload payload,
   ) {
-    final textColor = isMe ? Colors.white : FlixieColors.textPrimary;
-    final recommendation = payload.recommended;
-    final actionLabel = payload.activityLabel == 'review'
-        ? 'View review'
-        : payload.link.contains('shows')
-            ? 'Open show'
-            : 'Open movie';
-
+    final isOwnActivity = payload.userId != null
+        ? payload.userId == currentUserId
+        : currentUsername?.trim().isNotEmpty == true &&
+            payload.username.trim().toLowerCase() ==
+                currentUsername!.trim().toLowerCase();
+    final details = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(payload.title,
+            style: const TextStyle(
+                color: FlixieColors.textPrimary,
+                fontSize: 19,
+                fontWeight: FontWeight.w800,
+                height: 1.25)),
+        if (payload.rating != null) ...[
+          const SizedBox(height: 8),
+          Row(children: [
+            const Icon(Icons.star_rounded,
+                color: FlixieColors.warning, size: 18),
+            const SizedBox(width: 4),
+            Flexible(
+                child: Text(
+                    '${payload.rating!.toStringAsFixed(payload.rating! % 1 == 0 ? 0 : 1)}/10',
+                    style: const TextStyle(
+                        color: FlixieColors.warning,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700))),
+          ]),
+        ],
+        if (payload.recommended != null) ...[
+          const SizedBox(height: 5),
+          Text(payload.recommended! ? 'Recommends' : 'Doesn’t recommend',
+              style: TextStyle(
+                  color: payload.recommended!
+                      ? FlixieColors.success
+                      : FlixieColors.danger,
+                  fontSize: 13)),
+        ],
+      ],
+    );
+    final poster = ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox(
+          width: 64,
+          height: 96,
+          child: payload.posterUrl.isEmpty
+              ? const ColoredBox(
+                  color: FlixieColors.surfaceElevated,
+                  child: Icon(Icons.movie_outlined, color: FlixieColors.medium))
+              : CachedNetworkImage(
+                  imageUrl: payload.posterUrl,
+                  fit: BoxFit.cover,
+                  errorWidget: (_, __, ___) => const ColoredBox(
+                      color: FlixieColors.surfaceElevated,
+                      child: Icon(Icons.movie_outlined,
+                          color: FlixieColors.medium)))),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (payload.message.isNotEmpty) ...[
-          Text(
-            payload.message,
-            style: TextStyle(color: textColor, fontSize: 15, height: 1.3),
-          ),
-          const SizedBox(height: 10),
-        ],
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Icon(Icons.reply_rounded, size: 16, color: FlixieColors.medium),
+          const SizedBox(width: 6),
+          Expanded(
+              child: Text(
+                  isOwnActivity
+                      ? 'Replied to your ${payload.activityLabel}'
+                      : 'Replied to @${payload.username}’s ${payload.activityLabel}',
+                  style: const TextStyle(
+                      color: FlixieColors.medium, fontSize: 12))),
+        ]),
+        const SizedBox(height: 12),
         InkWell(
           onTap: () => _openLink(context, payload.link),
-          borderRadius: BorderRadius.circular(14),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: isMe
-                  ? const Color(0xFF5830AE)
-                  : FlixieColors.tabBarBackgroundFocused,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: isMe
-                    ? Colors.white.withValues(alpha: .28)
-                    : FlixieColors.primary.withValues(alpha: .42),
-              ),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(9),
-                  child: SizedBox(
-                    width: 64,
-                    height: 96,
-                    child: payload.posterUrl.isEmpty
-                        ? Container(
-                            color: FlixieColors.surface,
-                            child: const Icon(
-                              Icons.movie_outlined,
-                              color: FlixieColors.medium,
-                            ),
-                          )
-                        : CachedNetworkImage(
-                            imageUrl: payload.posterUrl,
-                            fit: BoxFit.cover,
-                            errorWidget: (_, __, ___) => Container(
-                              color: FlixieColors.surface,
-                              child: const Icon(
-                                Icons.movie_outlined,
-                                color: FlixieColors.medium,
-                              ),
-                            ),
-                          ),
-                  ),
-                ),
-                const SizedBox(width: 11),
-                Expanded(
-                  child: Column(
+          borderRadius: BorderRadius.circular(8),
+          child: LayoutBuilder(builder: (context, constraints) {
+            final stack = constraints.maxWidth < 220 ||
+                MediaQuery.textScalerOf(context).scale(1) > 1.5;
+            return stack
+                ? Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'REPLYING TO @${payload.username.toUpperCase()}’S ${payload.activityLabel.toUpperCase()}',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: .72),
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.05,
-                          height: 1.25,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        payload.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          height: 1.12,
-                        ),
-                      ),
-                      if (payload.rating != null || recommendation != null) ...[
-                        const SizedBox(height: 7),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 3,
-                          children: [
-                            if (payload.rating != null)
-                              Text(
-                                '★ ${payload.rating!.toStringAsFixed(payload.rating! % 1 == 0 ? 0 : 1)}/10',
-                                style: const TextStyle(
-                                  color: Color(0xFFFFC84A),
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            if (recommendation != null)
-                              Text(
-                                '${recommendation ? '👍' : '👎'} ${recommendation ? 'Recommends' : 'Doesn’t recommend'}',
-                                style: TextStyle(
-                                  color: recommendation
-                                      ? const Color(0xFF00E6A8)
-                                      : const Color(0xFFFF7E8A),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
-                      if (payload.reviewTitle?.isNotEmpty == true) ...[
-                        const SizedBox(height: 7),
-                        Text(
-                          payload.reviewTitle!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                      if (payload.reviewBody?.isNotEmpty == true) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          payload.reviewBody!,
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: .76),
-                            fontSize: 11.5,
-                            height: 1.25,
-                          ),
-                        ),
-                      ],
-                      if (payload.containsSpoilers) ...[
-                        const SizedBox(height: 7),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF4A3417),
-                            borderRadius: BorderRadius.circular(99),
-                          ),
-                          child: const Text(
-                            '⚠ CONTAINS SPOILERS',
-                            style: TextStyle(
-                              color: Color(0xFFFFC84A),
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ],
-                      if (payload.listName?.isNotEmpty == true) ...[
-                        const SizedBox(height: 7),
-                        InkWell(
-                          onTap: payload.listLink == null
-                              ? null
-                              : () => _openLink(context, payload.listLink!),
-                          borderRadius: BorderRadius.circular(6),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: .12),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.playlist_add_check_rounded,
-                                  color: Colors.white,
-                                  size: 15,
-                                ),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    'Added to ${payload.listName}',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 8),
-                      Text(
-                        '↗  $actionLabel',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+                    children: [poster, const SizedBox(height: 12), details])
+                : Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    poster,
+                    const SizedBox(width: 14),
+                    Expanded(child: details)
+                  ]);
+          }),
         ),
+        if (payload.containsSpoilers) ...[
+          const SizedBox(height: 10),
+          const Text('Contains spoilers',
+              style: TextStyle(color: FlixieColors.warning, fontSize: 13)),
+        ],
+        if (!payload.containsSpoilers &&
+            payload.reviewTitle?.isNotEmpty == true) ...[
+          const SizedBox(height: 10),
+          Text(payload.reviewTitle!,
+              style: const TextStyle(
+                  color: FlixieColors.textPrimary,
+                  fontWeight: FontWeight.w700)),
+        ],
+        if (!payload.containsSpoilers &&
+            payload.reviewBody?.isNotEmpty == true) ...[
+          const SizedBox(height: 5),
+          Text(payload.reviewBody!,
+              style: const TextStyle(
+                  color: FlixieColors.light, fontSize: 14, height: 1.4)),
+        ],
+        if (payload.listName?.isNotEmpty == true)
+          TextButton.icon(
+              onPressed: payload.listLink == null
+                  ? null
+                  : () => _openLink(context, payload.listLink!),
+              icon: const Icon(Icons.playlist_add_check_rounded, size: 18),
+              label: Text('Added to ${payload.listName}'),
+              style: TextButton.styleFrom(foregroundColor: FlixieColors.light)),
+        if (payload.message.isNotEmpty) ...[
+          const Divider(color: FlixieColors.tabBarBorder, height: 20),
+          Text(payload.message,
+              style: const TextStyle(
+                  color: FlixieColors.textPrimary, fontSize: 16, height: 1.4)),
+        ],
       ],
     );
   }
 
   Widget _buildMovieShareCard(BuildContext context, MovieSharePayload payload) {
-    final cardColor = isMe
-        ? Colors.white.withValues(alpha: 0.14)
-        : FlixieColors.tabBarBackgroundFocused.withValues(alpha: 0.9);
-    final borderColor = isMe
-        ? Colors.white.withValues(alpha: 0.22)
-        : FlixieColors.primary.withValues(alpha: 0.32);
-    final promptColor = isMe ? Colors.white : FlixieColors.light;
-
-    return Column(
+    final foreground = isMe ? Colors.white : FlixieColors.textPrimary;
+    final secondary = isMe ? Colors.white : FlixieColors.primaryTint;
+    final poster = ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: SizedBox(
+        width: 68,
+        height: 102,
+        child: payload.posterUrl.isEmpty
+            ? const ColoredBox(
+                color: FlixieColors.tabBarBackground,
+                child: Icon(Icons.movie_outlined, color: FlixieColors.light))
+            : CachedNetworkImage(
+                imageUrl: payload.posterUrl,
+                fit: BoxFit.cover,
+                errorWidget: (_, __, ___) => const ColoredBox(
+                    color: FlixieColors.tabBarBackground,
+                    child:
+                        Icon(Icons.movie_outlined, color: FlixieColors.light)),
+              ),
+      ),
+    );
+    final details = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (payload.prompt.isNotEmpty) ...[
-          Text(
-            payload.prompt,
-            style: TextStyle(color: promptColor, fontSize: 14.5, height: 1.25),
-          ),
-          const SizedBox(height: 8),
-        ],
-        InkWell(
-          onTap: () => _openLink(context, payload.link),
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            decoration: BoxDecoration(
-              color: cardColor,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: borderColor),
-            ),
-            padding: const EdgeInsets.all(8),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: SizedBox(
-                    width: 52,
-                    height: 78,
-                    child: payload.posterUrl.isEmpty
-                        ? Container(
-                            color: FlixieColors.tabBarBackground,
-                            child: const Icon(
-                              Icons.movie_outlined,
-                              color: FlixieColors.medium,
-                              size: 22,
-                            ),
-                          )
-                        : CachedNetworkImage(
-                            imageUrl: payload.posterUrl,
-                            fit: BoxFit.cover,
-                            errorWidget: (_, __, ___) => Container(
-                              color: FlixieColors.tabBarBackground,
-                              child: const Icon(
-                                Icons.movie_outlined,
-                                color: FlixieColors.medium,
-                                size: 22,
-                              ),
-                            ),
-                          ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Flexible(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        payload.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: FlixieColors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          height: 1.15,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.open_in_new_rounded,
-                            size: 13,
-                            color: isMe
-                                ? Colors.white.withValues(alpha: 0.96)
-                                : FlixieColors.primary,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Open movie',
-                            style: TextStyle(
-                              color: isMe
-                                  ? Colors.white.withValues(alpha: 0.96)
-                                  : FlixieColors.primary,
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+        Text(payload.title,
+            style: TextStyle(
+                color: foreground,
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                height: 1.25)),
+        const SizedBox(height: 10),
+        Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 4,
+            children: [
+              Text(payload.isShow ? 'View show' : 'View movie',
+                  style: TextStyle(
+                      color: secondary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600)),
+              Icon(Icons.chevron_right_rounded, color: secondary, size: 18),
+            ]),
       ],
+    );
+    return InkWell(
+      onTap: () => _openLink(context, payload.link),
+      borderRadius: BorderRadius.circular(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          LayoutBuilder(builder: (context, constraints) {
+            final stack = constraints.maxWidth < 220 ||
+                MediaQuery.textScalerOf(context).scale(1) > 1.5;
+            if (stack) {
+              return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [poster, const SizedBox(height: 12), details]);
+            }
+            return Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  poster,
+                  const SizedBox(width: 14),
+                  Flexible(child: details)
+                ]);
+          }),
+          if (payload.prompt.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Text(payload.prompt,
+                style: TextStyle(
+                    color: isMe ? Colors.white : FlixieColors.light,
+                    fontSize: 14.5,
+                    height: 1.4)),
+          ],
+        ],
+      ),
     );
   }
 

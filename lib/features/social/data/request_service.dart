@@ -1,7 +1,42 @@
+import 'package:flixie_app/models/group_watch_request.dart';
 import 'package:flixie_app/models/watch_request.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 
 class RequestService {
+  /// Direct plans live outside the conversation watch-request collection.
+  static Future<GroupWatchRequest> getChatWatchPlan(
+      String id, String userId) async {
+    final data = await ApiClient.get('/watch-requests/$id/state',
+        queryParams: {'userId': userId});
+    return chatPlanFromState(Map<String, dynamic>.from(data as Map), userId);
+  }
+
+  static GroupWatchRequest chatPlanFromState(
+      Map<String, dynamic> state, String userId) {
+    final request = Map<String, dynamic>.from(state['request'] as Map);
+    final participants = (request['participants'] as List? ?? const [])
+        .whereType<Map>()
+        .map((p) {
+      final user = p['user'] as Map?;
+      return <String, dynamic>{
+        ...Map<String, dynamic>.from(p),
+        'memberId': user?['id'] ?? p['userId'] ?? p['responderId'],
+        'responder': user,
+        'status': p['status'] ?? p['response'] ?? 'PENDING',
+      };
+    }).toList();
+    final mine = participants.where((p) => p['memberId'] == userId).firstOrNull;
+    return GroupWatchRequest.fromJson({
+      ...request,
+      'movie': request['movie'] ?? request['show'],
+      'responses': participants,
+      if (mine != null &&
+          ['ACCEPTED', 'DECLINED', 'MAYBE']
+              .contains(mine['status'].toString().toUpperCase()))
+        'currentUserResponse': mine['status'],
+    });
+  }
+
   static Future<Map<String, dynamic>?> sendRequest(
       Map<String, dynamic> body) async {
     final data = await ApiClient.post('/requests', body: body);
@@ -12,10 +47,11 @@ class RequestService {
   }
 
   static Future<void> updateRequest(String requestId, String status,
-      {String? message}) async {
+      {String? message, bool acceptProposedTime = true}) async {
     await ApiClient.post('/requests/update', body: {
       'id': requestId,
       'status': status,
+      'acceptProposedTime': acceptProposedTime,
       if (message != null && message.isNotEmpty) 'message': message,
     });
   }

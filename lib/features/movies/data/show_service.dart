@@ -92,26 +92,24 @@ class ShowService {
   }
 
   static Future<Map<String, dynamic>> addShowRating(
-      int showId, String userId, int rating) async {
+      int showId, String userId, int rating,
+      {String? recommendation}) async {
     final data = await ApiClient.post(
       '/shows/$showId/add/rating',
-      body: {'userId': userId, 'rating': rating},
+      body: {
+        'userId': userId,
+        'rating': rating,
+        'recommendation': recommendation
+      },
     );
     return data as Map<String, dynamic>;
   }
 
-  static Future<int?> getUserShowRating(int showId, String userId) async {
-    try {
-      final data = await ApiClient.post(
-        '/shows/$showId/user/rating',
-        body: {'userId': userId},
-      );
-      if (data is Map<String, dynamic>) {
-        final rating = data['rating'];
-        if (rating is num) return rating.toInt();
-      }
-    } catch (_) {}
-    return null;
+  static Future<Map<String, dynamic>?> getUserShowRating(
+      int showId, String userId) async {
+    final data = await ApiClient.post('/shows/$showId/user/rating',
+        body: {'userId': userId});
+    return data is Map<String, dynamic> ? data : null;
   }
 
   static Future<void> addToWatchlist(String userId, int showId) async {

@@ -1,3 +1,4 @@
+import 'package:flixie_app/models/profile_avatar.dart';
 import 'package:flixie_app/features/watch_plans/presentation/widgets/shared/watch_plan_components.dart';
 import 'package:flixie_app/features/watch_plans/presentation/widgets/group_plan/watch_plan_movie_options.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -20,8 +21,12 @@ class WatchRequestChatCard extends StatelessWidget {
       this.onMaybe,
       required this.onTap,
       this.memberUsernames = const {},
+      this.senderAvatar,
+      this.senderProfileBadges = const [],
       this.onLongPress});
 
+  final ProfileAvatar? senderAvatar;
+  final List<String> senderProfileBadges;
   final ChatMessage msg;
   final GroupWatchRequest? cachedRequest;
   final String? currentUserId;
@@ -50,10 +55,13 @@ class WatchRequestChatCard extends StatelessWidget {
             r?.movieTitle ??
             payload?['movieTitle'] as String? ??
             metadata?['movieTitle'] as String? ??
-            'Watch Plan';
+            (msg.text.startsWith('Watch Plan: ')
+                ? msg.text.substring(12)
+                : 'Watch Plan');
     final poster = selected?.posterPath ??
         r?.moviePosterPath ??
         payload?['moviePosterUrl'] as String? ??
+        payload?['moviePosterPath'] as String? ??
         metadata?['posterPath'] as String? ??
         payload?['posterPath'] as String?;
     final message = [
@@ -95,37 +103,74 @@ class WatchRequestChatCard extends StatelessWidget {
         r?.memberStatuses.where((m) => m.missedAt != null).length ?? 0;
     final attendees =
         r?.memberStatuses.where((m) => m.status == 'ACCEPTED').toList() ?? [];
+    final proposal = r?.activeScheduleProposal;
+    final date = DateTime.tryParse(
+            proposal?.proposedFor ?? r?.scheduledFor ?? r?.proposedDate ?? '')
+        ?.toLocal();
+    final watchDue = scheduled &&
+        proposal == null &&
+        date != null &&
+        !date.isAfter(DateTime.now());
+    final waiting = r?.memberStatuses
+            .where((m) => m.status == 'PENDING' || m.status == 'MAYBE')
+            .length ??
+        0;
     final label = complete
         ? 'Summary ready'
         : cancelled
             ? 'Cancelled'
             : expired
                 ? 'Expired'
-                : needsReply
-                    ? 'Your reply needed'
-                    : scheduled
-                        ? 'Scheduled'
-                        : decision == 'DECLINED'
-                            ? 'You declined'
-                            : r == null
-                                ? 'View Watch Plan'
-                                : 'Planning together';
+                : r == null
+                    ? 'Plan details unavailable'
+                    : needsReply
+                        ? 'Your reply needed'
+                        : proposal != null
+                            ? 'Agreeing a time'
+                            : watchDue
+                                ? 'Confirming the watch'
+                                : scheduled
+                                    ? 'Scheduled'
+                                    : multiple
+                                        ? 'Choosing a film'
+                                        : r.status == WatchRequestStatus.open
+                                            ? 'Waiting for replies'
+                                            : 'Ready to schedule';
+    final contextLine = complete
+        ? 'See how the watch went and what everyone thought.'
+        : cancelled
+            ? 'This plan is no longer going ahead.'
+            : expired
+                ? 'The time to respond to this plan has passed.'
+                : r == null
+                    ? 'Open the plan to check its latest progress.'
+                    : needsReply
+                        ? 'Let everyone know if you can join.'
+                        : proposal != null
+                            ? 'A proposed time is waiting for agreement.'
+                            : watchDue
+                                ? 'The planned time has passed. Record who watched.'
+                                : scheduled
+                                    ? 'The time is agreed. You’re ready to watch.'
+                                    : multiple
+                                        ? 'Compare the options and choose what to watch.'
+                                        : r.status == WatchRequestStatus.open
+                                            ? 'Once replies are in, agree when to watch.'
+                                            : 'Choose a time that works for everyone.';
     final color = complete || scheduled
         ? FlixieColors.success
-        : needsReply
+        : needsReply || proposal != null
             ? FlixieColors.warning
             : FlixieColors.light;
-    final date =
-        DateTime.tryParse(r?.scheduledFor ?? r?.proposedDate ?? '')?.toLocal();
     final action = complete
         ? 'View summary'
         : needsReply
-            ? 'View invitation'
+            ? (onAccept == null ? 'View invitation' : 'View plan')
             : 'View plan';
 
     Widget button({bool decline = false}) => SizedBox(
         width: double.infinity,
-        child: decline || (!complete && !needsReply)
+        child: decline || (!complete && (!needsReply || onAccept != null))
             ? OutlinedButton(
                 onPressed: isResponding
                     ? null
@@ -160,7 +205,7 @@ class WatchRequestChatCard extends StatelessWidget {
           style: const TextStyle(
               color: FlixieColors.textPrimary,
               fontWeight: FontWeight.w800,
-              fontSize: 19)),
+              fontSize: 22)),
       const SizedBox(height: 9),
       _fact(
           complete || scheduled
@@ -171,8 +216,9 @@ class WatchRequestChatCard extends StatelessWidget {
           label,
           color),
       const SizedBox(height: 8),
+      Text(contextLine, style: _body),
+      const SizedBox(height: 8),
       if (complete) ...[
-        const Text('Everyone has responded.', style: _body),
         const SizedBox(height: 10),
         Wrap(spacing: 16, runSpacing: 8, children: [
           _count(Icons.people_alt, '$watched watched', FlixieColors.success),
@@ -212,10 +258,11 @@ class WatchRequestChatCard extends StatelessWidget {
                                           .firstOrNull ??
                                       '?',
                                   fallbackColor: FlixieColors.primaryText,
-                                  size: 32))
+                                  size: 32,
+                                  profileBadges: attendees[i].profileBadges))
                       ])),
                 Text(
-                    '${r.acceptedCount} going${needsReply ? ' · Waiting for you' : ''}',
+                    '${r.acceptedCount} going${waiting > 0 ? ' · $waiting awaiting reply' : ''}${decision == 'DECLINED' ? ' · You declined' : ''}',
                     style: _body),
               ]),
         ],
@@ -225,38 +272,39 @@ class WatchRequestChatCard extends StatelessWidget {
     return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            ProfileAvatarView(
-                avatar: r?.requesterAvatar,
-                fallbackText: name.characters.firstOrNull ?? '?',
-                fallbackColor: FlixieColors.primaryText,
-                size: 32),
-            const SizedBox(width: 9),
-            Flexible(
-                child: Text(name,
-                    style: const TextStyle(
-                        color: FlixieColors.textPrimary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14))),
-            const SizedBox(width: 8),
-            Text(
-                MaterialLocalizations.of(context).formatTimeOfDay(
-                    TimeOfDay.fromDateTime(msg.createdAt.toLocal())),
-                style: _body),
-          ]),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.start,
+            textDirection: mine ? TextDirection.rtl : TextDirection.ltr,
+            children: [
+              ProfileAvatarView(
+                  avatar: r?.requesterAvatar ?? senderAvatar,
+                  fallbackText: name.characters.firstOrNull ?? '?',
+                  fallbackColor: FlixieColors.primaryText,
+                  size: 32,
+                  profileBadges: r?.requesterProfileBadges.isNotEmpty == true
+                      ? r!.requesterProfileBadges
+                      : senderProfileBadges),
+              const SizedBox(width: 9),
+              Flexible(
+                  child: Text(name,
+                      textAlign: mine ? TextAlign.right : TextAlign.left,
+                      style: const TextStyle(
+                          color: FlixieColors.primaryTint,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14))),
+            ],
+          ),
           const SizedBox(height: 8),
           Material(
-              color: FlixieColors.tabBarBackgroundFocused,
+              color: FlixieColors.surface,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(
-                      color: FlixieColors.primary.withValues(alpha: .6))),
+                  borderRadius: BorderRadius.circular(16)),
               clipBehavior: Clip.antiAlias,
               child: InkWell(
                 onTap: deleted ? null : onTap,
                 onLongPress: onLongPress,
                 child: Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(16),
                     child: deleted
                         ? const Text('This Watch Plan was deleted.',
                             style: _body)
@@ -272,9 +320,12 @@ class WatchRequestChatCard extends StatelessWidget {
                                   final art = multiple
                                       ? WatchPlanPosterStack(posters: [
                                           for (final c in r.candidates.take(3))
-                                            WatchPlanPoster(path: c.posterPath, title: c.title, width: stack ? 72 : 82),
+                                            WatchPlanPoster(
+                                                path: c.posterPath,
+                                                title: c.title,
+                                                width: stack ? 80 : 96),
                                         ])
-                                      : _poster(poster, stack ? 72 : 82);
+                                      : _poster(poster, stack ? 80 : 96);
                                   return stack
                                       ? Column(
                                           crossAxisAlignment:
@@ -307,7 +358,50 @@ class WatchRequestChatCard extends StatelessWidget {
                                   const Padding(
                                       padding: EdgeInsets.only(bottom: 8),
                                       child: LinearProgressIndicator()),
-                                if (needsReply && onDecline != null)
+                                if (needsReply && onAccept != null) ...[
+                                  LayoutBuilder(
+                                      builder: (context, constraints) {
+                                    final accept = FilledButton(
+                                        onPressed:
+                                            isResponding ? null : onAccept,
+                                        style: FilledButton.styleFrom(
+                                            backgroundColor:
+                                                FlixieColors.primary,
+                                            foregroundColor: Colors.white,
+                                            minimumSize: const Size(44, 44),
+                                            shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(10))),
+                                        child: const Text("I'm in"));
+                                    return constraints.maxWidth < 280 ||
+                                            MediaQuery.textScalerOf(context)
+                                                    .scale(1) >
+                                                1.4
+                                        ? Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.stretch,
+                                            children: [
+                                                accept,
+                                                const SizedBox(height: 8),
+                                                button()
+                                              ])
+                                        : Row(children: [
+                                            Expanded(child: accept),
+                                            const SizedBox(width: 8),
+                                            Expanded(child: button())
+                                          ]);
+                                  }),
+                                  if (onDecline != null)
+                                    Center(
+                                        child: TextButton(
+                                            onPressed:
+                                                isResponding ? null : onDecline,
+                                            style: TextButton.styleFrom(
+                                                foregroundColor:
+                                                    FlixieColors.medium),
+                                            child:
+                                                const Text('Can’t make it'))),
+                                ] else if (needsReply && onDecline != null)
                                   LayoutBuilder(
                                       builder: (context, constraints) =>
                                           constraints.maxWidth < 340 ||
@@ -331,6 +425,14 @@ class WatchRequestChatCard extends StatelessWidget {
                                   button(),
                               ])),
               )),
+          const SizedBox(height: 6),
+          Align(
+              alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+              child: Text(
+                  MaterialLocalizations.of(context).formatTimeOfDay(
+                      TimeOfDay.fromDateTime(msg.createdAt.toLocal())),
+                  style: const TextStyle(
+                      color: FlixieColors.medium, fontSize: 12))),
         ]));
   }
 

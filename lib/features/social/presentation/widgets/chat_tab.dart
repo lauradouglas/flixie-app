@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/social/presentation/widgets/chat_read_observer.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -24,9 +25,10 @@ import 'package:flixie_app/core/safety/safety_actions.dart';
 import 'package:flixie_app/core/safety/safety_service.dart';
 
 class GroupChatTab extends StatefulWidget {
-  const GroupChatTab({super.key, required this.groupId});
+  const GroupChatTab({super.key, required this.groupId, this.active = true});
 
   final String groupId;
+  final bool active;
 
   @override
   State<GroupChatTab> createState() => GroupChatTabState();
@@ -142,12 +144,17 @@ class GroupChatTabState extends State<GroupChatTab> {
             };
             for (final r in requests) {
               _requestCache[r.id] = r;
+              if (r.databaseRequestId != null) {
+                _requestCache[r.databaseRequestId!] = r;
+              }
+              if (r.linkedMessageId != null) {
+                _msgIdToReqId[r.linkedMessageId!] = r.id;
+              }
             }
             _requestsLoaded = true;
             _initLoading = false;
           });
         }
-        ChatService.markRead(conversationId, userId).catchError((_) {});
       }
     } catch (e) {
       logger.e('Chat init error: $e');
@@ -235,6 +242,12 @@ class GroupChatTabState extends State<GroupChatTab> {
       setState(() {
         for (final r in requests) {
           _requestCache[r.id] = r;
+          if (r.databaseRequestId != null) {
+            _requestCache[r.databaseRequestId!] = r;
+          }
+          if (r.linkedMessageId != null) {
+            _msgIdToReqId[r.linkedMessageId!] = r.id;
+          }
         }
         _msgIdToReqId.addAll(newMsgMap);
         _requestsLoaded = true;
@@ -745,120 +758,131 @@ class GroupChatTabState extends State<GroupChatTab> {
                     ),
                   );
                 }
-                return ListView.builder(
-                  reverse: true,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
-                  itemCount: messages.length,
-                  itemBuilder: (_, i) {
-                    final msg = messages[i];
-                    final isMe = msg.senderId == currentUserId;
-                    if (!isMe && SafetyService.isBlocked(msg.senderId)) {
-                      return const SizedBox.shrink();
-                    }
+                return ChatReadObserver(
+                    conversationId: conversationId,
+                    active: widget.active,
+                    child: ListView.builder(
+                      reverse: true,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 0, vertical: 8),
+                      itemCount: messages.length,
+                      itemBuilder: (_, i) {
+                        final msg = messages[i];
+                        final isMe = msg.senderId == currentUserId;
+                        if (!isMe && SafetyService.isBlocked(msg.senderId)) {
+                          return const SizedBox.shrink();
+                        }
 
-                    if (msg.type == 'watch_request') {
-                      // Resolve to a postgres UUID.
-                      // After the BE sets pgGroupRequestId on the message doc,
-                      // msg.watchRequestId IS the postgres UUID. Until then,
-                      // fall back to the _msgIdToReqId map built from the
-                      // Firestore watchRequests subcollection.
-                      final pgId = msg.watchRequestId ?? _msgIdToReqId[msg.id];
-                      if (!_requestsLoaded) {
-                        _ensureRequests();
-                      }
-                      final cachedReq =
-                          pgId != null ? _requestCache[pgId] : null;
-                      final respondKey = pgId ?? msg.id;
-                      final optimisticStatus = _respondMap[respondKey];
-                      String? myStatus = optimisticStatus;
-                      if (myStatus == null &&
-                          cachedReq != null &&
-                          currentUserId != null) {
-                        myStatus = cachedReq.memberStatuses
-                                .where((s) => s.memberId == currentUserId)
-                                .map((s) => s.status)
-                                .where((s) =>
-                                    s == 'ACCEPTED' ||
-                                    s == 'DECLINED' ||
-                                    s == 'MAYBE')
-                                .firstOrNull ??
-                            cachedReq.currentUserResponse?.apiValue;
-                      }
-                      return WatchRequestChatCard(
-                        msg: msg,
-                        cachedRequest: cachedReq,
-                        currentUserId: currentUserId,
-                        myStatus: myStatus,
-                        memberUsernames: _memberUsernames,
-                        isResponding: _respondingIds.contains(respondKey),
-                        onAccept: () => _respondInChat(
-                            respondKey, WatchResponseDecision.accepted),
-                        onDecline: () => _respondInChat(
-                            respondKey, WatchResponseDecision.declined),
-                        onMaybe: () => _respondInChat(
-                            respondKey, WatchResponseDecision.maybe),
-                        onTap: () {
-                          if (cachedReq != null) {
-                            context.push(
-                                '/groups/${widget.groupId}?tab=requests&requestId=${cachedReq.databaseRequestId ?? cachedReq.id}');
-                          } else {
-                            _showWatchRequestDetail(context, msg, messages,
-                                cachedReq, currentUserId);
+                        if (msg.type == 'watch_request') {
+                          // Resolve to a postgres UUID.
+                          // After the BE sets pgGroupRequestId on the message doc,
+                          // msg.watchRequestId IS the postgres UUID. Until then,
+                          // fall back to the _msgIdToReqId map built from the
+                          // Firestore watchRequests subcollection.
+                          final pgId =
+                              msg.watchRequestId ?? _msgIdToReqId[msg.id];
+                          if (!_requestsLoaded) {
+                            _ensureRequests();
                           }
-                        },
-                        onLongPress: isMe
-                            ? null
-                            : () => SafetyActions.contentMenu(
-                                  context,
-                                  targetType: 'WATCH_REQUEST_MESSAGE',
-                                  targetId: msg.id,
-                                  reportedUserId: msg.senderId,
-                                  username: msg.senderUsername ??
-                                      _memberUsernames[msg.senderId] ??
-                                      'User',
-                                  contentPreview:
-                                      msg.watchRequestPayload?['message']
-                                              as String? ??
-                                          msg.text,
-                                ),
-                      );
-                    }
+                          final cachedReq = _requestCache[pgId] ??
+                              _requestCache[_msgIdToReqId[msg.id]];
+                          final respondKey = pgId ?? msg.id;
+                          final optimisticStatus = _respondMap[respondKey];
+                          String? myStatus = optimisticStatus;
+                          if (myStatus == null &&
+                              cachedReq != null &&
+                              currentUserId != null) {
+                            myStatus = cachedReq.memberStatuses
+                                    .where((s) => s.memberId == currentUserId)
+                                    .map((s) => s.status)
+                                    .where((s) =>
+                                        s == 'ACCEPTED' ||
+                                        s == 'DECLINED' ||
+                                        s == 'MAYBE')
+                                    .firstOrNull ??
+                                cachedReq.currentUserResponse?.apiValue;
+                          }
+                          return WatchRequestChatCard(
+                            msg: msg,
+                            senderAvatar: _membersById[msg.senderId]?.avatar,
+                            senderProfileBadges:
+                                _membersById[msg.senderId]?.profileBadges ??
+                                    const [],
+                            cachedRequest: cachedReq,
+                            currentUserId: currentUserId,
+                            myStatus: myStatus,
+                            memberUsernames: _memberUsernames,
+                            isResponding: _respondingIds.contains(respondKey),
+                            onAccept: () => _respondInChat(
+                                respondKey, WatchResponseDecision.accepted),
+                            onDecline: () => _respondInChat(
+                                respondKey, WatchResponseDecision.declined),
+                            onMaybe: () => _respondInChat(
+                                respondKey, WatchResponseDecision.maybe),
+                            onTap: () {
+                              if (cachedReq != null) {
+                                context.push(
+                                    '/groups/${widget.groupId}?tab=requests&requestId=${cachedReq.databaseRequestId ?? cachedReq.id}');
+                              } else {
+                                _showWatchRequestDetail(context, msg, messages,
+                                    cachedReq, currentUserId);
+                              }
+                            },
+                            onLongPress: isMe
+                                ? null
+                                : () => SafetyActions.contentMenu(
+                                      context,
+                                      targetType: 'WATCH_REQUEST_MESSAGE',
+                                      targetId: msg.id,
+                                      reportedUserId: msg.senderId,
+                                      username: msg.senderUsername ??
+                                          _memberUsernames[msg.senderId] ??
+                                          'User',
+                                      contentPreview:
+                                          msg.watchRequestPayload?['message']
+                                                  as String? ??
+                                              msg.text,
+                                    ),
+                          );
+                        }
 
-                    // Regular text bubble
-                    final sid = msg.senderId;
-                    final username = msg.senderUsername ??
-                        _memberUsernames[sid] ??
-                        sid.substring(0, sid.length.clamp(0, 6));
-                    final member = _membersById[sid];
-                    final startsSenderRun = i == messages.length - 1 ||
-                        messages[i + 1].senderId != sid;
-                    return ChatBubble(
-                      message: msg.text,
-                      senderUsername: username,
-                      isMe: isMe,
-                      sentAt: msg.createdAt,
-                      avatar: member?.avatar,
-                      initials: member?.initials,
-                      profileBadges: member?.profileBadges ?? const [],
-                      showSenderLabel: !isMe && startsSenderRun,
-                      onSenderTap:
-                          isMe ? null : () => context.push('/friends/$sid'),
-                      replyTo:
-                          msg.replyToMessageId != null ? '↩ replied' : null,
-                      onLongPress: isMe
-                          ? null
-                          : () => SafetyActions.contentMenu(
-                                context,
-                                targetType: 'GROUP_MESSAGE',
-                                targetId: msg.id,
-                                reportedUserId: sid,
-                                username: username,
-                                contentPreview: msg.text,
-                              ),
-                    );
-                  },
-                );
+                        // Regular text bubble
+                        final sid = msg.senderId;
+                        final username = msg.senderUsername ??
+                            _memberUsernames[sid] ??
+                            sid.substring(0, sid.length.clamp(0, 6));
+                        final member = _membersById[sid];
+                        final startsSenderRun = i == messages.length - 1 ||
+                            messages[i + 1].senderId != sid;
+                        return ChatBubble(
+                          currentUserId: currentUserId,
+                          currentUsername:
+                              context.read<AuthProvider>().dbUser?.username,
+                          message: msg.text,
+                          senderUsername: username,
+                          isMe: isMe,
+                          sentAt: msg.createdAt,
+                          avatar: member?.avatar,
+                          initials: member?.initials,
+                          profileBadges: member?.profileBadges ?? const [],
+                          showSenderLabel: !isMe && startsSenderRun,
+                          onSenderTap:
+                              isMe ? null : () => context.push('/friends/$sid'),
+                          replyTo:
+                              msg.replyToMessageId != null ? '↩ replied' : null,
+                          onLongPress: isMe
+                              ? null
+                              : () => SafetyActions.contentMenu(
+                                    context,
+                                    targetType: 'GROUP_MESSAGE',
+                                    targetId: msg.id,
+                                    reportedUserId: sid,
+                                    username: username,
+                                    contentPreview: msg.text,
+                                  ),
+                        );
+                      },
+                    ));
               },
             ),
           ),

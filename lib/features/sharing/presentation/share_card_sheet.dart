@@ -20,6 +20,7 @@ Future<void> showShareCardSheet(
   return showModalBottomSheet<void>(
     context: context,
     useRootNavigator: true,
+    useSafeArea: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     barrierColor: FlixieColors.background.withValues(alpha: .72),

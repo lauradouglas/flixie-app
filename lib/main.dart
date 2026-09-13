@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/social/data/chat_unread_controller.dart';
 import 'dart:async';
 
 import 'package:firebase_app_check/firebase_app_check.dart';
@@ -131,6 +132,11 @@ void main() async {
             AuthService(),
             context.read<MovieService>(),
           ),
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, ChatUnreadController>(
+          create: (_) => ChatUnreadController(),
+          update: (_, auth, controller) =>
+              (controller ?? ChatUnreadController())..syncUser(auth.dbUser?.id),
         ),
         ChangeNotifierProxyProvider<AuthProvider, WatchRequestCache>(
           create: (_) => WatchRequestCache(),

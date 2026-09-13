@@ -42,10 +42,10 @@ class FlixieColors {
   static const Color lightShade = Color(0xFFA0ACBD);
   static const Color lightTint = Color(0xFFC7D1E2);
 
-  // Muted text
-  static const Color medium = Color(0xFF7F91A8);
-  static const Color mediumShade = Color(0xFF6C7D93);
-  static const Color mediumTint = Color(0xFF8E9FB5);
+  // Muted text stays readable on the darkest and elevated surfaces.
+  static const Color medium = Color(0xFFA0ACC0);
+  static const Color mediumShade = Color(0xFF909EB5);
+  static const Color mediumTint = Color(0xFFAFBACB);
 
   // Dark – deep navy
   static const Color dark = Color(0xFF1C3391);

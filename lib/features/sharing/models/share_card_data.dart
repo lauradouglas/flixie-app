@@ -8,6 +8,7 @@ enum ShareCardMediaType { movie, show }
 
 class ShareCardData {
   const ShareCardData._({
+    this.neutralRecommendation = false,
     required this.variant,
     required this.mediaType,
     required this.mediaId,
@@ -33,6 +34,7 @@ class ShareCardData {
     required String? posterPath,
     required User user,
     required int rating,
+    bool neutralRecommendation = false,
     bool? recommended,
     String? note,
   }) =>
@@ -45,6 +47,7 @@ class ShareCardData {
         user: user,
         rating: rating,
         recommended: recommended,
+        neutralRecommendation: neutralRecommendation,
         note: note,
       );
 
@@ -77,6 +80,7 @@ class ShareCardData {
     required String? posterPath,
     required User user,
     required int rating,
+    bool neutralRecommendation = false,
     bool? recommended,
     String? note,
     String? reviewTitle,
@@ -110,6 +114,7 @@ class ShareCardData {
       avatarColorValue: _avatarColorValue(user.iconColor),
       rating: rating.clamp(0, 10),
       recommended: recommended,
+      neutralRecommendation: neutralRecommendation,
       note: _clean(note),
       reviewTitle: _cleanReviewTitle(reviewTitle),
       reviewExcerpt: _truncate(_clean(reviewExcerpt), 280),
@@ -129,6 +134,7 @@ class ShareCardData {
   final int avatarColorValue;
   final int rating;
   final bool? recommended;
+  final bool neutralRecommendation;
   final String? note;
   final String? reviewTitle;
   final String? reviewExcerpt;
