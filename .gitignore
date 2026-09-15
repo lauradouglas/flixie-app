@@ -87,3 +87,4 @@ android/build/
 
 # Local Google Play credential path
 /.play-store.env
+/test/failures

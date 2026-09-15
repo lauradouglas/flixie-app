@@ -21,8 +21,8 @@ class ApiException implements Exception {
 
 class ApiClient {
   // static const String baseUrl = String.fromEnvironment(
-  // //   'API_BASE_URL',
-  // //   defaultValue: 'http://localhost:3000',
+  //   'API_BASE_URL',
+  //   defaultValue: 'http://localhost:3000',
   // );
 
   static const String baseUrl = String.fromEnvironment(
@@ -271,7 +271,8 @@ class ApiClient {
     throw StateError('Unreachable retry loop exit for $uri');
   }
 
-  static Future<dynamic> post(String path, {dynamic body}) async {
+  static Future<dynamic> post(String path,
+      {dynamic body, Duration? timeout, bool logRequestBody = true}) async {
     // Redact sensitive fields if present
     dynamic logBody = body;
     if (body is Map && body.containsKey('password')) {
@@ -287,7 +288,7 @@ class ApiClient {
     apiLogger.d('POST $path');
     apiLogger.d(
         'Headers: ${_headers().map((k, v) => MapEntry(k, k == "Authorization" ? "[REDACTED]" : v))}');
-    if (logBody != null) apiLogger.d('Body: $logBody');
+    if (logRequestBody && logBody != null) apiLogger.d('Body: $logBody');
     return _withAuthRetry(
       authenticated: true,
       requestLabel: 'POST $path',
@@ -298,7 +299,7 @@ class ApiClient {
               headers: _headers(),
               body: body != null ? jsonEncode(body) : null,
             )
-            .timeout(_timeout);
+            .timeout(timeout ?? _timeout);
         return _parseResponse(response);
       },
     );

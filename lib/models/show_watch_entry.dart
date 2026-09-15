@@ -30,7 +30,7 @@ class ShowWatchEntry {
       id: json['id']?.toString() ?? '',
       userId: json['userId']?.toString() ?? '',
       showId: _parseInt(json['showId']) ?? 0,
-      watchedAt: json['watchedAt'] as String? ?? json['createdAt'] as String?,
+      watchedAt: json['watchedAt'] as String?,
       rating: _parseDouble(json['rating']),
       notes: json['notes'] as String?,
       removed: json['removed'] as bool? ?? false,

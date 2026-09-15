@@ -125,7 +125,7 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
     return _WatchedEntry(
       id: item.id,
       movieId: item.movieId,
-      watchedAt: latestWatch?.watchedAt ?? item.watchedAt ?? item.createdAt,
+      watchedAt: latestWatch != null ? latestWatch.watchedAt : item.watchedAt,
       rating: latestWatch?.rating ?? item.rating,
       notes: latestWatch?.notes ?? item.notes,
       movie: movie,

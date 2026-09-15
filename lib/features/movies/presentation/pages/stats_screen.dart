@@ -58,7 +58,7 @@ class _StatsScreenState extends State<StatsScreen> {
           movie = WatchlistMovieDetails.fromJson(entry.movie!);
         } catch (_) {}
       }
-      final dateStr = entry.watchedAt ?? entry.createdAt;
+      final dateStr = entry.watchedAt;
       return StatsEntry(
         movie: movie,
         watchedAt: dateStr != null ? DateTime.tryParse(dateStr) : null,

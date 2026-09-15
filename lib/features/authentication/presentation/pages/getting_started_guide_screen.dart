@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/widgets/flixie_wordmark.dart';
+import 'package:flixie_app/features/library_import/data/library_export_links.dart';
 
 class GettingStartedGuideScreen extends StatefulWidget {
   const GettingStartedGuideScreen({
@@ -52,6 +54,27 @@ class _GettingStartedGuideScreenState extends State<GettingStartedGuideScreen> {
             'Tap Watched to create a movie log with its date and notes'),
         _GuideAction(Icons.star_outline_rounded,
             'Add a rating or review to each individual watch'),
+      ],
+    ),
+    _GuidePageData(
+      eyebrow: 'BRING YOUR LIBRARY',
+      title: 'Move in without starting over',
+      description:
+          'Already use IMDb or Letterboxd? Export your ratings and watchlist, then bring the downloaded files into Flixie.',
+      heroIcon: Icons.move_to_inbox_rounded,
+      accent: FlixieColors.secondary,
+      actions: [
+        _GuideAction(Icons.star_outline_rounded,
+            'IMDb: open Your Ratings or Your Watchlist on the website, then choose Export at the top right'),
+        _GuideAction(Icons.archive_outlined,
+            'Letterboxd: open Settings → Import & Export, then choose Export Your Data'),
+        _GuideAction(Icons.file_upload_outlined,
+            'In Flixie, open Settings → Import ratings & watchlist and choose the downloaded ZIP or CSV files'),
+      ],
+      externalLinks: [
+        _GuideExternalLink('IMDb ratings', imdbRatingsExportUrl),
+        _GuideExternalLink('IMDb watchlist', imdbWatchlistExportUrl),
+        _GuideExternalLink('Letterboxd export', letterboxdExportUrl),
       ],
     ),
     _GuidePageData(
@@ -130,6 +153,25 @@ class _GettingStartedGuideScreenState extends State<GettingStartedGuideScreen> {
     );
   }
 
+  Future<void> _openExternal(String url) async {
+    var opened = false;
+    try {
+      opened = await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (_) {
+      opened = false;
+    }
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Couldn’t open the export page. Please try again.'),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final page = _pages[_page];
@@ -140,10 +182,13 @@ class _GettingStartedGuideScreenState extends State<GettingStartedGuideScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 10, 12, 4),
-              child: Row(
+              child: Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 16,
+                runSpacing: 4,
                 children: [
                   const FlixieWordmark(),
-                  const Spacer(),
                   TextButton(
                     onPressed: _finish,
                     child: Text(widget.openedFromSettings ? 'Close' : 'Skip'),
@@ -158,6 +203,7 @@ class _GettingStartedGuideScreenState extends State<GettingStartedGuideScreen> {
                 onPageChanged: (value) => setState(() => _page = value),
                 itemBuilder: (context, index) => _GuidePage(
                   data: _pages[index],
+                  onExternalLink: _openExternal,
                   onAction: _pages[index].actionLabel == null
                       ? null
                       : () => context.push(
@@ -225,10 +271,15 @@ class _GettingStartedGuideScreenState extends State<GettingStartedGuideScreen> {
 }
 
 class _GuidePage extends StatelessWidget {
-  const _GuidePage({required this.data, this.onAction});
+  const _GuidePage({
+    required this.data,
+    this.onAction,
+    this.onExternalLink,
+  });
 
   final _GuidePageData data;
   final VoidCallback? onAction;
+  final ValueChanged<String>? onExternalLink;
 
   @override
   Widget build(BuildContext context) {
@@ -320,6 +371,49 @@ class _GuidePage extends StatelessWidget {
               ),
             ),
           ],
+          if (data.externalLinks.isNotEmpty && onExternalLink != null) ...[
+            const SizedBox(height: 14),
+            ...data.externalLinks.map(
+              (link) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 48),
+                    child: OutlinedButton(
+                      onPressed: () => onExternalLink!(link.url),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: data.accent,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        side: BorderSide(
+                          color: data.accent.withValues(alpha: .7),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.open_in_new_rounded, size: 19),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              'Open ${link.label}',
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -385,6 +479,7 @@ class _GuidePageData {
     required this.accent,
     required this.actions,
     this.actionLabel,
+    this.externalLinks = const [],
   });
 
   final String eyebrow;
@@ -394,6 +489,7 @@ class _GuidePageData {
   final Color accent;
   final List<_GuideAction> actions;
   final String? actionLabel;
+  final List<_GuideExternalLink> externalLinks;
 }
 
 class _GuideAction {
@@ -401,4 +497,11 @@ class _GuideAction {
 
   final IconData icon;
   final String label;
+}
+
+class _GuideExternalLink {
+  const _GuideExternalLink(this.label, this.url);
+
+  final String label;
+  final String url;
 }

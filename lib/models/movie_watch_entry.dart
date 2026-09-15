@@ -32,7 +32,7 @@ class MovieWatchEntry {
       id: json['id'] as String,
       userId: json['userId'] as String,
       movieId: _parseInt(json['movieId']) ?? 0,
-      watchedAt: json['watchedAt'] as String? ?? json['createdAt'] as String?,
+      watchedAt: json['watchedAt'] as String?,
       rating: _parseDouble(json['rating']),
       recommended: json['recommended'] as bool?,
       notes: json['notes'] as String?,

@@ -1,8 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_sheet.dart';
+import 'package:flixie_app/models/movie_watch_entry.dart';
 
 void main() {
+  testWidgets('editing an imported undated watch does not default to today',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    String? submittedDate = 'not-submitted';
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: RewatchLogSheet(
+      initial: const MovieWatchEntry(
+          id: 'imported',
+          userId: 'user',
+          movieId: 603,
+          rating: 8,
+          removed: false),
+      onSubmit: (
+          {required watchedAt,
+          required rating,
+          required recommended,
+          required notes}) async {
+        submittedDate = watchedAt;
+      },
+    ))));
+    await tester.tap(find.byTooltip('Recommend'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Save Changes'));
+    await tester.tap(find.text('Save Changes'));
+    await tester.pumpAndSettle();
+    expect(submittedDate, isNull);
+  });
   testWidgets('watch entry can continue into the review journey',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1400));

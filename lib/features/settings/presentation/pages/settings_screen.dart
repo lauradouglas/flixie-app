@@ -1,4 +1,7 @@
 import 'package:flixie_app/features/settings/data/episode_spoiler_preference.dart';
+import 'package:flixie_app/features/library_import/data/library_import_controller.dart';
+import 'package:flixie_app/features/library_import/presentation/library_import_screen.dart';
+import 'package:flixie_app/core/navigation/tab_refresh_controller.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
@@ -67,6 +70,29 @@ class SettingsScreen extends StatelessWidget {
           _sectionLabel('Account'),
           _SettingsGroup(
             children: [
+              SettingsTile(
+                icon: Icons.file_upload_outlined,
+                label: 'Import ratings & watchlist',
+                onTap: () async {
+                  final auth = context.read<AuthProvider>();
+                  final userId = auth.dbUser?.id;
+                  if (userId == null) return;
+                  final importController = LibraryImportController(
+                      userId: userId,
+                      isCurrentUser: () => auth.dbUser?.id == userId);
+                  await Navigator.of(context, rootNavigator: true).push<void>(
+                    MaterialPageRoute(
+                        builder: (_) => LibraryImportScreen(
+                              controller: importController,
+                            )),
+                  );
+                  if (auth.dbUser?.id == userId) {
+                    TabRefreshController.watchlist.value++;
+                    TabRefreshController.requestHomeRefresh();
+                    await auth.refreshUserData();
+                  }
+                },
+              ),
               SettingsTile(
                 icon: Icons.person_outline,
                 label: 'Edit details',

@@ -49,7 +49,8 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
         DateTime.tryParse(widget.initial?.watchedAt ?? '') ?? DateTime.now();
     final existingRating = widget.initial?.rating;
     _rating = existingRating?.round();
-    _includeWatchedDate = true;
+    _includeWatchedDate =
+        widget.initial == null || widget.initial!.watchedAt != null;
     _recommended = widget.initial?.recommended;
     _notesController = TextEditingController(text: widget.initial?.notes ?? '')
       ..addListener(_onNoteChanged);
