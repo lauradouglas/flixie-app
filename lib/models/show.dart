@@ -78,6 +78,50 @@ class TvShow {
     this.watchedEpisodeCount,
   });
 
+  TvShow withEpisodeProgress(Map<int, TvEpisode> changes) {
+    TvEpisode update(TvEpisode episode) => changes[episode.id] ?? episode;
+    return TvShow(
+        id: id,
+        name: name,
+        firstAirDate: firstAirDate,
+        lastAirDate: lastAirDate,
+        overview: overview,
+        posterPath: posterPath,
+        backdropPath: backdropPath,
+        popularity: popularity,
+        voteAverage: voteAverage,
+        tmdbRating: tmdbRating,
+        imdbRating: imdbRating,
+        imdbRatingLabel: imdbRatingLabel,
+        rottenTomatoRatingLabel: rottenTomatoRatingLabel,
+        metascoreRatingLabel: metascoreRatingLabel,
+        flixieScore: flixieScore,
+        friendRating: friendRating,
+        friendRecommendPercent: friendRecommendPercent,
+        voteCount: voteCount,
+        numberOfSeasons: numberOfSeasons,
+        numberOfEpisodes: numberOfEpisodes,
+        tagline: tagline,
+        status: status,
+        originalLanguage: originalLanguage,
+        originCountry: originCountry,
+        genres: genres,
+        networks: networks,
+        createdBy: createdBy,
+        seasons: seasons
+            .map((season) =>
+                season.withEpisodes(season.episodes.map(update).toList()))
+            .toList(),
+        episodes: episodes.map(update).toList(),
+        cast: cast,
+        crew: crew,
+        similarShows: similarShows,
+        friendActivity: friendActivity,
+        friendSummary: friendSummary,
+        watchProviders: watchProviders,
+        watchedEpisodeCount: null);
+  }
+
   factory TvShow.fromJson(Map<String, dynamic> json) {
     final progressByEpisodeId = _episodeProgressByEpisodeId(
       json['progress'] ??
@@ -241,6 +285,17 @@ class TvSeason {
     this.episodes = const [],
   });
 
+  TvSeason withEpisodes(List<TvEpisode> updated) => TvSeason(
+      id: id,
+      seasonNumber: seasonNumber,
+      name: name,
+      overview: overview,
+      posterPath: posterPath,
+      airDate: airDate,
+      episodeCount: episodeCount,
+      watchedEpisodeCount: updated.where((e) => e.watched).length,
+      episodes: updated);
+
   factory TvSeason.fromJson(
     Map<String, dynamic> json, {
     Map<int, Map<String, dynamic>> progressByEpisodeId = const {},
@@ -303,6 +358,7 @@ class TvEpisode {
   final int? runtime;
   final double? voteAverage;
   final bool watched;
+  final DateTime? watchedAt;
   final double? userRating;
   final int watchCount;
 
@@ -317,9 +373,25 @@ class TvEpisode {
     this.runtime,
     this.voteAverage,
     this.watched = false,
+    this.watchedAt,
     this.userRating,
     this.watchCount = 0,
   });
+
+  TvEpisode withWatched(bool value, DateTime? date) => TvEpisode(
+      id: id,
+      seasonNumber: seasonNumber,
+      episodeNumber: episodeNumber,
+      name: name,
+      overview: overview,
+      stillPath: stillPath,
+      airDate: airDate,
+      runtime: runtime,
+      voteAverage: voteAverage,
+      watched: value,
+      watchedAt: date,
+      userRating: userRating,
+      watchCount: watchCount);
 
   factory TvEpisode.fromJson(
     Map<String, dynamic> json, {
@@ -345,6 +417,9 @@ class TvEpisode {
               json['isWatched'] ??
               effectiveProgress?['watched']) ??
           false,
+      watchedAt: DateTime.tryParse(
+          _stringValue(json['watchedAt'] ?? effectiveProgress?['watchedAt']) ??
+              ''),
       userRating:
           _doubleValue(json['userRating'] ?? effectiveProgress?['rating']),
       watchCount: _intValue(
@@ -378,7 +453,7 @@ class TvShowEpisodeProgress {
     return airDate == null || !airDate.isAfter(now);
   }
 
-  int get releasedCount => releasedEpisodes.isEmpty
+  int get releasedCount => allEpisodes.isEmpty
       ? _show.resolvedEpisodeCount
       : releasedEpisodes.length;
 
@@ -398,6 +473,40 @@ class TvShowEpisodeProgress {
       releasedEpisodes.where((episode) => !episode.watched).firstOrNull;
   TvEpisode? get nextScheduled =>
       allEpisodes.where((episode) => !isReleased(episode)).firstOrNull;
+
+  bool get watchedRecently => allEpisodes.any((episode) =>
+      episode.watched &&
+      episode.watchedAt != null &&
+      !episode.watchedAt!.isAfter(now) &&
+      now.difference(episode.watchedAt!) <= const Duration(days: 30));
+
+  bool get hasNewEpisode {
+    final next = nextReleased;
+    if (next == null || !hasStarted) return false;
+    final aired = DateTime.tryParse(next.airDate ?? '');
+    return aired != null &&
+        !aired.isAfter(now) &&
+        now.difference(aired) <= const Duration(days: 7) &&
+        releasedEpisodes.where((e) => !e.watched).every((e) {
+          final date = DateTime.tryParse(e.airDate ?? '');
+          return date != null &&
+              now.difference(date) <= const Duration(days: 7);
+        });
+  }
+
+  String get nextLabel {
+    if (nextReleased != null) {
+      if (hasNewEpisode) return 'New episode';
+      if (!hasStarted) return 'Start watching';
+      return watchedRecently ? 'Continue watching' : 'Up next';
+    }
+    if (isCaughtUp) {
+      return _show.status == 'Ended' ? 'Show completed' : 'All caught up';
+    }
+    return nextScheduled != null
+        ? 'Coming soon'
+        : 'Episode details unavailable';
+  }
 
   static List<TvEpisode> _allEpisodes(TvShow show) {
     final byId = <int, TvEpisode>{};

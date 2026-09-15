@@ -30,3 +30,17 @@ class ActivityReactionSummary {
     return ActivityReactionSummary(counts: updated, mine: emoji);
   }
 }
+
+// Review API keys retain existing reactions while sharing activity's emoji set.
+const reviewActivityReactions = {
+  'love': ActivityReaction.love,
+  'interested': ActivityReaction.interested,
+  'hot_take': ActivityReaction.greatPick,
+  'funny': ActivityReaction.laugh,
+  'surprised': ActivityReaction.surprised,
+  'agree': ActivityReaction.agree,
+  'dislike': ActivityReaction.dislike,
+};
+
+String reviewReactionEmoji(String key) =>
+    reviewActivityReactions[key]?.emoji ?? (key == 'hmm' ? '🤔' : key);

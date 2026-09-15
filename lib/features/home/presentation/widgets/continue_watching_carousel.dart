@@ -22,7 +22,7 @@ class ContinueWatchingCarousel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 108,
+      height: 120 + MediaQuery.textScalerOf(context).scale(20),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: contentPadding,
@@ -88,7 +88,7 @@ class ContinueWatchingCard extends StatelessWidget {
     final episode = show.lastWatchedEpisode;
     final episodeLabel = episode == null
         ? '${show.watchedEpisodes} episodes watched'
-        : 'S${episode.seasonNumber} E${episode.episodeNumber}';
+        : 'Last watched · S${episode.seasonNumber} E${episode.episodeNumber}';
     final progress = (show.completionPercent / 100).clamp(0.0, 1.0);
     final imagePath = show.backdropPath ?? show.posterPath;
     final posterUrl =
@@ -96,7 +96,7 @@ class ContinueWatchingCard extends StatelessWidget {
 
     return SizedBox(
       width: cardWidth,
-      height: 102,
+      height: 120 + MediaQuery.textScalerOf(context).scale(20),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -129,8 +129,8 @@ class ContinueWatchingCard extends StatelessWidget {
                   top: 7,
                   right: 7,
                   child: SizedBox(
-                    width: 29,
-                    height: 29,
+                    width: 44,
+                    height: 44,
                     child: Material(
                       color: Colors.black.withValues(alpha: .68),
                       shape: CircleBorder(
@@ -143,7 +143,7 @@ class ContinueWatchingCard extends StatelessWidget {
                         padding: EdgeInsets.zero,
                         onPressed: onRemove,
                         icon: const Icon(
-                          Icons.close_rounded,
+                          Icons.more_horiz_rounded,
                           color: Colors.white,
                           size: 18,
                         ),

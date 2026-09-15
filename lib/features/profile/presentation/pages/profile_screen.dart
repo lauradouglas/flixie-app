@@ -1,3 +1,7 @@
+import 'package:flixie_app/features/social/presentation/pages/social_screen.dart'
+    show showProfileCreateGroupSheet;
+import 'package:flixie_app/features/profile/presentation/controllers/review_reactions_controller.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/review_card.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -65,6 +69,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _ratingsLoading = true;
   List<ContinueWatchingShow> _continueWatching = [];
   List<WatchProvider> _watchProviders = [];
+  int _activityLimit = 20;
+  String? _activityCursor;
+  int _activityGeneration = 0;
+  bool _activityFailed = false;
+  bool _activityRequestRunning = false;
   List<Review> _reviews = [];
   int _reviewCount = 0;
   List<Group> _groups = [];
@@ -72,7 +81,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _profileExtrasLoading = true;
   MovieWrapped? _wrapped;
   Map<int, Person> _directorPeople = {};
-  Map<int, List<PersonCreditItem>> _directorCredits = {};
 
   _ProfileTab _selectedTab = _ProfileTab.library;
   _ActivityFilter _activityFilter = _ActivityFilter.all;
@@ -103,14 +111,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    ReviewReactionsController.deletedReviews.addListener(_onReviewDeleted);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _authProvider?.addListener(_onAuthChanged);
       _loadAll();
     });
   }
 
+  void _onReviewDeleted() {
+    if (!mounted) return;
+    setState(() {
+      _reviews.removeWhere(ReviewReactionsController.isDeleted);
+    });
+  }
+
   @override
   void dispose() {
+    ReviewReactionsController.deletedReviews.removeListener(_onReviewDeleted);
     _authProvider?.removeListener(_onAuthChanged);
     super.dispose();
   }
@@ -121,7 +138,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final version = auth?.activityVersion ?? -1;
     if (userId != null &&
         (userId != _loadedForUserId || version != _lastActivityVersion)) {
-      _loadAll();
+      if (userId != _loadedForUserId) {
+        _loadAll();
+      } else {
+        _loadActivity();
+      }
     }
   }
 
@@ -148,7 +169,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  bool _statsFailed = false;
+  bool _socialLoadFailed = false;
+
   Future<void> _loadProfileExtras() async {
+    _socialLoadFailed = false;
+    _statsFailed = false;
     final auth = context.read<AuthProvider>();
     final userId = auth.dbUser?.id;
     if (userId == null) {
@@ -171,14 +197,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
           .catchError((_) => <WatchProvider>[]),
     ]);
     final statsFuture = Future.wait<Object>([
-      ProfileLookupController.instance
-          .getUserMovieReviews(userId)
-          .catchError((_) => <Review>[]),
-      GroupService.getUserGroups(userId).catchError((_) => <Group>[]),
-      RequestService.getWatchRequests(userId)
-          .catchError((_) => <WatchRequest>[]),
-      UserService.getMovieWrapped(userId, DateTime.now().year)
-          .catchError((_) => _emptyWrapped()),
+      UserService.getUserReviews(userId).catchError((_) => _reviews),
+      GroupService.getUserGroups(userId).catchError((_) {
+        _socialLoadFailed = true;
+        return _groups;
+      }),
+      RequestService.getWatchRequests(userId).catchError((_) {
+        _socialLoadFailed = true;
+        return _watchRequests;
+      }),
+      UserService.getMovieWrapped(userId, DateTime.now().year).catchError((_) {
+        _statsFailed = true;
+        return _wrapped ?? _emptyWrapped();
+      }),
     ]);
 
     try {
@@ -197,6 +228,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final results = await statsFuture.timeout(const Duration(seconds: 15));
       final wrapped = results[3] as MovieWrapped;
+      if (!mounted) return;
+      setState(() {
+        if (!_statsFailed) _wrapped = wrapped;
+        _reviews = results[0] as List<Review>;
+        _reviewCount = _reviews.length;
+      });
       final directorResults = await Future.wait(
         wrapped.topDirectors
             .where((director) => director.personId != null)
@@ -204,15 +241,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             .map((director) async {
           final id = director.personId!;
           try {
-            final values = await Future.wait<Object>([
-              PersonService.getPersonById(id),
-              PersonService.getPersonCredits(id),
-            ]);
-            return (
-              id: id,
-              person: values[0] as Person,
-              credits: values[1] as PersonCredits
-            );
+            final person = await PersonService.getPersonById(id)
+                .timeout(const Duration(seconds: 10));
+            return (id: id, person: person);
           } catch (_) {
             return null;
           }
@@ -225,22 +256,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _reviewCount = _reviews.length;
         _groups = results[1] as List<Group>;
         _watchRequests = watchRequests;
-        _wrapped = wrapped;
+        if (!_statsFailed) _wrapped = wrapped;
         _directorPeople = {
-          for (final result in directorResults
-              .whereType<({int id, Person person, PersonCredits credits})>())
+          for (final result
+              in directorResults.whereType<({int id, Person person})>())
             result.id: result.person,
-        };
-        _directorCredits = {
-          for (final result in directorResults
-              .whereType<({int id, Person person, PersonCredits credits})>())
-            result.id: result.credits.knownForCredits,
         };
       });
       context.read<AuthProvider>().updateCachedWatchRequests(watchRequests);
     } catch (e) {
       logger.e('[ProfileScreen] stats extras load error: $e');
-      if (mounted) setState(() => _wrapped = _emptyWrapped());
+      if (mounted) setState(() => _socialLoadFailed = true);
+      if (mounted) setState(() => _statsFailed = true);
     }
   }
 
@@ -253,14 +280,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (index < 0) return;
 
     setState(() => _continueWatching.removeAt(index));
+    var undone = false;
+    final notice = ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('${show.name} removed from Continue watching'),
+      duration: const Duration(seconds: 4),
+      action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () {
+            undone = true;
+            if (mounted) {
+              setState(() => _continueWatching.insert(
+                  index.clamp(0, _continueWatching.length), show));
+            }
+          }),
+    ));
+    await notice.closed;
+    if (undone) return;
     try {
       await ShowService.dismissContinueWatching(userId, show.showId);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showFlixieToast(
-        FlixieToast(
-            type: FlixieToastType.success,
-            content: Text('${show.name} removed from Continue Watching')),
-      );
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -280,6 +318,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (userId == null) return;
     await showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => WatchProvidersSheet(userId: userId),
@@ -287,37 +327,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (mounted) await _loadProfileExtras();
   }
 
-  Future<void> _loadActivity() async {
+  Future<void> _loadActivity({bool more = false}) async {
+    if (more && _activityRequestRunning) return;
+    final generation = ++_activityGeneration;
     final auth = context.read<AuthProvider>();
     final userId = auth.dbUser?.id;
     if (userId == null) return;
-
-    // Use prefetched cache if ready - no spinner needed
-    if (auth.cachedActivity != null) {
-      if (mounted) {
-        setState(() {
-          _activity = auth.cachedActivity!;
-          _loadedForUserId = userId;
-          _lastActivityVersion = auth.activityVersion;
-          _activityLoading = false;
-        });
-      }
-      return;
-    }
-
+    _loadedForUserId = userId;
+    _lastActivityVersion = auth.activityVersion;
+    setState(() {
+      _activityRequestRunning = true;
+      _activityLoading = !more;
+      _activityFailed = false;
+    });
     try {
-      final activity = await _profileLookup.getUserActivity(userId);
-      if (mounted) {
+      final page = await UserService.getUserActivityPage(userId,
+          filter: _activityFilter.name, cursor: more ? _activityCursor : null);
+      if (!mounted || generation != _activityGeneration) return;
+      setState(() {
+        _activity = more ? [..._activity, ...page.items] : page.items;
+        _activityCursor = page.nextCursor;
+        _activityLimit = _activity.length;
+      });
+    } catch (error) {
+      if (mounted && generation == _activityGeneration) {
+        setState(() => _activityFailed = true);
+      }
+    } finally {
+      if (mounted && generation == _activityGeneration) {
         setState(() {
-          _activity = activity;
-          _loadedForUserId = userId;
-          _lastActivityVersion = context.read<AuthProvider>().activityVersion;
           _activityLoading = false;
+          _activityRequestRunning = false;
         });
       }
-    } catch (e) {
-      logger.e('[ProfileScreen] activity load error: $e');
-      if (mounted) setState(() => _activityLoading = false);
     }
   }
 
@@ -427,7 +469,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         (dbUser?.watchedShows?.length ?? 0);
     final watchlistCount = (dbUser?.movieWatchlist?.length ?? 0) +
         (dbUser?.showWatchlist?.length ?? 0);
-    final favoritesCount = favoriteMovies.length;
+    final favoritesCount = favoriteMovies.length + favoriteShows.length;
 
     final visibleActivity = _activity;
 
@@ -441,6 +483,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onPressed: () => context.push('/settings'),
           ),
           IconButton(
+            tooltip: 'Notifications',
             icon: Badge(
               isLabelVisible: auth.unreadNotificationCount > 0,
               label: auth.unreadNotificationCount < 100
@@ -471,30 +514,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 await context.read<AuthProvider>().refreshUserData();
                 await _loadAll();
               },
-              child: SingleChildScrollView(
+              child: CustomScrollView(
+                key: PageStorageKey('profile-${_selectedTab.name}'),
                 physics: const AlwaysScrollableScrollPhysics(),
-                child: Column(
-                  children: [
-                    // Avatar, name, bio & edit (full-width, no side padding)
-                    ProfileHeader(
-                      displayName: displayName,
-                      username: username,
-                      bio: bio,
-                      iconColor: dbUser?.iconColor,
-                      avatar: dbUser?.avatar,
-                      profileBadges: dbUser?.profileBadges ?? const [],
-                      memberSince: _memberSinceLabel(dbUser?.createdAt),
-                      onPreview: userId == null
-                          ? null
-                          : () => context.push('/friends/$userId?preview=true'),
-                    ),
-
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _ProfileDashboard(
+                slivers: [
+                  SliverToBoxAdapter(
+                      child: ProfileHeader(
+                    displayName: displayName,
+                    username: username,
+                    bio: bio,
+                    iconColor: dbUser?.iconColor,
+                    avatar: dbUser?.avatar,
+                    profileBadges: dbUser?.profileBadges ?? const [],
+                    memberSince: _memberSinceLabel(dbUser?.createdAt),
+                    onPreview: userId == null
+                        ? null
+                        : () => context.push('/friends/$userId?preview=true'),
+                  )),
+                  SliverToBoxAdapter(
+                      child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 8),
+                          child: _ProfileDashboard(
                             watched: watchedCount,
                             watchlist: watchlistCount,
                             favorites: favoritesCount,
@@ -504,31 +545,79 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             onFavourites: () => setState(
                                 () => _selectedTab = _ProfileTab.library),
                             onRecap: () => context.push('/stats'),
-                          ),
-                          const SizedBox(height: 18),
-                          _ProfileTabSelector(
-                            selected: _selectedTab,
-                            onSelected: (tab) =>
-                                setState(() => _selectedTab = tab),
-                          ),
-                          const SizedBox(height: 16),
-                          _buildSelectedTabContent(
-                            context: context,
-                            textTheme: textTheme,
-                            userId: userId,
-                            favoriteMovies: favoriteMovies,
-                            favoritePeople: favoritePeople,
-                            favoriteShows: favoriteShows,
-                            favoriteGenres: dbUser?.favoriteGenres ?? const [],
-                            user: dbUser,
-                            visibleActivity: visibleActivity,
-                          ),
-                          const SizedBox(height: 16),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                          ))),
+                  if (_wrapped?.insights != null)
+                    SliverToBoxAdapter(
+                        child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _SocialSectionHeader(
+                                title: 'This month',
+                                onSeeAll: () => setState(
+                                    () => _selectedTab = _ProfileTab.stats),
+                                actionLabel: 'View stats'),
+                            Text(
+                                '${_wrapped!.insights!['monthMovies']} movie watches · ${_wrapped!.insights!['monthEpisodes']} episodes',
+                                style:
+                                    const TextStyle(color: FlixieColors.light)),
+                            if (_wrapped!.insights!['milestone'] != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 14),
+                                child: Row(children: [
+                                  const Icon(Icons.star_outline_rounded,
+                                      color: FlixieColors.warning),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                      child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                        const Text('Latest milestone',
+                                            style: TextStyle(
+                                                color: FlixieColors.medium,
+                                                fontSize: 12)),
+                                        Text(
+                                            '${_wrapped!.insights!['milestone']['count']} unique films watched',
+                                            style: const TextStyle(
+                                                color: FlixieColors.white,
+                                                fontWeight: FontWeight.w600)),
+                                      ])),
+                                ]),
+                              ),
+                          ]),
+                    )),
+                  SliverPersistentHeader(
+                      pinned: true,
+                      delegate: _ProfileTabsDelegate(
+                          height: 48 +
+                              (MediaQuery.textScalerOf(context).scale(16) -
+                                      16) *
+                                  2,
+                          child: _ProfileTabSelector(
+                              selected: _selectedTab,
+                              onSelected: (tab) =>
+                                  setState(() => _selectedTab = tab)))),
+                  SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                      sliver: _selectedTab == _ProfileTab.activity
+                          ? _buildActivityTab(
+                              context, textTheme, visibleActivity)
+                          : SliverToBoxAdapter(
+                              child: _buildSelectedTabContent(
+                              context: context,
+                              textTheme: textTheme,
+                              userId: userId,
+                              favoriteMovies: favoriteMovies,
+                              favoritePeople: favoritePeople,
+                              favoriteShows: favoriteShows,
+                              favoriteGenres:
+                                  dbUser?.favoriteGenres ?? const [],
+                              user: dbUser,
+                              visibleActivity: visibleActivity,
+                            ))),
+                ],
               ),
             ),
     );
@@ -573,6 +662,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (_continueWatching.isNotEmpty) ...[
+          _ProfileContinueWatching(
+            shows: _continueWatching,
+            onRemove: _removeContinueWatchingShow,
+          ),
+          const SizedBox(height: 20),
+        ],
         if (favoriteMovies.isNotEmpty ||
             favoritePeople.isNotEmpty ||
             favoriteShows.isNotEmpty) ...[
@@ -595,13 +691,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 20),
         ],
         if (userId != null) ...[
-          if (_continueWatching.isNotEmpty) ...[
-            _ProfileContinueWatching(
-              shows: _continueWatching,
-              onRemove: _removeContinueWatchingShow,
-            ),
-            const SizedBox(height: 20),
-          ],
           ListsPreviewSection(
             userId: userId,
             title: 'Your lists',
@@ -629,20 +718,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           onManage: _openWatchProviders,
         ),
         const SizedBox(height: 16),
-        _ProfileActionGrid(
-          actions: [
-            _ProfileAction(
-              icon: Icons.bookmarks_outlined,
-              label: 'Lists',
-              onTap: () => context.push('/movie-lists'),
-            ),
-            _ProfileAction(
-              icon: Icons.star_outline,
-              label: 'Reviews',
-              onTap: () => context.push('/my-reviews'),
-            ),
-          ],
-        ),
       ],
     );
   }
@@ -652,99 +727,128 @@ class _ProfileScreenState extends State<ProfileScreen> {
     TextTheme textTheme,
     List<ActivityListItem> visibleActivity,
   ) {
-    final filtered = _activity.where((item) {
-      return switch (_activityFilter) {
-        _ActivityFilter.all => true,
-        _ActivityFilter.watches => item.type == ActivityListType.movieWatched ||
-            item.type == ActivityListType.showWatched,
-        _ActivityFilter.ratings => item.type == ActivityListType.movieRating ||
-            item.type == ActivityListType.showRating,
-        _ActivityFilter.reviews => item.type == ActivityListType.movieReview ||
-            item.type == ActivityListType.showReview,
-        _ActivityFilter.lists => item.type == ActivityListType.movieWatchlist ||
-            item.type == ActivityListType.showWatchlist,
-      };
-    }).toList();
-    final grouped = <String, List<ActivityListItem>>{};
-    for (final item in filtered) {
-      grouped
-          .putIfAbsent(_activityDateLabel(item.timestamp), () => [])
-          .add(item);
+    final filtered = visibleActivity
+        .where((item) => switch (_activityFilter) {
+              _ActivityFilter.all => true,
+              _ActivityFilter.watches =>
+                item.type == ActivityListType.movieWatched ||
+                    item.type == ActivityListType.showWatched,
+              _ActivityFilter.ratings =>
+                item.type == ActivityListType.movieRating ||
+                    item.type == ActivityListType.showRating,
+              _ActivityFilter.reviews =>
+                item.type == ActivityListType.movieReview ||
+                    item.type == ActivityListType.showReview,
+              _ActivityFilter.lists =>
+                item.type == ActivityListType.movieWatchlist ||
+                    item.type == ActivityListType.showWatchlist,
+            })
+        .toList()
+      ..sort((a, b) {
+        final dates = (DateTime.tryParse(b.timestamp) ?? DateTime(1970))
+            .compareTo(DateTime.tryParse(a.timestamp) ?? DateTime(1970));
+        return dates != 0
+            ? dates
+            : '${a.type.value}:${a.id}'.compareTo('${b.type.value}:${b.id}');
+      });
+    final rows = <Object>[];
+    String? lastDate;
+    for (final item in filtered.take(_activityLimit)) {
+      final date = _activityDateLabel(item.timestamp);
+      if (date != lastDate) {
+        rows.add(date);
+        lastDate = date;
+      }
+      rows.add(item);
     }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          height: 44,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: _ActivityFilter.values.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
-            itemBuilder: (_, index) {
-              final filter = _ActivityFilter.values[index];
-              final selected = filter == _activityFilter;
-              return ChoiceChip(
-                showCheckmark: false,
-                selected: selected,
-                label: Text(_activityFilterLabel(filter)),
-                onSelected: (_) => setState(() => _activityFilter = filter),
-                selectedColor: FlixieColors.primary.withValues(alpha: .17),
-                backgroundColor: Colors.transparent,
-                side: BorderSide(
-                  color: selected
-                      ? FlixieColors.primary
-                      : FlixieColors.tabBarBorder,
-                ),
-                labelStyle: TextStyle(
-                  color: selected ? FlixieColors.primary : FlixieColors.light,
-                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 18),
-        Text(
-          '${filtered.length} ${filtered.length == 1 ? 'activity' : 'activities'} this month',
-          style: textTheme.bodyMedium?.copyWith(color: FlixieColors.medium),
-        ),
-        const SizedBox(height: 18),
-        if (_activityLoading)
-          const Center(child: CircularProgressIndicator())
-        else if (filtered.isEmpty)
-          _ProfileEmptyAction(
-            icon: Icons.auto_graph_rounded,
-            title:
-                'No ${_activityFilterLabel(_activityFilter).toLowerCase()} yet',
-            body: 'Your activity will appear here as you use Flixie.',
-            label: 'Browse',
-            onPressed: () => context.push('/search'),
-          )
-        else
-          ...grouped.entries.expand((entry) => [
-                Text(entry.key,
-                    style: const TextStyle(
-                        color: FlixieColors.white,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800)),
-                const SizedBox(height: 10),
-                ...entry.value.map((item) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: ActivityTile(item: item),
-                    )),
-                const SizedBox(height: 4),
-              ]),
-      ],
-    );
+    return SliverList(
+        delegate: SliverChildBuilderDelegate((context, index) {
+      if (index == 0) {
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Your activity',
+              style: TextStyle(
+                  color: FlixieColors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: [
+                for (final filter in _ActivityFilter.values)
+                  Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        selected: filter == _activityFilter,
+                        showCheckmark: false,
+                        label: Text(filter == _ActivityFilter.lists
+                            ? 'Watchlist'
+                            : _activityFilterLabel(filter)),
+                        onSelected: (_) {
+                          setState(() {
+                            _activityFilter = filter;
+                            _activity = [];
+                            _activityCursor = null;
+                          });
+                          _loadActivity();
+                        },
+                      )),
+              ])),
+          const SizedBox(height: 12),
+          if (_activityLoading)
+            const LinearProgressIndicator()
+          else if (_activityFailed)
+            TextButton.icon(
+                onPressed: _loadActivity,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Couldn’t load activity · Retry'))
+          else
+            Text(
+                filtered.isEmpty
+                    ? 'No activity yet.'
+                    : 'Showing ${filtered.take(_activityLimit).length} activities',
+                style: const TextStyle(color: FlixieColors.medium)),
+          const SizedBox(height: 12),
+        ]);
+      }
+      if (index == rows.length + 1) {
+        return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: _activityCursor != null
+                ? TextButton.icon(
+                    onPressed: _activityRequestRunning
+                        ? null
+                        : () => _loadActivity(more: true),
+                    icon: const Icon(Icons.expand_more),
+                    label: Text(
+                        _activityRequestRunning ? 'Loading…' : 'Load 20 more'))
+                : filtered.isEmpty
+                    ? const SizedBox.shrink()
+                    : const Center(
+                        child: Text('You’re up to date',
+                            style: TextStyle(color: FlixieColors.medium))));
+      }
+      final row = rows[index - 1];
+      if (row is String) {
+        return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Text(row,
+                style: const TextStyle(
+                    color: FlixieColors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700)));
+      }
+      final item = row as ActivityListItem;
+      return ActivityTile(
+          key: ValueKey('${item.type.value}:${item.id}'),
+          item: item,
+          compact: true);
+    }, childCount: rows.length + 2));
   }
 
   Widget _buildSocialTab(BuildContext context) {
     final userId = context.read<AuthProvider>().dbUser?.id ?? '';
     final groups = _groups
         .where((group) => group.status?.toUpperCase() != 'CLOSED')
-        .take(3)
         .toList();
     final plans = _watchRequests
         .where((request) =>
@@ -779,89 +883,64 @@ class _ProfileScreenState extends State<ProfileScreen> {
         const SizedBox(height: 22),
         _SocialSectionHeader(
           title: 'Your groups',
-          onSeeAll: () => context.push('/social'),
+          count: groups.length,
+          onSeeAll: () => context.push('/social?tab=groups'),
         ),
         const SizedBox(height: 10),
         if (groups.isEmpty)
           const Text('No groups yet.',
               style: TextStyle(color: FlixieColors.medium))
         else
-          ...groups.map((group) => GroupCard(
+          ...groups.take(3).map((group) => GroupCard(
+                compact: true,
                 group: group,
                 memberCount: group.memberCount,
                 onTap: () => context.push('/groups/${group.id}'),
               )),
-        if (plans.isNotEmpty) ...[
-          const SizedBox(height: 18),
-          _SocialSectionHeader(
-            title: 'Watch plans',
-            count: plans.length,
-            onSeeAll: () => context.push('/watch-requests'),
-          ),
-          const SizedBox(height: 10),
-          ...plans.take(2).map((request) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _ProfileWatchPlanCard(request: request),
-              )),
-        ],
+        TextButton.icon(
+          onPressed: () =>
+              showProfileCreateGroupSheet(context, onCreated: (group) {
+            if (mounted) setState(() => _groups.add(group));
+          }),
+          icon: const Icon(Icons.add_rounded),
+          label: const Text('Create group'),
+        ),
         const SizedBox(height: 18),
-        const Text('Requests',
-            style: TextStyle(
-                color: FlixieColors.white,
-                fontSize: 17,
-                fontWeight: FontWeight.w800)),
-        const SizedBox(height: 10),
-        Material(
-          color: FlixieColors.surface.withValues(alpha: .72),
-          borderRadius: BorderRadius.circular(14),
-          child: InkWell(
-            onTap: () => context.push('/watch-requests'),
-            borderRadius: BorderRadius.circular(14),
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: FlixieColors.tabBarBorder),
-              ),
-              child: Row(
-                children: [
-                  Badge(
-                    isLabelVisible: needsReply > 0,
-                    label: Text('$needsReply'),
-                    backgroundColor: FlixieColors.primary,
-                    child: const Icon(Icons.person_outline_rounded,
-                        color: FlixieColors.primary, size: 30),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          needsReply == 0
-                              ? 'No requests need your reply'
-                              : '$needsReply ${needsReply == 1 ? 'request needs' : 'requests need'} your reply',
-                          style: const TextStyle(
-                              color: FlixieColors.white,
-                              fontWeight: FontWeight.w800),
-                        ),
-                        const SizedBox(height: 3),
-                        const Text(
-                            'Friend requests · Group invites · Watch plans',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                                color: FlixieColors.medium, fontSize: 12)),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right_rounded,
-                      color: FlixieColors.medium),
-                ],
+        _SocialSectionHeader(
+          title: 'Watch plans',
+          count: plans.isEmpty ? null : plans.length,
+          onSeeAll: () => context.push('/watch-requests'),
+        ),
+        if (needsReply > 0)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Material(
+              color: FlixieColors.tabBarBackgroundFocused,
+              borderRadius: BorderRadius.circular(14),
+              child: ListTile(
+                onTap: () => context.push('/watch-requests'),
+                title: const Text('Watch plan requests'),
+                subtitle: const Text('Awaiting your reply'),
+                leading: CircleAvatar(
+                    radius: 14,
+                    backgroundColor: FlixieColors.warning,
+                    child: Text('$needsReply',
+                        style: const TextStyle(
+                            color: Colors.black, fontWeight: FontWeight.w700))),
+                trailing: const Icon(Icons.chevron_right_rounded),
               ),
             ),
           ),
-        ),
+        ...plans.take(2).map((request) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _ProfileWatchPlanCard(request: request),
+            )),
+        if (_socialLoadFailed)
+          TextButton.icon(
+            onPressed: _loadProfileExtras,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Couldn’t refresh groups and plans. Retry'),
+          ),
       ],
     );
   }
@@ -873,11 +952,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   ) {
     return _ProfileStatsContent(
       wrapped: _wrapped,
+      failed: _statsFailed,
+      onRetry: _loadProfileExtras,
       ratings: _ratings,
       reviewCount: _reviewCount,
       favoriteGenres: favoriteGenres,
       directorPeople: _directorPeople,
-      directorCredits: _directorCredits,
       onWrapped: () => context.push('/wrapped/${user?.id ?? ''}'),
       onFindMovies: () => context.push('/search'),
       onSeeRatings: () => context.push('/stats'),
@@ -963,19 +1043,19 @@ class _FavouritesLibrary extends StatelessWidget {
         if (movieItems.isNotEmpty &&
             (peopleItems.isNotEmpty || showItems.isNotEmpty))
           const SizedBox(height: 18),
-        if (peopleItems.isNotEmpty)
-          _FavouritePosterRail(
-            title: 'Favourite people',
-            items: peopleItems,
-            circular: true,
-          ),
-        if (peopleItems.isNotEmpty && showItems.isNotEmpty)
-          const SizedBox(height: 18),
         if (showItems.isNotEmpty)
           _FavouritePosterRail(
             title: 'Favourite shows',
             items: showItems,
             limit: maxFavouriteShows,
+          ),
+        if (showItems.isNotEmpty && peopleItems.isNotEmpty)
+          const SizedBox(height: 18),
+        if (peopleItems.isNotEmpty)
+          _FavouritePosterRail(
+            title: 'Favourite people',
+            items: peopleItems,
+            circular: true,
           ),
       ],
     );
@@ -1007,18 +1087,53 @@ class _FavouritePosterRail extends StatelessWidget {
   final int? limit;
   final bool circular;
 
+  void _showAll(BuildContext context) {
+    showModalBottomSheet<void>(
+        context: context,
+        useRootNavigator: true,
+        useSafeArea: true,
+        isScrollControlled: true,
+        builder: (context) => SizedBox(
+            height: MediaQuery.sizeOf(context).height * .8,
+            child: Column(children: [
+              ListTile(
+                  title: Text(title),
+                  subtitle: limit == null
+                      ? null
+                      : Text('${items.length} of $limit favourites'),
+                  trailing: IconButton(
+                      tooltip: 'Close',
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context))),
+              Expanded(
+                  child: ListView.builder(
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        return ListTile(
+                            title: Text(item.title),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: item.route == null
+                                ? null
+                                : () => context.push(item.route!));
+                      })),
+            ])));
+  }
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: circular ? 158 : 208,
+      height:
+          (circular ? 158 : 208) + MediaQuery.textScalerOf(context).scale(30),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           FlixieSectionHeader(
             title: title,
-            trailingLabel: limit == null ? null : '${items.length} of $limit',
+            trailingLabel: '${items.length} · See all',
+            onTrailingTap: () => _showAll(context),
             uppercase: false,
-            accentHeight: 22,
+            accentHeight: 0,
             titleStyle: const TextStyle(
               color: FlixieColors.white,
               fontSize: 18,
@@ -1076,11 +1191,11 @@ class _FavouritePosterRail extends StatelessWidget {
                         const SizedBox(height: 6),
                         Text(
                           item.title,
-                          maxLines: 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: FlixieColors.light,
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -1111,7 +1226,7 @@ class _RecentReviewsSummary extends StatelessWidget {
         FlixieSectionHeader(
           title: 'Recent reviews',
           uppercase: false,
-          accentHeight: 22,
+          accentHeight: 0,
           titleStyle: const TextStyle(
             color: FlixieColors.white,
             fontSize: 18,
@@ -1138,155 +1253,105 @@ class _ProfileReviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final poster = review.moviePosterPath;
     final date = DateTime.tryParse(review.createdAt);
-    final dateLabel = date == null
-        ? ''
-        : '${date.day}/${date.month}/${date.year.toString().substring(2)}';
-
-    return SizedBox(
-      height: 128,
-      child: Material(
-        color: FlixieColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: review.movieId == null
-              ? null
-              : () => context.push(movieDetailPath(review.movieId!)),
-          child: Container(
-            decoration: BoxDecoration(
-              border: Border.all(color: FlixieColors.tabBarBorder),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(
-                  width: 82,
-                  height: 126,
-                  child: poster == null
-                      ? const ColoredBox(
-                          color: FlixieColors.surfaceElevated,
-                          child: Icon(
-                            Icons.movie_outlined,
-                            color: FlixieColors.medium,
-                          ),
-                        )
-                      : Image.network(
-                          'https://image.tmdb.org/t/p/w342$poster',
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
-                              const Icon(Icons.movie_outlined),
-                        ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+    final mediaRoute = review.showId != null
+        ? showDetailPath(review.showId!)
+        : review.movieId != null
+            ? movieDetailPath(review.movieId!)
+            : null;
+    return Material(
+      color: FlixieColors.surface,
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => showReviewDetailSheet(context,
+            review: review,
+            currentUserId: context.read<AuthProvider>().dbUser?.id),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            if (review.moviePosterPath != null) ...[
+              ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                      'https://image.tmdb.org/t/p/w342${review.moviePosterPath}',
+                      width: 60,
+                      height: 90,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          const SizedBox(width: 60, height: 90))),
+              const SizedBox(width: 12),
+            ],
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  TextButton(
+                      onPressed: mediaRoute == null
+                          ? null
+                          : () => context.push(mediaRoute),
+                      style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          alignment: Alignment.centerLeft),
+                      child: Text(review.movieTitle ??
+                          (review.showId != null
+                              ? 'Show review'
+                              : 'Movie review'))),
+                  Text(review.title,
+                      style: const TextStyle(
+                          color: FlixieColors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700)),
+                  if (date != null)
+                    Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                            '${date.day} ${const [
+                              'Jan',
+                              'Feb',
+                              'Mar',
+                              'Apr',
+                              'May',
+                              'Jun',
+                              'Jul',
+                              'Aug',
+                              'Sep',
+                              'Oct',
+                              'Nov',
+                              'Dec'
+                            ][date.month - 1]} ${date.year}',
+                            style: const TextStyle(
+                                color: FlixieColors.medium, fontSize: 12))),
+                  const SizedBox(height: 6),
+                  Text(review.body,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: FlixieColors.light,
+                          fontSize: 13,
+                          height: 1.4)),
+                  Wrap(
+                      spacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                review.movieTitle ?? 'Movie review',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: FlixieColors.primary,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                            if (dateLabel.isNotEmpty)
-                              Text(
-                                dateLabel,
-                                style: const TextStyle(
-                                  color: FlixieColors.medium,
-                                  fontSize: 10,
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          review.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: FlixieColors.light,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          review.body,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: FlixieColors.medium,
-                            fontSize: 12,
-                            height: 1.35,
-                          ),
-                        ),
-                        const Spacer(),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.star_rounded,
-                              color: FlixieColors.warning,
-                              size: 16,
-                            ),
-                            const SizedBox(width: 3),
-                            Text(
-                              '${review.rating}/10',
-                              style: const TextStyle(
-                                color: FlixieColors.light,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            if (review.recommended) ...[
-                              const SizedBox(width: 10),
-                              const Icon(
-                                Icons.thumb_up_alt_outlined,
-                                color: FlixieColors.success,
-                                size: 15,
-                              ),
-                            ],
-                            const Spacer(),
-                            if (review.containsSpoilers)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: FlixieColors.warning
-                                      .withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: const Text(
-                                  'SPOILER',
-                                  style: TextStyle(
-                                    color: FlixieColors.warning,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+                        Text('★ ${review.rating}/10',
+                            style:
+                                const TextStyle(color: FlixieColors.warning)),
+                        if (review.recommended)
+                          const Icon(Icons.thumb_up_alt_outlined,
+                              color: FlixieColors.success, size: 16),
+                        TextButton(
+                            onPressed: () => showReviewDetailSheet(context,
+                                review: review,
+                                currentUserId:
+                                    context.read<AuthProvider>().dbUser?.id),
+                            child: const Text('Read review ›')),
+                        TextButton(
+                            onPressed: () => context.push('/my-reviews'),
+                            child: const Text('Manage')),
+                      ]),
+                ])),
+          ]),
         ),
       ),
     );
@@ -1296,22 +1361,24 @@ class _ProfileReviewCard extends StatelessWidget {
 class _ProfileStatsContent extends StatelessWidget {
   const _ProfileStatsContent({
     required this.wrapped,
+    required this.failed,
+    required this.onRetry,
     required this.ratings,
     required this.reviewCount,
     required this.favoriteGenres,
     required this.directorPeople,
-    required this.directorCredits,
     required this.onWrapped,
     required this.onFindMovies,
     required this.onSeeRatings,
   });
 
+  final bool failed;
+  final VoidCallback onRetry;
   final MovieWrapped? wrapped;
   final List<MovieRating> ratings;
   final int reviewCount;
   final List<dynamic> favoriteGenres;
   final Map<int, Person> directorPeople;
-  final Map<int, List<PersonCreditItem>> directorCredits;
   final VoidCallback onWrapped;
   final VoidCallback onFindMovies;
   final VoidCallback onSeeRatings;
@@ -1320,7 +1387,12 @@ class _ProfileStatsContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final data = wrapped;
     if (data == null) {
-      return const Center(child: CircularProgressIndicator());
+      return failed
+          ? TextButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Couldn’t load stats. Retry'))
+          : const Center(child: CircularProgressIndicator());
     }
     final average = ratings.isEmpty
         ? '–'
@@ -1333,401 +1405,232 @@ class _ProfileStatsContent extends StatelessWidget {
             .map((item) => item.count)
             .reduce((a, b) => a > b ? a : b);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _StatsCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('${data.year} so far',
-                            style: const TextStyle(
-                                color: FlixieColors.primary,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900)),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${data.rewatchCount} watches · ${data.totalMoviesWatched} movies · ${data.totalHoursWatched.toStringAsFixed(1)} hours',
+    final sortedRatings = [...ratings]
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final now = DateTime.now();
+    final monthCount = data.year == now.year ? now.month : 12;
+    final counts = List<int>.filled(monthCount, 0);
+    for (final month in data.monthlyWatchCounts) {
+      if (month.month > 0 && month.month <= monthCount) {
+        counts[month.month - 1] = month.count;
+      }
+    }
+    final maxMonth = counts.fold<int>(1, (a, b) => a > b ? a : b);
+    final minutes = (data.totalHoursWatched * 60).round();
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
+    Widget heading(String title) => Padding(
+          padding: const EdgeInsets.only(top: 22, bottom: 12),
+          child: Text(title,
+              style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: FlixieColors.white)),
+        );
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (failed)
+        TextButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Couldn’t refresh stats. Retry')),
+      Text('Movie watching · ${data.year}',
+          style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: FlixieColors.white)),
+      const SizedBox(height: 14),
+      Wrap(spacing: 28, runSpacing: 12, children: [
+        _StatsValue('${data.rewatchCount}', 'Watches'),
+        _StatsValue('${data.totalMoviesWatched}', 'Unique movies'),
+        _StatsValue('${minutes ~/ 60}h ${minutes % 60}m', 'Estimated time'),
+      ]),
+      Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+              onPressed: onWrapped,
+              child: Text('View ${data.year} Wrapped ›'))),
+      heading('Monthly watches'),
+      SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            for (var i = 0; i < counts.length; i++)
+              Semantics(
+                  label: '${months[i]} ${data.year}: ${counts[i]} watches',
+                  child: ExcludeSemantics(
+                      child: Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: Column(children: [
+                      Text('${counts[i]}',
                           style: const TextStyle(
-                              color: FlixieColors.medium, fontSize: 12.5),
-                        ),
-                      ],
-                    ),
-                  ),
-                  TextButton.icon(
-                    onPressed: onWrapped,
-                    icon: const Icon(Icons.card_giftcard_rounded, size: 17),
-                    label: Text('View ${data.year} Wrapped'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 72,
-                width: double.infinity,
-                child: CustomPaint(
-                  painter: _MonthlyStatsPainter(data.monthlyWatchCounts),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        if (favoriteGenres.isNotEmpty)
-          MovieTasteBadge(favoriteGenres: favoriteGenres)
-        else
-          _ProfileEmptyAction(
-            icon: Icons.explore_outlined,
-            title: 'Build your taste profile',
-            body: 'Rate and favourite movies to reveal your viewing taste.',
-            label: 'Find movies',
-            onPressed: onFindMovies,
-          ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-                child: _StatsMetric(
-                    icon: Icons.star_outline_rounded,
-                    value: average,
-                    label: 'Average rating',
-                    subtitle: 'Your scoring style',
-                    color: FlixieColors.warning)),
-            const SizedBox(width: 10),
-            Expanded(
-                child: _StatsMetric(
-                    icon: Icons.bookmark_added_outlined,
-                    value: '${ratings.length}',
-                    label: 'Ratings',
-                    subtitle: 'Keep it up',
-                    color: FlixieColors.primary)),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-                child: _StatsMetric(
-                    icon: Icons.chat_bubble_outline_rounded,
-                    value: '$reviewCount',
-                    label: 'Reviews',
-                    subtitle: 'Your voice matters',
-                    color: FlixieColors.danger)),
-            const SizedBox(width: 10),
-            Expanded(
-                child: _StatsMetric(
-                    icon: Icons.replay_rounded,
-                    value: data.topMovies.isEmpty
-                        ? '–'
-                        : '${data.topMovies.first.watchCount}×',
-                    label: data.topMovies.isEmpty
-                        ? 'Most rewatched'
-                        : data.topMovies.first.title,
-                    subtitle: 'Most rewatched',
-                    posterPath: data.topMovies.isEmpty
-                        ? null
-                        : data.topMovies.first.posterPath,
-                    color: FlixieColors.danger)),
-          ],
-        ),
-        if (data.topGenres.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _StatsCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Top genres',
-                    style: TextStyle(
-                        color: FlixieColors.primary,
-                        fontWeight: FontWeight.w800)),
-                const SizedBox(height: 12),
-                ...data.topGenres.take(4).toList().asMap().entries.map((entry) {
-                  final genre = entry.value;
-                  const colors = [
-                    FlixieColors.success,
-                    FlixieColors.danger,
-                    Color(0xFF5B8DEF),
-                    FlixieColors.warning
-                  ];
-                  final color = colors[entry.key % colors.length];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Row(children: [
-                      Icon(Icons.explore_outlined, color: color, size: 17),
-                      const SizedBox(width: 7),
+                              color: FlixieColors.light, fontSize: 12)),
+                      const SizedBox(height: 4),
                       SizedBox(
-                          width: 82,
-                          child: Text(genre.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  color: FlixieColors.light,
-                                  fontWeight: FontWeight.w700))),
-                      Expanded(
-                          child: ClipRRect(
-                              borderRadius: BorderRadius.circular(99),
-                              child: LinearProgressIndicator(
-                                  value: genre.count / maxGenre,
-                                  minHeight: 5,
-                                  backgroundColor: FlixieColors.surfaceElevated,
-                                  color: color))),
-                      const SizedBox(width: 10),
-                      Text('${genre.count}',
-                          style: const TextStyle(color: FlixieColors.medium)),
+                          height: 70,
+                          width: 28,
+                          child: Align(
+                              alignment: Alignment.bottomCenter,
+                              child: Container(
+                                height: counts[i] == 0
+                                    ? 2
+                                    : counts[i] / maxMonth * 70,
+                                decoration: BoxDecoration(
+                                    color: counts[i] == 0
+                                        ? FlixieColors.surfaceElevated
+                                        : FlixieColors.primaryText,
+                                    borderRadius: BorderRadius.circular(4)),
+                              ))),
+                      const SizedBox(height: 6),
+                      Text(months[i],
+                          style: const TextStyle(
+                              color: FlixieColors.light, fontSize: 12)),
                     ]),
-                  );
-                }),
-              ],
-            ),
-          ),
-        ],
-        if (data.topDirectors.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _StatsCard(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Top directors',
-                  style: TextStyle(
-                      color: FlixieColors.primary,
-                      fontWeight: FontWeight.w800)),
-              const SizedBox(height: 10),
-              SizedBox(
-                height: 132,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: data.topDirectors.take(4).length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (_, index) {
-                    final director = data.topDirectors[index];
-                    final id = director.personId;
-                    return _TopDirectorCard(
-                      director: director,
-                      person: id == null ? null : directorPeople[id],
-                      credits: id == null
-                          ? const []
-                          : directorCredits[id] ?? const [],
-                    );
-                  },
-                ),
-              ),
-            ]),
-          ),
-        ],
-        if (ratings.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _StatsCard(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                const Text('Recent ratings',
-                    style: TextStyle(
-                        color: FlixieColors.primary,
-                        fontWeight: FontWeight.w800)),
-                const Spacer(),
-                TextButton(
-                    onPressed: onSeeRatings, child: const Text('See all')),
-              ]),
-              SizedBox(
-                height: 170,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: ratings.take(8).length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 10),
-                  itemBuilder: (_, index) =>
-                      _RecentRatingTile(rating: ratings[index]),
-                ),
-              ),
-            ]),
-          ),
-        ],
+                  ))),
+          ])),
+      if (data.year == now.year)
+        Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text('${months[now.month - 1]} in progress',
+                style:
+                    const TextStyle(color: FlixieColors.medium, fontSize: 12))),
+      if (data.insights != null)
+        _ExtraViewingStats(
+            insights: data.insights!,
+            year: data.year,
+            movies: data.totalMoviesWatched),
+      heading('Your ratings · All time'),
+      Material(
+          color: FlixieColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          child: InkWell(
+            onTap: onSeeRatings,
+            borderRadius: BorderRadius.circular(14),
+            child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(children: [
+                  Expanded(
+                      child: Text(
+                          '$average / 10 average · ${ratings.length} movie ratings',
+                          style: const TextStyle(color: FlixieColors.light))),
+                  const Icon(Icons.chevron_right,
+                      color: FlixieColors.primaryText),
+                ])),
+          )),
+      Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: Text('$reviewCount movie and show reviews · All time',
+              style: const TextStyle(color: FlixieColors.medium))),
+      if (data.topMovies.isNotEmpty && data.topMovies.first.watchCount > 1) ...[
+        heading('Most watched again'),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          onTap: () =>
+              context.push(movieDetailPath(data.topMovies.first.movieId)),
+          title: Text(data.topMovies.first.title),
+          subtitle: Text(
+              '${data.topMovies.first.watchCount} watches in ${data.year}'),
+          leading: data.topMovies.first.posterPath == null
+              ? const Icon(Icons.movie_outlined)
+              : ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: CachedNetworkImage(
+                      imageUrl:
+                          'https://image.tmdb.org/t/p/w185${data.topMovies.first.posterPath}',
+                      width: 40,
+                      height: 60,
+                      fit: BoxFit.cover)),
+          trailing: const Icon(Icons.chevron_right),
+        ),
       ],
-    );
+      if (data.topGenres.isNotEmpty) ...[
+        heading('Top genres · ${data.year}'),
+        ...data.topGenres.take(4).map((genre) => Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: Column(children: [
+              Row(children: [
+                Expanded(child: Text(genre.name)),
+                Text('${genre.count}')
+              ]),
+              const SizedBox(height: 6),
+              LinearProgressIndicator(
+                  value: maxGenre <= 0 ? 0 : genre.count / maxGenre,
+                  minHeight: 5,
+                  color: FlixieColors.primaryText,
+                  backgroundColor: FlixieColors.surfaceElevated),
+            ]))),
+        const Text('Viewing counts by genre; movies can have several genres.',
+            style: TextStyle(color: FlixieColors.medium, fontSize: 12)),
+      ],
+      if (favoriteGenres.isNotEmpty) ...[
+        heading('Your taste'),
+        MovieTasteBadge(favoriteGenres: favoriteGenres, compact: true),
+      ],
+      if (data.topDirectors.isNotEmpty) ...[
+        heading('Top directors · ${data.year}'),
+        ...data.topDirectors.take(4).map((director) {
+          final profile = directorPeople[director.personId]?.profileImgUrl;
+          return ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: CircleAvatar(
+                backgroundImage: profile == null
+                    ? null
+                    : CachedNetworkImageProvider(
+                        'https://image.tmdb.org/t/p/w185$profile'),
+                child:
+                    profile == null ? const Icon(Icons.person_outline) : null),
+            title: Text(director.name),
+            subtitle: Text('${director.count} films'),
+            trailing: director.personId == null
+                ? null
+                : const Icon(Icons.chevron_right),
+            onTap: director.personId == null
+                ? null
+                : () => context.push(personDetailPath(director.personId!)),
+          );
+        }),
+      ],
+      if (ratings.isNotEmpty) ...[
+        const SizedBox(height: 18),
+        _SocialSectionHeader(title: 'Recent ratings', onSeeAll: onSeeRatings),
+        SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              for (final rating in sortedRatings.take(8))
+                Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: _RecentRatingTile(rating: rating)),
+            ])),
+      ],
+    ]);
   }
 }
 
-class _StatsCard extends StatelessWidget {
-  const _StatsCard({required this.child});
-  final Widget child;
-  @override
-  Widget build(BuildContext context) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-            color: FlixieColors.surface.withValues(alpha: .68),
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: FlixieColors.tabBarBorder)),
-        child: child,
-      );
-}
-
-class _StatsMetric extends StatelessWidget {
-  const _StatsMetric(
-      {required this.icon,
-      required this.value,
-      required this.label,
-      required this.subtitle,
-      this.posterPath,
-      required this.color});
-  final IconData icon;
+class _StatsValue extends StatelessWidget {
+  const _StatsValue(this.value, this.label);
   final String value;
   final String label;
-  final String subtitle;
-  final String? posterPath;
-  final Color color;
   @override
-  Widget build(BuildContext context) => Container(
-      padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [
-          color.withValues(alpha: .11),
-          FlixieColors.surface.withValues(alpha: .76),
-        ]),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: color.withValues(alpha: .3)),
-      ),
-      child: Row(children: [
-        Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: color.withValues(alpha: .55))),
-            child: Icon(icon, color: color, size: 21)),
-        const SizedBox(width: 10),
-        Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  color: FlixieColors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900)),
-          Text(label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style:
-                  const TextStyle(color: FlixieColors.light, fontSize: 11.5)),
-          Text(subtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style:
-                  TextStyle(color: color.withValues(alpha: .82), fontSize: 10))
-        ])),
-        if (posterPath != null) ...[
-          const SizedBox(width: 5),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: CachedNetworkImage(
-              imageUrl: posterPath!.startsWith('http')
-                  ? posterPath!
-                  : 'https://image.tmdb.org/t/p/w185$posterPath',
-              width: 32,
-              height: 48,
-              fit: BoxFit.cover,
-            ),
-          ),
-        ],
-      ]));
-}
-
-class _TopDirectorCard extends StatelessWidget {
-  const _TopDirectorCard({
-    required this.director,
-    required this.person,
-    required this.credits,
-  });
-  final WrappedNamedCount director;
-  final Person? person;
-  final List<PersonCreditItem> credits;
-
-  @override
-  Widget build(BuildContext context) {
-    final profile = person?.profileImgUrl;
-    final visibleCredits =
-        credits.where((credit) => credit.posterPath != null).take(4).toList();
-    return GestureDetector(
-      onTap: director.personId == null
-          ? null
-          : () => context.push(personDetailPath(director.personId!)),
-      child: SizedBox(
-        width: 260,
-        child: Row(children: [
-          Container(
-            padding: const EdgeInsets.all(2),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border:
-                  Border.all(color: FlixieColors.primary.withValues(alpha: .7)),
-            ),
-            child: CircleAvatar(
-              radius: 37,
-              backgroundColor: FlixieColors.surfaceElevated,
-              backgroundImage: profile == null
-                  ? null
-                  : CachedNetworkImageProvider(
-                      'https://image.tmdb.org/t/p/w185$profile'),
-              child: profile == null
-                  ? const Icon(Icons.person_outline, color: FlixieColors.medium)
-                  : null,
-            ),
-          ),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  Expanded(
-                    child: Text(director.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            color: FlixieColors.white,
-                            fontWeight: FontWeight.w800)),
-                  ),
-                  const Icon(Icons.chevron_right_rounded,
-                      color: FlixieColors.medium, size: 18),
-                ]),
-                Text('${director.count} films',
-                    style: const TextStyle(
-                        color: FlixieColors.medium, fontSize: 12)),
-                const SizedBox(height: 7),
-                SizedBox(
-                  height: 52,
-                  child: Row(
-                    children: visibleCredits
-                        .map((credit) => Padding(
-                              padding: const EdgeInsets.only(right: 5),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(4),
-                                child: CachedNetworkImage(
-                                  imageUrl:
-                                      'https://image.tmdb.org/t/p/w92${credit.posterPath}',
-                                  width: 34,
-                                  height: 52,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                            ))
-                        .toList(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ]),
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(value,
+            style: const TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w700,
+                color: FlixieColors.white)),
+        Text(label,
+            style: const TextStyle(color: FlixieColors.medium, fontSize: 13)),
+      ]);
 }
 
 class _RecentRatingTile extends StatelessWidget {
@@ -1755,6 +1658,9 @@ class _RecentRatingTile extends StatelessWidget {
                             imageUrl: 'https://image.tmdb.org/t/p/w342$path',
                             fit: BoxFit.cover))),
             const SizedBox(height: 5),
+            Text(rating.movie?.title ?? 'Movie',
+                style:
+                    const TextStyle(color: FlixieColors.light, fontSize: 12)),
             Row(children: [
               const Icon(Icons.star_rounded,
                   color: FlixieColors.warning, size: 15),
@@ -1770,102 +1676,56 @@ class _RecentRatingTile extends StatelessWidget {
   }
 }
 
-class _MonthlyStatsPainter extends CustomPainter {
-  _MonthlyStatsPainter(this.values);
-  final List<WrappedMonthlyCount> values;
-  @override
-  void paint(Canvas canvas, Size size) {
-    final counts = List<double>.filled(12, 0);
-    for (final value in values) {
-      if (value.month >= 1 && value.month <= 12) {
-        counts[value.month - 1] = value.count.toDouble();
-      }
-    }
-    final max = counts.fold<double>(1, (a, b) => a > b ? a : b);
-    final line = Paint()
-      ..color = FlixieColors.primary
-      ..strokeWidth = 2.5
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-    final path = Path();
-    for (var i = 0; i < 12; i++) {
-      final x = i * size.width / 11;
-      final y = 42 - (counts[i] / max * 34);
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-    canvas.drawPath(path, line);
-    const labels = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec'
-    ];
-    for (var i = 0; i < 12; i++) {
-      final painter = TextPainter(
-          text: TextSpan(
-              text: labels[i],
-              style: const TextStyle(color: FlixieColors.medium, fontSize: 9)),
-          textDirection: TextDirection.ltr)
-        ..layout();
-      painter.paint(
-          canvas, Offset(i * size.width / 11 - painter.width / 2, 54));
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _MonthlyStatsPainter oldDelegate) =>
-      oldDelegate.values != values;
-}
-
 class _SocialSectionHeader extends StatelessWidget {
   const _SocialSectionHeader({
     required this.title,
     required this.onSeeAll,
     this.count,
+    this.actionLabel = 'See all',
   });
 
+  final String actionLabel;
   final String title;
   final int? count;
   final VoidCallback onSeeAll;
 
   @override
-  Widget build(BuildContext context) => Row(
-        children: [
-          Text(title,
-              style: const TextStyle(
-                  color: FlixieColors.white,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800)),
-          if (count != null) ...[
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: FlixieColors.primary.withValues(alpha: .16),
-                borderRadius: BorderRadius.circular(99),
-              ),
-              child: Text('$count',
-                  style: const TextStyle(
-                      color: FlixieColors.primary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800)),
+  Widget build(BuildContext context) => SizedBox(
+        width: double.infinity,
+        child: OverflowBar(
+          alignment: MainAxisAlignment.spaceBetween,
+          overflowAlignment: OverflowBarAlignment.end,
+          spacing: 12,
+          children: [
+            Wrap(
+              spacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(title,
+                    style: const TextStyle(
+                        color: FlixieColors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800)),
+                if (count != null) ...[
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: FlixieColors.primary.withValues(alpha: .16),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Text('$count',
+                        style: const TextStyle(
+                            color: FlixieColors.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800)),
+                  ),
+                ],
+              ],
             ),
+            TextButton(onPressed: onSeeAll, child: Text(actionLabel)),
           ],
-          const Spacer(),
-          TextButton(onPressed: onSeeAll, child: const Text('See all')),
-        ],
+        ),
       );
 }
 
@@ -1987,8 +1847,21 @@ String _activityDateLabel(String raw) {
   final days = today.difference(value).inDays;
   if (days == 0) return 'Today';
   if (days == 1) return 'Yesterday';
-  if (days < 7) return '$days days ago';
-  return '${date.day}/${date.month}/${date.year}';
+  if (days > 1 && days < 7) return '$days days ago';
+  return '${date.day} ${const [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec'
+  ][date.month - 1]} ${date.year}';
 }
 
 class _ProfileContinueWatching extends StatelessWidget {
@@ -2008,7 +1881,7 @@ class _ProfileContinueWatching extends StatelessWidget {
         const FlixieSectionHeader(
           title: 'Continue watching',
           uppercase: false,
-          accentHeight: 22,
+          accentHeight: 0,
           titleStyle: TextStyle(
             color: FlixieColors.white,
             fontSize: 18,
@@ -2061,11 +1934,10 @@ class _WatchProvidersSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: FlixieColors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: FlixieColors.tabBarBorder),
       ),
       child: Row(
         children: [
@@ -2087,9 +1959,12 @@ class _WatchProvidersSummary extends StatelessWidget {
                   providers.isEmpty
                       ? 'Choose where you stream'
                       : providers
-                          .take(3)
-                          .map((provider) => provider.providerName)
-                          .join(' · '),
+                              .take(3)
+                              .map((provider) => provider.providerName)
+                              .join(' · ') +
+                          (providers.length > 3
+                              ? ' +${providers.length - 3}'
+                              : ''),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -2245,30 +2120,8 @@ class _ProfileDashboard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text(
-              'Taste at a glance',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: FlixieColors.light,
-                    fontWeight: FontWeight.w800,
-                  ),
-            ),
-            const Spacer(),
-            TextButton(
-              onPressed: onRecap,
-              child: const Text('View stats'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            color: FlixieColors.surface.withValues(alpha: .72),
-            border: Border.all(color: FlixieColors.tabBarBorder),
-            borderRadius: BorderRadius.circular(14),
-          ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
           child: Row(children: [
             Expanded(
               child: _DashboardMetric(
@@ -2322,21 +2175,17 @@ class _DashboardMetric extends StatelessWidget {
       borderRadius: BorderRadius.circular(10),
       onTap: onTap,
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, color: FlixieColors.primary, size: 20),
-        const SizedBox(height: 5),
         Text(value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
             style: const TextStyle(
                 color: FlixieColors.white,
                 fontWeight: FontWeight.w900,
-                fontSize: 20)),
+                fontSize: 24)),
         Text(label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
             style: const TextStyle(
                 color: FlixieColors.medium,
-                fontSize: 11,
+                fontSize: 13,
                 fontWeight: FontWeight.w600)),
       ]),
     );
@@ -2354,50 +2203,40 @@ class _ProfileTabSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 42,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: _ProfileTab.values.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final tab = _ProfileTab.values[index];
-          final isSelected = tab == selected;
-          return ChoiceChip(
-            selected: isSelected,
-            showCheckmark: false,
-            avatar: Icon(
-              _tabIcon(tab),
-              size: 16,
-              color: isSelected ? Colors.black : FlixieColors.medium,
-            ),
-            label: Text(_tabLabel(tab)),
-            selectedColor: FlixieColors.primary,
-            backgroundColor: FlixieColors.tabBarBackgroundFocused,
-            labelStyle: TextStyle(
-              color: isSelected ? Colors.black : FlixieColors.light,
-              fontWeight: FontWeight.w800,
-              fontSize: 12,
-            ),
-            side: BorderSide(
-              color: isSelected
-                  ? FlixieColors.primary
-                  : Colors.white.withValues(alpha: 0.08),
-            ),
-            onSelected: (_) => onSelected(tab),
-          );
-        },
-      ),
-    );
-  }
-
-  IconData _tabIcon(_ProfileTab tab) {
-    return switch (tab) {
-      _ProfileTab.library => Icons.video_library_outlined,
-      _ProfileTab.activity => Icons.timeline_rounded,
-      _ProfileTab.social => Icons.group_outlined,
-      _ProfileTab.stats => Icons.insights_outlined,
-    };
+    return Row(
+        children: _ProfileTab.values
+            .map((tab) => Expanded(
+                  child: Semantics(
+                    selected: tab == selected,
+                    button: true,
+                    child: InkWell(
+                      onTap: () => onSelected(tab),
+                      child: Container(
+                        constraints: const BoxConstraints(minHeight: 48),
+                        alignment: Alignment.center,
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 12, horizontal: 4),
+                        decoration: BoxDecoration(
+                            border: Border(
+                                bottom: BorderSide(
+                                    width: tab == selected ? 3 : 1,
+                                    color: tab == selected
+                                        ? FlixieColors.primary
+                                        : FlixieColors.tabBarBorder))),
+                        child: Text(_tabLabel(tab),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                color: tab == selected
+                                    ? FlixieColors.white
+                                    : FlixieColors.light,
+                                fontWeight: tab == selected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500)),
+                      ),
+                    ),
+                  ),
+                ))
+            .toList());
   }
 
   String _tabLabel(_ProfileTab tab) {
@@ -2486,70 +2325,254 @@ class _ProfileEmptyAction extends StatelessWidget {
   }
 }
 
-class _ProfileAction {
-  const _ProfileAction({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
+class _ProfileTabsDelegate extends SliverPersistentHeaderDelegate {
+  _ProfileTabsDelegate({required this.child, required this.height});
+  final Widget child;
+  final double height;
+  @override
+  double get minExtent => height;
+  @override
+  double get maxExtent => height;
+  @override
+  Widget build(
+          BuildContext context, double shrinkOffset, bool overlapsContent) =>
+      ColoredBox(
+          color: FlixieColors.background,
+          child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: child));
+  @override
+  bool shouldRebuild(covariant _ProfileTabsDelegate oldDelegate) => true;
 }
 
-class _ProfileActionGrid extends StatelessWidget {
-  const _ProfileActionGrid({required this.actions});
+class _ExtraViewingStats extends StatelessWidget {
+  const _ExtraViewingStats(
+      {required this.insights, required this.year, required this.movies});
+  final int movies;
+  final Map<String, dynamic> insights;
+  final int year;
 
-  final List<_ProfileAction> actions;
+  void _showBreakdown(BuildContext context, String title, List<dynamic> rows,
+      {bool ratings = false}) {
+    showModalBottomSheet<void>(
+        context: context,
+        useRootNavigator: true,
+        useSafeArea: true,
+        isScrollControlled: true,
+        builder: (context) => SizedBox(
+              height: MediaQuery.sizeOf(context).height * .65,
+              child: Column(children: [
+                Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(children: [
+                      Expanded(
+                          child: Text(title,
+                              style: Theme.of(context).textTheme.titleLarge)),
+                      IconButton(
+                          tooltip: 'Close',
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close)),
+                    ])),
+                Expanded(
+                    child: ListView(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        children: [
+                      Text(
+                          ratings
+                              ? 'All-time movie ratings · Minimum 3 ratings per genre'
+                              : 'Unique movies watched in $year',
+                          style: const TextStyle(color: FlixieColors.medium)),
+                      if (rows.isEmpty)
+                        const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 20),
+                            child: Text('Not enough logged data yet.')),
+                      for (final row in rows)
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text('${row['name']}'),
+                          subtitle:
+                              ratings ? Text('${row['count']} ratings') : null,
+                          trailing: Text(ratings
+                              ? '${(row['average'] as num).toStringAsFixed(1)}/10'
+                              : '${row['count']}'),
+                        ),
+                    ])),
+              ]),
+            ));
+  }
 
   @override
   Widget build(BuildContext context) {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
-      childAspectRatio: 3.6,
-      children: actions
-          .map(
-            (action) => Material(
-              color: FlixieColors.tabBarBackgroundFocused,
-              borderRadius: BorderRadius.circular(12),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: action.onTap,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Row(
-                    children: [
-                      Icon(action.icon, color: FlixieColors.primary, size: 19),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          action.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: FlixieColors.light,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                      const Icon(
-                        Icons.chevron_right_rounded,
-                        color: FlixieColors.medium,
-                        size: 18,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          )
-          .toList(growable: false),
-    );
+    final first = (insights['firstWatches'] as num).toInt();
+    final repeat = (insights['rewatches'] as num).toInt();
+    final distribution = (insights['distribution'] as List).cast<num>();
+    final peak = distribution.fold<num>(1, (a, b) => a > b ? a : b);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const SizedBox(height: 20),
+      const Text('Your viewing',
+          style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: FlixieColors.white)),
+      const SizedBox(height: 4),
+      Text('Based on your watch logs · $year',
+          style: const TextStyle(color: FlixieColors.medium, fontSize: 13)),
+      const SizedBox(height: 18),
+      Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+        Expanded(child: _ViewingTotal('$movies', 'Movies')),
+        Container(width: 1, height: 36, color: FlixieColors.tabBarBorder),
+        Expanded(child: _ViewingTotal('${insights['episodes']}', 'Episodes')),
+        Container(width: 1, height: 36, color: FlixieColors.tabBarBorder),
+        Expanded(child: _ViewingTotal('${insights['shows']}', 'Shows')),
+      ]),
+      const SizedBox(height: 22),
+      const Divider(color: FlixieColors.tabBarBorder),
+      const SizedBox(height: 16),
+      const Text('First watches & rewatches',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+      const SizedBox(height: 14),
+      Semantics(
+          label: '$first first watches and $repeat rewatches',
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: SizedBox(
+                height: 24,
+                child: first + repeat == 0
+                    ? const ColoredBox(color: FlixieColors.surfaceElevated)
+                    : Row(children: [
+                        if (first > 0)
+                          Expanded(
+                              flex: first,
+                              child: const ColoredBox(
+                                  color: FlixieColors.primary,
+                                  child: SizedBox.expand())),
+                        if (repeat > 0)
+                          Expanded(
+                              flex: repeat,
+                              child: const ColoredBox(
+                                  color: FlixieColors.primaryText,
+                                  child: SizedBox.expand())),
+                      ])),
+          )),
+      const SizedBox(height: 12),
+      Wrap(spacing: 20, runSpacing: 8, children: [
+        _WatchLegend(
+            color: FlixieColors.primary, label: '$first first watches'),
+        _WatchLegend(
+            color: FlixieColors.primaryText, label: '$repeat rewatches'),
+      ]),
+      const SizedBox(height: 12),
+      SizedBox(
+          width: double.infinity,
+          child: OverflowBar(
+              alignment: MainAxisAlignment.spaceBetween,
+              overflowAlignment: OverflowBarAlignment.end,
+              spacing: 12,
+              children: [
+                const Text('Based on your recorded movie history.',
+                    style: TextStyle(color: FlixieColors.medium, fontSize: 12)),
+                Text('${first + repeat} total',
+                    style: const TextStyle(
+                        color: FlixieColors.medium, fontSize: 12)),
+              ])),
+      const SizedBox(height: 22),
+      const Divider(color: FlixieColors.tabBarBorder),
+      const SizedBox(height: 16),
+      const Text('How you rate · All time',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+      const SizedBox(height: 10),
+      SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            for (var i = 0; i < distribution.length; i++)
+              Semantics(
+                  label: '${i + 1} out of 10: ${distribution[i]} ratings',
+                  child: ExcludeSemantics(
+                      child: Padding(
+                          padding: const EdgeInsets.only(right: 12),
+                          child: Column(children: [
+                            Text('${distribution[i]}',
+                                style: const TextStyle(fontSize: 12)),
+                            SizedBox(
+                                width: 26,
+                                height: 65,
+                                child: Align(
+                                    alignment: Alignment.bottomCenter,
+                                    child: Container(
+                                        height: distribution[i] == 0
+                                            ? 2
+                                            : distribution[i] / peak * 65,
+                                        color: FlixieColors.primary))),
+                            Text('${i + 1}',
+                                style: const TextStyle(
+                                    color: FlixieColors.medium)),
+                          ])))),
+          ])),
+      const SizedBox(height: 12),
+      for (final entry in const {
+        'Highest-rated genres': 'highestRatedGenres',
+        'Movies by decade': 'decades',
+        'Original languages explored': 'languages'
+      }.entries)
+        ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(entry.key),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _showBreakdown(
+                context, entry.key, insights[entry.value] as List? ?? [],
+                ratings: entry.value == 'highestRatedGenres')),
+      const SizedBox(height: 12),
+      const Divider(color: FlixieColors.tabBarBorder),
+      ListTile(
+        contentPadding: const EdgeInsets.symmetric(vertical: 8),
+        title: const Text('Watch plans',
+            style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: FlixieColors.white)),
+        subtitle: Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+                '${insights['confirmedPlans']} confirmed watches · $year')),
+        trailing: const Icon(Icons.chevron_right_rounded,
+            color: FlixieColors.primaryText),
+        onTap: () => context.push('/watch-requests'),
+      ),
+    ]);
   }
+}
+
+class _ViewingTotal extends StatelessWidget {
+  const _ViewingTotal(this.value, this.label);
+  final String value;
+  final String label;
+  @override
+  Widget build(BuildContext context) => Column(children: [
+        Text(value,
+            style: const TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.w700,
+                color: FlixieColors.white)),
+        const SizedBox(height: 3),
+        Text(label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 14, color: FlixieColors.light)),
+      ]);
+}
+
+class _WatchLegend extends StatelessWidget {
+  const _WatchLegend({required this.color, required this.label});
+  final Color color;
+  final String label;
+  @override
+  Widget build(BuildContext context) =>
+      Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 7),
+        Text(label,
+            style: const TextStyle(color: FlixieColors.light, fontSize: 13)),
+      ]);
 }

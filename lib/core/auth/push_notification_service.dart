@@ -513,7 +513,8 @@ class PushNotificationService {
 
   /// Removes the stored FCM token from the backend and deregisters the device
   /// from FCM so no further messages are delivered after sign-out.
-  static Future<void> removeToken(String userId) async {
+  static Future<void> removeToken(String userId,
+      {bool removeFromBackend = true}) async {
     _currentUserId = null;
     _navigationReady = false;
     _initializedUserId = null;
@@ -525,16 +526,19 @@ class PushNotificationService {
     _onMessageSubscription = null;
     _onMessageOpenedSubscription = null;
     try {
-      final token = await _messaging.getToken();
-      if (token != null) {
-        await UserService.removeFcmToken(userId, token);
+      final token = removeFromBackend
+          ? await _messaging.getToken().timeout(const Duration(seconds: 3))
+          : null;
+      if (token != null && removeFromBackend) {
+        await UserService.removeFcmToken(userId, token)
+            .timeout(const Duration(seconds: 5));
         logger.i('[FCM] This device token removed from backend');
       }
     } catch (e) {
       logger.w('[FCM] Failed to remove FCM token from backend: $e');
     }
     try {
-      await _messaging.deleteToken();
+      await _messaging.deleteToken().timeout(const Duration(seconds: 3));
       logger.i('[FCM] FCM token deleted from Firebase - device unsubscribed');
     } catch (e) {
       logger.w('[FCM] Failed to delete FCM token from Firebase: $e');

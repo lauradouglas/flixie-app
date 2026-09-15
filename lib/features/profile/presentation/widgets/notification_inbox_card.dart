@@ -374,12 +374,45 @@ class NotificationInboxCard extends StatelessWidget {
                     const SizedBox(width: 12),
                   ],
                   Expanded(
-                      child: Text(
-                          subtitle.isEmpty
-                              ? '${options.length} films to choose from'
-                              : subtitle,
-                          style: const TextStyle(
-                              color: FlixieColors.light, fontSize: 13))),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (title?.isNotEmpty == true || options.isNotEmpty)
+                          Text(
+                            title?.isNotEmpty == true
+                                ? title!
+                                : '${options.length} films to choose from',
+                            style: const TextStyle(
+                              color: FlixieColors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              height: 1.3,
+                            ),
+                          ),
+                        if (local != null ||
+                            n.watchRequestLocation?.isNotEmpty == true) ...[
+                          const SizedBox(height: 7),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 6,
+                            children: [
+                              if (local != null)
+                                _PlanDetail(
+                                  icon: Icons.calendar_today_outlined,
+                                  text:
+                                      '${MaterialLocalizations.of(context).formatMediumDate(local)} · ${TimeOfDay.fromDateTime(local).format(context)}',
+                                ),
+                              if (n.watchRequestLocation?.isNotEmpty == true)
+                                _PlanDetail(
+                                  icon: Icons.location_on_outlined,
+                                  text: n.watchRequestLocation!,
+                                ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ]),
               ],
               if (needs) ...[
@@ -476,4 +509,26 @@ class _NotificationHeadlineState extends State<_NotificationHeadline> {
       TextSpan(text: headline.substring(index + name.length)),
     ]));
   }
+}
+
+class _PlanDetail extends StatelessWidget {
+  const _PlanDetail({required this.icon, required this.text});
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Icon(icon, size: 14, color: FlixieColors.light)),
+          const SizedBox(width: 5),
+          Flexible(
+              child: Text(text,
+                  style: const TextStyle(
+                      color: FlixieColors.light, fontSize: 12, height: 1.4))),
+        ],
+      );
 }

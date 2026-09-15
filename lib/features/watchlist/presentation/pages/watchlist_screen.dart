@@ -1229,22 +1229,54 @@ class _WatchlistScreenState extends State<WatchlistScreen>
     if (mounted) _loadWatchlist();
   }
 
+  bool _checkingServices = false;
+
   Future<void> _toggleServices() async {
-    if (_userWatchProviderIds.isEmpty && _selectedTab != 1) {
-      final user = context.read<AuthProvider>().dbUser;
-      if (user == null) return;
-      await showModalBottomSheet<void>(
-          context: context,
-          useRootNavigator: true,
-          useSafeArea: true,
-          isScrollControlled: true,
-          builder: (context) => SizedBox(
-              height: MediaQuery.sizeOf(context).height * .85,
-              child: WatchProvidersSheet(userId: user.id)));
-      if (mounted) _loadWatchlist();
+    if (_checkingServices) return;
+    if (_selectedTab == 1) {
+      setState(() => _selectedTab = 0);
       return;
     }
-    setState(() => _selectedTab = _selectedTab == 1 ? 0 : 1);
+    final auth = context.read<AuthProvider>();
+    final user = auth.dbUser;
+    if (user == null) return;
+    _checkingServices = true;
+    try {
+      // An empty local availability cache does not mean no saved subscriptions.
+      var ids = auth.cachedUserWatchProviderIds;
+      if (ids == null) {
+        final saved = await UserService.getUserWatchProviders(user.id);
+        if (!mounted || auth.dbUser?.id != user.id) return;
+        ids = saved.map((provider) => provider.id).toSet();
+        auth.updateCachedUserWatchProviderIds(ids);
+      }
+      if (!mounted) return;
+      if (ids.isEmpty) {
+        await showModalBottomSheet<void>(
+            context: context,
+            useRootNavigator: true,
+            useSafeArea: true,
+            isScrollControlled: true,
+            builder: (context) => SizedBox(
+                height: MediaQuery.sizeOf(context).height * .85,
+                child: WatchProvidersSheet(userId: user.id)));
+        if (!mounted || auth.dbUser?.id != user.id) return;
+        ids = auth.cachedUserWatchProviderIds ?? const <int>{};
+        if (ids.isEmpty) return;
+      }
+      setState(() {
+        _userWatchProviderIds = {...ids!};
+        _selectedTab = 1;
+      });
+      _loadWatchProviderAvailability(_allWatchlist);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Couldn’t load your services. Please try again.')));
+      }
+    } finally {
+      _checkingServices = false;
+    }
   }
 
   void _clearFilters() {

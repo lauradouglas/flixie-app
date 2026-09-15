@@ -92,8 +92,11 @@ class SearchResults {
       results: resultsList
           .map((e) => SearchResultItem.fromJson(e as Map<String, dynamic>))
           .toList(),
-      totalPages: (json['totalPages'] as num?)?.toInt() ?? 0,
-      totalResults: (json['totalResults'] as num?)?.toInt() ?? 0,
+      totalPages:
+          ((json['totalPages'] ?? json['total_pages']) as num?)?.toInt() ?? 0,
+      totalResults:
+          ((json['totalResults'] ?? json['total_results']) as num?)?.toInt() ??
+              0,
     );
   }
 }

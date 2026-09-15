@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -48,6 +49,44 @@ class _SearchScreenState extends State<SearchScreen> {
   SearchResults? _searchResults;
   SearchEntityResults? _entityResults;
   bool _isSearching = false;
+  bool _loadingMore = false;
+  bool _searchFailed = false;
+  bool _defaultFailed = false;
+  List<String> _recentSearches = [];
+  late final Future<void> _historyReady;
+  static const _historyKey = 'device_recent_searches_v1';
+
+  Future<void> _loadHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() => _recentSearches = prefs.getStringList(_historyKey) ?? []);
+    }
+  }
+
+  Future<void> _saveHistory(String query) async {
+    await _historyReady;
+    if (!mounted) return;
+    final value = query.trim();
+    if (value.isEmpty) return;
+    final next = [
+      value,
+      ..._recentSearches.where((q) => q.toLowerCase() != value.toLowerCase())
+    ].take(8).toList();
+    setState(() => _recentSearches = next);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_historyKey, next);
+  }
+
+  Future<void> _removeHistory([String? query]) async {
+    await _historyReady;
+    if (!mounted) return;
+    final next = query == null
+        ? <String>[]
+        : _recentSearches.where((q) => q != query).toList();
+    setState(() => _recentSearches = next);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_historyKey, next);
+  }
 
   @override
   void initState() {
@@ -57,6 +96,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _trendingMovies = cached;
       _isLoadingDefault = false;
     }
+    _historyReady = _loadHistory();
     _loadDefaultData();
   }
 
@@ -68,6 +108,10 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _loadDefaultData() async {
+    setState(() {
+      _defaultFailed = false;
+      _isLoadingDefault = _trendingMovies.isEmpty;
+    });
     try {
       final trending = await TrendingService.getTrendingMovies();
       if (mounted) {
@@ -78,27 +122,29 @@ class _SearchScreenState extends State<SearchScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoadingDefault = false);
+        setState(() {
+          _isLoadingDefault = false;
+          _defaultFailed = true;
+        });
       }
     }
   }
 
   void _onSearchChanged(String value) {
     _debounce?.cancel();
+    _searchRequestId++;
     final query = value.trim();
-    setState(() => _query = value);
-    if (query.length < 3) {
-      _searchRequestId++;
-      setState(() {
-        _searchResults = null;
-        _entityResults = null;
-        _isSearching = false;
-      });
-      return;
-    }
-    _debounce = Timer(const Duration(milliseconds: 500), () {
-      _performSearch(query);
+    setState(() {
+      _query = value;
+      _searchResults = null;
+      _entityResults = null;
+      _searchFailed = false;
+      _loadingMore = false;
+      _isSearching = query.isNotEmpty;
     });
+    if (query.isEmpty) return;
+    _debounce =
+        Timer(const Duration(milliseconds: 400), () => _performSearch(query));
   }
 
   void _submitSearch(String value) {
@@ -106,52 +152,73 @@ class _SearchScreenState extends State<SearchScreen> {
     if (query.isEmpty) return;
     _debounce?.cancel();
     setState(() => _query = value);
+    _saveHistory(query);
     _performSearch(query);
   }
 
-  Future<void> _performSearch(String query) async {
+  Future<void> _performSearch(String query, {bool loadMore = false}) async {
     if (query.trim().isEmpty) return;
     final requestId = ++_searchRequestId;
-    setState(() => _isSearching = true);
+    final page =
+        loadMore ? (_searchResults?.page ?? _entityResults?.page ?? 1) + 1 : 1;
+    setState(() {
+      _isSearching = !loadMore;
+      _loadingMore = loadMore;
+      _searchFailed = false;
+    });
     try {
       final SearchResults? results;
       final SearchEntityResults? entityResults;
       switch (_searchMode) {
         case _SearchMode.all:
-          results = await SearchService.search(query);
+          results = await SearchService.search(query, page: page);
           entityResults = null;
           break;
         case _SearchMode.movies:
-          results = await SearchService.search(query, type: 'movie');
+          results =
+              await SearchService.search(query, type: 'movie', page: page);
           entityResults = null;
           break;
         case _SearchMode.shows:
-          results = await SearchService.search(query, type: 'tv');
+          results = await SearchService.search(query, type: 'tv', page: page);
           entityResults = null;
           break;
         case _SearchMode.people:
-          results = await SearchService.search(query, type: 'person');
+          results =
+              await SearchService.search(query, type: 'person', page: page);
           entityResults = null;
           break;
         case _SearchMode.companies:
           results = null;
-          entityResults = await SearchService.searchCompany(query);
+          entityResults = await SearchService.searchCompany(query, page: page);
           break;
         case _SearchMode.collections:
           results = null;
-          entityResults = await SearchService.searchCollection(query);
+          entityResults =
+              await SearchService.searchCollection(query, page: page);
           break;
       }
       if (mounted && requestId == _searchRequestId) {
         setState(() {
-          _searchResults = results;
+          _searchResults = loadMore && results != null
+              ? SearchResults(
+                  page: results.page,
+                  results: [...?_searchResults?.results, ...results.results],
+                  totalPages: results.totalPages,
+                  totalResults: results.totalResults)
+              : results;
           _entityResults = entityResults;
           _isSearching = false;
+          _loadingMore = false;
         });
       }
     } catch (e) {
       if (mounted && requestId == _searchRequestId) {
-        setState(() => _isSearching = false);
+        setState(() {
+          _isSearching = false;
+          _loadingMore = false;
+          _searchFailed = true;
+        });
       }
     }
   }
@@ -217,6 +284,7 @@ class _SearchScreenState extends State<SearchScreen> {
             children: [
               if (_query.isNotEmpty)
                 IconButton(
+                  tooltip: 'Clear search',
                   icon: const Icon(Icons.close_rounded,
                       color: FlixieColors.medium),
                   onPressed: () {
@@ -260,7 +328,7 @@ class _SearchScreenState extends State<SearchScreen> {
     ];
 
     return SizedBox(
-      height: 54,
+      height: 42 + MediaQuery.textScalerOf(context).scale(16),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.fromLTRB(16, 2, 16, 10),
@@ -301,143 +369,91 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _setSearchMode(_SearchMode mode) {
     if (_searchMode == mode) return;
-    final hadSearchResponse = _searchResults != null || _entityResults != null;
+    _debounce?.cancel();
+    _searchRequestId++;
     setState(() {
       _searchMode = mode;
       _searchResults = null;
       _entityResults = null;
+      _loadingMore = false;
+      _searchFailed = false;
+      _isSearching = false;
     });
     final query = _controller.text.trim();
-    if (query.length >= 3 || hadSearchResponse) {
-      _performSearch(query);
-    }
+    if (query.isNotEmpty) _performSearch(query);
   }
 
   Widget _buildDefaultView() {
-    if (_isLoadingDefault) {
-      return const Center(
-          child: CircularProgressIndicator(color: FlixieColors.primary));
-    }
-
-    return SingleChildScrollView(
+    return ListView(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Browse By
-          const _SectionHeader(title: 'Browse by'),
-          const SizedBox(height: 10),
-          _buildBrowseByGrid(),
-          const SizedBox(height: 22),
-          // Trending Now
-          if (_trendingMovies.isNotEmpty) ...[
-            const _SectionHeader(title: 'Trending now'),
-            const SizedBox(height: 10),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: EdgeInsets.zero,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 16,
-                childAspectRatio: 0.52,
-              ),
-              itemCount: _trendingMovies.length,
-              itemBuilder: (context, i) => _TrendingPosterCard(
-                movie: _trendingMovies[i],
-                onTap: () => context.push(movieDetailPath(
-                  _trendingMovies[i].id,
-                  source: DetailSource.trending,
-                )),
-              ),
-            ),
-          ],
+      children: [
+        if (_recentSearches.isNotEmpty) ...[
+          Row(children: [
+            const Expanded(
+                child: Text('Recent searches',
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
+            TextButton(
+                onPressed: () => _removeHistory(),
+                child: const Text('Clear all'))
+          ]),
+          for (final query in _recentSearches)
+            ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.history_rounded, size: 20),
+                title: Text(query),
+                trailing: IconButton(
+                    tooltip: 'Remove $query from recent searches',
+                    icon: const Icon(Icons.close, size: 18),
+                    onPressed: () => _removeHistory(query)),
+                onTap: () {
+                  _controller.text = query;
+                  _submitSearch(query);
+                }),
+          const SizedBox(height: 16),
         ],
-      ),
+        const _SectionHeader(title: 'Trending movies'),
+        const SizedBox(height: 12),
+        if (_isLoadingDefault) const Center(child: CircularProgressIndicator()),
+        if (_defaultFailed)
+          _retryMessage('Couldn’t load trending movies.', _loadDefaultData),
+        LayoutBuilder(builder: (context, constraints) {
+          final columns = (constraints.maxWidth /
+                  (180 * MediaQuery.textScalerOf(context).scale(1)))
+              .floor()
+              .clamp(2, 5);
+          final width = (constraints.maxWidth - (columns - 1) * 12) / columns;
+          return Wrap(spacing: 12, runSpacing: 20, children: [
+            for (final movie in _trendingMovies)
+              SizedBox(
+                  width: width,
+                  child: _TrendingPosterCard(
+                      movie: movie,
+                      onTap: () => context.push(movieDetailPath(movie.id,
+                          source: DetailSource.trending)))),
+          ]);
+        }),
+      ],
     );
   }
 
-  Widget _buildBrowseByGrid() {
-    const categories = [
-      _BrowseCategory(
-          label: 'Movies',
-          icon: Icons.movie_filter_rounded,
-          color: Color(0xFFEF4444),
-          mode: _SearchMode.movies),
-      _BrowseCategory(
-          label: 'Shows',
-          icon: Icons.live_tv_rounded,
-          color: Color(0xFF8B5CF6),
-          mode: _SearchMode.shows),
-      _BrowseCategory(
-          label: 'People',
-          icon: Icons.person_outline_rounded,
-          color: Color(0xFFF59E0B),
-          mode: _SearchMode.people),
-      // TODO: Re-add Collections and Studios when their search experiences
-      // are ready for users.
-      // _BrowseCategory(
-      //     label: 'Collections',
-      //     icon: Icons.folder_special_outlined,
-      //     color: Color(0xFF6366F1),
-      //     mode: _SearchMode.collections),
-      // _BrowseCategory(
-      //     label: 'Studios',
-      //     icon: Icons.business_outlined,
-      //     color: Color(0xFF14B8A6),
-      //     mode: _SearchMode.companies),
-    ];
-    return GridView.count(
-      crossAxisCount: 3,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
-      childAspectRatio: 1.7,
-      children: categories
-          .map((cat) => GestureDetector(
-                onTap: () {
-                  _setSearchMode(cat.mode);
-                },
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: _searchMode == cat.mode
-                        ? cat.color.withValues(alpha: 0.16)
-                        : FlixieColors.tabBarBackgroundFocused,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: _searchMode == cat.mode
-                          ? cat.color.withValues(alpha: 0.7)
-                          : Colors.white.withValues(alpha: 0.07),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(cat.icon, color: cat.color, size: 20),
-                      const SizedBox(width: 7),
-                      Text(
-                        cat.label,
-                        style: const TextStyle(
-                          color: FlixieColors.light,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ))
-          .toList(),
-    );
-  }
+  Widget _retryMessage(String message, VoidCallback retry) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text(message),
+          TextButton(onPressed: retry, child: const Text('Try again'))
+        ]),
+      );
 
   Widget _buildSearchResultsView() {
     if (_isSearching) {
       return const Center(child: CircularProgressIndicator());
     }
 
+    if (_searchFailed && _searchResults == null && _entityResults == null) {
+      return _retryMessage(
+          'Couldn’t load search results.', () => _performSearch(_query.trim()));
+    }
     final results = _searchResults?.results ?? [];
     final entityResults = _entityResults?.results ?? [];
     final hasSearchResponse = _searchResults != null || _entityResults != null;
@@ -485,58 +501,79 @@ class _SearchScreenState extends State<SearchScreen> {
       );
     }
 
-    final rankedResults = _rankedResults(results);
     final total = _searchResults?.totalResults ?? results.length;
 
-    return ListView(
+    return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-      children: [
-        _SearchSummary(query: _query.trim(), total: total),
-        const SizedBox(height: 18),
-        ...rankedResults.map((item) {
-          if (item.isPerson && item.person != null) {
-            return _PersonResultTile(
-              person: item.person!,
-              query: _query.trim(),
-              onTap: () => context.push(personDetailPath(
+      itemCount: results.length + 2,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return Padding(
+              padding: const EdgeInsets.only(bottom: 18),
+              child: _SearchSummary(query: _query.trim(), total: total));
+        }
+        if (index == results.length + 1) {
+          if (_searchFailed) {
+            return _retryMessage('Couldn’t load more results.',
+                () => _performSearch(_query.trim(), loadMore: true));
+          }
+          if ((_searchResults?.page ?? 0) >=
+              (_searchResults?.totalPages ?? 0)) {
+            return const SizedBox.shrink();
+          }
+          return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: _loadingMore
+                  ? const Center(child: CircularProgressIndicator())
+                  : TextButton(
+                      onPressed: () =>
+                          _performSearch(_query.trim(), loadMore: true),
+                      child: const Text('Load more')));
+        }
+        final item = results[index - 1];
+        if (item.isPerson && item.person != null) {
+          return _PersonResultTile(
+            person: item.person!,
+            query: _query.trim(),
+            onTap: () {
+              _saveHistory(_query);
+              context.push(personDetailPath(
                 item.person!.id,
                 source: DetailSource.search,
-              )),
-            );
-          }
-          if (item.isShow && item.show != null) {
-            return _SearchMediaTile.show(
-              show: item.show!,
-              query: _query.trim(),
-              onTap: () => context.push(showDetailPath(
+              ));
+            },
+          );
+        }
+        if (item.isShow && item.show != null) {
+          return _SearchMediaTile.show(
+            show: item.show!,
+            query: _query.trim(),
+            onTap: () {
+              _saveHistory(_query);
+              context.push(showDetailPath(
                 item.show!.id,
                 source: DetailSource.search,
-              )),
-            );
-          }
-          if (item.movie != null) {
-            return _SearchMediaTile.movie(
-              movie: item.movie!,
-              query: _query.trim(),
-              onTap: () => context.push(movieDetailPath(
+              ));
+            },
+          );
+        }
+        if (item.movie != null) {
+          return _SearchMediaTile.movie(
+            movie: item.movie!,
+            query: _query.trim(),
+            onTap: () {
+              _saveHistory(_query);
+              context.push(movieDetailPath(
                 item.movie!.id,
                 source: DetailSource.search,
-              )),
-            );
-          }
-          return const SizedBox.shrink();
-        }),
-      ],
+              ));
+            },
+          );
+        }
+        return const SizedBox.shrink();
+      },
     );
   }
-
-  List<SearchResultItem> _rankedResults(
-    List<SearchResultItem> results,
-  ) =>
-      rankSearchResultsByPopularity(
-        results,
-        groupByMediaType: _searchMode == _SearchMode.all,
-      );
 }
 
 // ─── Section header with left accent bar ───────────────────────────────────
@@ -573,20 +610,6 @@ class _SectionHeader extends StatelessWidget {
 }
 
 // ─── Browse-by category data ─────────────────────────────────────────────────
-
-class _BrowseCategory {
-  const _BrowseCategory({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.mode,
-  });
-
-  final String label;
-  final IconData icon;
-  final Color color;
-  final _SearchMode mode;
-}
 
 enum _SearchMode {
   all,
@@ -646,7 +669,8 @@ class _TrendingPosterCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
+            AspectRatio(
+              aspectRatio: 2 / 3,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: movie.poster != null
@@ -671,15 +695,14 @@ class _TrendingPosterCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               movie.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                   color: FlixieColors.white,
                   fontWeight: FontWeight.w600,
-                  fontSize: 13),
+                  fontSize: 14),
             ),
             const SizedBox(height: 3),
-            Row(
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 if (year != null)
                   Text(year,
@@ -864,7 +887,8 @@ class _SearchSummary extends StatelessWidget {
               Icon(Icons.search_rounded, color: FlixieColors.medium, size: 22),
         ),
         const SizedBox(width: 10),
-        Column(
+        Expanded(
+            child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text.rich(
@@ -888,7 +912,7 @@ class _SearchSummary extends StatelessWidget {
               style: const TextStyle(color: FlixieColors.medium, fontSize: 13),
             ),
           ],
-        ),
+        )),
       ],
     );
   }
@@ -988,7 +1012,6 @@ class _SearchMediaTile extends StatelessWidget {
                     _HighlightedText(
                       text: name,
                       query: query,
-                      maxLines: 2,
                       baseStyle: const TextStyle(
                         color: FlixieColors.white,
                         fontSize: 16,
@@ -1072,22 +1095,17 @@ class _HighlightedText extends StatelessWidget {
     required this.text,
     required this.query,
     required this.baseStyle,
-    this.maxLines = 1,
   });
 
   final String text;
   final String query;
   final TextStyle baseStyle;
-  final int maxLines;
 
   @override
   Widget build(BuildContext context) {
     final start = text.toLowerCase().indexOf(query.toLowerCase());
     if (query.isEmpty || start < 0) {
-      return Text(text,
-          maxLines: maxLines,
-          overflow: TextOverflow.ellipsis,
-          style: baseStyle);
+      return Text(text, style: baseStyle);
     }
     final end = start + query.length;
     return Text.rich(
@@ -1101,8 +1119,6 @@ class _HighlightedText extends StatelessWidget {
           TextSpan(text: text.substring(end)),
         ],
       ),
-      maxLines: maxLines,
-      overflow: TextOverflow.ellipsis,
     );
   }
 }
@@ -1155,7 +1171,6 @@ class _PersonResultTile extends StatelessWidget {
                     _HighlightedText(
                       text: person.name,
                       query: query,
-                      maxLines: 2,
                       baseStyle: const TextStyle(
                         color: FlixieColors.white,
                         fontSize: 16,

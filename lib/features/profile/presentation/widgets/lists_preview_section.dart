@@ -18,6 +18,7 @@ class ListsPreviewSection extends StatefulWidget {
     this.allowManage = false,
     this.embedded = false,
     this.publicOnly = false,
+    this.hideWhenEmpty = false,
   });
 
   final String userId;
@@ -26,6 +27,7 @@ class ListsPreviewSection extends StatefulWidget {
   final bool allowManage;
   final bool embedded;
   final bool publicOnly;
+  final bool hideWhenEmpty;
 
   @override
   State<ListsPreviewSection> createState() => _ListsPreviewSectionState();
@@ -63,13 +65,14 @@ class _ListsPreviewSectionState extends State<ListsPreviewSection> {
                 list.userId == null ||
                 list.userId == widget.userId)
             .toList(growable: false);
-        final lists = widget.publicOnly
-            ? loadedLists
-                .where((list) => list.visibility == ListVisibility.public)
-                .toList(growable: false)
-            : loadedLists;
+        final lists = loadedLists
+            .where((list) => list.visibleInProfile(
+                  viewerId: auth.dbUser?.id,
+                  publicPreview: widget.publicOnly,
+                ))
+            .toList(growable: false);
         final previewLists =
-            (widget.allowManage ? lists.take(4) : lists).map((list) {
+            (widget.allowManage ? lists.take(2) : lists).map((list) {
           final posters = list.previewPosterUrls.map(_posterUrl).toList();
           return MediaDetailListItem(
             id: list.id,
@@ -84,6 +87,11 @@ class _ListsPreviewSectionState extends State<ListsPreviewSection> {
           );
         }).toList(growable: false);
 
+        if (widget.hideWhenEmpty &&
+            snapshot.connectionState != ConnectionState.waiting &&
+            lists.isEmpty) {
+          return const SizedBox.shrink();
+        }
         final content = snapshot.connectionState == ConnectionState.waiting &&
                 snapshot.data == null
             ? MediaListsSection(
@@ -131,7 +139,7 @@ class _ListsPreviewSectionState extends State<ListsPreviewSection> {
                         '${lists.length} ${lists.length == 1 ? 'list' : 'lists'}',
                     editLabel: 'Manage',
                     showOwnItemCount: true,
-                    showEdit: widget.allowManage,
+                    showEdit: false,
                     onEdit: () => context.push('/movie-lists'),
                     onSeeAll: widget.allowManage
                         ? () => context.push('/movie-lists')

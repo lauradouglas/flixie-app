@@ -104,8 +104,6 @@ class GreetingHeader extends StatelessWidget {
                 label: 'Plans',
                 onTap: onRequests,
                 badgeCount: requestCount,
-                supportingLabel:
-                    requestCount > 0 ? '$requestCount need(s) you' : null,
               ),
             ],
           ),
@@ -121,14 +119,12 @@ class _ActionButton extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.badgeCount = 0,
-    this.supportingLabel,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
   final int badgeCount;
-  final String? supportingLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -140,7 +136,7 @@ class _ActionButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           onTap: onTap,
           child: SizedBox(
-            height: 80,
+            height: 64,
             child: Center(
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 7),
@@ -148,7 +144,7 @@ class _ActionButton extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     SizedBox(
-                      width: 30,
+                      width: 48,
                       height: 27,
                       child: Stack(
                         clipBehavior: Clip.none,
@@ -157,15 +153,15 @@ class _ActionButton extends StatelessWidget {
                           Icon(icon, color: FlixieColors.primary, size: 18),
                           if (badgeCount > 0)
                             Positioned(
-                              top: -3,
-                              right: -5,
+                              top: 0,
+                              right: -4,
                               child: Container(
                                 constraints: const BoxConstraints(
-                                  minWidth: 20,
-                                  minHeight: 20,
+                                  minWidth: 16,
+                                  minHeight: 16,
                                 ),
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 5, vertical: 2),
+                                    horizontal: 4, vertical: 2),
                                 alignment: Alignment.center,
                                 decoration: const BoxDecoration(
                                   color: FlixieColors.tertiary,
@@ -173,11 +169,13 @@ class _ActionButton extends StatelessWidget {
                                 ),
                                 child: Text(
                                   badgeCount > 99 ? '99+' : '$badgeCount',
+                                  semanticsLabel:
+                                      '$badgeCount plans need your attention',
                                   style: const TextStyle(
                                     color: Colors.black,
-                                    fontSize: 11,
+                                    fontSize: 10,
                                     height: 1,
-                                    fontWeight: FontWeight.w900,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ),
@@ -201,25 +199,6 @@ class _ActionButton extends StatelessWidget {
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 3),
-                    SizedBox(
-                      height: 9,
-                      child: supportingLabel == null
-                          ? null
-                          : FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                supportingLabel!,
-                                maxLines: 1,
-                                style: const TextStyle(
-                                  color: FlixieColors.medium,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w600,
-                                  height: 1,
-                                ),
-                              ),
-                            ),
                     ),
                   ],
                 ),

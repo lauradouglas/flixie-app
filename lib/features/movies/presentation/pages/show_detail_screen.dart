@@ -1,3 +1,6 @@
+import 'package:flixie_app/features/movies/presentation/widgets/watch_provider_header.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/provider_tab_label.dart';
+import 'package:flixie_app/features/settings/data/episode_spoiler_preference.dart';
 import 'package:flixie_app/features/sharing/models/share_card_data.dart';
 import 'package:flixie_app/features/sharing/presentation/share_card_sheet.dart';
 import 'package:flixie_app/features/sharing/presentation/media_chat_share.dart';
@@ -57,6 +60,8 @@ class ShowDetailScreen extends StatefulWidget {
 class _ShowDetailScreenState extends State<ShowDetailScreen> {
   TvShow? _show;
   bool _hideEpisodeSpoilers = true;
+  bool _savingSpoilerPreference = false;
+
   List<WatchProvider> _watchProviders = [];
   List<TvShowCredit> _cast = [];
   List<TvShowCredit> _crew = [];
@@ -83,6 +88,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
   int? _selectedSeasonNumber;
   final Set<int> _updatingEpisodeIds = {};
   final Set<int> _updatingSeasonNumbers = {};
+  final _tabContentKey = GlobalKey();
   _ShowDetailTab _selectedTab = _ShowDetailTab.overview;
 
   static const _background = FlixieColors.background;
@@ -94,6 +100,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
   @override
   void initState() {
     super.initState();
+    EpisodeSpoilerPreference.instance.addListener(_spoilerPreferenceChanged);
     final id = int.tryParse(widget.showId);
     if (id != null && id > 0) {
       context.read<AnalyticsController?>()?.contentOpened(
@@ -102,7 +109,42 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
             source: widget.source.value,
           );
     }
-    _load();
+    _restoreSpoilerPreference();
+  }
+
+  void _spoilerPreferenceChanged() {
+    if (!mounted) return;
+    setState(() {
+      _hideEpisodeSpoilers = EpisodeSpoilerPreference.instance.hide;
+      _savingSpoilerPreference = EpisodeSpoilerPreference.instance.saving;
+    });
+  }
+
+  @override
+  void dispose() {
+    EpisodeSpoilerPreference.instance.removeListener(_spoilerPreferenceChanged);
+    super.dispose();
+  }
+
+  Future<void> _restoreSpoilerPreference() async {
+    try {
+      await EpisodeSpoilerPreference.instance.load();
+      _spoilerPreferenceChanged();
+    } catch (_) {
+      // Keep spoiler protection on when storage is unavailable.
+    }
+    if (mounted) await _load();
+  }
+
+  Future<void> _setHideEpisodeSpoilers(bool value) async {
+    try {
+      await EpisodeSpoilerPreference.instance.setHidden(value);
+    } catch (_) {
+      if (mounted) {
+        _showSnack('Couldn’t save your spoiler preference. Please try again.',
+            type: FlixieToastType.error);
+      }
+    }
   }
 
   Future<void> _load() async {
@@ -505,7 +547,11 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
           showId: showId,
           episodeId: episode.id,
           watched: watched,
-          watchedAt: watched ? DateTime.now().toUtc().toIso8601String() : null,
+          watchedAt: watched
+              ? (undo ? episode.watchedAt : DateTime.now())
+                  ?.toUtc()
+                  .toIso8601String()
+              : null,
         );
         applied.add(episode);
       } catch (_) {
@@ -513,9 +559,15 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       }
     }
     if (!mounted) return;
-    await _load();
-    if (!mounted) return;
-    setState(() => _updatingSeasonNumbers.remove(seasonNumber));
+    setState(() {
+      _show = _show!.withEpisodeProgress({
+        for (final episode in applied)
+          episode.id: episode.withWatched(watched,
+              watched ? (undo ? episode.watchedAt : DateTime.now()) : null),
+      });
+      _updatingSeasonNumbers.remove(seasonNumber);
+    });
+    context.read<AuthProvider>().markActivityChanged();
     final failed = episodes.length - applied.length;
     if (applied.isEmpty) {
       _showSnack('Unable to update season progress',
@@ -542,7 +594,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     ));
   }
 
-  Future<void> _setEpisodeWatched(TvEpisode episode, bool watched) async {
+  Future<void> _setEpisodeWatched(TvEpisode episode, bool watched,
+      {bool undo = false}) async {
     final userId = context.read<AuthProvider>().dbUser?.id;
     final showId = _show?.id;
     if (userId == null || showId == null) return;
@@ -554,14 +607,31 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         showId: showId,
         episodeId: episode.id,
         watched: watched,
-        watchedAt: watched ? DateTime.now().toUtc().toIso8601String() : null,
+        watchedAt: watched
+            ? (undo ? episode.watchedAt : DateTime.now())
+                ?.toUtc()
+                .toIso8601String()
+            : null,
       );
       if (!mounted) return;
       HapticFeedback.selectionClick();
-      await _load();
+      setState(() => _show = _show!.withEpisodeProgress({
+            episode.id: episode.withWatched(watched,
+                watched ? (undo ? episode.watchedAt : DateTime.now()) : null),
+          }));
+      context.read<AuthProvider>().markActivityChanged();
       if (mounted) {
-        _showSnack(
-            watched ? 'Episode marked watched' : 'Episode marked unwatched');
+        ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+          type: FlixieToastType.success,
+          content: Text(
+              watched ? 'Episode marked watched' : 'Episode marked unwatched'),
+          action: undo
+              ? null
+              : SnackBarAction(
+                  label: 'Undo',
+                  onPressed: () =>
+                      _setEpisodeWatched(episode, !watched, undo: true)),
+        ));
       }
     } catch (_) {
       if (mounted) {
@@ -690,8 +760,9 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         action: SnackBarAction(
             label: 'Retry',
             onPressed: () {
-              if (mounted && !_isRatingLoading)
+              if (mounted && !_isRatingLoading) {
                 _setUserRating(rating, recommendation: recommendation);
+              }
             }),
       ));
     }
@@ -846,51 +917,50 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     return RefreshIndicator(
       color: _primary,
       onRefresh: _load,
-      child: CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          _buildSliverAppBar(context, show),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildActions(),
-                  const SizedBox(height: 18),
-                  if (TvShowEpisodeProgress(show).watchedCount > 0) ...[
-                    _buildEpisodeProgressBanner(show),
-                    const SizedBox(height: 18),
-                  ],
-                  _buildSynopsis(context, show),
-                  const SizedBox(height: 18),
-                  _buildFriendSummary(show),
-                  if ((_friendSummary?.friendCount ??
-                          show.friendSummary?.friendCount ??
-                          0) >
-                      0)
-                    const SizedBox(height: 18),
-                  _buildProviderSection(show),
-                  const SizedBox(height: 18),
-                ],
+      child: SafeArea(
+          bottom: false,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              _buildSliverAppBar(context, show),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildActions(),
+                      const SizedBox(height: 18),
+                      if (TvShowEpisodeProgress(show).hasStarted) ...[
+                        _buildEpisodeProgressBanner(show),
+                        const SizedBox(height: 18),
+                      ],
+                      _buildProviderSection(show),
+                      const SizedBox(height: 18),
+                      if (!TvShowEpisodeProgress(show).hasStarted) ...[
+                        _buildEpisodeProgressBanner(show),
+                        const SizedBox(height: 18),
+                      ],
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: _ShowTabsHeaderDelegate(
-              selected: _selectedTab,
-              onSelected: (tab) => setState(() => _selectedTab = tab),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 18, 16, 110),
-              child: _buildSelectedTab(context, show),
-            ),
-          ),
-        ],
-      ),
+              SliverPersistentHeader(
+                pinned: true,
+                delegate: _ShowTabsHeaderDelegate(
+                  selected: _selectedTab,
+                  onSelected: (tab) => setState(() => _selectedTab = tab),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  key: _tabContentKey,
+                  padding: const EdgeInsets.fromLTRB(16, 18, 16, 110),
+                  child: _buildSelectedTab(context, show),
+                ),
+              ),
+            ],
+          )),
     );
   }
 
@@ -898,9 +968,12 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     switch (_selectedTab) {
       case _ShowDetailTab.overview:
         final sections = [
+          _buildSynopsis(context, show),
+          _buildFriendSummary(show),
           _buildSeasonOverview(show),
           _buildCastSection(context, show),
           _buildSimilarSection(context, show),
+          _buildShowInfoSection(context, show),
         ]
             .where((child) => !(child is SizedBox &&
                 child.child == null &&
@@ -986,84 +1059,52 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
   }
 
   Widget _buildSliverAppBar(BuildContext context, TvShow show) {
-    return SliverAppBar(
-      expandedHeight: MediaQuery.sizeOf(context).width < 380 ? 260 : 270,
-      pinned: false,
-      backgroundColor: FlixieColors.background,
-      automaticallyImplyLeading: false,
-      flexibleSpace: FlexibleSpaceBar(
-        background: SafeArea(
-          bottom: false,
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: LayoutBuilder(builder: (context, constraints) {
-                  final compact = constraints.maxWidth < 360;
-                  final posterWidth =
-                      (constraints.maxWidth * .42).clamp(120.0, 168.0);
-                  return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(
-                          width: posterWidth,
-                          child: AspectRatio(
-                            aspectRatio: 2 / 3,
-                            child: Hero(
-                              tag: 'show-poster-${show.id}',
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  onTap: show.posterPath == null
-                                      ? null
-                                      : () => _showPosterViewer(show),
-                                  child: ClipRRect(
-                                    borderRadius: const BorderRadius.only(
-                                      topRight: Radius.circular(12),
-                                      bottomRight: Radius.circular(12),
-                                    ),
-                                    child: _ShowPoster(path: show.posterPath),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: compact ? 14 : 20),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 16),
-                            child:
-                                _buildHeroInformation(show, compact: compact),
-                          ),
-                        ),
-                      ]);
+    return SliverToBoxAdapter(
+        child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(children: [
+                Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _heroIconButton(
+                          icon: Icons.arrow_back_ios_new_rounded,
+                          onTap: () => context.pop()),
+                      _heroIconButton(
+                          icon: Icons.ios_share_rounded,
+                          onTap: () => MediaChatShare(context).show(
+                              ChatShareMedia(
+                                  id: show.id,
+                                  title: show.name,
+                                  posterPath: show.posterPath,
+                                  isShow: true))),
+                    ]),
+                const SizedBox(height: 12),
+                LayoutBuilder(builder: (context, constraints) {
+                  final stacked = constraints.maxWidth < 300 ||
+                      MediaQuery.textScalerOf(context).scale(1) > 1.5;
+                  final poster = SizedBox(
+                      width: 112,
+                      height: 168,
+                      child: InkWell(
+                          onTap: () => _showPosterViewer(show),
+                          child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: _ShowPoster(path: show.posterPath))));
+                  final info = _buildHeroInformation(show, compact: true);
+                  return stacked
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [poster, const SizedBox(height: 16), info])
+                      : Row(children: [
+                          poster,
+                          const SizedBox(width: 20),
+                          Expanded(child: info)
+                        ]);
                 }),
-              ),
-              Positioned(
-                top: 8,
-                left: 16,
-                child: _heroIconButton(
-                  icon: Icons.arrow_back_ios_new_rounded,
-                  onTap: () => context.pop(),
-                ),
-              ),
-              Positioned(
-                top: 8,
-                right: 16,
-                child: _heroIconButton(
-                  icon: Icons.ios_share_rounded,
-                  onTap: () => MediaChatShare(context).show(ChatShareMedia(
-                      id: show.id,
-                      title: show.name,
-                      posterPath: show.posterPath,
-                      isShow: true)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+              ]),
+            )));
   }
 
   Widget _buildHeroInformation(TvShow show, {required bool compact}) {
@@ -1074,8 +1115,6 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(show.name,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
             style: TextStyle(
                 color: Colors.white,
                 fontSize: compact ? 24 : 28,
@@ -1101,28 +1140,6 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         if ((show.status ?? '').isNotEmpty) ...[
           const SizedBox(height: 8),
           _StatusChip(label: show.status!),
-        ],
-        if ((show.tagline ?? '').isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text(show.tagline!,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  color: FlixieColors.light, fontSize: 13, height: 1.25)),
-        ],
-        if (show.genres.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text(show.genres.take(2).join('  ·  '),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: FlixieColors.medium, fontSize: 12)),
-        ],
-        if (show.createdBy.isNotEmpty) ...[
-          const SizedBox(height: 7),
-          Text('Created by ${show.createdBy.take(2).join(', ')}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: FlixieColors.medium, fontSize: 12)),
         ],
       ],
     );
@@ -1151,6 +1168,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       height: 46,
       child: IconButton(
         onPressed: onTap,
+        tooltip: icon == Icons.ios_share_rounded ? 'Share show' : 'Back',
         style: IconButton.styleFrom(
           backgroundColor: Colors.black.withValues(alpha: 0.45),
           shape: const CircleBorder(),
@@ -1465,112 +1483,60 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         released.isNotEmpty && released.every((episode) => episode.watched);
     final busy = _updatingSeasonNumbers.contains(selected.seasonNumber);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
-        Expanded(child: _buildSectionHeader(context, 'Seasons')),
-        Text('${show.seasons.length} seasons',
-            style: const TextStyle(color: FlixieColors.light, fontSize: 13)),
-      ]),
-      SwitchListTile.adaptive(
-        contentPadding: EdgeInsets.zero,
-        title: const Text('Hide episode spoilers'),
-        subtitle: const Text(
-            'Hide unwatched titles and images. Tap an episode to reveal its details.'),
-        value: _hideEpisodeSpoilers,
-        onChanged: (value) => setState(() => _hideEpisodeSpoilers = value),
-      ),
-      const SizedBox(height: 16),
       SizedBox(
-        height: 152 + MediaQuery.textScalerOf(context).scale(44),
+        height: 158 + MediaQuery.textScalerOf(context).scale(20),
         child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: show.seasons.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 14),
-            itemBuilder: (_, index) {
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
               final season = show.seasons[index];
-              final active = season.seasonNumber == selected.seasonNumber;
-              final seasonEpisodes =
-                  show.episodesForSeason(season.seasonNumber);
-              final seasonWatched = season.resolvedEpisodeCount > 0 &&
-                  (seasonEpisodes.isNotEmpty
-                      ? seasonEpisodes.length >= season.resolvedEpisodeCount &&
-                          seasonEpisodes.every((episode) =>
-                              episode.watched && _isReleased(episode))
-                      : season.watchedEpisodeCount >=
-                          season.resolvedEpisodeCount);
+              final active = selected.seasonNumber == season.seasonNumber;
               return Semantics(
                   selected: active,
                   button: true,
                   child: InkWell(
-                    onTap: () => setState(
-                        () => _selectedSeasonNumber = season.seasonNumber),
-                    child: Container(
-                        width: 100,
-                        decoration: BoxDecoration(
-                            border: Border(
-                                bottom: BorderSide(
+                      onTap: () => setState(
+                          () => _selectedSeasonNumber = season.seasonNumber),
+                      borderRadius: BorderRadius.circular(12),
+                      child: SizedBox(
+                          width: 96,
+                          child: Column(children: [
+                            Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                        color: active
+                                            ? _primary
+                                            : Colors.transparent,
+                                        width: 2)),
+                                child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: SizedBox(
+                                        height: 128,
+                                        width: 86,
+                                        child: _ShowPoster(
+                                            path: season.posterPath ??
+                                                show.posterPath)))),
+                            const SizedBox(height: 6),
+                            Text(
+                                season.seasonNumber == 0
+                                    ? 'Specials'
+                                    : 'Season ${season.seasonNumber}',
+                                style: TextStyle(
                                     color: active
-                                        ? FlixieColors.primaryText
-                                        : Colors.transparent,
-                                    width: 3))),
-                        child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              SizedBox(
-                                height: 132,
-                                width: 100,
-                                child: Stack(fit: StackFit.expand, children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(6),
-                                    child: _ShowPoster(path: season.posterPath),
-                                  ),
-                                  if (seasonWatched)
-                                    Positioned(
-                                      top: 6,
-                                      right: 6,
-                                      child: ExcludeSemantics(
-                                          child: Container(
-                                        padding: const EdgeInsets.all(4),
-                                        decoration: const BoxDecoration(
-                                          color: FlixieColors.success,
-                                          shape: BoxShape.circle,
-                                          boxShadow: [
-                                            BoxShadow(
-                                                color: Colors.black38,
-                                                blurRadius: 4)
-                                          ],
-                                        ),
-                                        child: const Icon(Icons.check_rounded,
-                                            size: 18,
-                                            color: FlixieColors.background),
-                                      )),
-                                    ),
-                                ]),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                  season.seasonNumber == 0
-                                      ? 'Specials'
-                                      : 'Season ${season.seasonNumber}',
-                                  style: TextStyle(
-                                      color: active
-                                          ? Colors.white
-                                          : FlixieColors.light,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600)),
-                              Text(
-                                  seasonWatched
-                                      ? 'Watched'
-                                      : '${season.resolvedEpisodeCount} episodes',
-                                  style: TextStyle(
-                                      color: seasonWatched
-                                          ? FlixieColors.success
-                                          : FlixieColors.light,
-                                      fontSize: 12)),
-                            ])),
-                  ));
+                                        ? Colors.white
+                                        : FlixieColors.light)),
+                          ]))));
             }),
       ),
-      const SizedBox(height: 24),
+      SwitchListTile.adaptive(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('Hide spoilers'),
+        value: _hideEpisodeSpoilers,
+        onChanged: _savingSpoilerPreference ? null : _setHideEpisodeSpoilers,
+      ),
       Row(
         children: [
           Expanded(
@@ -1614,15 +1580,12 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         ],
       ),
       const Divider(color: FlixieColors.tabBarBorder),
-      const Padding(
-          padding: EdgeInsets.symmetric(vertical: 12),
-          child: Text('Tap an episode for details. Tick the box when watched.',
-              style: TextStyle(color: FlixieColors.light, fontSize: 12))),
       if (episodes.isEmpty)
         const Text('No episodes available yet.',
             style: TextStyle(color: FlixieColors.light)),
       for (final episode in episodes)
         _EpisodeCard(
+            isNext: TvShowEpisodeProgress(show).nextReleased?.id == episode.id,
             hideSpoilers: _hideEpisodeSpoilers && !episode.watched,
             episode: episode,
             isUpdating: busy || _updatingEpisodeIds.contains(episode.id),
@@ -1638,254 +1601,157 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
 
   Widget _buildEpisodeProgressBanner(TvShow show) {
     final progress = TvShowEpisodeProgress(show);
-    final watchedCount = progress.watchedCount;
-    final total = progress.releasedCount;
     final next = progress.nextReleased;
-    final scheduled = progress.nextScheduled;
-    final ended = (show.status ?? '').toLowerCase().contains('ended') ||
-        (show.status ?? '').toLowerCase().contains('cancel');
-    final complete = total > 0 && watchedCount >= total;
-    final currentSeason = next?.seasonNumber;
-    final seasonRemaining = currentSeason == null
-        ? 0
-        : progress.releasedEpisodes
-            .where((episode) =>
-                episode.seasonNumber == currentSeason && !episode.watched)
-            .length;
-    final title = watchedCount == 0
-        ? 'Not started yet'
-        : complete
-            ? (ended ? 'Series completed' : 'You’re all caught up')
-            : '$watchedCount of $total episodes watched';
-    final subtitle = watchedCount == 0
-        ? '$total released ${total == 1 ? 'episode' : 'episodes'} available'
-        : complete
-            ? scheduled == null
-                ? '$watchedCount episodes watched'
-                : 'Next episode ${_dateLabel(scheduled.airDate)}'
-            : currentSeason == null
-                ? '${total - watchedCount} released episodes remaining'
-                : 'Season $currentSeason  ·  $seasonRemaining ${seasonRemaining == 1 ? 'episode' : 'episodes'} remaining';
-    final actionLabel = next == null
-        ? 'View episodes'
-        : '${watchedCount == 0 ? 'Start' : 'Continue'} S${next.seasonNumber} E${next.episodeNumber}';
-
+    final episode = next ?? progress.nextScheduled;
+    final hidden = _hideEpisodeSpoilers && episode != null && !episode.watched;
+    final busy = episode != null && _updatingEpisodeIds.contains(episode.id);
+    final seasonEpisodes = progress.releasedEpisodes
+        .where((item) => next == null || item.seasonNumber == next.seasonNumber)
+        .toList();
+    final watched = seasonEpisodes.where((item) => item.watched).length;
+    final total = seasonEpisodes.length;
+    const lavender = Color(0xFFC7B5FF);
+    const peach = Color(0xFFFFAD66);
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
-      child: LayoutBuilder(builder: (context, constraints) {
-        final compact = constraints.maxWidth < 360;
-        final status = Row(
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: complete
-                    ? FlixieColors.success
-                    : FlixieColors.primary.withValues(alpha: .18),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                complete ? Icons.check_rounded : Icons.play_arrow_rounded,
-                color:
-                    complete ? FlixieColors.background : FlixieColors.primary,
-                size: 25,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(title,
-                        maxLines: 1,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800)),
-                  ),
-                  const SizedBox(height: 3),
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(subtitle,
-                        maxLines: 1,
-                        style: const TextStyle(
-                            color: FlixieColors.light,
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w500)),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        );
-        final action = Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: compact ? double.infinity : 150,
-              child: FilledButton(
-                onPressed: () {
-                  if (next != null) {
-                    _showEpisodeSheet(next);
-                  } else {
-                    setState(() => _selectedTab = _ShowDetailTab.episodes);
-                  }
-                },
-                style: FilledButton.styleFrom(
-                  backgroundColor: FlixieColors.primary,
-                  foregroundColor: Colors.black,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
-                  shape: const StadiumBorder(),
-                ),
-                child: Text(actionLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w900)),
-              ),
-            ),
-            if (next != null) ...[
-              const SizedBox(height: 5),
-              SizedBox(
-                width: compact ? double.infinity : 150,
-                child: Text(
-                  [next.name, if (next.runtime != null) '${next.runtime}m']
-                      .join('  ·  '),
-                  maxLines: 2,
-                  softWrap: true,
-                  textAlign: TextAlign.center,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 2),
+      decoration: BoxDecoration(
+          color: const Color(0xFF211738),
+          borderRadius: BorderRadius.circular(16)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(
+              progress.hasNewEpisode
+                  ? Icons.auto_awesome_rounded
+                  : progress.isCaughtUp
+                      ? Icons.task_alt_rounded
+                      : Icons.local_activity_outlined,
+              color: peach,
+              size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+              child: Text(progress.nextLabel,
                   style: const TextStyle(
-                      color: FlixieColors.medium, fontSize: 10.5, height: 1.2),
-                ),
-              ),
-            ],
-          ],
-        );
-        return Column(
-          children: [
-            if (compact) ...[
-              status,
-              const SizedBox(height: 12),
-              action,
-            ] else
-              Row(children: [
-                Expanded(child: status),
-                const SizedBox(width: 14),
-                action,
-              ]),
-            if (total > 0) ...[
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: FractionallySizedBox(
-                  widthFactor: compact ? 1 : .58,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(99),
-                    child: LinearProgressIndicator(
-                      value: watchedCount / total,
-                      minHeight: 5,
-                      backgroundColor: Colors.white.withValues(alpha: .08),
-                      valueColor:
-                          const AlwaysStoppedAnimation(FlixieColors.primary),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ],
-        );
-      }),
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700))),
+        ]),
+        if (episode != null) ...[
+          const SizedBox(height: 10),
+          InkWell(
+              onTap: () => _showEpisodeSheet(episode),
+              borderRadius: BorderRadius.circular(12),
+              child: Row(children: [
+                SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: hidden
+                            ? const ColoredBox(
+                                color: FlixieColors.surface,
+                                child: Icon(Icons.visibility_off_outlined,
+                                    color: lavender, size: 22))
+                            : _EpisodeStill(path: episode.stillPath))),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text(
+                          'Season ${episode.seasonNumber} · Episode ${episode.episodeNumber}',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 4),
+                      Text(hidden ? 'Spoilers tucked away' : episode.name,
+                          style: const TextStyle(color: FlixieColors.light)),
+                      if (episode.runtime != null)
+                        Text('${episode.runtime} min',
+                            style: const TextStyle(color: FlixieColors.light)),
+                      if (next == null)
+                        Text('Expected ${_dateLabel(episode.airDate)}',
+                            style: const TextStyle(color: FlixieColors.light)),
+                    ])),
+              ])),
+        ],
+        const SizedBox(height: 10),
+        Text(
+            next == null
+                ? '$watched of $total episodes watched'
+                : '$watched of $total watched this season',
+            style: const TextStyle(color: FlixieColors.light, fontSize: 13)),
+        if (total > 0) ...[
+          const SizedBox(height: 8),
+          LinearProgressIndicator(
+              value: watched / total,
+              minHeight: 6,
+              borderRadius: BorderRadius.circular(6),
+              color: lavender,
+              backgroundColor: FlixieColors.surface),
+        ],
+        if (next != null) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                      backgroundColor: lavender,
+                      foregroundColor: const Color(0xFF1A102B),
+                      minimumSize: const Size(48, 46),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      textStyle: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w700)),
+                  onPressed: busy ? null : () => _setEpisodeWatched(next, true),
+                  icon: const Icon(Icons.check_rounded, size: 20),
+                  label: Text(busy ? 'Saving…' : 'Mark watched'))),
+        ],
+        Center(
+            child: TextButton(
+                style: TextButton.styleFrom(
+                    foregroundColor: lavender,
+                    minimumSize: const Size(48, 48),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    textStyle: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w500)),
+                onPressed: () {
+                  setState(() {
+                    _selectedTab = _ShowDetailTab.episodes;
+                    if (episode != null) {
+                      _selectedSeasonNumber = episode.seasonNumber;
+                    }
+                  });
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    final target = _tabContentKey.currentContext;
+                    if (mounted && target != null) {
+                      Scrollable.ensureVisible(target,
+                          alignment: 0.15,
+                          duration: const Duration(milliseconds: 250));
+                    }
+                  });
+                },
+                child: Text(
+                    progress.hasStarted ? 'Edit progress' : 'View episodes'))),
+      ]),
     );
   }
 
-  // ignore: unused_element
-  Widget _buildNextEpisode(TvShow show) {
-    final progress = TvShowEpisodeProgress(show);
-    final episode = progress.nextReleased ?? progress.nextScheduled;
-    if (episode == null) return const SizedBox.shrink();
-    final released = _isReleased(episode);
-    final busy = _updatingEpisodeIds.contains(episode.id);
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _buildSectionHeader(
-          context,
-          !released
-              ? 'Upcoming episode'
-              : progress.watchedCount == 0
-                  ? 'Start watching'
-                  : 'Next episode'),
-      const SizedBox(height: 12),
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-            color: FlixieColors.surface,
-            borderRadius: BorderRadius.circular(12)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            SizedBox(
-                width: 88,
-                height: 66,
-                child: ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: _EpisodeStill(path: episode.stillPath))),
-            const SizedBox(width: 14),
-            Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                  Text(
-                      'Season ${episode.seasonNumber} · Episode ${episode.episodeNumber}',
-                      style: const TextStyle(
-                          color: FlixieColors.light, fontSize: 12)),
-                  const SizedBox(height: 5),
-                  Text(episode.name,
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 6),
-                  Text(
-                      [
-                        if (episode.runtime != null) '${episode.runtime} min',
-                        if (!released)
-                          _dateLabel(episode.airDate)
-                        else
-                          'Not watched',
-                      ].whereType<String>().join(' · '),
-                      style: const TextStyle(
-                          color: FlixieColors.light, fontSize: 12)),
-                ])),
-          ]),
-          const SizedBox(height: 12),
-          Wrap(
-              spacing: 12,
-              runSpacing: 4,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                if (released)
-                  FilledButton.icon(
-                    onPressed:
-                        busy ? null : () => _setEpisodeWatched(episode, true),
-                    style: FilledButton.styleFrom(
-                        minimumSize: const Size(48, 44),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6))),
-                    icon: const Icon(Icons.check, size: 18),
-                    label: Text(busy ? 'Saving…' : 'Mark as watched'),
-                  ),
-                TextButton(
-                    onPressed: () => _showEpisodeSheet(episode),
-                    child: const Text('Episode details')),
-              ]),
-        ]),
-      ),
-    ]);
+  void _openEpisodes([int? season]) {
+    setState(() {
+      _selectedTab = _ShowDetailTab.episodes;
+      if (season != null) _selectedSeasonNumber = season;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final target = _tabContentKey.currentContext;
+      if (mounted && target != null) {
+        Scrollable.ensureVisible(target,
+            alignment: .15, duration: const Duration(milliseconds: 250));
+      }
+    });
   }
 
   Widget _buildSeasonOverview(TvShow show) {
@@ -1895,16 +1761,12 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       Row(children: [
         Expanded(child: _buildSectionHeader(context, 'Seasons')),
         TextButton(
-            onPressed: () =>
-                setState(() => _selectedTab = _ShowDetailTab.episodes),
+            onPressed: () => _openEpisodes(),
             child: const Text('All episodes')),
       ]),
       for (final season in seasons) ...[
         InkWell(
-          onTap: () => setState(() {
-            _selectedSeasonNumber = season.seasonNumber;
-            _selectedTab = _ShowDetailTab.episodes;
-          }),
+          onTap: () => _openEpisodes(season.seasonNumber),
           child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Row(children: [
@@ -2130,44 +1992,36 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
 
   Widget _buildProviderSection(TvShow show) {
     final providers = _providersForTab(_watchProviderTab);
+    final hasOptions =
+        _ShowProviderTab.values.any((tab) => _providersForTab(tab).isNotEmpty);
     final region =
         context.watch<AuthProvider>().dbUser?.watchProviderRegion ?? 'GB';
-    final country = switch (region) {
-      'GB' => 'United Kingdom',
-      'US' => 'United States',
-      _ => region
-    };
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _buildSectionHeader(context, 'Where to watch'),
-      Row(children: [
-        Expanded(
-            child: Text(country,
-                style: const TextStyle(color: FlixieColors.light))),
-        TextButton(
-            onPressed: () async {
-              await showSettingsEditDetailsSheet(context);
-              if (mounted) {
-                await _load();
-              }
-            },
-            child: const Text('Change')),
-      ]),
-      Row(
-          children: _ShowProviderTab.values
-              .map((tab) => Expanded(child: _providerTabButton(tab)))
-              .toList()),
-      for (final provider in providers.take(3))
+      WatchProviderHeader(
+          region: region,
+          onChange: () async {
+            await showSettingsEditDetailsSheet(context);
+            if (mounted) await _load();
+          }),
+      if (hasOptions)
+        Row(
+            children: _ShowProviderTab.values
+                .map((tab) => Expanded(child: _providerTabButton(tab)))
+                .toList()),
+      for (final provider in providers.take(2))
         _buildCompactProviderCard(provider),
       if (providers.isEmpty)
         Padding(
-            padding: const EdgeInsets.symmetric(vertical: 20),
+            padding: const EdgeInsets.only(top: 4, bottom: 8),
             child: Text(
-                'No ${_providerTabLabel(_watchProviderTab).toLowerCase()} options in this country.',
+                hasOptions
+                    ? 'No ${_providerTabLabel(_watchProviderTab).toLowerCase()} options listed. Check the other options above.'
+                    : 'No watch options listed yet.',
                 style: const TextStyle(color: FlixieColors.light))),
-      if (providers.isNotEmpty)
+      if (providers.length > 2)
         TextButton(
             onPressed: () => _showAllProviderOptions(providers),
-            child: const Text('See all watch options →')),
+            child: Text('See all ${providers.length} options')),
     ]);
   }
 
@@ -2179,7 +2033,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         child: InkWell(
           onTap: () => setState(() => _watchProviderTab = tab),
           child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 14),
+            constraints: const BoxConstraints(minHeight: 48),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
             decoration: BoxDecoration(
                 border: Border(
                     bottom: BorderSide(
@@ -2188,12 +2043,10 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                             : FlixieColors.tabBarBorder,
                         width: selected ? 3 : 1))),
             alignment: Alignment.center,
-            child: Text(_providerTabLabel(tab),
-                style: TextStyle(
-                    color: selected
-                        ? FlixieColors.primaryText
-                        : FlixieColors.light,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500)),
+            child: ProviderTabLabel(
+                label: _providerTabLabel(tab),
+                count: _providersForTab(tab).length,
+                selected: selected),
           ),
         ));
   }
@@ -2262,14 +2115,14 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     return WatchProviderLink(
         provider: provider,
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
+          padding: const EdgeInsets.symmetric(vertical: 9),
           decoration: const BoxDecoration(
               border:
                   Border(bottom: BorderSide(color: FlixieColors.tabBarBorder))),
           child: Row(children: [
             Container(
-                width: 46,
-                height: 46,
+                width: 40,
+                height: 40,
                 padding: const EdgeInsets.all(2),
                 decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(7),
@@ -2419,19 +2272,6 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
               onTap: _updatingAction != null ? null : _showAddToListSheet,
             ),
           ),
-          Expanded(
-            child: _statusActionItem(
-              icon: Icons.group_add_outlined,
-              label: 'Invite',
-              color: FlixieColors.primary,
-              isActive: false,
-              isLoading: false,
-              onTap: _updatingAction != null
-                  ? null
-                  : () => _showSnack('Show invitations are coming soon',
-                      type: FlixieToastType.info),
-            ),
-          ),
         ]),
       ],
     );
@@ -2507,12 +2347,10 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: 3),
-                SizedBox(
-                  height: 14,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
                   child: Text(
                     badge ?? label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: isActive ? color : FlixieColors.light,
@@ -2832,41 +2670,42 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
           style: const TextStyle(color: FlixieColors.medium, fontSize: 11),
         ),
         const SizedBox(height: 10),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(
-              color: FlixieColors.surface.withValues(alpha: 0.58),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.1))),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 58,
-                height: 28,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: summary.friends
-                      .take(3)
-                      .toList()
-                      .asMap()
-                      .entries
-                      .map((entry) => Positioned(
-                          left: entry.key * 17,
-                          child: _showFriendAvatar(entry.value, 28)))
-                      .toList(),
+        if (summary.friendCount > 3)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+                color: FlixieColors.surface.withValues(alpha: 0.58),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.1))),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 58,
+                  height: 28,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: summary.friends
+                        .take(3)
+                        .toList()
+                        .asMap()
+                        .entries
+                        .map((entry) => Positioned(
+                            left: entry.key * 17,
+                            child: _showFriendAvatar(entry.value, 28)))
+                        .toList(),
+                  ),
                 ),
-              ),
-              _showFriendMetric(summary.watchedCount, 'watched'),
-              _showFriendMetric(summary.ratedCount, 'rated'),
-              _showFriendMetric(summary.recommendedCount, 'recommend'),
-              _showFriendMetric(summary.watchlistCount, 'watchlist'),
-              _showFriendMetric(summary.favouriteCount, 'favourite'),
-            ],
+                _showFriendMetric(summary.watchedCount, 'watched'),
+                _showFriendMetric(summary.ratedCount, 'rated'),
+                _showFriendMetric(summary.recommendedCount, 'recommend'),
+                _showFriendMetric(summary.watchlistCount, 'watchlist'),
+                _showFriendMetric(summary.favouriteCount, 'favourite'),
+              ],
+            ),
           ),
-        ),
         const SizedBox(height: 8),
-        ...summary.friends.take(1).map(_buildShowFriendRow),
+        ...summary.friends.take(3).map(_buildShowFriendRow),
       ],
     );
   }
@@ -3263,11 +3102,13 @@ class _EpisodeCard extends StatelessWidget {
   const _EpisodeCard(
       {required this.episode,
       this.hideSpoilers = false,
+      this.isNext = false,
       required this.onOpen,
       required this.onToggleWatched,
       required this.isUpdating});
   final TvEpisode episode;
   final bool hideSpoilers;
+  final bool isNext;
   final VoidCallback onOpen, onToggleWatched;
   final bool isUpdating;
 
@@ -3275,75 +3116,85 @@ class _EpisodeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final date = DateTime.tryParse(episode.airDate ?? '');
     final upcoming = date != null && date.isAfter(DateTime.now());
-    return Column(children: [
-      Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Row(children: [
-            Expanded(
-                child: InkWell(
-                    onTap: onOpen,
-                    child: Row(children: [
-                      SizedBox(
-                          width: 74,
-                          height: 56,
-                          child: ClipRRect(
-                              borderRadius: BorderRadius.circular(5),
-                              child: hideSpoilers
-                                  ? const ColoredBox(
-                                      color: FlixieColors.surface,
-                                      child: Icon(Icons.visibility_off_outlined,
-                                          color: FlixieColors.light))
-                                  : _EpisodeStill(path: episode.stillPath))),
-                      const SizedBox(width: 12),
-                      Expanded(
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                            Text('Episode ${episode.episodeNumber}',
-                                style: const TextStyle(
-                                    color: FlixieColors.light, fontSize: 11)),
-                            const SizedBox(height: 4),
-                            Text(hideSpoilers ? 'Title hidden' : episode.name,
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 14)),
-                            const SizedBox(height: 5),
-                            Text(
-                                upcoming
-                                    ? 'Upcoming · ${episode.airDate}'
-                                    : episode.runtime != null
-                                        ? '${episode.runtime} min'
-                                        : episode.watched
-                                            ? 'Watched'
-                                            : 'Not watched',
-                                style: const TextStyle(
-                                    color: FlixieColors.light, fontSize: 12)),
-                          ])),
-                    ]))),
-            const SizedBox(width: 8),
-            if (isUpdating)
-              const SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: Center(
-                      child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2))))
-            else
-              Semantics(
-                  label: 'Episode ${episode.episodeNumber} watched',
-                  child: Checkbox(
-                      value: episode.watched,
-                      onChanged: upcoming ? null : (_) => onToggleWatched(),
-                      activeColor: FlixieColors.success,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4)),
-                      materialTapTargetSize: MaterialTapTargetSize.padded)),
-          ])),
-      const Divider(height: 1, color: FlixieColors.tabBarBorder),
-    ]);
+    return ColoredBox(
+        color: isNext ? FlixieColors.surfaceElevated : Colors.transparent,
+        child: Column(children: [
+          Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Row(children: [
+                Expanded(
+                    child: InkWell(
+                        onTap: onOpen,
+                        child: Row(children: [
+                          SizedBox(
+                              width: 74,
+                              height: 56,
+                              child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(5),
+                                  child: hideSpoilers
+                                      ? const ColoredBox(
+                                          color: FlixieColors.surface,
+                                          child: Icon(
+                                              Icons.visibility_off_outlined,
+                                              color: FlixieColors.light))
+                                      : _EpisodeStill(
+                                          path: episode.stillPath))),
+                          const SizedBox(width: 12),
+                          Expanded(
+                              child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                Text(
+                                    '${isNext ? 'Up next · ' : ''}Episode ${episode.episodeNumber}',
+                                    style: const TextStyle(
+                                        color: FlixieColors.light,
+                                        fontSize: 11)),
+                                const SizedBox(height: 4),
+                                Text(
+                                    hideSpoilers
+                                        ? 'Title hidden'
+                                        : episode.name,
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14)),
+                                const SizedBox(height: 5),
+                                Text(
+                                    upcoming
+                                        ? 'Upcoming · ${episode.airDate}'
+                                        : episode.runtime != null
+                                            ? '${episode.runtime} min'
+                                            : episode.watched
+                                                ? 'Watched'
+                                                : 'Not watched',
+                                    style: const TextStyle(
+                                        color: FlixieColors.light,
+                                        fontSize: 12)),
+                              ])),
+                        ]))),
+                const SizedBox(width: 8),
+                if (isUpdating)
+                  const SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: Center(
+                          child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 2))))
+                else
+                  Semantics(
+                      label: 'Episode ${episode.episodeNumber} watched',
+                      child: Checkbox(
+                          value: episode.watched,
+                          onChanged: upcoming ? null : (_) => onToggleWatched(),
+                          activeColor: FlixieColors.primary,
+                          shape: const CircleBorder(),
+                          materialTapTargetSize: MaterialTapTargetSize.padded)),
+              ])),
+          const Divider(height: 1, color: FlixieColors.tabBarBorder),
+        ]));
   }
 }
 
@@ -3571,7 +3422,6 @@ class _ShowTabsHeaderDelegate extends SliverPersistentHeaderDelegate {
       _ShowDetailTab.episodes: 'Episodes',
       _ShowDetailTab.reviews: 'Reviews',
       _ShowDetailTab.activity: 'My Activity',
-      _ShowDetailTab.details: 'Details',
     };
     return ColoredBox(
       color: FlixieColors.background,
@@ -3601,11 +3451,15 @@ class _ShowTabsHeaderDelegate extends SliverPersistentHeaderDelegate {
                               : Colors.transparent,
                           width: 3)),
                 ),
-                child: Text(entry.value,
-                    style: TextStyle(
-                      color: active ? Colors.white : FlixieColors.light,
-                      fontWeight: active ? FontWeight.w800 : FontWeight.w500,
-                    )),
+                child: Semantics(
+                    selected: active,
+                    button: true,
+                    child: Text(entry.value,
+                        style: TextStyle(
+                          color: active ? Colors.white : FlixieColors.light,
+                          fontWeight:
+                              active ? FontWeight.w800 : FontWeight.w500,
+                        ))),
               ),
             );
           }).toList(),

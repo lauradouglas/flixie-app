@@ -32,6 +32,8 @@ class _FriendsRowState extends State<FriendsRow> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useRootNavigator: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -47,6 +49,8 @@ class _FriendsRowState extends State<FriendsRow> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useRootNavigator: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -67,52 +71,55 @@ class _FriendsRowState extends State<FriendsRow> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text(
-              'Friends',
-              style: textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: FlixieColors.light,
+        SizedBox(
+          width: double.infinity,
+          child: OverflowBar(
+            alignment: MainAxisAlignment.spaceBetween,
+            overflowAlignment: OverflowBarAlignment.end,
+            spacing: 12,
+            children: [
+              Wrap(
+                spacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    'Friends',
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: FlixieColors.light,
+                    ),
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: FlixieColors.primary.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '$total',
+                      style: const TextStyle(
+                        color: FlixieColors.primary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: FlixieColors.primary.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                '$total',
-                style: const TextStyle(
-                  color: FlixieColors.primary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
+              TextButton.icon(
+                onPressed: () => _showAddFriendSheet(context),
+                style: TextButton.styleFrom(
+                  foregroundColor: FlixieColors.primary,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
                 ),
+                icon: const Icon(Icons.person_add_alt_1_outlined, size: 17),
+                label: const Text('Add friend'),
               ),
-            ),
-            const Spacer(),
-            TextButton.icon(
-              onPressed: () => _showAddFriendSheet(context),
-              style: TextButton.styleFrom(
-                foregroundColor: FlixieColors.primary,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                minimumSize: Size.zero,
-              ),
-              icon: const Icon(Icons.person_add_alt_1_outlined, size: 17),
-              label: const Text('Add friend'),
-            ),
-            TextButton(
-              onPressed: () => _showAllFriendsSheet(context),
-              style: TextButton.styleFrom(
-                foregroundColor: FlixieColors.light,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                minimumSize: Size.zero,
-              ),
-              child: const Text('See all'),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: 10),
         if (widget.isLoading)
@@ -126,22 +133,31 @@ class _FriendsRowState extends State<FriendsRow> {
             ),
           )
         else
-          SizedBox(
-            height: 102,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: friends.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 10),
-              itemBuilder: (_, i) {
-                final friend = friends[i].friendUser;
-                if (friend == null) return const SizedBox.shrink();
-                return GestureDetector(
-                  onTap: () => context.push('/friends/${friend.id}'),
-                  child: _FriendPreviewCard(user: friend),
-                );
-              },
-            ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              for (final friendship in friends)
+                if (friendship.friendUser != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () =>
+                          context.push('/friends/${friendship.friendUser!.id}'),
+                      child: _FriendPreviewCard(user: friendship.friendUser!),
+                    ),
+                  ),
+            ]),
           ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: () => _showAllFriendsSheet(context),
+            label: const Text('View all friends'),
+            icon: const Icon(Icons.chevron_right_rounded, size: 18),
+            iconAlignment: IconAlignment.end,
+          ),
+        ),
       ],
     );
   }
@@ -165,7 +181,7 @@ class _FriendPreviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 76,
+      width: 100,
       child: Column(
         children: [
           ProfileAvatarView(
@@ -181,11 +197,10 @@ class _FriendPreviewCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             user.username,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
             style: const TextStyle(
               color: FlixieColors.light,
-              fontSize: 12.5,
+              fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
           ),

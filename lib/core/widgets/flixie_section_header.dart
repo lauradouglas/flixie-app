@@ -50,15 +50,16 @@ class FlixieSectionHeader extends StatelessWidget {
       padding: padding,
       child: Row(
         children: [
-          Container(
-            width: 4,
-            height: accentHeight,
-            decoration: BoxDecoration(
-              color: FlixieColors.primary,
-              borderRadius: BorderRadius.circular(2),
+          if (accentHeight > 0)
+            Container(
+              width: 4,
+              height: accentHeight,
+              decoration: BoxDecoration(
+                color: FlixieColors.primary,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-          ),
-          const SizedBox(width: 10),
+          if (accentHeight > 0) const SizedBox(width: 10),
           if (trailingText != null)
             Expanded(child: titleWidget)
           else

@@ -64,10 +64,15 @@ class Review {
           : null,
       movieTitle: json['movie'] != null
           ? _nullableString((json['movie'] as Map<String, dynamic>)['title'])
-          : _nullableString(json['movieTitle']),
+          : json['show'] is Map
+              ? _nullableString(json['show']['name'])
+              : _nullableString(json['movieTitle']),
       moviePosterPath: json['movie'] is Map<String, dynamic>
-          ? _nullableString((json['movie'] as Map<String, dynamic>)['posterPath'])
-          : _nullableString(json['moviePosterPath']),
+          ? _nullableString(
+              (json['movie'] as Map<String, dynamic>)['posterPath'])
+          : json['show'] is Map
+              ? _nullableString(json['show']['posterPath'])
+              : _nullableString(json['moviePosterPath']),
       reactions: (json['reactions'] as Map<String, dynamic>?)
               ?.map((k, v) => MapEntry(k, (v as num).toInt())) ??
           {},

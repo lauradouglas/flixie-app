@@ -203,6 +203,25 @@ class UserService {
     await ApiClient.delete('/users/external-id/$externalId');
   }
 
+  static Future<({List<ActivityListItem> items, String? nextCursor})>
+      getUserActivityPage(String userId,
+          {String filter = 'all', String? cursor}) async {
+    final query = Uri(queryParameters: {
+      'limit': '20',
+      'filter': filter,
+      if (cursor != null) 'cursor': cursor
+    }).query;
+    final data = await ApiClient.get('/users/$userId/activity?$query')
+        as Map<String, dynamic>;
+    return (
+      items: (data['items'] as List)
+          .map((item) =>
+              ActivityListItem.fromJson(Map<String, dynamic>.from(item as Map)))
+          .toList(),
+      nextCursor: data['nextCursor'] as String?
+    );
+  }
+
   static Future<List<ActivityListItem>> getUserActivity(String userId) async {
     final data = await ApiClient.get('/users/$userId/activity');
     final activities = (data as List<dynamic>)
@@ -360,6 +379,18 @@ class UserService {
   }
 
   // ---- Reviews -------------------------------------------------------------
+
+  static Future<void> deleteReview(Review review, String userId) async {
+    final type = review.showId == null ? 'MOVIE' : 'SHOW';
+    await ApiClient.delete('/users/$userId/reviews/$type/${review.id}');
+  }
+
+  static Future<List<Review>> getUserReviews(String userId) async {
+    final data = await ApiClient.get('/users/$userId/reviews');
+    return (data as List<dynamic>)
+        .map((item) => Review.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
 
   static Future<List<Review>> getUserMovieReviews(String userId) async {
     apiLogger.d('GET /users/$userId/movies/reviews');

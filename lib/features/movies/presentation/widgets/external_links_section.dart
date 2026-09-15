@@ -37,7 +37,7 @@ class ExternalLinksSection extends StatelessWidget {
       return GestureDetector(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           decoration: BoxDecoration(
             color: FlixieColors.surface,
             borderRadius: BorderRadius.circular(12),
@@ -111,7 +111,7 @@ class ExternalLinksSection extends StatelessWidget {
                 ),
               ),
             ),
-            label: 'Official Profile',
+            label: 'View on IMDb',
             onTap: () => launch('https://www.imdb.com/title/${movie.imdbId}'),
           ),
         if (hasImdb && (hasHomepage || hasSocials)) const SizedBox(height: 10),

@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/settings/data/episode_spoiler_preference.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
@@ -121,6 +122,7 @@ class SettingsScreen extends StatelessWidget {
           _sectionLabel('Preferences'),
           _SettingsGroup(
             children: [
+              const _EpisodeSpoilerSetting(),
               Consumer<AnalyticsController>(
                 builder: (context, analytics, _) => SettingsTile(
                   icon: Icons.analytics_outlined,
@@ -414,11 +416,12 @@ class _LogOutButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: FlixieColors.danger.withValues(alpha: 0.1),
+    return Material(
+      clipBehavior: Clip.antiAlias,
+      color: FlixieColors.danger.withValues(alpha: 0.1),
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(kSettingsCornerRadius),
-        border: Border.all(
+        side: BorderSide(
           color: FlixieColors.danger.withValues(alpha: 0.3),
         ),
       ),
@@ -476,11 +479,12 @@ class _DeleteAccountButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: FlixieColors.danger.withValues(alpha: 0.06),
+    return Material(
+      clipBehavior: Clip.antiAlias,
+      color: FlixieColors.danger.withValues(alpha: 0.06),
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(kSettingsCornerRadius),
-        border: Border.all(color: FlixieColors.danger.withValues(alpha: 0.2)),
+        side: BorderSide(color: FlixieColors.danger.withValues(alpha: 0.2)),
       ),
       child: ListTile(
         leading: const Icon(
@@ -1237,4 +1241,50 @@ class _SettingsCountryPickerSheetState
       ),
     );
   }
+}
+
+class _EpisodeSpoilerSetting extends StatefulWidget {
+  const _EpisodeSpoilerSetting();
+
+  @override
+  State<_EpisodeSpoilerSetting> createState() => _EpisodeSpoilerSettingState();
+}
+
+class _EpisodeSpoilerSettingState extends State<_EpisodeSpoilerSetting> {
+  final preference = EpisodeSpoilerPreference.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    preference.load().catchError((Object _) {});
+  }
+
+  Future<void> _change(bool value) async {
+    try {
+      await preference.setHidden(value);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+            type: FlixieToastType.error,
+            content: const Text(
+                'Couldn’t save your spoiler preference. Please try again.')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+        listenable: preference,
+        builder: (context, _) => SettingsTile(
+          icon: Icons.visibility_off_outlined,
+          label: 'Hide episode spoilers',
+          onTap: () {
+            if (!preference.saving) _change(!preference.hide);
+          },
+          trailing: Switch.adaptive(
+            value: preference.hide,
+            onChanged: preference.saving ? null : _change,
+          ),
+        ),
+      );
 }

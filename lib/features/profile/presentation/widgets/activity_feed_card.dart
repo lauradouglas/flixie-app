@@ -17,7 +17,8 @@ class ActivityFeedCard extends StatefulWidget {
       this.onReply,
       this.onReview,
       this.onOpenList,
-      this.busy = false});
+      this.busy = false,
+      this.embedded = false});
   final ActivityListItem item;
   final ActivityReactionSummary reactions;
   final ValueChanged<BuildContext>? onReact;
@@ -27,6 +28,7 @@ class ActivityFeedCard extends StatefulWidget {
   final VoidCallback? onReply;
   final VoidCallback? onReview, onOpenList;
   final bool busy;
+  final bool embedded;
   @override
   State<ActivityFeedCard> createState() => _ActivityFeedCardState();
 }
@@ -75,6 +77,12 @@ class _ActivityFeedCardState extends State<ActivityFeedCard> {
     return '${elapsed.inDays}d ago';
   }
 
+  Widget _surface({required EdgeInsets padding, required Widget child}) =>
+      widget.embedded
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20), child: child)
+          : WatchPlanSurface(padding: padding, child: child);
+
   @override
   Widget build(BuildContext context) {
     final item = widget.item;
@@ -84,7 +92,7 @@ class _ActivityFeedCardState extends State<ActivityFeedCard> {
     return GestureDetector(
         onLongPress:
             widget.busy || widget.onReact == null ? null : _openReactions,
-        child: WatchPlanSurface(
+        child: _surface(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -134,7 +142,7 @@ class _ActivityFeedCardState extends State<ActivityFeedCard> {
                     child: WatchPlanPoster(
                         path: item.mediaPosterPath,
                         title: item.mediaTitle,
-                        width: 84)),
+                        width: widget.embedded ? 68 : 84)),
                 const SizedBox(width: 16),
                 Expanded(
                     child: Column(

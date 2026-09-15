@@ -39,6 +39,8 @@ class ProfileHeader extends StatelessWidget {
   void _openEditSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: FlixieColors.tabBarBackgroundFocused,
       shape: const RoundedRectangleBorder(
@@ -53,6 +55,7 @@ class ProfileHeader extends StatelessWidget {
 
   void _openAvatarSheet(BuildContext context) => showModalBottomSheet<void>(
         context: context,
+        useRootNavigator: true,
         isScrollControlled: true,
         useSafeArea: true,
         backgroundColor: FlixieColors.background,
@@ -64,160 +67,96 @@ class ProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final color = _avatarColor;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          GestureDetector(
-            onTap: () => _openAvatarSheet(context),
-            child: ProfileAvatarView(
-              avatar: avatar,
-              fallbackText:
-                  displayName.isEmpty ? '?' : displayName[0].toUpperCase(),
-              fallbackColor: color,
-              size: 108,
-              profileBadges: profileBadges,
-            ),
-          ),
-          const SizedBox(width: 18),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Semantics(
+              button: true,
+              label: 'Change profile avatar',
+              child: InkWell(
+                  onTap: () => _openAvatarSheet(context),
+                  child: ProfileAvatarView(
+                      avatar: avatar,
+                      fallbackText: displayName.isEmpty
+                          ? '?'
+                          : displayName[0].toUpperCase(),
+                      fallbackColor: _avatarColor,
+                      size: 76,
+                      profileBadges: profileBadges))),
+          const SizedBox(width: 16),
           Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                // A single badge can sit beside the handle. Multiple featured
-                // badges use their own line so their Wrap never forms an
-                // accidental second row alongside the username.
-                final badgesInline =
-                    profileBadges.length == 1 && constraints.maxWidth >= 240;
-                return Column(
+              child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            '@$username',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: FlixieColors.light,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        if (badgesInline) ...[
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: ProfileBadgePills(
-                                badges: profileBadges,
-                                compact: true,
-                                featuredOnly: true,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    if (profileBadges.isNotEmpty && !badgesInline) ...[
-                      const SizedBox(height: 8),
-                      ProfileBadgePills(
-                        badges: profileBadges,
-                        compact: true,
-                        featuredOnly: true,
-                      ),
-                    ],
-                    const SizedBox(height: 7),
-                    Text(
-                      displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.headlineSmall?.copyWith(
+                Text(displayName,
+                    style: const TextStyle(
                         color: FlixieColors.white,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    if (bio case final bioText
-                        when bioText != null && bioText.isNotEmpty) ...[
-                      const SizedBox(height: 7),
-                      Text(
-                        bioText,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: FlixieColors.light,
-                          fontSize: 13,
-                          height: 1.35,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        _ProfileHeaderAction(
-                          icon: Icons.edit_rounded,
-                          label: 'Edit',
-                          onTap: () => _openEditSheet(context),
-                        ),
-                        if (onPreview != null) ...[
-                          const SizedBox(width: 22),
-                          _ProfileHeaderAction(
-                            icon: Icons.visibility_outlined,
-                            label: 'Preview',
-                            onTap: onPreview!,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800)),
+                const SizedBox(height: 4),
+                Text('@$username',
+                    style: const TextStyle(
+                        color: FlixieColors.light, fontSize: 14)),
+              ])),
+        ]),
+        if (profileBadges.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          ProfileBadgePills(badges: profileBadges, compact: true),
         ],
-      ),
+        if (bio?.isNotEmpty == true) ...[
+          const SizedBox(height: 12),
+          _ExpandableProfileBio(text: bio!),
+        ],
+        const SizedBox(height: 4),
+        Wrap(spacing: 12, children: [
+          TextButton.icon(
+              onPressed: () => _openEditSheet(context),
+              icon: const Icon(Icons.edit_outlined, size: 18),
+              label: const Text('Edit profile')),
+          if (onPreview != null)
+            TextButton.icon(
+                onPressed: onPreview,
+                icon: const Icon(Icons.visibility_outlined, size: 18),
+                label: const Text('Preview profile')),
+        ]),
+      ]),
     );
   }
 }
 
-class _ProfileHeaderAction extends StatelessWidget {
-  const _ProfileHeaderAction({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
+class _ExpandableProfileBio extends StatefulWidget {
+  const _ExpandableProfileBio({required this.text});
+  final String text;
   @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(99),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: FlixieColors.surfaceElevated,
-              shape: BoxShape.circle,
-              border: Border.all(color: FlixieColors.tabBarBorder),
-            ),
-            child: Icon(icon, color: FlixieColors.light, size: 18),
-          ),
-          const SizedBox(width: 6),
-          Text(label,
-              style: const TextStyle(color: FlixieColors.medium, fontSize: 12)),
-        ],
-      ),
-    );
-  }
+  State<_ExpandableProfileBio> createState() => _ExpandableProfileBioState();
+}
+
+class _ExpandableProfileBioState extends State<_ExpandableProfileBio> {
+  bool expanded = false;
+  @override
+  Widget build(BuildContext context) =>
+      LayoutBuilder(builder: (context, constraints) {
+        const style =
+            TextStyle(color: FlixieColors.light, fontSize: 14, height: 1.4);
+        final painter = TextPainter(
+            text: TextSpan(text: widget.text, style: style),
+            maxLines: 2,
+            textDirection: Directionality.of(context),
+            textScaler: MediaQuery.textScalerOf(context))
+          ..layout(maxWidth: constraints.maxWidth);
+        final overflows = painter.didExceedMaxLines;
+        painter.dispose();
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(widget.text,
+              style: style,
+              maxLines: expanded ? null : 2,
+              overflow:
+                  expanded ? TextOverflow.visible : TextOverflow.ellipsis),
+          if (overflows)
+            TextButton(
+                onPressed: () => setState(() => expanded = !expanded),
+                child: Text(expanded ? 'Read less' : 'Read more')),
+        ]);
+      });
 }

@@ -18,6 +18,8 @@ class FavoriteMoviesSection extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useRootNavigator: true,
+      useSafeArea: true,
       backgroundColor: FlixieColors.tabBarBackgroundFocused,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -48,7 +50,7 @@ class FavoriteMoviesSection extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Text(
-                'FAVOURITE MOVIES',
+                'Favourite movies',
                 style: textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -148,7 +150,7 @@ class _MoviePosterCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            title.toUpperCase(),
+            title,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(

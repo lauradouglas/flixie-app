@@ -47,12 +47,41 @@ class DelayedMovies extends MovieService {
   Future<MovieImages> getMovieImages(int id) async => const MovieImages();
 }
 
-Widget app(GuestAuth auth, DelayedMovies movies, String id) =>
-    MultiProvider(providers: [
-      ChangeNotifierProvider<AuthProvider>.value(value: auth),
-      Provider<MovieService>.value(value: movies),
-    ], child: MaterialApp(home: MovieDetailScreen(movieId: id)));
+Widget app(GuestAuth auth, DelayedMovies movies, String id,
+        {double textScale = 1}) =>
+    MultiProvider(
+        providers: [
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
+          Provider<MovieService>.value(value: movies),
+        ],
+        child: MaterialApp(
+            builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context)
+                    .copyWith(textScaler: TextScaler.linear(textScale)),
+                child: child!),
+            home: MovieDetailScreen(movieId: id)));
 void main() {
+  testWidgets('narrow movie header reflows with large text and long title',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 740);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final auth = GuestAuth();
+    final movies = DelayedMovies();
+    addTearDown(auth.dispose);
+    await tester.pumpWidget(app(auth, movies, '1', textScale: 2));
+    movies.core[1]!.complete(const Movie(
+        id: 1,
+        title:
+            'A very long movie title that needs multiple lines to be readable',
+        overview: 'A story.',
+        runtime: 120));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets(
       'core renders while optional work is held; optional errors retry independently',
       (tester) async {

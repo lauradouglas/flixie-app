@@ -84,6 +84,16 @@ class MovieList {
     );
   }
 
+  bool visibleInProfile(
+      {required String? viewerId, required bool publicPreview}) {
+    if (publicPreview) return visibility == ListVisibility.public;
+    if (visibility == ListVisibility.private) {
+      return viewerId != null && userId != null && userId == viewerId;
+    }
+    // The API authorises friends/group access before returning these lists.
+    return true;
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,

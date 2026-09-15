@@ -34,7 +34,8 @@ import 'package:flixie_app/features/social/presentation/widgets/activity_filter_
 import 'package:flixie_app/features/social/presentation/widgets/conversations_hub.dart';
 
 class SocialScreen extends StatefulWidget {
-  const SocialScreen({super.key});
+  const SocialScreen({super.key, this.initialTab = 0});
+  final int initialTab;
 
   @override
   State<SocialScreen> createState() => _SocialScreenState();
@@ -47,7 +48,16 @@ class _SocialScreenState extends State<SocialScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedTab = widget.initialTab;
     TabRefreshController.social.addListener(_onSocialTabRefresh);
+  }
+
+  @override
+  void didUpdateWidget(covariant SocialScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialTab != widget.initialTab) {
+      _selectedTab = widget.initialTab;
+    }
   }
 
   @override
@@ -2367,3 +2377,14 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
     );
   }
 }
+
+Future<void> showProfileCreateGroupSheet(BuildContext context,
+        {required ValueChanged<Group> onCreated}) =>
+    showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
+      isScrollControlled: true,
+      backgroundColor: FlixieColors.tabBarBackgroundFocused,
+      builder: (_) => _CreateGroupSheet(onCreated: onCreated),
+    );

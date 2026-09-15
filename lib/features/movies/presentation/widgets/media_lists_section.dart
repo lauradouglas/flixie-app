@@ -125,7 +125,9 @@ class MediaListsSection extends StatelessWidget {
               OutlinedButton.icon(
                 onPressed: onEdit,
                 icon: const Icon(Icons.edit_outlined, size: 15),
-                label: Text(editLabel),
+                label: Text(ownLists.isEmpty && editLabel == 'Edit'
+                    ? 'Add to list'
+                    : editLabel),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: FlixieColors.light,
                   padding:

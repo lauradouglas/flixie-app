@@ -490,13 +490,10 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
       }
     } else {
       logger.i('User signed out, clearing database user');
-      // Remove FCM token from backend before clearing the auth token so the
-      // API request can still be authenticated. Fire-and-forget is intentional:
-      // we do not want to block the sign-out flow on a network call, and any
-      // failure is tolerable because the token will be re-registered on next
-      // login.
+      // The session has already ended; only deregister this device locally.
       if (_dbUser?.externalId != null) {
-        unawaited(PushNotificationService.removeToken(_dbUser!.externalId!));
+        unawaited(PushNotificationService.removeToken(_dbUser!.externalId!,
+            removeFromBackend: false));
       }
       ApiClient.setToken(null);
       _dbUser = null;
@@ -889,10 +886,9 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  /// Replaces the cached db user with [user] and notifies listeners.
-  /// Use when a service call already returns the updated user model.
+  /// Applies a profile update without discarding omitted collections.
   void updateCachedUser(models.User user) {
-    _dbUser = user;
+    _dbUser = user.preservingCollectionsFrom(_dbUser);
     notifyListeners();
   }
 
@@ -1250,6 +1246,10 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> signOut() async {
     _setLoading(true);
     try {
+      final userId = _dbUser?.externalId;
+      if (userId != null) {
+        await PushNotificationService.removeToken(userId);
+      }
       await _onAuthStateChanged(null);
       await _authService.signOut().timeout(_initialTokenTimeout);
     } finally {

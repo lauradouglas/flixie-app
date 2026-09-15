@@ -10,6 +10,83 @@ import 'package:flixie_app/features/movies/presentation/widgets/review_card.dart
 import 'package:flixie_app/models/review.dart';
 
 void main() {
+  testWidgets('only owners see delete and can cancel without losing review',
+      (tester) async {
+    final review = Review.fromJson({
+      'id': 'delete-test',
+      'userId': 'owner',
+      'movieId': 42,
+      'title': 'My review',
+      'body': 'Keep this review',
+      'rating': 8
+    });
+    Future<void> mount(String viewer) async {
+      await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+              body: ReviewDetailSheet(
+                  review: review,
+                  currentUserId: viewer,
+                  initialReactions: const {},
+                  initialMyReaction: null,
+                  onReactionChanged: (_, __) {},
+                  displayName: 'Owner',
+                  initials: 'O',
+                  formattedDate: 'Today'))));
+      await tester.pump();
+    }
+
+    await mount('other');
+    expect(find.text('Delete review'), findsNothing);
+    await mount('owner');
+    await tester.ensureVisible(find.text('Delete review'));
+    await tester.tap(find.text('Delete review'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete this review?'), findsOneWidget);
+    await tester.tap(find.text('Keep review'));
+    await tester.pumpAndSettle();
+    expect(find.text('Keep this review'), findsOneWidget);
+    expect(find.text('Delete this review?'), findsNothing);
+  });
+  testWidgets(
+      'review sheet hides spoilers and reflows activity reactions at large text',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 640));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final review = Review.fromJson({
+      'id': 'sheet',
+      'movieId': 42,
+      'title': 'A review with a longer title',
+      'body': 'Protected review text',
+      'rating': 8,
+      'containsSpoilers': true
+    });
+    await tester.pumpWidget(MaterialApp(
+        builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: const TextScaler.linear(2)),
+            child: child!),
+        home: Scaffold(
+            body: Builder(
+                builder: (context) => TextButton(
+                    onPressed: () => showReviewDetailSheet(context,
+                        review: review, currentUserId: null),
+                    child: const Text('Open'))))));
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    expect(find.text('Protected review text'), findsNothing);
+    await tester.ensureVisible(find.text('Spoiler review · Reveal'));
+    await tester.tap(find.text('Spoiler review · Reveal'));
+    await tester.pumpAndSettle();
+    expect(find.text('Protected review text'), findsOneWidget);
+    await tester.ensureVisible(find.text('👎'));
+    expect(find.text('👀'), findsOneWidget);
+    expect(find.text('💯'), findsOneWidget);
+    expect(find.text('0'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byTooltip('Close review'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ReviewDetailSheet), findsNothing);
+  });
   for (final type in ['MOVIE', 'SHOW']) {
     test('$type retrieves persisted reviews with author badges', () async {
       await http.runWithClient(() async {
@@ -97,7 +174,8 @@ void main() {
           onWriteReview: () {},
         )))));
     expect(find.byType(ReviewCard), findsNWidgets(4));
-    await tester.tap(find.text('See all 6'));
+    await tester.ensureVisible(find.text('See all 6 reviews'));
+    await tester.tap(find.text('See all 6 reviews'));
     await tester.pumpAndSettle();
     expect(find.text('All Reviews (6)'), findsOneWidget);
     await tester.drag(find.byType(ListView).last, const Offset(0, -1800));

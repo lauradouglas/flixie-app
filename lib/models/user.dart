@@ -213,6 +213,22 @@ class User {
   }
 
   // Create a copy of User with updated fields
+  /// Profile update responses may omit collections; an explicit empty list
+  /// still replaces the cached collection.
+  User preservingCollectionsFrom(User? cached) {
+    if (cached == null || cached.id != id) return this;
+    return copyWith(
+      movieWatchlist: movieWatchlist ?? cached.movieWatchlist,
+      showWatchlist: showWatchlist ?? cached.showWatchlist,
+      watchedMovies: watchedMovies ?? cached.watchedMovies,
+      watchedShows: watchedShows ?? cached.watchedShows,
+      favoriteMovies: favoriteMovies ?? cached.favoriteMovies,
+      favoriteShows: favoriteShows ?? cached.favoriteShows,
+      favoritePeople: favoritePeople ?? cached.favoritePeople,
+      favoriteGenres: favoriteGenres ?? cached.favoriteGenres,
+    );
+  }
+
   User copyWith({
     String? id,
     String? externalId,

@@ -1,5 +1,6 @@
-import 'dart:ui';
-
+import 'package:provider/provider.dart';
+import 'package:flixie_app/core/auth/auth_provider.dart';
+import 'package:flixie_app/models/activity_reaction.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -53,6 +54,8 @@ Future<void> showReviewDetailSheet(
           '${date.year.toString().substring(2)}';
   return showModalBottomSheet<void>(
     context: context,
+    useRootNavigator: true,
+    useSafeArea: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (_) => ReviewDetailSheet(
@@ -69,13 +72,9 @@ Future<void> showReviewDetailSheet(
 }
 
 // Ordered list of supported reactions: (emoji, reactionType key)
-const _kReactions = [
-  ('\u{1F44D}', 'agree'),
-  ('\u{1F525}', 'hot_take'),
-  ('\u{2764}\u{FE0F}', 'love'),
-  ('\u{1F602}', 'funny'),
-  ('\u{1F914}', 'hmm'),
-];
+final _kReactions = reviewActivityReactions.entries
+    .map((entry) => (entry.value.emoji, entry.key))
+    .toList();
 
 class _ReviewCardState extends State<ReviewCard> {
   late Map<String, int> _reactions;
@@ -86,6 +85,7 @@ class _ReviewCardState extends State<ReviewCard> {
   @override
   void initState() {
     super.initState();
+    ReviewReactionsController.deletedReviews.addListener(_onDeleted);
     _reactions = Map<String, int>.from(widget.review.reactions);
     _myReaction = widget.review.myReaction;
     SafetyService.blockedUsers().then<void>((_) {
@@ -93,6 +93,16 @@ class _ReviewCardState extends State<ReviewCard> {
         setState(() => _blocked = true);
       }
     }).catchError((_) {});
+  }
+
+  void _onDeleted() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    ReviewReactionsController.deletedReviews.removeListener(_onDeleted);
+    super.dispose();
   }
 
   String _getInitials() {
@@ -151,6 +161,8 @@ class _ReviewCardState extends State<ReviewCard> {
   void _openFullReview(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => ReviewDetailSheet(
@@ -175,225 +187,210 @@ class _ReviewCardState extends State<ReviewCard> {
 
   @override
   Widget build(BuildContext context) {
-    if (_blocked || SafetyService.isBlocked(widget.review.userId)) {
+    if (ReviewReactionsController.isDeleted(widget.review) ||
+        _blocked ||
+        SafetyService.isBlocked(widget.review.userId)) {
       return const SizedBox.shrink();
     }
     final review = widget.review;
     final hasSpoilers = review.containsSpoilers;
 
-    return GestureDetector(
-      onTap: () => _openFullReview(context),
-      child: Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: FlixieColors.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: FlixieColors.tabBarBorder),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header row
-            Row(
+    final rating = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.star_rounded, color: FlixieColors.warning, size: 20),
+        const SizedBox(width: 4),
+        Text('${review.rating}/10',
+            style: const TextStyle(
+                color: FlixieColors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 16)),
+      ],
+    );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: FlixieColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => _openFullReview(context),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ProfileAvatarView(
-                  avatar: review.user?.avatar,
-                  fallbackText: _getInitials(),
-                  fallbackColor: _avatarColor(),
-                  profileBadges: review.user?.profileBadges ?? const [],
-                  size: 58,
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
+                LayoutBuilder(builder: (context, constraints) {
+                  final stacked = constraints.maxWidth < 300 ||
+                      MediaQuery.textScalerOf(context).scale(14) > 19;
+                  return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        _getDisplayName(),
-                        style: const TextStyle(
-                          color: FlixieColors.white,
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w700,
+                      Row(children: [
+                        ProfileAvatarView(
+                          avatar: review.user?.avatar,
+                          fallbackText: _getInitials(),
+                          fallbackColor: _avatarColor(),
+                          profileBadges: review.user?.profileBadges ?? const [],
+                          size: 42,
                         ),
-                      ),
-                      if (review.title.isNotEmpty) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          review.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: FlixieColors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 17,
+                        const SizedBox(width: 12),
+                        Expanded(
+                            child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(_getDisplayName(),
+                                style: const TextStyle(
+                                    color: FlixieColors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700)),
+                            const SizedBox(height: 2),
+                            Text(_formatDate(review.createdAt),
+                                style: const TextStyle(
+                                    color: FlixieColors.medium, fontSize: 12)),
+                          ],
+                        )),
+                        if (!stacked) rating,
+                        if (widget.currentUserId != null &&
+                            widget.currentUserId != review.userId)
+                          PopupMenuButton<String>(
+                            tooltip: 'Review actions',
+                            padding: EdgeInsets.zero,
+                            onSelected: (action) async {
+                              if (action == 'report') {
+                                await SafetyActions.report(
+                                  context,
+                                  targetType: review.showId == null
+                                      ? 'MOVIE_REVIEW'
+                                      : 'SHOW_REVIEW',
+                                  targetId: review.id,
+                                  reportedUserId: review.userId,
+                                  contentPreview:
+                                      '${review.title}\n${review.body}',
+                                );
+                              } else if (action == 'block') {
+                                final blocked = await SafetyActions.block(
+                                  context,
+                                  userId: review.userId,
+                                  username: _getDisplayName(),
+                                );
+                                if (blocked && mounted) {
+                                  setState(() => _blocked = true);
+                                }
+                              }
+                            },
+                            itemBuilder: (_) => const [
+                              PopupMenuItem(
+                                value: 'report',
+                                child: Text('Report review'),
+                              ),
+                              PopupMenuItem(
+                                value: 'block',
+                                child: Text(
+                                  'Block user',
+                                  style: TextStyle(color: FlixieColors.danger),
+                                ),
+                              ),
+                            ],
+                            icon: const Icon(Icons.more_vert, size: 20),
                           ),
-                        ),
-                      ],
+                      ]),
+                      if (stacked)
+                        Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: rating),
                     ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.star_rounded,
-                            color: FlixieColors.warning, size: 20),
-                        const SizedBox(width: 3),
-                        Text(
-                          '${review.rating}/10',
-                          style: const TextStyle(
-                            color: FlixieColors.white,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 18,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      _formatDate(review.createdAt),
+                  );
+                }),
+                if (review.title.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text(review.title,
                       style: const TextStyle(
-                        color: FlixieColors.medium,
-                        fontSize: 12.5,
+                          color: FlixieColors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 17)),
+                ],
+                if (hasSpoilers) ...[
+                  const SizedBox(height: 8),
+                  Material(
+                    color: FlixieColors.primary.withValues(alpha: .10),
+                    borderRadius: BorderRadius.circular(8),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () =>
+                          setState(() => _spoilerRevealed = !_spoilerRevealed),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 12),
+                        child: Row(children: [
+                          const Icon(Icons.visibility_off_outlined,
+                              color: FlixieColors.light, size: 18),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                              child: Text('Spoiler review',
+                                  style: TextStyle(
+                                      color: FlixieColors.light,
+                                      fontSize: 13))),
+                          Text(_spoilerRevealed ? 'Hide' : 'Reveal',
+                              style: const TextStyle(
+                                  color: FlixieColors.light,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13)),
+                        ]),
                       ),
                     ),
-                  ],
-                ),
-                if (widget.currentUserId != null &&
-                    widget.currentUserId != review.userId)
-                  PopupMenuButton<String>(
-                    tooltip: 'Review actions',
-                    padding: EdgeInsets.zero,
-                    onSelected: (action) async {
-                      if (action == 'report') {
-                        await SafetyActions.report(
-                          context,
-                          targetType: review.showId == null
-                              ? 'MOVIE_REVIEW'
-                              : 'SHOW_REVIEW',
-                          targetId: review.id,
-                          reportedUserId: review.userId,
-                          contentPreview: '${review.title}\n${review.body}',
-                        );
-                      } else if (action == 'block') {
-                        final blocked = await SafetyActions.block(
-                          context,
-                          userId: review.userId,
-                          username: _getDisplayName(),
-                        );
-                        if (blocked && mounted) {
-                          setState(() => _blocked = true);
-                        }
-                      }
-                    },
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(
-                        value: 'report',
-                        child: Text('Report review'),
-                      ),
-                      PopupMenuItem(
-                        value: 'block',
-                        child: Text(
-                          'Block user',
-                          style: TextStyle(color: FlixieColors.danger),
-                        ),
-                      ),
-                    ],
-                    icon: const Icon(Icons.more_vert, size: 20),
                   ),
-              ],
-            ),
-            const SizedBox(height: 18),
-
-            // Body - spoiler guard or truncated preview
-            if (hasSpoilers && !_spoilerRevealed)
-              GestureDetector(
-                onTap: () => setState(() => _spoilerRevealed = true),
-                child: Container(
-                  width: double.infinity,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-                  decoration: BoxDecoration(
-                    color: FlixieColors.warning.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: FlixieColors.warning.withValues(alpha: 0.45),
-                    ),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.warning_amber_rounded,
-                          color: FlixieColors.warning, size: 19),
-                      SizedBox(width: 10),
-                      Text(
-                        'Contains spoilers - tap to reveal',
-                        style: TextStyle(
-                          color: FlixieColors.warning,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            else
-              Text(
-                review.body,
-                maxLines: 4,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: FlixieColors.light,
-                  fontSize: 14,
-                  height: 1.5,
-                ),
-              ),
-
-            const SizedBox(height: 16),
-
-            if (review.recommended)
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-                decoration: BoxDecoration(
-                  color: FlixieColors.success.withValues(alpha: 0.08),
-                  border: Border.all(color: FlixieColors.success, width: 1),
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+                ],
+                if ((!hasSpoilers || _spoilerRevealed) &&
+                    review.body.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(review.body,
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: FlixieColors.light,
+                          fontSize: 14,
+                          height: 1.5)),
+                ],
+                if (review.recommended) ...[
+                  const SizedBox(height: 12),
+                  const Row(children: [
                     Icon(Icons.thumb_up_alt_rounded,
                         color: FlixieColors.success, size: 16),
                     SizedBox(width: 7),
-                    Text('Recommends',
-                        style: TextStyle(
-                            color: FlixieColors.success,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700)),
-                  ],
+                    Expanded(
+                        child: Text('Recommends',
+                            style: TextStyle(
+                                color: FlixieColors.success,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600))),
+                  ]),
+                ],
+                const SizedBox(height: 4),
+                SizedBox(
+                  width: double.infinity,
+                  child: Wrap(
+                    spacing: 12,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    alignment: _reactions.isEmpty
+                        ? WrapAlignment.end
+                        : WrapAlignment.spaceBetween,
+                    children: [
+                      if (_reactions.isNotEmpty)
+                        _ReactionPreview(
+                            reactions: _reactions, myReaction: _myReaction),
+                      TextButton.icon(
+                        onPressed: () => _openFullReview(context),
+                        iconAlignment: IconAlignment.end,
+                        icon: const Icon(Icons.chevron_right, size: 18),
+                        label: const Text('Read review'),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-
-            const SizedBox(height: 16),
-
-            // Footer: reactions + "Read more"
-            Row(
-              children: [
-                if (_reactions.isNotEmpty)
-                  Expanded(
-                    child: _ReactionPreview(
-                        reactions: _reactions, myReaction: _myReaction),
-                  )
-                else
-                  const Spacer(),
-                const Icon(Icons.chevron_right,
-                    color: FlixieColors.primary, size: 22),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -438,6 +435,39 @@ class _ReviewDetailSheetState extends State<ReviewDetailSheet> {
   late String? _myReaction;
   String? _reactingType;
   bool _spoilerRevealed = false;
+
+  bool _deleting = false;
+  Future<void> _deleteReview() async {
+    final confirmed = await showDialog<bool>(
+        context: context,
+        useRootNavigator: true,
+        builder: (context) => AlertDialog(
+                title: const Text('Delete this review?'),
+                content: const Text(
+                    'Your review and its reactions will be permanently removed.'),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Keep review')),
+                  TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('Delete review'))
+                ]));
+    if (confirmed != true || !mounted) return;
+    setState(() => _deleting = true);
+    try {
+      await _reviewReactions.deleteReview(widget.review, widget.currentUserId!);
+      if (!mounted) return;
+      context.read<AuthProvider>().invalidateCachedReviews();
+      Navigator.pop(context);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _deleting = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Couldn’t delete your review. Please try again.')));
+      }
+    }
+  }
 
   Color _avatarColor() {
     final hex = widget.review.user?.iconColor?['hexCode']
@@ -523,214 +553,153 @@ class _ReviewDetailSheetState extends State<ReviewDetailSheet> {
   @override
   Widget build(BuildContext context) {
     final review = widget.review;
-    return DraggableScrollableSheet(
-      initialChildSize: 0.84,
-      minChildSize: 0.4,
-      maxChildSize: 0.97,
-      builder: (context, scrollController) => Container(
-        decoration: const BoxDecoration(
-          color: FlixieColors.background,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-        ),
-        child: Column(
-          children: [
-            // Handle
-            Container(
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              width: 42,
-              height: 4,
-              decoration: BoxDecoration(
-                color: FlixieColors.medium,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(22, 4, 18, 18),
-              child: Row(
-                children: [
-                  ProfileAvatarView(
-                    avatar: review.user?.avatar,
-                    fallbackText: widget.initials,
-                    fallbackColor: _avatarColor(),
-                    profileBadges: review.user?.profileBadges ?? const [],
-                    size: 60,
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.displayName,
-                          style: const TextStyle(
-                            color: FlixieColors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        if (review.title.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            review.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: FlixieColors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.star_rounded,
-                              color: FlixieColors.warning, size: 21),
-                          const SizedBox(width: 3),
-                          Text(
-                            '${review.rating}/10',
-                            style: const TextStyle(
-                              color: FlixieColors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Text(
-                        widget.formattedDate,
-                        style: const TextStyle(
-                          color: FlixieColors.medium,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 22),
-              child: Divider(
-                color: Colors.white.withValues(alpha: 0.09),
-                height: 1,
-              ),
-            ),
-            // Scrollable body
-            Expanded(
-              child: SingleChildScrollView(
-                controller: scrollController,
-                padding: const EdgeInsets.fromLTRB(22, 20, 22, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: review.containsSpoilers && !_spoilerRevealed
-                          ? () => setState(() => _spoilerRevealed = true)
-                          : null,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          ImageFiltered(
-                            imageFilter:
-                                review.containsSpoilers && !_spoilerRevealed
-                                    ? ImageFilter.blur(sigmaX: 5, sigmaY: 5)
-                                    : ImageFilter.blur(sigmaX: 0, sigmaY: 0),
-                            child: Text(
-                              review.body,
-                              style: TextStyle(
-                                color: review.containsSpoilers &&
-                                        !_spoilerRevealed
-                                    ? FlixieColors.light.withValues(alpha: .72)
-                                    : FlixieColors.light,
-                                fontSize: 14,
-                                height: 1.6,
-                              ),
-                            ),
-                          ),
-                          if (review.containsSpoilers && !_spoilerRevealed) ...[
-                            const SizedBox(height: 12),
-                            const Row(
-                              children: [
-                                Icon(Icons.warning_amber_rounded,
-                                    color: FlixieColors.warning, size: 18),
-                                SizedBox(width: 7),
-                                Text(
-                                  'Contains spoilers · tap review to reveal',
-                                  style: TextStyle(
-                                    color: FlixieColors.warning,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    if (review.recommended) ...[
-                      const SizedBox(height: 20),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: FlixieColors.success.withValues(alpha: 0.08),
-                          border: Border.all(color: FlixieColors.success),
-                          borderRadius: BorderRadius.circular(9),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.thumb_up_alt_rounded,
-                                color: FlixieColors.success, size: 17),
-                            SizedBox(width: 8),
-                            Text('Recommends',
-                                style: TextStyle(
-                                    color: FlixieColors.success,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700)),
-                          ],
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 24),
-                    // Reaction strip
-                    _ReactionStrip(
-                      reactions: _reactions,
-                      myReaction: _myReaction,
-                      reactingType: _reactingType,
-                      onReact: _react,
-                    ),
-                    const SizedBox(height: 22),
-                    Divider(color: Colors.white.withValues(alpha: 0.09)),
-                    Center(
-                      child: TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text(
-                          'Close',
-                          style: TextStyle(
-                            color: FlixieColors.primary,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
+    return Container(
+      constraints:
+          BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .88),
+      decoration: const BoxDecoration(
+        color: FlixieColors.background,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
+      child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                  height: 48,
+                  child: Stack(children: [
+                    Center(
+                        child: Container(
+                            width: 42,
+                            height: 4,
+                            decoration: BoxDecoration(
+                                color: FlixieColors.medium,
+                                borderRadius: BorderRadius.circular(2)))),
+                    Positioned(
+                        right: 8,
+                        top: 0,
+                        child: IconButton(
+                            tooltip: 'Close review',
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.close))),
+                  ])),
+              Flexible(
+                  child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      LayoutBuilder(builder: (context, constraints) {
+                        final stacked = constraints.maxWidth < 300 ||
+                            MediaQuery.textScalerOf(context).scale(15) > 21;
+                        final rating =
+                            Row(mainAxisSize: MainAxisSize.min, children: [
+                          const Icon(Icons.star_rounded,
+                              color: FlixieColors.warning, size: 22),
+                          const SizedBox(width: 4),
+                          Text('${review.rating}/10',
+                              style: const TextStyle(
+                                  color: FlixieColors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700)),
+                        ]);
+                        return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(children: [
+                                ProfileAvatarView(
+                                    avatar: review.user?.avatar,
+                                    fallbackText: widget.initials,
+                                    fallbackColor: _avatarColor(),
+                                    profileBadges:
+                                        review.user?.profileBadges ?? const [],
+                                    size: 44),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                    child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                      Text(widget.displayName,
+                                          style: const TextStyle(
+                                              color: FlixieColors.white,
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w700)),
+                                      const SizedBox(height: 3),
+                                      Text(widget.formattedDate,
+                                          style: const TextStyle(
+                                              color: FlixieColors.medium,
+                                              fontSize: 13)),
+                                    ])),
+                                if (!stacked) rating,
+                              ]),
+                              if (stacked)
+                                Padding(
+                                    padding: const EdgeInsets.only(top: 12),
+                                    child: rating),
+                            ]);
+                      }),
+                      if (review.title.isNotEmpty) ...[
+                        const SizedBox(height: 20),
+                        Text(review.title,
+                            style: const TextStyle(
+                                color: FlixieColors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 24)),
+                      ],
+                      if (review.recommended) ...[
+                        const SizedBox(height: 8),
+                        const Row(children: [
+                          Icon(Icons.thumb_up_alt_rounded,
+                              color: FlixieColors.success, size: 18),
+                          SizedBox(width: 8),
+                          Expanded(
+                              child: Text('Recommends',
+                                  style: TextStyle(
+                                      color: FlixieColors.success,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600))),
+                        ]),
+                      ],
+                      const SizedBox(height: 20),
+                      if (review.containsSpoilers) ...[
+                        TextButton.icon(
+                          onPressed: () => setState(
+                              () => _spoilerRevealed = !_spoilerRevealed),
+                          icon: const Icon(Icons.visibility_off_outlined,
+                              size: 18),
+                          label: Text(_spoilerRevealed
+                              ? 'Hide spoilers'
+                              : 'Spoiler review · Reveal'),
+                        ),
+                        if (_spoilerRevealed) const SizedBox(height: 8),
+                      ],
+                      if (!review.containsSpoilers || _spoilerRevealed)
+                        Text(review.body,
+                            style: const TextStyle(
+                                color: FlixieColors.light,
+                                fontSize: 16,
+                                height: 1.5)),
+                      const SizedBox(height: 24),
+                      if (widget.currentUserId != null &&
+                          widget.currentUserId == review.userId)
+                        TextButton.icon(
+                            onPressed: _deleting ? null : _deleteReview,
+                            icon: const Icon(Icons.delete_outline,
+                                color: FlixieColors.danger),
+                            label: Text(
+                                _deleting ? 'Deleting…' : 'Delete review',
+                                style: const TextStyle(
+                                    color: FlixieColors.danger))),
+                      _ReactionStrip(
+                          reactions: _reactions,
+                          myReaction: _myReaction,
+                          reactingType: _reactingType,
+                          onReact: _react),
+                    ]),
+              )),
+            ],
+          )),
     );
   }
 }
@@ -758,7 +727,7 @@ class _ReactionStrip extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Reactions',
+          'React to this review',
           style: TextStyle(
             color: FlixieColors.medium,
             fontSize: 14,
@@ -767,28 +736,32 @@ class _ReactionStrip extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
-        Row(
-          children: _kReactions.map((entry) {
-            final (emoji, type) = entry;
-            final count = reactions[type] ?? 0;
-            final isActive = myReaction == type;
-            final isLoading = reactingType == type;
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: _kReactions.map((entry) {
+              final (emoji, type) = entry;
+              final count = reactions[type] ?? 0;
+              final isActive = myReaction == type;
+              final isLoading = reactingType == type;
 
-            return Expanded(
-              child: _ReactionChip(
-                emoji: emoji,
-                count: count,
-                isActive: isActive,
-                isLoading: isLoading,
-                onTap: isLoading ? null : () => onReact(type),
-              ),
-            );
-          }).toList(),
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: _ReactionChip(
+                  emoji: emoji,
+                  count: count,
+                  isActive: isActive,
+                  isLoading: isLoading,
+                  onTap: reactingType != null ? null : () => onReact(type),
+                ),
+              );
+            }).toList(),
+          ),
         ),
         const SizedBox(height: 16),
         const Center(
           child: Text(
-            'Tap to react • tap again to remove',
+            'Tap again to remove your reaction',
             style: TextStyle(
               color: FlixieColors.medium,
               fontSize: 12,
@@ -852,53 +825,43 @@ class _ReactionChipState extends State<_ReactionChip>
 
   @override
   Widget build(BuildContext context) {
-    const activeColor = FlixieColors.primary;
-    final bg = widget.isActive
-        ? activeColor.withValues(alpha: 0.18)
-        : FlixieColors.tabBarBorder;
-    final border = widget.isActive ? activeColor : Colors.transparent;
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: widget.onTap,
-      child: Column(
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(
-              color: bg,
-              shape: BoxShape.circle,
-              border: Border.all(color: border, width: 1.2),
-            ),
-            alignment: Alignment.center,
-            child: widget.isLoading
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
+    return Semantics(
+      button: true,
+      selected: widget.isActive,
+      label: '${widget.emoji}, ${widget.count} reactions',
+      child: Material(
+        color:
+            widget.isActive ? FlixieColors.primary : FlixieColors.tabBarBorder,
+        borderRadius: BorderRadius.circular(24),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: widget.onTap,
+          child: Container(
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              if (widget.isLoading)
+                const SizedBox(
+                    width: 24,
+                    height: 24,
                     child: CircularProgressIndicator(
-                      strokeWidth: 1.7,
-                      valueColor: AlwaysStoppedAnimation<Color>(activeColor),
-                    ),
-                  )
-                : ScaleTransition(
+                        strokeWidth: 2, color: FlixieColors.white))
+              else
+                ScaleTransition(
                     scale: _scale,
                     child: Text(widget.emoji,
-                        style: const TextStyle(fontSize: 24)),
-                  ),
+                        style: const TextStyle(fontSize: 24))),
+              if (widget.count > 0) ...[
+                const SizedBox(width: 6),
+                Text('${widget.count}',
+                    style: const TextStyle(
+                        color: FlixieColors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700)),
+              ],
+            ]),
           ),
-          const SizedBox(height: 8),
-          AnimatedDefaultTextStyle(
-            duration: const Duration(milliseconds: 200),
-            style: TextStyle(
-              color: widget.isActive ? activeColor : FlixieColors.medium,
-              fontSize: 13,
-              fontWeight: widget.isActive ? FontWeight.w700 : FontWeight.w500,
-            ),
-            child: Text('${widget.count}'),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -929,12 +892,7 @@ class _ReactionPreview extends StatelessWidget {
       child: Row(
         children: [
           ...top.map((e) {
-            final emoji = _kReactions
-                .firstWhere(
-                  (r) => r.$2 == e.key,
-                  orElse: () => ('?', e.key),
-                )
-                .$1;
+            final emoji = reviewReactionEmoji(e.key);
             final isMe = myReaction == e.key;
             return Container(
               margin: const EdgeInsets.only(right: 6),

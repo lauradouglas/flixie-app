@@ -1,3 +1,4 @@
+import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flixie_app/models/activity_reaction.dart';
@@ -18,10 +19,12 @@ class ActivityTile extends StatefulWidget {
       {super.key,
       required this.item,
       this.compact = false,
+      this.embedded = false,
       this.showMoviePreview = true,
       this.detailSource = DetailSource.unknown});
   final ActivityListItem item;
   final bool compact, showMoviePreview;
+  final bool embedded;
   final DetailSource detailSource;
 
   @override
@@ -64,7 +67,7 @@ class _ActivityTileState extends State<ActivityTile>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _load(force: true);
+    if (state == AppLifecycleState.resumed) _load();
   }
 
   @override
@@ -180,8 +183,114 @@ class _ActivityTileState extends State<ActivityTile>
     final currentUserId = context.read<AuthProvider?>()?.dbUser?.id;
     final route = _mediaRoute();
     final payload = ActivityReplyPayload.fromActivity(item);
+    if (widget.compact) {
+      final label = switch (item.type) {
+        ActivityListType.movieRating || ActivityListType.showRating => 'Rated',
+        ActivityListType.movieReview ||
+        ActivityListType.showReview =>
+          'Wrote a review',
+        ActivityListType.movieWatched ||
+        ActivityListType.showWatched =>
+          item.isRewatch ? 'Watched again' : 'Watched',
+        ActivityListType.movieWatchlist ||
+        ActivityListType.showWatchlist =>
+          'Added to watchlist',
+        ActivityListType.favoriteMovie ||
+        ActivityListType.favoriteShow ||
+        ActivityListType.favoritePerson =>
+          'Added to favourites',
+        _ => item.type.value.replaceAll('-', ' '),
+      };
+      return InkWell(
+        onTap: () => showModalBottomSheet<void>(
+            context: context,
+            useRootNavigator: true,
+            useSafeArea: true,
+            isScrollControlled: true,
+            builder: (context) => ConstrainedBox(
+                constraints: BoxConstraints(
+                    maxHeight: MediaQuery.sizeOf(context).height * .85),
+                child: SafeArea(
+                    top: false,
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      SizedBox(
+                          height: 48,
+                          child: Stack(children: [
+                            Center(
+                                child: Container(
+                                    width: 36,
+                                    height: 4,
+                                    decoration: BoxDecoration(
+                                        color: FlixieColors.medium,
+                                        borderRadius:
+                                            BorderRadius.circular(2)))),
+                            Positioned(
+                                right: 8,
+                                top: 0,
+                                child: IconButton(
+                                    tooltip: 'Close activity',
+                                    onPressed: () => Navigator.pop(context),
+                                    icon: const Icon(Icons.close, size: 22))),
+                          ])),
+                      Flexible(
+                          child: SingleChildScrollView(
+                              child: ActivityTile(
+                                  item: item,
+                                  embedded: true,
+                                  detailSource: detailSource))),
+                    ])))),
+        child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox(
+                      width: 48,
+                      height: 72,
+                      child: item.mediaPosterPath == null
+                          ? const Icon(Icons.movie_outlined)
+                          : Image.network(
+                              item.mediaPosterPath!.startsWith('http')
+                                  ? item.mediaPosterPath!
+                                  : 'https://image.tmdb.org/t/p/w185${item.mediaPosterPath}',
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  const Icon(Icons.movie_outlined)))),
+              const SizedBox(width: 12),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Text(item.mediaTitle ?? item.listName ?? 'Activity',
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 4),
+                    Text(label),
+                    if (item.notes?.isNotEmpty == true &&
+                        item.reviewData?.containsSpoilers != true)
+                      Text(item.notes!,
+                          maxLines: 2, overflow: TextOverflow.ellipsis),
+                    Wrap(spacing: 8, children: [
+                      if (item.mediaRating != null)
+                        Text(
+                            '★ ${item.mediaRating!.toStringAsFixed(item.mediaRating! % 1 == 0 ? 0 : 1)}/10',
+                            style:
+                                const TextStyle(color: FlixieColors.warning)),
+                      if (item.recommended == true)
+                        const Text('Recommends',
+                            style: TextStyle(color: FlixieColors.success)),
+                      for (final reaction in _reactions.counts.entries
+                          .where((entry) => entry.value > 0))
+                        Text('${reaction.key} ${reaction.value}'),
+                    ]),
+                  ])),
+              const Icon(Icons.chevron_right, size: 20),
+            ])),
+      );
+    }
     return ActivityFeedCard(
       item: item,
+      embedded: widget.embedded,
       reactions: _reactions,
       busy: _saving,
       onReact: item.userId == currentUserId ? null : _react,

@@ -1,8 +1,10 @@
+import 'package:flixie_app/features/movies/presentation/widgets/review_card.dart'
+    as shared;
+import 'package:flixie_app/features/profile/presentation/controllers/review_reactions_controller.dart';
+import 'package:flixie_app/models/activity_reaction.dart';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import 'package:flixie_app/core/analytics/detail_source.dart';
 import 'package:provider/provider.dart';
 
 import 'package:flixie_app/models/review.dart';
@@ -28,12 +30,22 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
   @override
   void initState() {
     super.initState();
+    ReviewReactionsController.deletedReviews.addListener(_onReviewDeleted);
     _loadReviews();
     _searchController.addListener(_filterReviews);
   }
 
+  void _onReviewDeleted() {
+    if (!mounted) return;
+    setState(() {
+      _allReviews.removeWhere(ReviewReactionsController.isDeleted);
+      _filteredReviews.removeWhere(ReviewReactionsController.isDeleted);
+    });
+  }
+
   @override
   void dispose() {
+    ReviewReactionsController.deletedReviews.removeListener(_onReviewDeleted);
     _searchController.dispose();
     super.dispose();
   }
@@ -57,7 +69,7 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
     }
 
     try {
-      final reviews = await UserService.getUserMovieReviews(userId);
+      final reviews = await UserService.getUserReviews(userId);
       setState(() {
         _allReviews = reviews;
         _filterReviews();
@@ -234,13 +246,9 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
       itemBuilder: (context, index) {
         return ReviewCard(
           review: _filteredReviews[index],
-          onTap: () {
-            if (_filteredReviews[index].movieId != null) {
-              context.push(
-                movieDetailPath(_filteredReviews[index].movieId!),
-              );
-            }
-          },
+          onTap: () => shared.showReviewDetailSheet(context,
+              review: _filteredReviews[index],
+              currentUserId: context.read<AuthProvider>().dbUser?.id),
         );
       },
     );
@@ -443,13 +451,6 @@ class _ReviewCardState extends State<ReviewCard> {
                 // Reactions preview
                 if (review.reactions.isNotEmpty) ...[
                   ...(() {
-                    const emojiMap = {
-                      'agree': '\u{1F44D}',
-                      'hot_take': '\u{1F525}',
-                      'love': '\u{2764}\u{FE0F}',
-                      'funny': '\u{1F602}',
-                      'hmm': '\u{1F914}',
-                    };
                     final sorted = review.reactions.entries.toList()
                       ..sort((a, b) => b.value.compareTo(a.value));
                     return sorted.take(3).map((e) => Padding(
@@ -457,7 +458,7 @@ class _ReviewCardState extends State<ReviewCard> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(emojiMap[e.key] ?? e.key,
+                              Text(reviewReactionEmoji(e.key),
                                   style: const TextStyle(fontSize: 13)),
                               const SizedBox(width: 2),
                               Text(

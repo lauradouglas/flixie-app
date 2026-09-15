@@ -15,9 +15,11 @@ class GroupCard extends StatelessWidget {
     this.memberCount,
     this.members = const [],
     this.statusLabel,
+    this.compact = false,
     this.onTap,
   });
 
+  final bool compact;
   final Group group;
   final int? memberCount;
   final List<GroupMember> members;
@@ -35,6 +37,49 @@ class GroupCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final count = memberCount ?? group.memberCount;
+    if (compact) {
+      final description = group.description?.trim() ?? '';
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Material(
+          color: FlixieColors.tabBarBackgroundFocused,
+          borderRadius: BorderRadius.circular(14),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: onTap ?? () => context.push('/groups/${group.id}'),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(children: [
+                GroupAvatar(group: group, radius: 24),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text(group.name,
+                          style: const TextStyle(
+                              color: FlixieColors.textPrimary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16)),
+                      const SizedBox(height: 3),
+                      Text(
+                          [
+                            if (count != null)
+                              '$count member${count == 1 ? '' : 's'}',
+                            if (description.isNotEmpty) description,
+                          ].join(' · '),
+                          style: const TextStyle(
+                              color: FlixieColors.light, fontSize: 13)),
+                    ])),
+                const SizedBox(width: 8),
+                const Icon(Icons.chevron_right_rounded,
+                    color: FlixieColors.primaryText),
+              ]),
+            ),
+          ),
+        ),
+      );
+    }
     return GestureDetector(
       onTap: onTap ?? () => context.push('/groups/${group.id}'),
       child: Container(

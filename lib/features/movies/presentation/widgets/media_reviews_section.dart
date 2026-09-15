@@ -27,16 +27,12 @@ class MediaReviewsSection extends StatelessWidget {
               spacing: 12,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                const Text('Reviews',
-                    style: TextStyle(
+                Text(reviews.isEmpty ? 'Reviews' : 'Reviews ${reviews.length}',
+                    style: const TextStyle(
                         color: FlixieColors.white,
                         fontSize: 20,
                         fontWeight: FontWeight.w800)),
-                if (reviews.isNotEmpty)
-                  TextButton(
-                      onPressed: () => _showAll(context),
-                      child: Text('See all ${reviews.length}')),
-                OutlinedButton.icon(
+                TextButton.icon(
                     onPressed: onWriteReview,
                     icon: const Icon(Icons.edit_rounded, size: 16),
                     label: const Text('Write review')),
@@ -55,13 +51,17 @@ class MediaReviewsSection extends StatelessWidget {
           else if (reviews.isEmpty)
             const Padding(
                 padding: EdgeInsets.symmetric(vertical: 8),
-                child: Text('No reviews yet. Be the first to write one!',
+                child: Text('No reviews yet. What did you think?',
                     style: TextStyle(color: FlixieColors.light, fontSize: 13))),
           for (final review in reviews.take(4))
             ReviewCard(
                 key: ValueKey(review.id),
                 review: review,
                 currentUserId: currentUserId),
+          if (reviews.length > 4)
+            TextButton(
+                onPressed: () => _showAll(context),
+                child: Text('See all ${reviews.length} reviews')),
         ],
       );
 

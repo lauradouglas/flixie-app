@@ -534,14 +534,15 @@ class MediaDetailScreenSkeleton extends StatelessWidget {
                           SizedBox(height: 10),
                           SkeletonBox(width: 142, height: 16),
                           SizedBox(height: 13),
-                          Row(
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
                             children: [
                               SkeletonBox(
                                 width: 70,
                                 height: 30,
                                 borderRadius: 15,
                               ),
-                              SizedBox(width: 8),
                               SkeletonBox(
                                 width: 82,
                                 height: 30,
@@ -592,9 +593,9 @@ class MediaDetailScreenSkeleton extends StatelessWidget {
                 SizedBox(height: 8),
                 Row(
                   children: [
-                    SkeletonBox(width: 142, height: 76, borderRadius: 12),
+                    Expanded(child: SkeletonBox(height: 76, borderRadius: 12)),
                     SizedBox(width: 10),
-                    SkeletonBox(width: 142, height: 76, borderRadius: 12),
+                    Expanded(child: SkeletonBox(height: 76, borderRadius: 12)),
                   ],
                 ),
                 SizedBox(height: 22),

@@ -18,6 +18,93 @@ void main() {
   TvShow show(List<TvEpisode> episodes, {String status = 'Returning Series'}) =>
       TvShow(id: 10, name: 'Test show', episodes: episodes, status: status);
 
+  test('watch dates survive API parsing and drive recent viewing', () {
+    final parsed = TvEpisode.fromJson({
+      'id': 1,
+      'seasonNumber': 1,
+      'episodeNumber': 1,
+      'userState': {'watched': true, 'watchedAt': '2026-08-06T12:00:00Z'},
+    });
+    final progress = TvShowEpisodeProgress(
+        show([
+          parsed,
+          episode(2, 1, 2, airDate: '2026-07-01'),
+        ]),
+        now: now);
+    expect(parsed.watchedAt, DateTime.utc(2026, 8, 6, 12));
+    expect(progress.nextLabel, 'Continue watching');
+  });
+
+  test('new release takes priority when earlier episodes are watched', () {
+    final progress = TvShowEpisodeProgress(
+        show([
+          episode(1, 1, 1, watched: true, airDate: '2026-07-01'),
+          episode(2, 1, 2, airDate: '2026-08-06'),
+        ]),
+        now: now);
+    expect(progress.nextLabel, 'New episode');
+  });
+
+  test('older unwatched episodes prevent a new-release prompt', () {
+    final progress = TvShowEpisodeProgress(
+        show([
+          episode(1, 1, 1, watched: true),
+          episode(2, 1, 2, airDate: '2026-07-01'),
+          episode(3, 1, 3, airDate: '2026-08-06'),
+        ]),
+        now: now);
+    expect(progress.hasNewEpisode, isFalse);
+    expect(progress.nextLabel, 'Up next');
+    expect(progress.nextReleased?.id, 2);
+  });
+
+  test('future-only shows have no released episodes or watched action', () {
+    final progress = TvShowEpisodeProgress(
+        show([
+          episode(1, 1, 1, airDate: '2026-09-01'),
+        ]),
+        now: now);
+    expect(progress.releasedCount, 0);
+    expect(progress.nextReleased, isNull);
+    expect(progress.nextLabel, 'Coming soon');
+  });
+
+  test('completed and returning shows have distinct completion labels', () {
+    final episodes = [episode(1, 1, 1, watched: true)];
+    expect(TvShowEpisodeProgress(show(episodes), now: now).nextLabel,
+        'All caught up');
+    expect(
+        TvShowEpisodeProgress(show(episodes, status: 'Ended'), now: now)
+            .nextLabel,
+        'Show completed');
+  });
+
+  test('local progress updates preserve show and episode metadata', () {
+    final date = DateTime.utc(2026, 8, 6);
+    final original =
+        TvShow(id: 10, name: 'Test', overview: 'Synopsis', seasons: [
+      TvSeason(
+          id: 1,
+          seasonNumber: 1,
+          name: 'Season 1',
+          posterPath: '/poster.jpg',
+          episodes: [episode(1, 1, 1)])
+    ]);
+    final updated = original.withEpisodeProgress({
+      1: original.seasons.first.episodes.first.withWatched(true, date),
+    });
+    expect(original.seasons.first.episodes.first.watched, isFalse);
+    expect(updated.overview, 'Synopsis');
+    expect(updated.seasons.first.posterPath, '/poster.jpg');
+    expect(updated.seasons.first.watchedEpisodeCount, 1);
+    expect(TvShowEpisodeProgress(updated, now: now).watchedCount, 1);
+    expect(updated.seasons.first.episodes.first.watchedAt, date);
+    final undone = updated.withEpisodeProgress({
+      1: original.seasons.first.episodes.first,
+    });
+    expect(TvShowEpisodeProgress(undone, now: now).watchedCount, 0);
+  });
+
   test('never-started show offers its first released episode', () {
     final progress = TvShowEpisodeProgress(
       show([episode(1, 1, 1), episode(2, 1, 2)]),

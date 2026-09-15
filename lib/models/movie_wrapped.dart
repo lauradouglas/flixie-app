@@ -1,4 +1,5 @@
 class MovieWrapped {
+  final Map<String, dynamic>? insights;
   final int year;
   final int totalMoviesWatched;
   final int rewatchCount;
@@ -11,6 +12,7 @@ class MovieWrapped {
   final WrappedCard? wrappedCard;
 
   const MovieWrapped({
+    this.insights,
     required this.year,
     required this.totalMoviesWatched,
     required this.rewatchCount,
@@ -36,6 +38,7 @@ class MovieWrapped {
     final cardJson = json['wrappedCard'] as Map<String, dynamic>?;
 
     return MovieWrapped(
+      insights: json['insights'] as Map<String, dynamic>?,
       year: _parseInt(json['year']) ?? DateTime.now().year,
       totalMoviesWatched: _parseInt(
               totals?['totalMoviesWatched'] ?? json['totalMoviesWatched']) ??

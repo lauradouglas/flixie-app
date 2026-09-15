@@ -1,3 +1,5 @@
+import 'package:flixie_app/models/movie_rating.dart';
+import 'package:flixie_app/models/favorite_movie.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'dart:ui';
@@ -35,6 +37,8 @@ import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.d
 import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/review_card.dart'
     show showReviewDetailSheet;
+import 'package:flixie_app/features/movies/presentation/widgets/review_card.dart'
+    as shared;
 
 enum _FriendshipStatus { none, pending, requested, friends }
 
@@ -77,6 +81,7 @@ class _FriendRecentReviewCard extends StatefulWidget {
     required this.username,
     required this.onTap,
     required this.onViewReview,
+    // ignore: unused_element_parameter
     this.onReply,
   });
 
@@ -376,6 +381,15 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     return false;
   }
 
+  bool get _isSelf => context.read<AuthProvider>().dbUser?.id == widget.userId;
+  bool _bioExpanded = false;
+  String? _activityCursor;
+  bool _activityFailed = false;
+  bool _reviewsFailed = false;
+  int _reviewLimit = 10;
+  List<MovieRating> _sharedRatings = [];
+  Map<int, int> _myRatingValues = {};
+
   Future<void> _loadAll() async {
     // _loadUser must complete first: compatibility uses _user.favoriteMovies
     await _loadUser();
@@ -403,8 +417,9 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
   }
 
   Future<void> _loadReviews() async {
+    _reviewsFailed = false;
     try {
-      final reviews = await UserService.getUserMovieReviews(widget.userId);
+      final reviews = await UserService.getUserReviews(widget.userId);
       if (mounted) {
         setState(() {
           _reviews = reviews;
@@ -413,20 +428,35 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       }
     } catch (e) {
       logger.e('[FriendProfileScreen] reviews load error: $e');
+      _reviewsFailed = true;
       if (mounted) setState(() => _reviewsLoading = false);
     }
   }
 
-  Future<void> _loadActivity() async {
+  Future<void> _loadActivity({bool more = false}) async {
+    if (more && _activityLoading) return;
+    if (mounted) {
+      setState(() {
+        _activityLoading = true;
+        _activityFailed = false;
+      });
+    }
     try {
-      final activity = await UserService.getUserActivity(widget.userId);
+      final page = await UserService.getUserActivityPage(widget.userId,
+          cursor: more ? _activityCursor : null);
+      final activity = page.items;
       if (!mounted) return;
       setState(() {
-        _activity = activity.where((item) => !item.removed).toList();
+        _activity = [
+          ...(more ? _activity : <ActivityListItem>[]),
+          ...activity.where((item) => !item.removed)
+        ];
+        _activityCursor = page.nextCursor;
         _activityLoading = false;
       });
     } catch (e) {
       logger.e('[FriendProfileScreen] activity load error: $e');
+      _activityFailed = true;
       if (mounted) setState(() => _activityLoading = false);
     }
   }
@@ -435,7 +465,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     final currentUser = context.read<AuthProvider>().dbUser;
     final myId = currentUser?.id;
     final myFavoriteMovies = currentUser?.favoriteMovies;
-    if (myId == null) {
+    if (myId == null || myId == widget.userId) {
       if (mounted) setState(() => _compatibilityLoading = false);
       return;
     }
@@ -470,6 +500,9 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       }
       if (mounted) {
         setState(() {
+          _sharedRatings =
+              friendRatings.where((r) => myMap.containsKey(r.movieId)).toList();
+          _myRatingValues = myMap;
           _compatibilityScore = score;
           _sharedMovieCount = sharedIds.length;
           _sharedFavCount = sharedFavCount;
@@ -486,7 +519,9 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     if (favorites == null) return {};
     final ids = <int>{};
     for (final item in favorites) {
-      if (item is Map<String, dynamic>) {
+      if (item is FavoriteMovie) {
+        if (item.removed != true) ids.add(item.movieId);
+      } else if (item is Map<String, dynamic> && item['removed'] != true) {
         final id = item['movieId'] ?? item['id'];
         if (id is int) ids.add(id);
       } else if (item is int) {
@@ -631,6 +666,8 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     final movie = await showModalBottomSheet<MovieShort>(
       context: context,
       isScrollControlled: true,
+      useRootNavigator: true,
+      useSafeArea: true,
       backgroundColor: FlixieColors.surface,
       builder: (sheetContext) => Padding(
         padding: EdgeInsets.only(
@@ -660,6 +697,8 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useRootNavigator: true,
+      useSafeArea: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -880,10 +919,10 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(user.username),
+        title: Text(_isSelf ? 'Public profile preview' : 'Profile'),
         centerTitle: true,
         actions: [
-          if (!widget.previewMode)
+          if (!widget.previewMode && !_isSelf)
             PopupMenuButton<String>(
               tooltip: 'Profile actions',
               onSelected: (action) async {
@@ -959,8 +998,9 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
             // Notification deep links use preview mode to suppress ordinary
             // profile actions. An incoming friend request is an exception:
             // its recipient still needs the Accept / Decline decision here.
-            if (!widget.previewMode ||
-                _friendshipStatus == _FriendshipStatus.pending) ...[
+            if (!_isSelf &&
+                (!widget.previewMode ||
+                    _friendshipStatus == _FriendshipStatus.pending)) ...[
               const SizedBox(height: 18),
               _profileActions(),
               if (_friendshipStatus == _FriendshipStatus.friends) ...[
@@ -992,70 +1032,47 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
 
   Widget _modernHeader(User user) {
     final showFirstName = user.firstName?.trim().isNotEmpty == true;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
         ProfileAvatarView(
-          avatar: user.avatar,
-          fallbackText: user.initials ?? user.username[0].toUpperCase(),
-          fallbackColor: _avatarColor,
-          size: 80,
-          profileBadges: user.profileBadges,
-        ),
-        const SizedBox(width: 22),
+            avatar: user.avatar,
+            fallbackText: user.initials ??
+                (user.username.isEmpty ? '?' : user.username[0]),
+            fallbackColor: _avatarColor,
+            size: 76,
+            profileBadges: user.profileBadges),
+        const SizedBox(width: 16),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '@${user.username}',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: FlixieColors.white,
-                  fontSize: 25,
-                  height: 1.05,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              if (showFirstName) ...[
-                const SizedBox(height: 5),
-                Text(user.firstName!,
-                    style: const TextStyle(
-                        color: FlixieColors.light, fontSize: 16)),
-              ],
-              if (user.profileBadges.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                ProfileBadgePills(
-                  badges: user.profileBadges,
-                  compact: true,
-                  featuredOnly: true,
-                ),
-              ],
-              const SizedBox(height: 9),
-              Row(children: [
-                const Icon(Icons.calendar_month_outlined,
-                    size: 14, color: FlixieColors.medium),
-                const SizedBox(width: 5),
-                Flexible(
-                  child: Text(_memberSinceLabel,
-                      style: const TextStyle(
-                          color: FlixieColors.medium, fontSize: 12)),
-                ),
-              ]),
-              if (user.bio?.trim().isNotEmpty == true) ...[
-                const SizedBox(height: 9),
-                Text(user.bio!.trim(),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        color: FlixieColors.light, height: 1.35)),
-              ],
-            ],
-          ),
-        ),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(showFirstName ? user.firstName! : user.username,
+              style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  color: FlixieColors.white)),
+          Text('@${user.username}',
+              style: const TextStyle(color: FlixieColors.medium)),
+          if (user.profileBadges.isNotEmpty)
+            Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: ProfileBadgePills(
+                    badges: user.profileBadges, compact: true)),
+        ])),
+      ]),
+      if (user.bio?.trim().isNotEmpty == true) ...[
+        const SizedBox(height: 14),
+        Text(user.bio!.trim(),
+            maxLines: _bioExpanded ? null : 2,
+            overflow:
+                _bioExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+            style: const TextStyle(color: FlixieColors.light, height: 1.4)),
+        TextButton(
+            onPressed: () => setState(() => _bioExpanded = !_bioExpanded),
+            child: Text(_bioExpanded ? 'Read less' : 'Read more')),
       ],
-    );
+      Text(_memberSinceLabel,
+          style: const TextStyle(color: FlixieColors.medium, fontSize: 12)),
+    ]);
   }
 
   Widget _profileActions() {
@@ -1087,23 +1104,19 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       return SizedBox(width: double.infinity, child: _buildFriendshipButton());
     }
     return Row(children: [
-      Tooltip(
-        message: 'Message ${_user?.username ?? 'friend'}',
-        child: IconButton.outlined(
-          onPressed: () => context.push('/chat/${widget.userId}'),
-          icon: const Icon(Icons.chat_bubble_outline_rounded),
-          style: IconButton.styleFrom(
-            minimumSize: const Size(50, 50),
-            side: const BorderSide(color: FlixieColors.primary),
-          ),
-        ),
-      ),
+      Expanded(
+          child: OutlinedButton.icon(
+        onPressed: () => context.push('/chat/${widget.userId}'),
+        icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+        label: const Text('Message'),
+        style: OutlinedButton.styleFrom(minimumSize: const Size(0, 50)),
+      )),
       const SizedBox(width: 12),
       Expanded(
         child: FilledButton.icon(
           onPressed: _inviteToWatch,
           icon: const Icon(Icons.person_add_alt_1),
-          label: const Text('Invite to watch'),
+          label: const Text('Plan a watch'),
           style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
         ),
       ),
@@ -1116,50 +1129,26 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       (watchlist, 'Watchlist', Icons.bookmark_border_rounded),
       (favourites, 'Favourites', Icons.favorite_border_rounded),
     ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Taste at a glance',
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: FlixieColors.light,
-                fontWeight: FontWeight.w800,
-              ),
-        ),
-        const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            color: FlixieColors.surface.withValues(alpha: .72),
-            border: Border.all(color: FlixieColors.tabBarBorder),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Row(children: [
-            for (var i = 0; i < values.length; i++) ...[
-              Expanded(
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(values[i].$3, color: FlixieColors.primary, size: 20),
-                  const SizedBox(height: 5),
-                  Text('${values[i].$1}',
-                      style: const TextStyle(
-                          color: FlixieColors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900)),
-                  Text(values[i].$2,
-                      style: const TextStyle(
-                          color: FlixieColors.medium,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600)),
-                ]),
-              ),
-              if (i < values.length - 1)
-                Container(
-                    width: 1, height: 48, color: FlixieColors.tabBarBorder),
-            ],
-          ]),
-        ),
-      ],
-    );
+    return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(children: [
+          for (var i = 0; i < values.length; i++) ...[
+            Expanded(
+                child: Column(children: [
+              Text('${values[i].$1}',
+                  style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                      color: FlixieColors.white)),
+              Text(values[i].$2,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      color: FlixieColors.medium, fontSize: 13)),
+            ])),
+            if (i < values.length - 1)
+              Container(width: 1, height: 36, color: FlixieColors.tabBarBorder),
+          ],
+        ]));
   }
 
   Widget _profileTabs() {
@@ -1197,19 +1186,227 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     ]);
   }
 
+  void _showSharedRatings() {
+    final friendName = _user?.username ?? 'Friend';
+    showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: FlixieColors.tabBarBackgroundFocused,
+      builder: (sheetContext) => ConstrainedBox(
+        constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(sheetContext).height * .8),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 8, 12),
+              child: Row(children: [
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      const Text('You both rated',
+                          style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
+                              color: FlixieColors.white)),
+                      const SizedBox(height: 4),
+                      Text(
+                          '${_sharedRatings.length} films in common · Scores out of 10',
+                          style: const TextStyle(
+                              fontSize: 12, color: FlixieColors.medium)),
+                    ])),
+                IconButton(
+                    tooltip: 'Close',
+                    onPressed: () => Navigator.pop(sheetContext),
+                    icon: const Icon(Icons.close)),
+              ])),
+          Flexible(
+              child: ListView.separated(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            itemCount: _sharedRatings.length,
+            separatorBuilder: (_, __) =>
+                const Divider(height: 1, color: FlixieColors.tabBarBorder),
+            itemBuilder: (_, index) {
+              final rating = _sharedRatings[index];
+              final mine = _myRatingValues[rating.movieId]!;
+              final path = rating.movie?.posterPath;
+              return InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  context.push(movieDetailPath(rating.movieId));
+                },
+                child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          ClipRRect(
+                              borderRadius: BorderRadius.circular(7),
+                              child: SizedBox(
+                                  width: 48,
+                                  height: 72,
+                                  child: path == null
+                                      ? const ColoredBox(
+                                          color: FlixieColors.surfaceElevated,
+                                          child: Icon(Icons.movie_outlined))
+                                      : CachedNetworkImage(
+                                          imageUrl: path.startsWith('http')
+                                              ? path
+                                              : 'https://image.tmdb.org/t/p/w185$path',
+                                          fit: BoxFit.cover,
+                                          errorWidget: (_, __, ___) =>
+                                              const Icon(Icons.movie_outlined),
+                                        ))),
+                          const SizedBox(width: 12),
+                          Expanded(
+                              child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                Text(rating.movie?.title ?? 'Movie',
+                                    style: const TextStyle(
+                                        color: FlixieColors.white,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 15)),
+                                const SizedBox(height: 8),
+                                Wrap(spacing: 8, runSpacing: 6, children: [
+                                  _ComparisonScore(label: 'You', score: mine),
+                                  _ComparisonScore(
+                                      label: friendName, score: rating.rating),
+                                  if (mine == rating.rating)
+                                    const Padding(
+                                        padding:
+                                            EdgeInsets.symmetric(vertical: 6),
+                                        child: Text('Same score',
+                                            style: TextStyle(
+                                                fontSize: 11,
+                                                color:
+                                                    FlixieColors.primaryText))),
+                                ]),
+                              ])),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.chevron_right_rounded,
+                              size: 18, color: FlixieColors.medium),
+                        ])),
+              );
+            },
+          )),
+        ]),
+      ),
+    );
+  }
+
+  List<Widget> _sharedWatchlist(User user) {
+    if (_isSelf || _friendshipStatus != _FriendshipStatus.friends) return [];
+    final mine = context.read<AuthProvider>().dbUser?.movieWatchlist ?? [];
+    final ids = mine
+        .where((entry) => entry.removed != true)
+        .map((entry) => entry.movieId)
+        .toSet();
+    final shared = (user.movieWatchlist ?? [])
+        .where((entry) => entry.removed != true && ids.contains(entry.movieId))
+        .toList();
+    if (shared.isEmpty) return [];
+    return [
+      const Text('Watch together',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+      const Text('On both your movie watchlists',
+          style: TextStyle(color: FlixieColors.medium, fontSize: 13)),
+      const SizedBox(height: 10),
+      SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            for (final entry in shared)
+              _profilePoster(
+                  entry.movie?.title ?? 'Movie',
+                  entry.movie?.posterPath,
+                  () => context.push(movieDetailPath(entry.movieId))),
+          ])),
+      const SizedBox(height: 18),
+    ];
+  }
+
+  Widget _profilePoster(String title, String? path, VoidCallback onTap) =>
+      Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: SizedBox(
+              width: 100,
+              child: InkWell(
+                  onTap: onTap,
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: SizedBox(
+                                width: 100,
+                                height: 150,
+                                child: path == null
+                                    ? const ColoredBox(
+                                        color: FlixieColors.surface,
+                                        child: Icon(Icons.movie_outlined))
+                                    : CachedNetworkImage(
+                                        imageUrl: path.startsWith('http')
+                                            ? path
+                                            : 'https://image.tmdb.org/t/p/w342$path',
+                                        fit: BoxFit.cover))),
+                        const SizedBox(height: 6),
+                        Text(title,
+                            style: const TextStyle(
+                                fontSize: 13, color: FlixieColors.light)),
+                      ]))));
+
+  Widget _friendShows(User user) {
+    final shows = (user.favoriteShows ?? [])
+        .whereType<Map<String, dynamic>>()
+        .where((entry) => entry['removed'] != true)
+        .toList();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text('Favourite shows',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+      const SizedBox(height: 10),
+      SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            for (final entry in shows)
+              Builder(builder: (_) {
+                final show = entry['show'] as Map<String, dynamic>? ?? entry;
+                final id = entry['showId'] ?? show['id'];
+                return _profilePoster(
+                    '${show['name'] ?? show['title'] ?? 'Show'}',
+                    show['posterPath'] as String?,
+                    () => context.push(showDetailPath(id as int)));
+              })
+          ])),
+      const SizedBox(height: 18),
+    ]);
+  }
+
   List<Widget> _overviewContent(User user) => [
-        if (!_compatibilityLoading) ...[
-          TasteCompatibilityCard(
-            score: _compatibilityScore,
-            sharedMovies: _sharedMovieCount,
-            sharedFavs: _sharedFavCount,
-            friendName: user.username,
-          ),
-          const SizedBox(height: 20),
+        if (!_isSelf &&
+            !_compatibilityLoading &&
+            _sharedRatings.isNotEmpty) ...[
+          const Text('In common',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+          ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text('${_sharedRatings.length} films you’ve both rated'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: _showSharedRatings),
+          if (_sharedFavCount > 0)
+            Text('$_sharedFavCount shared favourite movies',
+                style: const TextStyle(color: FlixieColors.light)),
+          const SizedBox(height: 16),
         ],
+        ..._sharedWatchlist(user),
+        if (user.favoriteShows?.isNotEmpty == true) _friendShows(user),
         ListsPreviewSection(
           userId: widget.userId,
-          title: 'LISTS',
+          title: 'Shared lists',
+          hideWhenEmpty: true,
           emptyMessage: 'No lists shared with you yet.',
           embedded: true,
           publicOnly: widget.previewMode,
@@ -1220,12 +1417,14 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
         ],
         if (_reviews.isNotEmpty) ...[
           const SizedBox(height: 18),
-          _recentReview(_reviews.first),
+          shared.ReviewCard(
+              review: _reviews.first,
+              currentUserId: context.read<AuthProvider>().dbUser?.id),
         ],
       ];
 
   List<Widget> _activityContent(User user) {
-    if (_activityLoading) {
+    if (_activityLoading && _activity.isEmpty) {
       return const [
         Padding(
           padding: EdgeInsets.symmetric(vertical: 56),
@@ -1233,6 +1432,13 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
             child: CircularProgressIndicator(color: FlixieColors.primary),
           ),
         ),
+      ];
+    }
+    if (_activityFailed && _activity.isEmpty) {
+      return [
+        TextButton(
+            onPressed: _loadActivity,
+            child: const Text('Couldn’t load activity. Retry'))
       ];
     }
     if (_activity.isEmpty) {
@@ -1251,14 +1457,27 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       for (var index = 0; index < _activity.length; index++) ...[
         ActivityTile(
           item: _activity[index],
+          compact: true,
           detailSource: DetailSource.friendActivity,
         ),
         if (index != _activity.length - 1) const SizedBox(height: 10),
       ],
+      if (_activityCursor != null || _activityFailed)
+        TextButton(
+            onPressed:
+                _activityLoading ? null : () => _loadActivity(more: true),
+            child: Text(_activityFailed ? 'Retry' : 'Load more')),
     ];
   }
 
   List<Widget> _reviewsContent() {
+    if (_reviewsFailed) {
+      return [
+        TextButton(
+            onPressed: _loadReviews,
+            child: const Text('Couldn’t load reviews. Retry'))
+      ];
+    }
     if (_reviewsLoading) {
       return const [Center(child: CircularProgressIndicator())];
     }
@@ -1268,30 +1487,26 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       ];
     }
     return [
-      ListView.separated(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: _reviews.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
-        itemBuilder: (_, i) => _FriendRecentReviewCard(
-          review: _reviews[i],
-          username: _user?.username ?? 'Friend',
-          onTap: () {
-            final id = _reviews[i].movieId;
-            if (id != null) {
-              context.push(
-                movieDetailPath(id, source: DetailSource.friendActivity),
-              );
-            }
-          },
-          onViewReview: () => _openReview(_reviews[i]),
-          onReply:
-              widget.previewMode ? null : () => _replyToReview(_reviews[i]),
-        ),
-      ),
+      for (final review in _reviews.take(_reviewLimit))
+        Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: shared.ReviewCard(
+                review: review,
+                currentUserId: context.read<AuthProvider>().dbUser?.id)),
+      if (_reviews.length > _reviewLimit)
+        TextButton(
+            onPressed: () => setState(() => _reviewLimit += 10),
+            child: const Text('Load more reviews')),
     ];
   }
 
+  String _reviewPosterUrl(String? path) => path == null
+      ? ''
+      : path.startsWith('http')
+          ? path
+          : 'https://image.tmdb.org/t/p/w342$path';
+
+  // ignore: unused_element
   void _replyToReview(Review review) {
     if (review.movieId == null) return;
     context.push(
@@ -1311,6 +1526,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     );
   }
 
+  // ignore: unused_element
   void _openReview(Review review) {
     showReviewDetailSheet(
       context,
@@ -1319,42 +1535,6 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     );
   }
 
-  Widget _recentReview(Review review) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('RECENT ACTIVITY',
-              style:
-                  TextStyle(fontWeight: FontWeight.w800, letterSpacing: 1.4)),
-          const SizedBox(height: 10),
-          _FriendRecentReviewCard(
-            review: review,
-            username: _user?.username ?? 'Friend',
-            onTap: () {
-              if (review.movieId != null) {
-                context.push(
-                  movieDetailPath(
-                    review.movieId!,
-                    source: DetailSource.friendActivity,
-                  ),
-                );
-              }
-            },
-            onViewReview: () => _openReview(review),
-            onReply: widget.previewMode || review.movieId == null
-                ? null
-                : () => _replyToReview(review),
-          ),
-        ],
-      );
-
-  String _reviewPosterUrl(String? path) {
-    final value = path?.trim() ?? '';
-    if (value.isEmpty || value.startsWith('http')) return value;
-    return 'https://image.tmdb.org/t/p/w342$value';
-  }
-
-  // Kept temporarily while the public-profile redesign settles, so its mature
-  // loading/error variants remain available during follow-up visual QA.
   // ignore: unused_element
   Widget _legacyBuild(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -1712,4 +1892,29 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
             ),
     );
   }
+}
+
+class _ComparisonScore extends StatelessWidget {
+  const _ComparisonScore({required this.label, required this.score});
+  final String label;
+  final int score;
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+        decoration: BoxDecoration(
+            color: FlixieColors.surfaceElevated,
+            borderRadius: BorderRadius.circular(8)),
+        child: Text.rich(
+            TextSpan(children: [
+              TextSpan(
+                  text: '$label  ',
+                  style: const TextStyle(color: FlixieColors.light)),
+              TextSpan(
+                  text: '$score',
+                  style: const TextStyle(
+                      color: FlixieColors.primaryText,
+                      fontWeight: FontWeight.w800)),
+            ]),
+            style: const TextStyle(fontSize: 12)),
+      );
 }

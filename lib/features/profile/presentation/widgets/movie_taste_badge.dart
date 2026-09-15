@@ -4,8 +4,10 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 
 /// Derives a fun "movie taste" personality label from the user's favourite genres.
 class MovieTasteBadge extends StatelessWidget {
-  const MovieTasteBadge({super.key, required this.favoriteGenres});
+  const MovieTasteBadge(
+      {super.key, required this.favoriteGenres, this.compact = false});
 
+  final bool compact;
   final List<dynamic> favoriteGenres;
 
   // ---------------------------------------------------------------------------
@@ -121,7 +123,11 @@ class MovieTasteBadge extends StatelessWidget {
 
   static ({String label, IconData icon, Color color})? _resolve(
       List<dynamic> genres) {
-    final names = genres.map(_genreName).whereType<String>().toList();
+    final names = genres
+        .map(_genreName)
+        .whereType<String>()
+        .where((name) => name.isNotEmpty)
+        .toList();
     if (names.isEmpty) return null;
 
     for (final (pattern, label, icon, color) in _rules) {
@@ -141,10 +147,26 @@ class MovieTasteBadge extends StatelessWidget {
     final genreNames = favoriteGenres
         .map(_genreName)
         .whereType<String>()
+        .where((name) => name.isNotEmpty)
         .take(4)
         .map((n) => n[0].toUpperCase() + n.substring(1))
         .toList();
 
+    if (compact) {
+      return Row(children: [
+        Icon(personality.icon, color: FlixieColors.primaryText, size: 28),
+        const SizedBox(width: 12),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(personality.label,
+              style: const TextStyle(
+                  color: FlixieColors.white, fontWeight: FontWeight.w700)),
+          Text('Based on your favourite genres: ${genreNames.join(' · ')}',
+              style: const TextStyle(color: FlixieColors.medium, fontSize: 13)),
+        ])),
+      ]);
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

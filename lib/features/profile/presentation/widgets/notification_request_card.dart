@@ -713,9 +713,15 @@ class NotificationRequestCard extends StatelessWidget {
     final date = notification.receivedAt.isEmpty
         ? ''
         : formatDate(notification.receivedAt);
-    final linked = notification.link?['request'] ?? notification.link?['groupRequest'];
-    final options = linked is Map && linked['selectedCandidateId'] == null && linked['proposedCandidateId'] == null
-        ? (linked['candidates'] as List? ?? []).whereType<Map>().take(3).toList()
+    final linked =
+        notification.link?['request'] ?? notification.link?['groupRequest'];
+    final options = linked is Map &&
+            linked['selectedCandidateId'] == null &&
+            linked['proposedCandidateId'] == null
+        ? (linked['candidates'] as List? ?? [])
+            .whereType<Map>()
+            .take(3)
+            .toList()
         : <Map>[];
     final posterPath = notification.watchMediaPosterPath;
     final posterUrl = posterPath == null
@@ -756,23 +762,27 @@ class NotificationRequestCard extends StatelessWidget {
                   WatchPlanPosterStack(posters: [
                     for (final c in options)
                       WatchPlanPoster(
-                        path: (c['movie']?['posterPath'] ?? c['show']?['posterPath'] ?? c['posterPath']) as String?,
-                        title: (c['movie']?['title'] ?? c['show']?['name'] ?? c['title']) as String?,
+                        path: (c['movie']?['posterPath'] ??
+                            c['show']?['posterPath'] ??
+                            c['posterPath']) as String?,
+                        title: (c['movie']?['title'] ??
+                            c['show']?['name'] ??
+                            c['title']) as String?,
                         width: 48,
                       ),
                   ])
                 else
                   _RequestMediaPreview(
-                  posterUrl: posterUrl,
-                  accent: accent,
-                  fallbackIcon: _typeIcon,
-                  avatar: _isFriendRequest ? notification.senderAvatar : null,
-                  avatarFallbackText: initials,
-                  onAvatarTap: canOpenProfile ? openProfile : null,
-                  onMediaTap: !_isFriendRequest && mediaRoute != null
-                      ? () => context.push(mediaRoute)
-                      : null,
-                ),
+                    posterUrl: posterUrl,
+                    accent: accent,
+                    fallbackIcon: _typeIcon,
+                    avatar: _isFriendRequest ? notification.senderAvatar : null,
+                    avatarFallbackText: initials,
+                    onAvatarTap: canOpenProfile ? openProfile : null,
+                    onMediaTap: !_isFriendRequest && mediaRoute != null
+                        ? () => context.push(mediaRoute)
+                        : null,
+                  ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
