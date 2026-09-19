@@ -40,8 +40,8 @@ class FilmInfoCard extends StatelessWidget {
         children: [
           Text(
             label.toUpperCase(),
-            style: const TextStyle(
-              color: FlixieColors.medium,
+            style: TextStyle(
+              color: context.colors.medium,
               fontSize: 11,
               fontWeight: FontWeight.w600,
               letterSpacing: 1.1,
@@ -50,8 +50,8 @@ class FilmInfoCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             value,
-            style: const TextStyle(
-              color: FlixieColors.light,
+            style: TextStyle(
+              color: context.colors.light,
               fontSize: 15,
               fontWeight: FontWeight.w500,
             ),
@@ -60,11 +60,11 @@ class FilmInfoCard extends StatelessWidget {
       );
     }
 
-    const divider = Column(
+    final divider = Column(
       children: [
-        SizedBox(height: 12),
-        Divider(color: FlixieColors.tabBarBorder, thickness: 1, height: 1),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
+        Divider(color: context.colors.tabBarBorder, thickness: 1, height: 1),
+        const SizedBox(height: 12),
       ],
     );
 
@@ -104,9 +104,9 @@ class FilmInfoCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: FlixieColors.surface,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: FlixieColors.tabBarBorder),
+        border: Border.all(color: context.colors.tabBarBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

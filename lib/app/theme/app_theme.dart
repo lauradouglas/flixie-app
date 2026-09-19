@@ -1,4 +1,8 @@
+export 'flixie_palette.dart';
+import 'package:flixie_app/app/theme/flixie_pill_style.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'flixie_palette.dart';
 
 import 'package:flixie_app/app/theme/flixie_typography.dart';
 
@@ -7,20 +11,21 @@ class FlixieColors {
   // Primary – vivid purple
   static const Color primary = Color(0xFF7C4DFF);
   static const Color primaryShade = Color(0xFF6534E8);
-  static const Color primaryTint = Color(0xFF7C4DFF);
+  static const Color primaryTint = Color(0xFFB9A0FF);
   // Accessible purple for normal-sized text on the dark surface ramp.
   static const Color primaryText = Color(0xFFB9A0FF);
 
-  // Secondary – cyan accent
-  static const Color secondary = Color(0xFF00D1C7);
-  static const Color secondaryShade = Color(0xFF00B8AF);
-  static const Color secondaryTint = Color(0xFF26D9D0);
+  // Secondary – soft mint for social and shared-watch highlights
+  static const Color secondary = Color(0xFF65D6C4);
+  static const Color secondaryShade = Color(0xFF19776B);
+  static const Color secondaryTint = Color(0xFF95E3D7);
 
   // Tertiary – peach/orange
   static const Color tertiary = Color(0xFFF1A77A);
-  static const Color tertiaryShade = Color(0xFFD4936B);
+  static const Color tertiaryShade = Color(0xFF99552D);
   static const Color tertiaryTint = Color(0xFFF2B087);
 
+  // Functional colours stay distinct from the supporting brand accents.
   // Success – vivid green
   static const Color success = Color(0xFF00D97E);
   static const Color successShade = Color(0xFF00C070);
@@ -52,6 +57,11 @@ class FlixieColors {
   static const Color darkShade = Color(0xFF192D80);
   static const Color darkTint = Color(0xFF33479C);
 
+  // Warm light surfaces and visible interactive boundaries.
+  static const Color bone = Color(0xFFF3F0E9);
+  static const Color lightTextSecondary = Color(0xFF51495F);
+  static const Color controlOutline = Color(0xFF8C7AAE);
+
   // Background / navigation
   static const Color background = Color(0xFF120A24);
   static const Color surface = Color(0xFF1A1033);
@@ -76,26 +86,26 @@ class AppTheme {
     const colorScheme = ColorScheme(
       brightness: Brightness.dark,
       primary: FlixieColors.primary,
-      onPrimary: Colors.black,
+      onPrimary: Colors.white,
       primaryContainer: FlixieColors.primaryShade,
-      onPrimaryContainer: FlixieColors.light,
+      onPrimaryContainer: Colors.white,
       secondary: FlixieColors.secondary,
-      onSecondary: Colors.black,
+      onSecondary: FlixieColors.background,
       secondaryContainer: FlixieColors.secondaryShade,
-      onSecondaryContainer: FlixieColors.light,
+      onSecondaryContainer: Colors.white,
       tertiary: FlixieColors.tertiary,
-      onTertiary: Colors.black,
+      onTertiary: FlixieColors.background,
       tertiaryContainer: FlixieColors.tertiaryShade,
-      onTertiaryContainer: FlixieColors.light,
+      onTertiaryContainer: Colors.white,
       error: FlixieColors.danger,
-      onError: Colors.black,
+      onError: FlixieColors.background,
       errorContainer: FlixieColors.dangerShade,
-      onErrorContainer: FlixieColors.light,
+      onErrorContainer: FlixieColors.background,
       surface: FlixieColors.surface,
-      onSurface: FlixieColors.light,
+      onSurface: FlixieColors.textPrimary,
       surfaceContainerHighest: FlixieColors.surfaceElevated,
       onSurfaceVariant: FlixieColors.medium,
-      outline: FlixieColors.mediumShade,
+      outline: FlixieColors.controlOutline,
       shadow: Colors.black,
       scrim: Colors.black54,
       inverseSurface: FlixieColors.light,
@@ -110,24 +120,23 @@ class AppTheme {
       scaffoldBackgroundColor: Colors.transparent,
 
       // App bar
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
         foregroundColor: FlixieColors.light,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        titleTextStyle: TextStyle(
-          color: FlixieColors.light,
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
+        titleTextStyle: FlixieTypography.sectionTitle.copyWith(
+          color: FlixieColors.textPrimary,
         ),
-        iconTheme: IconThemeData(color: FlixieColors.light),
+        iconTheme: const IconThemeData(color: FlixieColors.light),
       ),
 
       // Bottom navigation bar
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: FlixieColors.tabBarBackground,
-        selectedItemColor: FlixieColors.primary,
+        selectedItemColor: FlixieColors.primaryText,
         unselectedItemColor: FlixieColors.medium,
         type: BottomNavigationBarType.fixed,
         elevation: 8,
@@ -140,19 +149,19 @@ class AppTheme {
         indicatorShape: const StadiumBorder(),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return const IconThemeData(color: FlixieColors.primary);
+            return const IconThemeData(color: FlixieColors.primaryText);
           }
           return const IconThemeData(color: FlixieColors.medium);
         }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return const TextStyle(
-              color: FlixieColors.primary,
-              fontSize: 11,
+              color: FlixieColors.primaryText,
+              fontSize: 12,
               fontWeight: FontWeight.w700,
             );
           }
-          return const TextStyle(color: FlixieColors.medium, fontSize: 11);
+          return const TextStyle(color: FlixieColors.medium, fontSize: 12);
         }),
         surfaceTintColor: Colors.transparent,
         elevation: 0,
@@ -207,9 +216,22 @@ class AppTheme {
         ),
       ),
 
-      // Elevated buttons
+      // Filled and elevated actions share the same readable label style.
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: FlixieColors.primary,
+          foregroundColor: Colors.white,
+          textStyle: FlixieTypography.button,
+          minimumSize: const Size(64, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
+          textStyle: FlixieTypography.button,
+          minimumSize: const Size(64, 48),
           backgroundColor: FlixieColors.primary,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
@@ -224,6 +246,8 @@ class AppTheme {
       // Outlined buttons
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
+          textStyle: FlixieTypography.button,
+          minimumSize: const Size(64, 48),
           foregroundColor: FlixieColors.primaryText,
           side: const BorderSide(color: FlixieColors.primary),
           shape: RoundedRectangleBorder(
@@ -236,6 +260,7 @@ class AppTheme {
       // Text buttons
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
+          textStyle: FlixieTypography.button,
           foregroundColor: FlixieColors.primaryText,
         ),
       ),
@@ -250,15 +275,16 @@ class AppTheme {
         suffixIconColor: FlixieColors.medium,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: FlixieColors.tabBarBorder),
+          borderSide: const BorderSide(color: FlixieColors.controlOutline),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: FlixieColors.tabBarBorder),
+          borderSide: const BorderSide(color: FlixieColors.controlOutline),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: FlixieColors.primary, width: 2),
+          borderSide:
+              const BorderSide(color: FlixieColors.primaryText, width: 2),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -271,19 +297,12 @@ class AppTheme {
       ),
 
       // Chip theme
-      chipTheme: ChipThemeData(
-        backgroundColor: FlixieColors.tabBarBorder,
-        labelStyle: const TextStyle(color: FlixieColors.light),
-        selectedColor: FlixieColors.primary,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-      ),
+      chipTheme: FlixiePillStyle.theme(Brightness.dark),
 
       // Floating action button
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: FlixieColors.primary,
-        foregroundColor: Colors.black,
+        foregroundColor: Colors.white,
       ),
 
       // Progress indicator
@@ -301,7 +320,7 @@ class AppTheme {
           fontSize: 14,
           fontWeight: FontWeight.w600,
         ),
-        actionTextColor: FlixieColors.primary,
+        actionTextColor: FlixieColors.primaryText,
       ),
 
       // Divider
@@ -323,202 +342,126 @@ class AppTheme {
   }
 
   static ThemeData get lightTheme {
-    const textDark = Color(0xFF1C1C2E);
-    const textMuted = Color(0xFF6B6B8A);
-    const surface = Color(0xFFF5F7FA);
-    const surfaceVariant = Color(0xFFE8EDF5);
-    const outline = Color(0xFFCDD2DC);
-
-    const colorScheme = ColorScheme(
+    final base = darkTheme;
+    const c = FlixiePalette(Brightness.light);
+    final scheme = ColorScheme.fromSeed(
+      seedColor: FlixieColors.primary,
       brightness: Brightness.light,
       primary: FlixieColors.primary,
       onPrimary: Colors.white,
-      primaryContainer: FlixieColors.primaryTint,
-      onPrimaryContainer: textDark,
-      secondary: FlixieColors.secondary,
+      primaryContainer: const Color(0xFFEAE0FC),
+      onPrimaryContainer: c.textPrimary,
+      secondary: c.secondary,
       onSecondary: Colors.white,
-      secondaryContainer: FlixieColors.secondaryTint,
-      onSecondaryContainer: textDark,
-      tertiary: FlixieColors.tertiary,
+      secondaryContainer: const Color(0xFFDDF2EA),
+      onSecondaryContainer: c.secondary,
+      tertiary: c.tertiary,
       onTertiary: Colors.white,
-      tertiaryContainer: FlixieColors.tertiaryTint,
-      onTertiaryContainer: textDark,
-      error: FlixieColors.danger,
+      tertiaryContainer: const Color(0xFFF9E4DC),
+      onTertiaryContainer: c.tertiary,
+      error: c.danger,
       onError: Colors.white,
-      errorContainer: FlixieColors.dangerTint,
-      onErrorContainer: textDark,
-      surface: surface,
-      onSurface: textDark,
-      surfaceContainerHighest: surfaceVariant,
-      onSurfaceVariant: textMuted,
-      outline: outline,
-      shadow: Colors.black,
-      scrim: Colors.black54,
-      inverseSurface: textDark,
-      onInverseSurface: surface,
-      inversePrimary: FlixieColors.primaryShade,
+      errorContainer: const Color(0xFFFBE3E7),
+      onErrorContainer: c.danger,
+      surface: c.surface,
+      onSurface: c.textPrimary,
+      onSurfaceVariant: c.light,
+      surfaceContainerHighest: c.surfaceElevated,
+      outline: FlixieColors.controlOutline,
     );
-
-    return ThemeData(
-      useMaterial3: true,
-      fontFamily: FlixieTypography.fontFamily,
-      colorScheme: colorScheme,
+    // Copy existing geometry and typography: appearance changes colours only.
+    return base.copyWith(
+      brightness: Brightness.light,
+      colorScheme: scheme,
       scaffoldBackgroundColor: Colors.transparent,
-      appBarTheme: const AppBarTheme(
-        backgroundColor: surface,
-        foregroundColor: textDark,
-        elevation: 0,
-        centerTitle: true,
-        titleTextStyle: TextStyle(
-          color: textDark,
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-        ),
-        iconTheme: IconThemeData(color: textDark),
+      canvasColor: c.surface,
+      primaryTextTheme: FlixieTypography.textTheme(
+          primary: c.textPrimary, secondary: c.light, muted: c.medium),
+      tabBarTheme: base.tabBarTheme.copyWith(
+          labelColor: c.textPrimary,
+          unselectedLabelColor: c.light,
+          indicatorColor: c.primary),
+      dividerColor: c.tabBarBorder,
+      disabledColor: c.medium.withValues(alpha: .38),
+      hintColor: c.medium,
+      textSelectionTheme: TextSelectionThemeData(
+          cursorColor: c.primary,
+          selectionColor: c.primary.withValues(alpha: .2),
+          selectionHandleColor: c.primary),
+      appBarTheme: base.appBarTheme.copyWith(
+        backgroundColor: Colors.transparent,
+        foregroundColor: c.light,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        titleTextStyle:
+            base.appBarTheme.titleTextStyle?.copyWith(color: c.textPrimary),
+        iconTheme: IconThemeData(color: c.light),
       ),
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-        backgroundColor: surface,
-        selectedItemColor: FlixieColors.primary,
-        unselectedItemColor: textMuted,
-        type: BottomNavigationBarType.fixed,
-        elevation: 8,
+      bottomNavigationBarTheme: base.bottomNavigationBarTheme.copyWith(
+          backgroundColor: c.tabBarBackground,
+          selectedItemColor: c.primaryText,
+          unselectedItemColor: c.medium),
+      navigationBarTheme: base.navigationBarTheme.copyWith(
+        backgroundColor: c.tabBarBackground,
+        indicatorColor: c.primary.withValues(alpha: .15),
+        iconTheme: WidgetStateProperty.resolveWith((states) => IconThemeData(
+            color: states.contains(WidgetState.selected)
+                ? c.primaryText
+                : c.medium)),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) =>
+            base.navigationBarTheme.labelTextStyle!.resolve(states)!.copyWith(
+                color: states.contains(WidgetState.selected)
+                    ? c.primaryText
+                    : c.medium)),
       ),
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: surface,
-        indicatorColor: FlixieColors.primary.withValues(alpha: 0.15),
-        iconTheme: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return const IconThemeData(color: FlixieColors.primary);
-          }
-          return const IconThemeData(color: textMuted);
-        }),
-        labelTextStyle: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return const TextStyle(
-              color: FlixieColors.primary,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            );
-          }
-          return const TextStyle(color: textMuted, fontSize: 12);
-        }),
-        surfaceTintColor: Colors.transparent,
-      ),
-      cardTheme: CardThemeData(
-        color: Colors.white,
-        elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: Colors.black.withValues(alpha: 0.07)),
-        ),
-      ),
-      bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: surface,
-        surfaceTintColor: Colors.transparent,
-        modalBackgroundColor: surface,
-        modalBarrierColor: Colors.black54,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-      ),
-      dialogTheme: DialogThemeData(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: outline),
-        ),
-      ),
-      popupMenuTheme: PopupMenuThemeData(
-        color: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        elevation: 10,
-        shadowColor: Colors.black.withValues(alpha: 0.18),
-        position: PopupMenuPosition.under,
-        menuPadding: const EdgeInsets.symmetric(vertical: 4),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: outline),
-        ),
-        textStyle: const TextStyle(
-          color: textDark,
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: FlixieColors.primary,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        ),
-      ),
+      cardTheme: base.cardTheme.copyWith(
+          color: c.surface,
+          shape: (base.cardTheme.shape as RoundedRectangleBorder)
+              .copyWith(side: BorderSide(color: c.tabBarBorder))),
+      bottomSheetTheme: base.bottomSheetTheme.copyWith(
+          backgroundColor: c.surface, modalBackgroundColor: c.surface),
+      dialogTheme: base.dialogTheme.copyWith(
+          backgroundColor: c.surface,
+          shape: (base.dialogTheme.shape as RoundedRectangleBorder)
+              .copyWith(side: BorderSide(color: c.tabBarBorder))),
+      popupMenuTheme: base.popupMenuTheme.copyWith(
+          color: c.surface,
+          textStyle: base.popupMenuTheme.textStyle?.copyWith(color: c.light),
+          shape: (base.popupMenuTheme.shape as RoundedRectangleBorder)
+              .copyWith(side: BorderSide(color: c.tabBarBorder))),
       outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: FlixieColors.primaryShade,
-          side: const BorderSide(color: FlixieColors.primary),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        ),
-      ),
+          style: base.outlinedButtonTheme.style?.copyWith(
+              foregroundColor: WidgetStatePropertyAll(c.primaryText))),
       textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(foregroundColor: FlixieColors.primaryShade),
+          style: base.textButtonTheme.style?.copyWith(
+              foregroundColor: WidgetStatePropertyAll(c.primaryText))),
+      inputDecorationTheme: base.inputDecorationTheme.copyWith(
+        fillColor: c.surface,
+        labelStyle: TextStyle(color: c.medium),
+        hintStyle: TextStyle(color: c.medium),
+        prefixIconColor: c.medium,
+        suffixIconColor: c.medium,
+        focusedBorder: (base.inputDecorationTheme.focusedBorder
+                as OutlineInputBorder)
+            .copyWith(borderSide: BorderSide(color: c.primaryText, width: 2)),
+        errorBorder:
+            (base.inputDecorationTheme.errorBorder as OutlineInputBorder)
+                .copyWith(borderSide: BorderSide(color: c.danger)),
+        focusedErrorBorder:
+            (base.inputDecorationTheme.focusedErrorBorder as OutlineInputBorder)
+                .copyWith(borderSide: BorderSide(color: c.danger, width: 2)),
       ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: Colors.white,
-        labelStyle: const TextStyle(color: textMuted),
-        hintStyle: const TextStyle(color: textMuted),
-        prefixIconColor: textMuted,
-        suffixIconColor: textMuted,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: outline),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: outline),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: FlixieColors.primary, width: 2),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: FlixieColors.danger),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: FlixieColors.danger, width: 2),
-        ),
-      ),
-      chipTheme: ChipThemeData(
-        backgroundColor: surfaceVariant,
-        labelStyle: const TextStyle(color: textDark),
-        selectedColor: FlixieColors.primary,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      ),
-      floatingActionButtonTheme: const FloatingActionButtonThemeData(
-        backgroundColor: FlixieColors.primary,
-        foregroundColor: Colors.white,
-      ),
-      progressIndicatorTheme: const ProgressIndicatorThemeData(
-        color: FlixieColors.primary,
-        linearTrackColor: outline,
-        circularTrackColor: outline,
-      ),
-      dividerTheme: const DividerThemeData(color: outline, thickness: 1),
-      iconTheme: const IconThemeData(color: textDark),
+      chipTheme: FlixiePillStyle.theme(Brightness.light),
+      progressIndicatorTheme: base.progressIndicatorTheme.copyWith(
+          linearTrackColor: c.tabBarBorder, circularTrackColor: c.tabBarBorder),
+      snackBarTheme: base.snackBarTheme.copyWith(
+          backgroundColor: c.surfaceElevated,
+          contentTextStyle: base.snackBarTheme.contentTextStyle
+              ?.copyWith(color: c.textPrimary),
+          actionTextColor: c.primaryText),
+      dividerTheme: base.dividerTheme.copyWith(color: c.tabBarBorder),
+      iconTheme: IconThemeData(color: c.light),
       textTheme: FlixieTypography.textTheme(
-        primary: textDark,
-        secondary: textDark,
-        muted: textMuted,
-      ),
+          primary: c.textPrimary, secondary: c.light, muted: c.medium),
     );
   }
 }

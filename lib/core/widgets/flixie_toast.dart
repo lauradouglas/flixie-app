@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flixie_app/app/theme/app_theme.dart';
 
 enum FlixieToastType { success, info, warning, error }
 
@@ -31,15 +32,14 @@ class FlixieToast extends SnackBar {
     Color? backgroundColor,
     SnackBarBehavior? behavior,
   }) : super(
-          backgroundColor: const Color(0xFF261B40),
+          backgroundColor: Colors.transparent,
           elevation: 0,
           persist: persist ?? false,
           behavior: SnackBarBehavior.floating,
           margin: const EdgeInsets.all(8),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: EdgeInsets.zero,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
-            side: BorderSide(color: type.colour, width: 1.5),
           ),
           duration: duration ??
               Duration(
@@ -63,11 +63,20 @@ class _ToastBodyState extends State<_ToastBody> {
   @override
   Widget build(BuildContext context) =>
       LayoutBuilder(builder: (context, constraints) {
+        final light = Theme.of(context).brightness == Brightness.light;
+        final accent = light
+            ? switch (widget.type) {
+                FlixieToastType.success => context.colors.success,
+                FlixieToastType.info => context.colors.primaryText,
+                FlixieToastType.warning => context.colors.warning,
+                FlixieToastType.error => context.colors.danger,
+              }
+            : widget.type.colour;
         final content = widget.content;
         final message = DefaultTextStyle(
-          style: const TextStyle(
+          style: TextStyle(
               fontFamily: 'Manrope',
-              color: Colors.white,
+              color: light ? context.colors.textPrimary : Colors.white,
               fontSize: 14,
               fontWeight: FontWeight.w600,
               height: 1.35),
@@ -80,7 +89,7 @@ class _ToastBodyState extends State<_ToastBody> {
             ? null
             : TextButton(
                 style: TextButton.styleFrom(
-                  foregroundColor: widget.type.colour,
+                  foregroundColor: accent,
                   minimumSize: const Size(48, 48),
                   textStyle: const TextStyle(
                       fontFamily: 'Manrope',
@@ -99,22 +108,30 @@ class _ToastBodyState extends State<_ToastBody> {
               );
         final stackAction = constraints.maxWidth < 300 ||
             MediaQuery.textScalerOf(context).scale(1) > 1.3;
-        return Column(mainAxisSize: MainAxisSize.min, children: [
-          Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-            ExcludeSemantics(
-                child: Icon(widget.type.icon,
-                    color: widget.type.colour, size: 24)),
-            const SizedBox(width: 12),
-            Expanded(child: message),
-            if (actionButton != null && !stackAction) ...[
-              const SizedBox(width: 8),
-              actionButton,
-            ],
-          ]),
-          if (actionButton != null && stackAction)
-            Align(
-                alignment: AlignmentDirectional.centerEnd, child: actionButton),
-        ]);
+        return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: light ? context.colors.surface : const Color(0xFF261B40),
+              borderRadius: BorderRadius.circular(14),
+              border:
+                  Border.all(color: accent.withValues(alpha: light ? .3 : .65)),
+            ),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                ExcludeSemantics(
+                    child: Icon(widget.type.icon, color: accent, size: 24)),
+                const SizedBox(width: 12),
+                Expanded(child: message),
+                if (actionButton != null && !stackAction) ...[
+                  const SizedBox(width: 8),
+                  actionButton,
+                ],
+              ]),
+              if (actionButton != null && stackAction)
+                Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: actionButton),
+            ]));
       });
 }
 

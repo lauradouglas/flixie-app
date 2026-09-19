@@ -52,7 +52,7 @@ class MonthlyBarChart extends StatelessWidget {
                       style: TextStyle(
                         color: isActive
                             ? FlixieColors.primary
-                            : FlixieColors.medium,
+                            : context.colors.medium,
                         fontSize: 9,
                         fontWeight:
                             isActive ? FontWeight.bold : FontWeight.normal,
@@ -75,7 +75,7 @@ class MonthlyBarChart extends StatelessWidget {
                   Text(
                     _kMonthNames[i],
                     style: TextStyle(
-                      color: isActive ? Colors.white : FlixieColors.medium,
+                      color: isActive ? Colors.white : context.colors.medium,
                       fontSize: 9,
                       fontWeight:
                           isActive ? FontWeight.bold : FontWeight.normal,

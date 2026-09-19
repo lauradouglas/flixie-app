@@ -56,7 +56,7 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
       FlixieToast(
         type: FlixieToastType.success,
         content: const Text('Password updated successfully.'),
-        backgroundColor: FlixieColors.surfaceElevated,
+        backgroundColor: context.colors.surfaceElevated,
       ),
     );
   }
@@ -67,9 +67,9 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
 
     return Container(
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
-      decoration: const BoxDecoration(
-        color: FlixieColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(
         top: false,
@@ -85,16 +85,16 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: FlixieColors.medium,
+                    color: context.colors.medium,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Change Password',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: context.colors.white,
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
@@ -137,8 +137,7 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
                 const SizedBox(height: 12),
                 Text(
                   _errorMessage!,
-                  style:
-                      const TextStyle(color: FlixieColors.danger, fontSize: 13),
+                  style: TextStyle(color: context.colors.danger, fontSize: 13),
                 ),
               ],
               const SizedBox(height: 20),
@@ -190,13 +189,13 @@ class _PasswordField extends StatelessWidget {
     return TextFormField(
       controller: controller,
       obscureText: obscure,
-      style: const TextStyle(color: Colors.white),
+      style: TextStyle(color: context.colors.white),
       validator: validator,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: FlixieColors.medium),
+        labelStyle: TextStyle(color: context.colors.medium),
         filled: true,
-        fillColor: FlixieColors.tabBarBorder,
+        fillColor: context.colors.tabBarBorder,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide.none,
@@ -204,7 +203,7 @@ class _PasswordField extends StatelessWidget {
         suffixIcon: IconButton(
           icon: Icon(
             obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-            color: FlixieColors.medium,
+            color: context.colors.medium,
           ),
           onPressed: onToggle,
         ),

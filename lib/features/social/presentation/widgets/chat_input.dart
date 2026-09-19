@@ -25,17 +25,17 @@ class ChatInput extends StatelessWidget {
         16,
         MediaQuery.of(context).viewInsets.bottom + 10,
       ),
-      decoration: const BoxDecoration(
-        color: FlixieColors.background,
-        border: Border(top: BorderSide(color: FlixieColors.tabBarBorder)),
+      decoration: BoxDecoration(
+        color: context.colors.background,
+        border: Border(top: BorderSide(color: context.colors.tabBarBorder)),
       ),
       child: SafeArea(
         top: false,
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: FlixieColors.tabBarBorder),
-            color: FlixieColors.tabBarBackground,
+            border: Border.all(color: context.colors.tabBarBorder),
+            color: context.colors.tabBarBackground,
           ),
           child: Row(
             children: [
@@ -43,15 +43,15 @@ class ChatInput extends StatelessWidget {
                 child: TextField(
                   controller: controller,
                   focusNode: focusNode,
-                  style: const TextStyle(color: FlixieColors.textPrimary),
+                  style: TextStyle(color: context.colors.textPrimary),
                   maxLines: null,
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => onSend(),
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: 'Message…',
-                    hintStyle: TextStyle(color: FlixieColors.medium),
+                    hintStyle: TextStyle(color: context.colors.medium),
                     border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(
+                    contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 11,
                     ),

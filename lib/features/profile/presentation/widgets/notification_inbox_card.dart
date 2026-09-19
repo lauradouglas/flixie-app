@@ -62,7 +62,7 @@ String? notificationPlanLabel(FlixieNotification n) {
 String notificationHeadline(FlixieNotification n) {
   final name = n.senderName.isEmpty ? 'Someone' : n.senderName;
   if (n.type == FlixieNotification.friendRequest) {
-    return switch (n.action) {
+    return switch (n.recipientAction) {
       FlixieNotification.actionAccepted => '$name accepted your friend request',
       FlixieNotification.actionDeclined => '$name declined your friend request',
       FlixieNotification.actionSent => 'Friend request sent to $name',
@@ -180,10 +180,10 @@ class NotificationInboxCard extends StatelessWidget {
         const ['PLAN_ACCEPTED', 'PLAN_SCHEDULED', 'ALL_PARTICIPANTS_LOGGED']
             .contains(n.watchPlanEvent);
     final accent = cancelled
-        ? FlixieColors.danger
+        ? context.colors.danger
         : positive
-            ? FlixieColors.success
-            : FlixieColors.primaryText;
+            ? context.colors.success
+            : context.colors.primaryText;
     if (!needs) {
       final detail = cancelled
           ? 'This plan has been cancelled.'
@@ -197,9 +197,9 @@ class NotificationInboxCard extends StatelessWidget {
             onLongPress: onOptions,
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                   border: Border(
-                      bottom: BorderSide(color: FlixieColors.tabBarBorder))),
+                      bottom: BorderSide(color: context.colors.tabBarBorder))),
               child:
                   Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Padding(
@@ -225,8 +225,9 @@ class NotificationInboxCard extends StatelessWidget {
                       if (planLabel != null) ...[
                         const SizedBox(height: 5),
                         Text(planLabel,
-                            style: const TextStyle(
-                                color: FlixieColors.primaryText, fontSize: 12)),
+                            style: TextStyle(
+                                color: context.colors.primaryText,
+                                fontSize: 12)),
                       ],
                       if (detail.isNotEmpty) ...[
                         const SizedBox(height: 6),
@@ -244,16 +245,16 @@ class NotificationInboxCard extends StatelessWidget {
                               const SizedBox(width: 6),
                               Expanded(
                                   child: Text(detail,
-                                      style: const TextStyle(
-                                          color: FlixieColors.light,
+                                      style: TextStyle(
+                                          color: context.colors.light,
                                           fontSize: 12))),
                             ]),
                       ],
                       if (cancelled && subtitle.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(subtitle,
-                            style: const TextStyle(
-                                color: FlixieColors.light, fontSize: 12)),
+                            style: TextStyle(
+                                color: context.colors.light, fontSize: 12)),
                       ],
                       if (n.isWatchPlanNotification &&
                           !cancelled &&
@@ -261,16 +262,16 @@ class NotificationInboxCard extends StatelessWidget {
                         Padding(
                             padding: const EdgeInsets.only(top: 6),
                             child: Text('$cta →',
-                                style: const TextStyle(
-                                    color: FlixieColors.primaryText,
+                                style: TextStyle(
+                                    color: context.colors.primaryText,
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600))),
                     ])),
                 const SizedBox(width: 8),
                 Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
                   Text(date,
-                      style: const TextStyle(
-                          color: FlixieColors.light, fontSize: 10)),
+                      style:
+                          TextStyle(color: context.colors.light, fontSize: 10)),
                   SizedBox(
                       width: 44,
                       height: 44,
@@ -280,7 +281,7 @@ class NotificationInboxCard extends StatelessWidget {
                           icon: Icon(
                               !n.isRead ? Icons.circle : Icons.more_horiz,
                               size: !n.isRead ? 7 : 18,
-                              color: FlixieColors.primaryText))),
+                              color: context.colors.primaryText))),
                 ]),
               ]),
             ),
@@ -290,7 +291,7 @@ class NotificationInboxCard extends StatelessWidget {
       label: n.isRead ? null : 'Unread',
       child: Material(
         color:
-            needs ? FlixieColors.tabBarBackgroundFocused : Colors.transparent,
+            needs ? context.colors.tabBarBackgroundFocused : Colors.transparent,
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           onTap: onOpen,
@@ -301,9 +302,9 @@ class NotificationInboxCard extends StatelessWidget {
             decoration: BoxDecoration(
                 border: needs
                     ? Border.all(
-                        color: FlixieColors.primaryText.withValues(alpha: .2))
-                    : const Border(
-                        bottom: BorderSide(color: FlixieColors.tabBarBorder)),
+                        color: context.colors.primaryText.withValues(alpha: .2))
+                    : Border(
+                        bottom: BorderSide(color: context.colors.tabBarBorder)),
                 borderRadius: needs ? BorderRadius.circular(14) : null),
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -318,13 +319,14 @@ class NotificationInboxCard extends StatelessWidget {
                       if (planLabel != null) ...[
                         const SizedBox(height: 5),
                         Text(planLabel,
-                            style: const TextStyle(
-                                color: FlixieColors.primaryText, fontSize: 12)),
+                            style: TextStyle(
+                                color: context.colors.primaryText,
+                                fontSize: 12)),
                       ],
                       const SizedBox(height: 5),
                       Text(date,
-                          style: const TextStyle(
-                              color: FlixieColors.light, fontSize: 11)),
+                          style: TextStyle(
+                              color: context.colors.light, fontSize: 11)),
                     ])),
                 if (!n.isRead)
                   Padding(
@@ -332,8 +334,8 @@ class NotificationInboxCard extends StatelessWidget {
                       child: Container(
                           width: 7,
                           height: 7,
-                          decoration: const BoxDecoration(
-                              color: FlixieColors.primaryText,
+                          decoration: BoxDecoration(
+                              color: context.colors.primaryText,
                               shape: BoxShape.circle))),
                 SizedBox(
                     width: 36,
@@ -342,8 +344,8 @@ class NotificationInboxCard extends StatelessWidget {
                         padding: EdgeInsets.zero,
                         tooltip: 'Notification options',
                         onPressed: onOptions,
-                        icon: const Icon(Icons.more_horiz,
-                            size: 19, color: FlixieColors.light))),
+                        icon: Icon(Icons.more_horiz,
+                            size: 19, color: context.colors.light))),
               ]),
               if (subtitle.isNotEmpty || options.isNotEmpty) ...[
                 const SizedBox(height: 12),
@@ -382,8 +384,8 @@ class NotificationInboxCard extends StatelessWidget {
                             title?.isNotEmpty == true
                                 ? title!
                                 : '${options.length} films to choose from',
-                            style: const TextStyle(
-                              color: FlixieColors.white,
+                            style: TextStyle(
+                              color: context.colors.white,
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
                               height: 1.3,
@@ -417,16 +419,16 @@ class NotificationInboxCard extends StatelessWidget {
               ],
               if (needs) ...[
                 const SizedBox(height: 10),
-                const Wrap(
+                Wrap(
                     spacing: 6,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Icon(Icons.schedule,
-                          size: 15, color: FlixieColors.warning),
-                      SizedBox(width: 6),
+                          size: 15, color: context.colors.warning),
+                      const SizedBox(width: 6),
                       Text('Needs you',
                           style: TextStyle(
-                              color: FlixieColors.warning, fontSize: 12))
+                              color: context.colors.warning, fontSize: 12))
                     ]),
               ],
               if (processing)
@@ -492,8 +494,8 @@ class _NotificationHeadlineState extends State<_NotificationHeadline> {
     final name = n.senderName;
     final id = n.senderId;
     final index = name.isEmpty ? -1 : headline.indexOf(name);
-    const style = TextStyle(
-        color: FlixieColors.white, fontSize: 14, fontWeight: FontWeight.w600);
+    final style = TextStyle(
+        color: context.colors.white, fontSize: 14, fontWeight: FontWeight.w600);
     if (index < 0 || id == null || id.isEmpty) {
       return Text(headline, style: style);
     }
@@ -503,7 +505,7 @@ class _NotificationHeadlineState extends State<_NotificationHeadline> {
       TextSpan(text: headline.substring(0, index)),
       TextSpan(
           text: name,
-          style: const TextStyle(color: FlixieColors.primaryText),
+          style: TextStyle(color: context.colors.primaryText),
           recognizer: _usernameTap,
           mouseCursor: SystemMouseCursors.click),
       TextSpan(text: headline.substring(index + name.length)),
@@ -523,12 +525,12 @@ class _PlanDetail extends StatelessWidget {
         children: [
           Padding(
               padding: const EdgeInsets.only(top: 2),
-              child: Icon(icon, size: 14, color: FlixieColors.light)),
+              child: Icon(icon, size: 14, color: context.colors.light)),
           const SizedBox(width: 5),
           Flexible(
               child: Text(text,
-                  style: const TextStyle(
-                      color: FlixieColors.light, fontSize: 12, height: 1.4))),
+                  style: TextStyle(
+                      color: context.colors.light, fontSize: 12, height: 1.4))),
         ],
       );
 }

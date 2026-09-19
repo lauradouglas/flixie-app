@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -20,18 +21,25 @@ class FavoriteMoviesSection extends StatelessWidget {
       isScrollControlled: true,
       useRootNavigator: true,
       useSafeArea: true,
-      backgroundColor: FlixieColors.tabBarBackgroundFocused,
+      backgroundColor: context.colors.tabBarBackgroundFocused,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _AllFavoriteMoviesSheet(favoriteMovies: favoriteMovies),
+      builder: (_) => _AllFavoriteMoviesSheet(
+          favoriteMovies:
+              favoriteMovies.where((e) => e.removed != true).toList()
+                ..sort((a, b) => (a.rank ?? 999).compareTo(b.rank ?? 999))),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final top3 = favoriteMovies.take(3).toList();
+    final ranked = favoriteMovies
+        .where((movie) => movie.removed != true)
+        .toList()
+      ..sort((a, b) => (a.rank ?? 999).compareTo(b.rank ?? 999));
+    final visibleMovies = ranked.take(10).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -40,31 +48,22 @@ class FavoriteMoviesSection extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: Row(
             children: [
-              Container(
-                width: 4,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: FlixieColors.primary,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text(
+              Expanded(
+                  child: Text(
                 'Favourite movies',
-                style: textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: 1.5,
-                ),
-              ),
-              const Spacer(),
-              if (favoriteMovies.length > 3)
+                style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: context.colors.textPrimary),
+              )),
+              if (ranked.isNotEmpty)
                 IconButton(
                   icon: const Icon(
                     Icons.arrow_forward,
                     color: FlixieColors.primary,
                     size: 20,
                   ),
+                  tooltip: 'See all favourite movies',
                   onPressed: () => _showAllMoviesSheet(context),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -72,25 +71,26 @@ class FavoriteMoviesSection extends StatelessWidget {
             ],
           ),
         ),
-        if (top3.isEmpty)
+        if (visibleMovies.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
             child: Text(
               'No favourite movies yet.',
-              style: textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
+              style:
+                  textTheme.bodySmall?.copyWith(color: context.colors.medium),
             ),
           )
         else
           SizedBox(
-            height: 214,
+            height: 150 + 6 + MediaQuery.textScalerOf(context).scale(38),
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              itemCount: top3.length,
+              itemCount: visibleMovies.length,
               separatorBuilder: (_, __) => const SizedBox(width: 10),
               itemBuilder: (_, index) {
-                final movie = _parseMovie(top3[index]);
+                final movie = _parseMovie(visibleMovies[index]);
                 return SizedBox(
-                  width: 118,
+                  width: 100,
                   child: _MoviePosterCard(
                     movieId: movie.$1,
                     title: movie.$2,
@@ -143,21 +143,21 @@ class _MoviePosterCard extends StatelessWidget {
                   ? CachedNetworkImage(
                       imageUrl: '$_imgBase$posterPath',
                       fit: BoxFit.cover,
-                      errorWidget: (_, __, ___) => _fallback(),
+                      errorWidget: (_, __, ___) => _fallback(context),
                     )
-                  : _fallback(),
+                  : _fallback(context),
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
             title,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: FlixieColors.light,
-              fontSize: 11,
+            style: TextStyle(
+              color: context.colors.light,
+              fontSize: 13,
+              height: 1.4,
               fontWeight: FontWeight.w600,
-              letterSpacing: 0.8,
             ),
           ),
         ],
@@ -165,12 +165,12 @@ class _MoviePosterCard extends StatelessWidget {
     );
   }
 
-  Widget _fallback() {
+  Widget _fallback(BuildContext context) {
     return Container(
-      color: FlixieColors.tabBarBorder,
-      child: const Icon(
+      color: context.colors.tabBarBorder,
+      child: Icon(
         Icons.movie_outlined,
-        color: FlixieColors.medium,
+        color: context.colors.medium,
         size: 36,
       ),
     );
@@ -203,7 +203,7 @@ class _AllFavoriteMoviesSheet extends StatelessWidget {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: FlixieColors.medium.withValues(alpha: 0.4),
+              color: context.colors.medium.withValues(alpha: 0.4),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -219,45 +219,42 @@ class _AllFavoriteMoviesSheet extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: FlixieColors.primary.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '${favoriteMovies.length}',
-                    style: const TextStyle(
-                      color: FlixieColors.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
+                FlixiePill.label(label: Text('${favoriteMovies.length}')),
               ],
             ),
           ),
           const SizedBox(height: 12),
           Expanded(
-            child: GridView.builder(
-              controller: scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 10,
-                childAspectRatio: 0.55,
-              ),
-              itemCount: favoriteMovies.length,
-              itemBuilder: (_, i) {
-                final movie = _parseMovie(favoriteMovies[i]);
-                return _MoviePosterCard(
-                  movieId: movie.$1,
-                  title: movie.$2,
-                  posterPath: movie.$3,
-                );
-              },
-            ),
+            child: LayoutBuilder(builder: (context, constraints) {
+              final scaler = MediaQuery.textScalerOf(context);
+              final availableWidth = constraints.maxWidth - 40;
+              final columns = (availableWidth / (scaler.scale(100) + 10))
+                  .floor()
+                  .clamp(1, 5);
+              final posterWidth =
+                  (availableWidth - (columns - 1) * 10) / columns;
+              return GridView.builder(
+                controller: scrollController,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 10,
+                  mainAxisExtent:
+                      posterWidth * 1.5 + 6 + scaler.scale(13) * 1.4 * 2 + 4,
+                ),
+                itemCount: favoriteMovies.length,
+                itemBuilder: (_, i) {
+                  final movie = _parseMovie(favoriteMovies[i]);
+                  return _MoviePosterCard(
+                    movieId: movie.$1,
+                    title: movie.$2,
+                    posterPath: movie.$3,
+                  );
+                },
+              );
+            }),
           ),
         ],
       ),

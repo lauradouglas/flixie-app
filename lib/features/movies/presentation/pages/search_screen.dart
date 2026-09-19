@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -232,20 +233,24 @@ class _SearchScreenState extends State<SearchScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
-        title: const Text(
+        title: Text(
           'Search',
           style: TextStyle(
-              color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+              color: context.colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold),
         ),
         actions: [
           IconButton(
             icon: Badge(
               isLabelVisible: unreadCount > 0,
               label: Text(unreadCount < 100 ? '$unreadCount' : '99+'),
-              backgroundColor: FlixieColors.tertiary,
-              textColor: Colors.black,
-              child:
-                  const Icon(Icons.notifications_outlined, color: Colors.white),
+              backgroundColor: FlixieColors.primaryShade,
+              textColor: Colors.white,
+              textStyle:
+                  const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+              child: Icon(Icons.notifications_outlined,
+                  color: context.colors.white),
             ),
             onPressed: () => context.push('/notifications'),
           ),
@@ -273,20 +278,18 @@ class _SearchScreenState extends State<SearchScreen> {
         onChanged: _onSearchChanged,
         onSubmitted: _submitSearch,
         textInputAction: TextInputAction.search,
-        style: const TextStyle(color: Colors.white),
+        style: TextStyle(color: context.colors.white),
         decoration: InputDecoration(
           hintText: _searchMode.hintText,
-          hintStyle: const TextStyle(color: FlixieColors.medium),
-          prefixIcon:
-              const Icon(Icons.search_rounded, color: FlixieColors.medium),
+          hintStyle: TextStyle(color: context.colors.medium),
+          prefixIcon: Icon(Icons.search_rounded, color: context.colors.medium),
           suffixIcon: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (_query.isNotEmpty)
                 IconButton(
                   tooltip: 'Clear search',
-                  icon: const Icon(Icons.close_rounded,
-                      color: FlixieColors.medium),
+                  icon: Icon(Icons.close_rounded, color: context.colors.medium),
                   onPressed: () {
                     _controller.clear();
                     _onSearchChanged('');
@@ -295,7 +298,7 @@ class _SearchScreenState extends State<SearchScreen> {
             ],
           ),
           filled: true,
-          fillColor: FlixieColors.tabBarBackgroundFocused,
+          fillColor: context.colors.tabBarBackgroundFocused,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
             borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
@@ -337,31 +340,18 @@ class _SearchScreenState extends State<SearchScreen> {
         itemBuilder: (context, index) {
           final mode = modes[index];
           final selected = mode == _searchMode;
-          return ChoiceChip(
-            selected: selected,
-            showCheckmark: false,
-            label: Text(mode.label),
-            avatar: mode == _SearchMode.all
-                ? null
-                : Icon(
-                    mode.icon,
-                    size: 17,
-                    color: selected ? Colors.black : FlixieColors.medium,
-                  ),
-            selectedColor: FlixieColors.primary,
-            backgroundColor: FlixieColors.tabBarBackgroundFocused,
-            labelStyle: TextStyle(
-              color: selected ? Colors.black : FlixieColors.light,
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-            ),
-            side: BorderSide(
-              color: selected
-                  ? FlixieColors.primary
-                  : Colors.white.withValues(alpha: 0.08),
-            ),
-            onSelected: (_) => _setSearchMode(mode),
-          );
+          return FlixiePill.choice(
+              selected: selected,
+              showCheckmark: false,
+              label: Text(mode.label),
+              avatar: mode == _SearchMode.all
+                  ? null
+                  : Icon(
+                      mode.icon,
+                      size: 17,
+                      color: selected ? Colors.white : context.colors.medium,
+                    ),
+              onSelected: (_) => _setSearchMode(mode));
         },
       ),
     );
@@ -463,7 +453,7 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.search_off, size: 64, color: FlixieColors.medium),
+            Icon(Icons.search_off, size: 64, color: context.colors.medium),
             const SizedBox(height: 16),
             Text(
               'No results for "$_query"',
@@ -598,8 +588,8 @@ class _SectionHeader extends StatelessWidget {
         const SizedBox(width: 8),
         Text(
           title,
-          style: const TextStyle(
-            color: FlixieColors.light,
+          style: TextStyle(
+            color: context.colors.light,
             fontWeight: FontWeight.w700,
             fontSize: 16,
           ),
@@ -680,23 +670,23 @@ class _TrendingPosterCard extends StatelessWidget {
                         fit: BoxFit.cover,
                         width: double.infinity,
                         errorWidget: (_, __, ___) => Container(
-                          color: FlixieColors.tabBarBackgroundFocused,
-                          child: const Icon(Icons.movie_outlined,
-                              color: FlixieColors.medium),
+                          color: context.colors.tabBarBackgroundFocused,
+                          child: Icon(Icons.movie_outlined,
+                              color: context.colors.medium),
                         ),
                       )
                     : Container(
-                        color: FlixieColors.tabBarBackgroundFocused,
-                        child: const Icon(Icons.movie_outlined,
-                            color: FlixieColors.medium),
+                        color: context.colors.tabBarBackgroundFocused,
+                        child: Icon(Icons.movie_outlined,
+                            color: context.colors.medium),
                       ),
               ),
             ),
             const SizedBox(height: 6),
             Text(
               movie.name,
-              style: const TextStyle(
-                  color: FlixieColors.white,
+              style: TextStyle(
+                  color: context.colors.white,
                   fontWeight: FontWeight.w600,
                   fontSize: 14),
             ),
@@ -706,17 +696,17 @@ class _TrendingPosterCard extends StatelessWidget {
               children: [
                 if (year != null)
                   Text(year,
-                      style: const TextStyle(
-                          color: FlixieColors.medium, fontSize: 12)),
+                      style: TextStyle(
+                          color: context.colors.medium, fontSize: 12)),
                 if (year != null && vote != null && vote > 0) ...[
                   const SizedBox(width: 6),
-                  const Icon(Icons.star_rounded,
-                      size: 12, color: FlixieColors.tertiary),
+                  Icon(Icons.star_rounded,
+                      size: 12, color: context.colors.tertiary),
                   const SizedBox(width: 2),
                   Text(
                     vote.toStringAsFixed(1),
-                    style: const TextStyle(
-                        color: FlixieColors.tertiary,
+                    style: TextStyle(
+                        color: context.colors.tertiary,
                         fontSize: 12,
                         fontWeight: FontWeight.w600),
                   ),
@@ -795,7 +785,7 @@ class _EntityResultTile extends StatelessWidget {
                       style: Theme.of(context)
                           .textTheme
                           .bodySmall
-                          ?.copyWith(color: FlixieColors.medium),
+                          ?.copyWith(color: context.colors.medium),
                     ),
                     if (result.overview != null) ...[
                       const SizedBox(height: 4),
@@ -806,14 +796,14 @@ class _EntityResultTile extends StatelessWidget {
                         style: Theme.of(context)
                             .textTheme
                             .bodySmall
-                            ?.copyWith(color: FlixieColors.light),
+                            ?.copyWith(color: context.colors.light),
                       ),
                     ],
                   ],
                 ),
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.search_rounded, color: FlixieColors.medium),
+              Icon(Icons.search_rounded, color: context.colors.medium),
             ],
           ),
         ),
@@ -849,22 +839,7 @@ class _MediaTypePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.38)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-    );
+    return FlixiePill.label(label: Text(label));
   }
 }
 
@@ -881,10 +856,10 @@ class _SearchSummary extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(top: 2),
-          child:
-              Icon(Icons.search_rounded, color: FlixieColors.medium, size: 22),
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Icon(Icons.search_rounded,
+              color: context.colors.medium, size: 22),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -893,7 +868,7 @@ class _SearchSummary extends StatelessWidget {
           children: [
             Text.rich(
               TextSpan(
-                style: const TextStyle(color: FlixieColors.light, fontSize: 14),
+                style: TextStyle(color: context.colors.light, fontSize: 14),
                 children: [
                   const TextSpan(text: 'Search for '),
                   TextSpan(
@@ -909,7 +884,7 @@ class _SearchSummary extends StatelessWidget {
             const SizedBox(height: 3),
             Text(
               '$total ${total == 1 ? 'result' : 'results'}',
-              style: const TextStyle(color: FlixieColors.medium, fontSize: 13),
+              style: TextStyle(color: context.colors.medium, fontSize: 13),
             ),
           ],
         )),
@@ -1012,8 +987,8 @@ class _SearchMediaTile extends StatelessWidget {
                     _HighlightedText(
                       text: name,
                       query: query,
-                      baseStyle: const TextStyle(
-                        color: FlixieColors.white,
+                      baseStyle: TextStyle(
+                        color: context.colors.white,
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                       ),
@@ -1028,22 +1003,22 @@ class _SearchMediaTile extends StatelessWidget {
                           label: isShow ? 'Show' : 'Movie',
                           color: isShow
                               ? FlixieColors.primary
-                              : FlixieColors.danger,
+                              : context.colors.danger,
                         ),
                         if (year != null)
                           Text(year!,
-                              style: const TextStyle(
-                                  color: FlixieColors.medium, fontSize: 13)),
+                              style: TextStyle(
+                                  color: context.colors.medium, fontSize: 13)),
                         if (rating != null && rating! > 0)
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.star_rounded,
-                                  color: FlixieColors.warning, size: 17),
+                              Icon(Icons.star_rounded,
+                                  color: context.colors.warning, size: 17),
                               const SizedBox(width: 3),
                               Text(rating!.toStringAsFixed(1),
-                                  style: const TextStyle(
-                                      color: FlixieColors.medium,
+                                  style: TextStyle(
+                                      color: context.colors.medium,
                                       fontSize: 13)),
                             ],
                           ),
@@ -1055,8 +1030,8 @@ class _SearchMediaTile extends StatelessWidget {
                         overview!,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: FlixieColors.light,
+                        style: TextStyle(
+                          color: context.colors.light,
                           fontSize: 12.5,
                           height: 1.28,
                         ),
@@ -1066,8 +1041,7 @@ class _SearchMediaTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 6),
-              const Icon(Icons.chevron_right_rounded,
-                  color: FlixieColors.medium),
+              Icon(Icons.chevron_right_rounded, color: context.colors.medium),
             ],
           ),
         ),
@@ -1082,10 +1056,10 @@ class _MediaPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        color: FlixieColors.surfaceElevated,
+        color: context.colors.surfaceElevated,
         child: Icon(
           isShow ? Icons.live_tv_rounded : Icons.movie_outlined,
-          color: FlixieColors.medium,
+          color: context.colors.medium,
         ),
       );
 }
@@ -1157,9 +1131,9 @@ class _PersonResultTile extends StatelessWidget {
                           imageUrl:
                               'https://image.tmdb.org/t/p/w185${person.profileImgUrl}',
                           fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) => _placeholder(),
+                          errorWidget: (_, __, ___) => _placeholder(context),
                         )
-                      : _placeholder(),
+                      : _placeholder(context),
                 ),
               ),
               const SizedBox(width: 14),
@@ -1171,8 +1145,8 @@ class _PersonResultTile extends StatelessWidget {
                     _HighlightedText(
                       text: person.name,
                       query: query,
-                      baseStyle: const TextStyle(
-                        color: FlixieColors.white,
+                      baseStyle: TextStyle(
+                        color: context.colors.white,
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                       ),
@@ -1183,15 +1157,15 @@ class _PersonResultTile extends StatelessWidget {
                       runSpacing: 5,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        const _MediaTypePill(
+                        _MediaTypePill(
                           label: 'Person',
-                          color: FlixieColors.secondary,
+                          color: context.colors.secondary,
                         ),
                         if (person.department?.isNotEmpty ?? false)
                           Text(
                             person.department!,
-                            style: const TextStyle(
-                              color: FlixieColors.medium,
+                            style: TextStyle(
+                              color: context.colors.medium,
                               fontSize: 13,
                             ),
                           ),
@@ -1201,9 +1175,9 @@ class _PersonResultTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 6),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
-                color: FlixieColors.medium,
+                color: context.colors.medium,
               ),
             ],
           ),
@@ -1212,8 +1186,8 @@ class _PersonResultTile extends StatelessWidget {
     );
   }
 
-  Widget _placeholder() => Container(
-        color: FlixieColors.secondary.withValues(alpha: .3),
-        child: const Icon(Icons.person, color: FlixieColors.secondary),
+  Widget _placeholder(BuildContext context) => Container(
+        color: context.colors.secondary.withValues(alpha: .3),
+        child: Icon(Icons.person, color: context.colors.secondary),
       );
 }

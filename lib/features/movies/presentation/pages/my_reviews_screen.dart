@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/review_card.dart'
     as shared;
 import 'package:flixie_app/features/profile/presentation/controllers/review_reactions_controller.dart';
@@ -128,15 +129,15 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: FlixieColors.background,
+        backgroundColor: context.colors.background,
         elevation: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'My Reviews',
               style: TextStyle(
-                color: Colors.white,
+                color: context.colors.white,
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
@@ -157,15 +158,15 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
             margin: const EdgeInsets.only(right: 8),
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: FlixieColors.tabBarBackgroundFocused,
+              color: context.colors.tabBarBackgroundFocused,
               borderRadius: BorderRadius.circular(8),
             ),
             child: DropdownButton<String>(
               value: _sortBy,
               underline: const SizedBox(),
-              dropdownColor: FlixieColors.tabBarBackgroundFocused,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
-              icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+              dropdownColor: context.colors.tabBarBackgroundFocused,
+              style: TextStyle(color: context.colors.white, fontSize: 14),
+              icon: Icon(Icons.arrow_drop_down, color: context.colors.white),
               items: const [
                 DropdownMenuItem(value: 'newest', child: Text('Newest First')),
                 DropdownMenuItem(value: 'oldest', child: Text('Oldest First')),
@@ -180,13 +181,13 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: TextField(
               controller: _searchController,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: context.colors.white),
               decoration: InputDecoration(
                 hintText: 'Search reviews...',
                 hintStyle: const TextStyle(color: Colors.grey),
                 prefixIcon: const Icon(Icons.search, color: Colors.grey),
                 filled: true,
-                fillColor: FlixieColors.tabBarBackgroundFocused,
+                fillColor: context.colors.tabBarBackgroundFocused,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: BorderSide.none,
@@ -292,9 +293,9 @@ class _ReviewCardState extends State<ReviewCard> {
       onTap: _handleTap,
       child: Container(
         decoration: BoxDecoration(
-          color: FlixieColors.surface,
+          color: context.colors.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: FlixieColors.tabBarBorder),
+          border: Border.all(color: context.colors.tabBarBorder),
         ),
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -304,8 +305,8 @@ class _ReviewCardState extends State<ReviewCard> {
             if (review.movieTitle != null) ...[
               Text(
                 review.movieTitle!,
-                style: const TextStyle(
-                  color: FlixieColors.warning,
+                style: TextStyle(
+                  color: context.colors.warning,
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.3,
@@ -317,65 +318,22 @@ class _ReviewCardState extends State<ReviewCard> {
             Row(
               children: [
                 // Rating
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: FlixieColors.primary.withValues(alpha: 0.2),
-                    border: Border.all(color: FlixieColors.primary, width: 1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.star,
-                          color: FlixieColors.warning, size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${review.rating}/10',
-                        style: const TextStyle(
-                          color: FlixieColors.textPrimary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                FlixiePill.label(
+                    label: Text('${review.rating}/10'),
+                    avatar: Icon(Icons.star, color: context.colors.warning)),
                 const SizedBox(width: 8),
                 // Recommended badge
                 if (review.recommended)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: FlixieColors.success.withValues(alpha: 0.2),
-                      border: Border.all(color: FlixieColors.success, width: 1),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.thumb_up,
-                            color: FlixieColors.success, size: 12),
-                        SizedBox(width: 4),
-                        Text(
-                          'Recommended',
-                          style: TextStyle(
-                            color: FlixieColors.success,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  FlixiePill.label(
+                      label: const Text('Recommended'),
+                      avatar:
+                          Icon(Icons.thumb_up, color: context.colors.success)),
                 const Spacer(),
                 // Date
                 Text(
                   formattedDate,
-                  style: const TextStyle(
-                    color: FlixieColors.medium,
+                  style: TextStyle(
+                    color: context.colors.medium,
                     fontSize: 11,
                   ),
                 ),
@@ -385,8 +343,8 @@ class _ReviewCardState extends State<ReviewCard> {
             // Title
             Text(
               review.title,
-              style: const TextStyle(
-                color: FlixieColors.textPrimary,
+              style: TextStyle(
+                color: context.colors.textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
@@ -404,44 +362,18 @@ class _ReviewCardState extends State<ReviewCard> {
                     review.body,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: FlixieColors.light,
+                    style: TextStyle(
+                      color: context.colors.light,
                       fontSize: 14,
                       height: 1.5,
                     ),
                   ),
                 ),
                 if (review.containsSpoilers && !_spoilerRevealed)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: FlixieColors.surface.withValues(alpha: 0.9),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: FlixieColors.warning.withValues(alpha: 0.6),
-                      ),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.visibility_outlined,
-                          color: FlixieColors.warning,
-                          size: 15,
-                        ),
-                        SizedBox(width: 6),
-                        Text(
-                          'Tap to reveal spoiler',
-                          style: TextStyle(
-                            color: FlixieColors.warning,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  FlixiePill.label(
+                      label: const Text('Tap to reveal spoiler'),
+                      avatar: Icon(Icons.visibility_outlined,
+                          color: context.colors.warning)),
               ],
             ),
             const SizedBox(height: 12),
@@ -463,8 +395,8 @@ class _ReviewCardState extends State<ReviewCard> {
                               const SizedBox(width: 2),
                               Text(
                                 '${e.value}',
-                                style: const TextStyle(
-                                    color: FlixieColors.medium, fontSize: 11),
+                                style: TextStyle(
+                                    color: context.colors.medium, fontSize: 11),
                               ),
                             ],
                           ),
@@ -474,23 +406,10 @@ class _ReviewCardState extends State<ReviewCard> {
                 const Spacer(),
                 // Spoiler warning
                 if (review.containsSpoilers)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: FlixieColors.danger.withValues(alpha: 0.2),
-                      border: Border.all(color: FlixieColors.danger, width: 1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text(
-                      'SPOILERS',
-                      style: TextStyle(
-                        color: FlixieColors.danger,
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
+                  FlixiePill.label(
+                      label: const Text('Spoilers'),
+                      avatar: Icon(Icons.warning_amber_rounded,
+                          color: context.colors.danger)),
               ],
             ),
           ],

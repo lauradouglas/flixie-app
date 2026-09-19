@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flixie_app/core/safety/safety_service.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -104,6 +105,49 @@ void main() {
               }
               requests++;
               return pending?.future ?? Future.value(response(feed('First')));
+            }));
+  });
+
+  testWidgets('blocking hides cached group activity before refresh completes',
+      (tester) async {
+    SafetyService.reset();
+    final auth = _Auth();
+    addTearDown(auth.dispose);
+    final pending = Completer<http.Response>();
+    var loads = 0;
+    await http.runWithClient(() async {
+      await tester.pumpWidget(ChangeNotifierProvider<AuthProvider>.value(
+        value: auth,
+        child: MaterialApp(
+            home: Scaffold(
+                body: GroupActivityTab(
+          group: null,
+          memberCount: 2,
+          groupId: 'fixture',
+          initialRequests: const [],
+          initialActivity: const [],
+          groupLists: const [],
+          onRefresh: () async {},
+        ))),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.text('Visible before block'), findsOneWidget);
+      await SafetyService.block('friend');
+      await tester.pump();
+      expect(pending.isCompleted, isFalse);
+      expect(find.text('Visible before block'), findsNothing);
+      // Even a stale response must not restore blocked content.
+      pending.complete(response(feed('Visible before block')));
+      await tester.pumpAndSettle();
+      expect(find.text('Visible before block'), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+      SafetyService.reset();
+    },
+        () => MockClient((request) async {
+              if (request.url.path == '/safety/blocks') return response({});
+              loads++;
+              if (loads == 1) return response(feed('Visible before block'));
+              return pending.future;
             }));
   });
 

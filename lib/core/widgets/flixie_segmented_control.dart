@@ -27,7 +27,7 @@ class FlixieSegmentedControl<T> extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: FlixieColors.tabBarBackgroundFocused,
+        color: context.colors.tabBarBackgroundFocused,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: FlixieColors.primary.withValues(alpha: .42),
@@ -56,12 +56,12 @@ class FlixieSegmentedControl<T> extends StatelessWidget {
                   ),
                   child: DefaultTextStyle.merge(
                     style: TextStyle(
-                      color: selected ? Colors.white : FlixieColors.light,
+                      color: selected ? Colors.white : context.colors.light,
                       fontWeight: FontWeight.w800,
                     ),
                     child: IconTheme.merge(
                       data: IconThemeData(
-                        color: selected ? Colors.white : FlixieColors.medium,
+                        color: selected ? Colors.white : context.colors.medium,
                         size: 18,
                       ),
                       child: segment.child,

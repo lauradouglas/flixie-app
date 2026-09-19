@@ -36,7 +36,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         FlixieToast(
           type: FlixieToastType.error,
           content: Text(auth.errorMessage ?? 'Could not send reset email.'),
-          backgroundColor: FlixieColors.danger,
+          backgroundColor: context.colors.danger,
         ),
       );
     }
@@ -136,10 +136,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Icon(
+        Icon(
           Icons.mark_email_read_outlined,
           size: 64,
-          color: FlixieColors.success,
+          color: context.colors.success,
         ),
         const SizedBox(height: 16),
         Text(

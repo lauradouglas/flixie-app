@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -129,15 +130,14 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       _summary(),
       const SizedBox(height: 20),
-      const Divider(color: FlixieColors.tabBarBorder),
+      Divider(color: context.colors.tabBarBorder),
       const SizedBox(height: 16),
       if (complete)
         _recap()
       else if (r.isDeclined || r.isCancelled || r.isExpired) ...[
         const SizedBox(height: 16),
-        const Text(
-            'This plan is closed. You can make another whenever you’re ready.',
-            style: _body),
+        Text('This plan is closed. You can make another whenever you’re ready.',
+            style: _body.copyWith(color: context.colors.light)),
         _button('Plan another movie', Icons.add, widget.onNewPlan),
         _button('Close', Icons.close, widget.onClosePlan, primary: false),
       ] else if (r.isPending)
@@ -175,18 +175,20 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                Text(title, style: _title),
+                Text(title,
+                    style: _title.copyWith(color: context.colors.textPrimary)),
                 const SizedBox(height: 5),
-                Text('With $friend', style: _body),
+                Text('With $friend',
+                    style: _body.copyWith(color: context.colors.light)),
                 const SizedBox(height: 8),
                 Text(stage == 'Scheduled' ? widget.scheduledLabel : stage,
-                    style: _body),
+                    style: _body.copyWith(color: context.colors.light)),
                 const SizedBox(height: 10),
                 _badge(
                     complete ? 'Watched' : stage,
                     complete || stage == 'Scheduled'
-                        ? FlixieColors.success
-                        : FlixieColors.primaryText),
+                        ? context.colors.success
+                        : context.colors.primaryText),
                 const SizedBox(height: 10),
                 Row(children: [
                   _avatar(true, 28),
@@ -194,7 +196,7 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
                   _avatar(false, 28)
                 ]),
               ])),
-          const Icon(Icons.chevron_right, color: FlixieColors.medium),
+          Icon(Icons.chevron_right, color: context.colors.medium),
         ])),
       );
 
@@ -234,10 +236,10 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
 
   Widget _summary() {
     final colour = complete || stage == 'Scheduled'
-        ? FlixieColors.success
+        ? context.colors.success
         : stage == 'Agree on a time'
             ? const Color(0xFF00D4D4)
-            : FlixieColors.primaryText;
+            : context.colors.primaryText;
     final icon = complete
         ? Icons.star_outline
         : stage == 'Scheduled'
@@ -268,18 +270,22 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
         ]),
         const SizedBox(height: 8),
         Text(title,
-            style: _title.copyWith(fontSize: 25, fontWeight: FontWeight.w900)),
+            style: _title
+                .copyWith(color: context.colors.textPrimary)
+                .copyWith(fontSize: 25, fontWeight: FontWeight.w900)),
         const SizedBox(height: 2),
         Text('Watch plan',
-            style: _body.copyWith(
-                color: FlixieColors.primaryText, fontWeight: FontWeight.w700)),
+            style: _body.copyWith(color: context.colors.light).copyWith(
+                color: context.colors.primaryText,
+                fontWeight: FontWeight.w700)),
         if (r.scheduledFor != null && !needsMovie) ...[
           const SizedBox(height: 8),
-          Text(widget.scheduledLabel, style: _body),
+          Text(widget.scheduledLabel,
+              style: _body.copyWith(color: context.colors.light)),
         ],
         if (r.location?.isNotEmpty == true) ...[
           const SizedBox(height: 8),
-          Text(r.location!, style: _body),
+          Text(r.location!, style: _body.copyWith(color: context.colors.light)),
         ],
         const SizedBox(height: 10),
         Row(children: [
@@ -297,28 +303,29 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
         if (r.candidates.length > 1)
           Text(
               '${r.candidates.length} starting suggestions. You can both add films after joining.',
-              style: _body)
+              style: _body.copyWith(color: context.colors.light))
         else
           Text(
               r.proposedDate != null
                   ? 'Accept to confirm this film and time.'
                   : 'Join the plan, then find a time together.',
-              style: _body),
+              style: _body.copyWith(color: context.colors.light)),
         if (r.proposedDate != null) ...[
           const SizedBox(height: 12),
-          Text(_date(r.proposedDate!), style: _title),
+          Text(_date(r.proposedDate!),
+              style: _title.copyWith(color: context.colors.textPrimary)),
         ],
         const SizedBox(height: 24),
         Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
           Column(children: [
             _avatar(true, 64),
             const SizedBox(height: 8),
-            const Text('You', style: _body)
+            Text('You', style: _body.copyWith(color: context.colors.light))
           ]),
           Column(children: [
             _avatar(false, 64),
             const SizedBox(height: 8),
-            Text(friend, style: _body)
+            Text(friend, style: _body.copyWith(color: context.colors.light))
           ]),
         ]),
         const SizedBox(height: 24),
@@ -326,7 +333,7 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
             r.message?.trim().isNotEmpty == true
                 ? r.message!
                 : 'Fancy a movie night?',
-            style: _title),
+            style: _title.copyWith(color: context.colors.textPrimary)),
         if (r.requesterId != widget.myUserId) ...[
           _button('I’m in', Icons.check, widget.onAccept),
           if (!needsMovie && r.proposedDate != null)
@@ -338,14 +345,15 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
         ] else
           Padding(
               padding: const EdgeInsets.only(top: 16),
-              child: Text('Waiting for $friend to join.', style: _body)),
+              child: Text('Waiting for $friend to join.',
+                  style: _body.copyWith(color: context.colors.light))),
       ]);
 
   Widget _movies() {
     if (_showFinalChoices && !_isCreator) {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('Your picks are saved. $friend will finalise the movie.',
-            style: _body),
+            style: _body.copyWith(color: context.colors.light)),
         _button('Edit my picks', Icons.edit_outlined,
             () => setState(() => _reviewMovies = false),
             primary: false),
@@ -353,14 +361,17 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
     }
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       if (!_showFinalChoices) ...[
-        Text('What could you watch?', style: _title.copyWith(fontSize: 22)),
+        Text('What could you watch?',
+            style: _title
+                .copyWith(color: context.colors.textPrimary)
+                .copyWith(fontSize: 22)),
         const SizedBox(height: 6),
       ],
       Text(
           _showFinalChoices
               ? 'Choose the final movie for your plan.'
               : 'Select every title you would happily watch.',
-          style: _body),
+          style: _body.copyWith(color: context.colors.light)),
       const SizedBox(height: 16),
       for (final candidate in r.candidates)
         Padding(
@@ -376,7 +387,7 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
           icon: const Icon(Icons.add_circle_outline),
           label: const Text('Add another option'),
           style:
-              TextButton.styleFrom(foregroundColor: FlixieColors.primaryText),
+              TextButton.styleFrom(foregroundColor: context.colors.primaryText),
         )),
       if (!_showFinalChoices)
         _button('Save my picks', Icons.playlist_add_check, () async {
@@ -402,16 +413,16 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
       button: true,
       child: Material(
         color: both
-            ? FlixieColors.success.withValues(alpha: .08)
-            : FlixieColors.background.withValues(alpha: .35),
+            ? context.colors.success.withValues(alpha: .08)
+            : context.colors.background.withValues(alpha: .35),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
           side: BorderSide(
               color: both
-                  ? FlixieColors.success
+                  ? context.colors.success
                   : selected
                       ? FlixieColors.primary
-                      : FlixieColors.tabBarBorder,
+                      : context.colors.tabBarBorder,
               width: both || selected ? 2 : 1),
         ),
         child: InkWell(
@@ -434,8 +445,8 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                     Text(candidate.title ?? 'Movie option',
-                        style: const TextStyle(
-                            color: FlixieColors.textPrimary,
+                        style: TextStyle(
+                            color: context.colors.textPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.w800)),
                     const SizedBox(height: 4),
@@ -445,8 +456,8 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
                             : '$approvals of 2 would watch',
                         style: TextStyle(
                             color: both
-                                ? FlixieColors.success
-                                : FlixieColors.medium,
+                                ? context.colors.success
+                                : context.colors.medium,
                             fontSize: 12,
                             fontWeight: FontWeight.w700)),
                   ])),
@@ -460,7 +471,7 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
                         : () => widget.onSelectCandidate(candidate.id),
                     style: FilledButton.styleFrom(
                       backgroundColor: FlixieColors.primary,
-                      foregroundColor: Colors.black,
+                      foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 10),
                       minimumSize: const Size(0, 44),
@@ -474,8 +485,9 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
                     selected
                         ? Icons.check_circle_rounded
                         : Icons.circle_outlined,
-                    color:
-                        selected ? FlixieColors.success : FlixieColors.medium),
+                    color: selected
+                        ? context.colors.success
+                        : context.colors.medium),
             ]),
           ),
         ),
@@ -488,8 +500,8 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const SizedBox(height: 20),
       if (proposal == null) ...[
-        const Text('Movie confirmed. Find a time that works for you both.',
-            style: _body),
+        Text('Movie confirmed. Find a time that works for you both.',
+            style: _body.copyWith(color: context.colors.light)),
         _button(
             'Suggest a time', Icons.calendar_month, widget.onSuggestSchedule),
         _button('Change movie', Icons.movie_outlined, widget.onChangeMovie,
@@ -499,15 +511,16 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
             proposal.proposerId == widget.myUserId
                 ? 'Your proposal'
                 : '$friend’s proposal',
-            style: _title),
+            style: _title.copyWith(color: context.colors.textPrimary)),
         const SizedBox(height: 12),
         Text(
             proposal.proposedFor == null
                 ? 'Time to agree'
                 : _date(proposal.proposedFor!),
-            style: _body),
+            style: _body.copyWith(color: context.colors.light)),
         if (proposal.location?.isNotEmpty == true)
-          Text(proposal.location!, style: _body),
+          Text(proposal.location!,
+              style: _body.copyWith(color: context.colors.light)),
         const SizedBox(height: 16),
         _person(
             true,
@@ -521,12 +534,14 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
           _button('Works for me', Icons.check,
               () => widget.onRespondToProposal(proposal, 'accepted'))
         else
-          Text('Waiting for $friend to confirm.', style: _body),
+          Text('Waiting for $friend to confirm.',
+              style: _body.copyWith(color: context.colors.light)),
         _button(
             'Suggest another time', Icons.schedule, widget.onSuggestSchedule,
             primary: false),
         const SizedBox(height: 10),
-        const Text('A new proposal needs agreement again.', style: _body),
+        Text('A new proposal needs agreement again.',
+            style: _body.copyWith(color: context.colors.light)),
       ],
     ]);
   }
@@ -534,7 +549,7 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
   Widget _scheduled() =>
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const SizedBox(height: 20),
-        _badge('Both confirmed', FlixieColors.success),
+        _badge('Both confirmed', context.colors.success),
         const SizedBox(height: 16),
         _person(true, 'Confirmed', true),
         _person(false, 'Confirmed', true),
@@ -557,18 +572,19 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
   Widget _afterWatch() =>
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const SizedBox(height: 20),
-        Text('How did $title go?', style: _title),
+        Text('How did $title go?',
+            style: _title.copyWith(color: context.colors.textPrimary)),
         const SizedBox(height: 8),
-        const Text(
-            'Log your watch when you’re ready. You each respond separately.',
-            style: _body),
+        Text('Log your watch when you’re ready. You each respond separately.',
+            style: _body.copyWith(color: context.colors.light)),
         if (!r.watchConfirmations.any((c) => c.userId == widget.myUserId)) ...[
           _button('Log your watch', Icons.check, widget.onConfirmWatched),
           _button('I didn’t make it', Icons.event_busy, widget.onNotThisTime,
               primary: false),
         ],
         const SizedBox(height: 20),
-        const Text('Your progress', style: _title),
+        Text('Your progress',
+            style: _title.copyWith(color: context.colors.textPrimary)),
         for (final mine in [true, false])
           Builder(builder: (_) {
             final entry = r.watchConfirmations
@@ -584,8 +600,8 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
                 entry != null);
           }),
         const SizedBox(height: 8),
-        const Text('Missed it? Your friend can still log their watch.',
-            style: _body),
+        Text('Missed it? Your friend can still log their watch.',
+            style: _body.copyWith(color: context.colors.light)),
       ]);
 
   Widget _recap() {
@@ -597,8 +613,8 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
       if (ratings.isNotEmpty)
         Text(
             '${(ratings.reduce((a, b) => a + b) / ratings.length).toStringAsFixed(1)} / 10',
-            style: const TextStyle(
-                color: FlixieColors.warning,
+            style: TextStyle(
+                color: context.colors.warning,
                 fontSize: 32,
                 fontWeight: FontWeight.w800)),
       Text(
@@ -607,14 +623,14 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
               : ratings.isEmpty
                   ? 'No ratings yet'
                   : '1 rating',
-          style: _body),
+          style: _body.copyWith(color: context.colors.light)),
       if (ratings.length == 2) ...[
         const SizedBox(height: 12),
         _badge(
             (ratings[0] - ratings[1]).abs() <= 2
                 ? 'Similar takes'
                 : 'Different takes',
-            FlixieColors.success),
+            context.colors.success),
       ],
       const SizedBox(height: 20),
       for (final mine in [true, false])
@@ -639,12 +655,13 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
                     entry?.reviewText?.isNotEmpty == true)
                   Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: Text(entry!.reviewText!, style: _body)),
+                      child: Text(entry!.reviewText!,
+                          style: _body.copyWith(color: context.colors.light))),
               ]);
         }),
       if (recommendations > 0)
         Text(recommendations == 2 ? 'Both recommend it' : '1 recommends it',
-            style: _body),
+            style: _body.copyWith(color: context.colors.light)),
       _message(),
       _button('Plan another movie', Icons.add, widget.onNewPlan,
           primary: false),
@@ -660,7 +677,7 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
-          color: isCreator ? FlixieColors.warning : FlixieColors.primary,
+          color: isCreator ? context.colors.warning : FlixieColors.primary,
           width: 2,
         ),
       ),
@@ -679,17 +696,20 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
         child: Row(children: [
           _avatar(mine, 36),
           const SizedBox(width: 10),
-          Expanded(child: Text(mine ? 'You' : friend, style: _body)),
+          Expanded(
+              child: Text(mine ? 'You' : friend,
+                  style: _body.copyWith(color: context.colors.light))),
           Expanded(
               child: Text(status,
                   textAlign: TextAlign.end,
                   style: TextStyle(
-                      color:
-                          done ? FlixieColors.success : FlixieColors.medium))),
+                      color: done
+                          ? context.colors.success
+                          : context.colors.medium))),
           const SizedBox(width: 8),
           Icon(done ? Icons.check_circle : Icons.schedule,
               size: 20,
-              color: done ? FlixieColors.success : FlixieColors.medium),
+              color: done ? context.colors.success : context.colors.medium),
         ]),
       );
   Widget _message() => _button('Message $friend', Icons.chat_bubble_outline,
@@ -716,14 +736,10 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
                       style: const TextStyle(fontSize: 16))),
         ),
       );
-  Widget _badge(String label, Color color) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-            color: color.withValues(alpha: .15),
-            borderRadius: BorderRadius.circular(20)),
-        child: Text(label,
-            style: TextStyle(color: color, fontWeight: FontWeight.w700)),
-      );
+  Widget _badge(String label, Color color) {
+    return FlixiePill.label(label: Text(label));
+  }
+
   String _date(DateTime value) =>
       '${MaterialLocalizations.of(context).formatMediumDate(value.toLocal())}, ${TimeOfDay.fromDateTime(value.toLocal()).format(context)}';
 }

@@ -14,7 +14,7 @@ Future<T?> showFlixiePromptSheet<T>({
     isDismissible: isDismissible,
     enableDrag: isDismissible,
     showDragHandle: isDismissible,
-    backgroundColor: FlixieColors.surface,
+    backgroundColor: context.colors.surface,
     constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width),
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -25,8 +25,8 @@ Future<T?> showFlixiePromptSheet<T>({
       child: SafeArea(
         top: false,
         child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-              24, 0, 24, 24 + MediaQuery.viewInsetsOf(context).bottom),
+          padding: EdgeInsets.fromLTRB(24, isDismissible ? 0 : 24, 24,
+              24 + MediaQuery.viewInsetsOf(context).bottom),
           child: SizedBox(width: double.infinity, child: builder(context)),
         ),
       ),
@@ -50,14 +50,16 @@ class FlixiePromptSheetContent extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           DefaultTextStyle.merge(
-            style: const TextStyle(
-                fontSize: 22, fontWeight: FontWeight.w700, color: Colors.white),
+            style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: context.colors.white),
             child: title,
           ),
           const SizedBox(height: 16),
           DefaultTextStyle.merge(
-            style: const TextStyle(
-                fontSize: 16, height: 1.5, color: FlixieColors.light),
+            style: TextStyle(
+                fontSize: 16, height: 1.5, color: context.colors.light),
             child: content,
           ),
           const SizedBox(height: 24),

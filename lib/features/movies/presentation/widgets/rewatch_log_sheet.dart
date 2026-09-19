@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flixie_app/core/api/api_client.dart';
@@ -70,9 +71,9 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: FlixieColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -86,7 +87,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: FlixieColors.medium,
+              color: context.colors.medium,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -102,20 +103,20 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                       : widget.isRewatch
                           ? 'Log Rewatch'
                           : 'Log Watch',
-                  style: const TextStyle(
-                    color: FlixieColors.white,
+                  style: TextStyle(
+                    color: context.colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: FlixieColors.light),
+                  icon: Icon(Icons.close, color: context.colors.light),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
             ),
           ),
-          const Divider(color: FlixieColors.tabBarBorder, height: 1),
+          Divider(color: context.colors.tabBarBorder, height: 1),
           // Form body
           Flexible(
             child: SingleChildScrollView(
@@ -123,10 +124,10 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Rating (optional)',
                     style: TextStyle(
-                      color: FlixieColors.light,
+                      color: context.colors.light,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -140,50 +141,29 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                       return ConstrainedBox(
                         constraints:
                             const BoxConstraints(minWidth: 48, minHeight: 42),
-                        child: ChoiceChip(
-                          label: Text('$value'),
-                          avatar: Icon(
-                            isSelected
-                                ? Icons.star_rounded
-                                : Icons.star_border_rounded,
-                            size: 17,
-                            color:
-                                isSelected ? Colors.white : FlixieColors.medium,
-                          ),
-                          selected: isSelected,
-                          showCheckmark: false,
-                          onSelected: (_) => setState(
-                            () {
-                              _rating = isSelected ? null : value;
-                              if (_rating == null) _recommended = null;
-                            },
-                          ),
-                          selectedColor: FlixieColors.primary,
-                          backgroundColor: FlixieColors.surfaceElevated,
-                          side: BorderSide(
-                            color: isSelected
-                                ? FlixieColors.primary
-                                : FlixieColors.tabBarBorder,
-                          ),
-                          labelStyle: TextStyle(
-                            color:
-                                isSelected ? Colors.white : FlixieColors.light,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(9),
-                          ),
-                          visualDensity: VisualDensity.compact,
-                        ),
+                        child: FlixiePill.choice(
+                            label: Text('$value'),
+                            avatar: Icon(
+                                isSelected
+                                    ? Icons.star_rounded
+                                    : Icons.star_border_rounded,
+                                size: 17),
+                            selected: isSelected,
+                            showCheckmark: false,
+                            onSelected: (_) => setState(
+                                  () {
+                                    _rating = isSelected ? null : value;
+                                    if (_rating == null) _recommended = null;
+                                  },
+                                )),
                       );
                     }),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     _rating != null ? '$_rating / 10' : 'No rating',
-                    style: const TextStyle(
-                      color: FlixieColors.medium,
+                    style: TextStyle(
+                      color: context.colors.medium,
                       fontSize: 13,
                     ),
                   ),
@@ -214,8 +194,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      onPressed: _saving ||
-                              (_rating != null && _recommended == null)
+                      onPressed: _saving
                           ? null
                           : () async {
                               final navigator = Navigator.of(context);
@@ -276,8 +255,8 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                     const SizedBox(height: 10),
                     Text(
                       _saveError!,
-                      style: const TextStyle(
-                        color: FlixieColors.danger,
+                      style: TextStyle(
+                        color: context.colors.danger,
                         fontSize: 12,
                       ),
                     ),
@@ -300,16 +279,16 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
         visualDensity: VisualDensity.compact,
         value: _writeReview,
         controlAffinity: ListTileControlAffinity.leading,
-        title: const Text(
+        title: Text(
           'Write a review after logging',
           style: TextStyle(
-            color: FlixieColors.light,
+            color: context.colors.light,
             fontWeight: FontWeight.w700,
           ),
         ),
-        subtitle: const Text(
+        subtitle: Text(
           'Your rating and recommendation will carry over.',
-          style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+          style: TextStyle(color: context.colors.medium, fontSize: 12),
         ),
         onChanged: (value) => setState(() => _writeReview = value ?? false),
       ),
@@ -320,14 +299,14 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Row(
+        Row(
           children: [
-            Icon(Icons.tune_rounded, color: FlixieColors.medium, size: 18),
-            SizedBox(width: 8),
+            Icon(Icons.tune_rounded, color: context.colors.medium, size: 18),
+            const SizedBox(width: 8),
             Text(
               'Details (optional)',
               style: TextStyle(
-                color: FlixieColors.light,
+                color: context.colors.light,
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
               ),
@@ -338,10 +317,10 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
         Container(
           padding: const EdgeInsets.fromLTRB(12, 5, 12, 12),
           decoration: BoxDecoration(
-            color: FlixieColors.surfaceElevated.withValues(alpha: .28),
+            color: context.colors.surfaceElevated.withValues(alpha: .28),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: FlixieColors.tabBarBorder.withValues(alpha: .7),
+              color: context.colors.tabBarBorder.withValues(alpha: .7),
             ),
           ),
           child: Column(
@@ -355,10 +334,10 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                   visualDensity: VisualDensity.compact,
                   value: _includeWatchedDate,
                   controlAffinity: ListTileControlAffinity.leading,
-                  title: const Text(
+                  title: Text(
                     'Watch date',
                     style: TextStyle(
-                      color: FlixieColors.light,
+                      color: context.colors.light,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -366,8 +345,8 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                     _includeWatchedDate
                         ? 'Today by default - tap below to change it.'
                         : 'Leave off to simply mark it watched.',
-                    style: const TextStyle(
-                      color: FlixieColors.medium,
+                    style: TextStyle(
+                      color: context.colors.medium,
                       fontSize: 12,
                     ),
                   ),
@@ -394,21 +373,21 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                       vertical: 11,
                     ),
                     decoration: BoxDecoration(
-                      color: FlixieColors.surface,
+                      color: context.colors.surface,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: FlixieColors.tabBarBorder),
+                      border: Border.all(color: context.colors.tabBarBorder),
                     ),
                     child: Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.calendar_today,
-                          color: FlixieColors.medium,
+                          color: context.colors.medium,
                           size: 17,
                         ),
                         const SizedBox(width: 10),
                         Text(
                           '${_watchedAt.day}/${_watchedAt.month}/${_watchedAt.year}',
-                          style: const TextStyle(color: FlixieColors.light),
+                          style: TextStyle(color: context.colors.light),
                         ),
                       ],
                     ),
@@ -416,28 +395,28 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                 ),
                 const SizedBox(height: 14),
               ],
-              const Text(
+              Text(
                 'Personal note',
                 style: TextStyle(
-                  color: FlixieColors.light,
+                  color: context.colors.light,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 3),
-              const Text(
+              Text(
                 'Only visible to you and friends',
-                style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+                style: TextStyle(color: context.colors.medium, fontSize: 12),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: _notesController,
                 maxLines: 3,
-                style: const TextStyle(color: FlixieColors.white),
+                style: TextStyle(color: context.colors.white),
                 decoration: InputDecoration(
                   hintText: 'Add a personal note (optional)',
-                  hintStyle: const TextStyle(color: FlixieColors.medium),
+                  hintStyle: TextStyle(color: context.colors.medium),
                   filled: true,
-                  fillColor: FlixieColors.surface,
+                  fillColor: context.colors.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide.none,
@@ -454,19 +433,19 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
   Widget _buildRewatchComparison() {
     final previous = widget.previousWatch?.rating;
     if (previous == null) {
-      return const Text(
+      return Text(
         'Last time: Not rated',
-        style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+        style: TextStyle(color: context.colors.medium, fontSize: 12),
       );
     }
     final difference = _rating == null ? null : _rating! - previous.round();
     final comparisonColor = difference == null
-        ? FlixieColors.medium
+        ? context.colors.medium
         : difference == 0
-            ? FlixieColors.warning
+            ? context.colors.warning
             : difference > 0
-                ? FlixieColors.success
-                : FlixieColors.danger;
+                ? context.colors.success
+                : context.colors.danger;
     final comparisonLabel = difference == null
         ? ''
         : difference == 0
@@ -484,8 +463,8 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
       ),
       child: RichText(
         text: TextSpan(
-          style: const TextStyle(
-            color: FlixieColors.medium,
+          style: TextStyle(
+            color: context.colors.medium,
             fontSize: 12,
             fontWeight: FontWeight.w600,
           ),
@@ -493,8 +472,8 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
             const TextSpan(text: 'Last time: '),
             TextSpan(
               text: '${previous.toStringAsFixed(0)}/10',
-              style: const TextStyle(
-                color: FlixieColors.light,
+              style: TextStyle(
+                color: context.colors.light,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -502,8 +481,8 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
               const TextSpan(text: '  ·  This time: '),
               TextSpan(
                 text: '$_rating/10',
-                style: const TextStyle(
-                  color: FlixieColors.white,
+                style: TextStyle(
+                  color: context.colors.white,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -535,7 +514,7 @@ class _RecommendationButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = positive ? FlixieColors.success : FlixieColors.danger;
+    final color = positive ? context.colors.success : context.colors.danger;
     final label = positive ? 'Recommend' : 'Don’t recommend';
     return Tooltip(
       message: label,
@@ -555,10 +534,10 @@ class _RecommendationButton extends StatelessWidget {
               decoration: BoxDecoration(
                 color: selected
                     ? color.withValues(alpha: .22)
-                    : FlixieColors.surfaceElevated,
+                    : context.colors.surfaceElevated,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: selected ? color : FlixieColors.tabBarBorder,
+                  color: selected ? color : context.colors.tabBarBorder,
                   width: selected ? 1.5 : 1,
                 ),
                 boxShadow: selected
@@ -574,7 +553,7 @@ class _RecommendationButton extends StatelessWidget {
                 positive
                     ? Icons.thumb_up_alt_rounded
                     : Icons.thumb_down_alt_rounded,
-                color: selected ? color : FlixieColors.light,
+                color: selected ? color : context.colors.light,
                 size: 22,
               ),
             ),
@@ -592,7 +571,7 @@ class _RecommendationPicker extends StatelessWidget {
   });
 
   final bool? recommended;
-  final ValueChanged<bool> onChanged;
+  final ValueChanged<bool?> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -602,35 +581,35 @@ class _RecommendationPicker extends StatelessWidget {
         positive: true,
         onTap: () => onChanged(true),
       ),
-      const SizedBox(width: 8),
+      FlixiePill.choice(
+          label: const Text('No opinion'),
+          selected: recommended == null,
+          onSelected: (_) => onChanged(null)),
       _RecommendationButton(
         selected: recommended == false,
         positive: false,
         onTap: () => onChanged(false),
       ),
     ];
-    const label = Text(
-      'Would you recommend it? *',
+    final label = Text(
+      'Would you recommend it?',
       style: TextStyle(
-        color: FlixieColors.light,
+        color: context.colors.light,
         fontWeight: FontWeight.w700,
       ),
     );
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth < 335) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              label,
-              const SizedBox(height: 8),
-              Row(mainAxisSize: MainAxisSize.min, children: buttons),
-            ],
-          );
-        }
-        return Row(children: [const Expanded(child: label), ...buttons]);
-      },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        label,
+        const SizedBox(height: 8),
+        Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: buttons),
+      ],
     );
   }
 }

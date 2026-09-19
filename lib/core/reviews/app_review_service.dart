@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:in_app_review/in_app_review.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Requests a native Store review after an onboarding-complete user reaches a
 /// positive Watch Plan or movie-engagement milestone. Store quotas remain the
@@ -15,7 +16,8 @@ class AppReviewService {
   static const _minimumCompletedPlans = 1;
   static const _minimumMovieInteractions = 3;
   static const _cooldown = Duration(days: 120);
-  static const _appStoreId = String.fromEnvironment('FLIXIE_APP_STORE_ID');
+  static const _appStoreId =
+      String.fromEnvironment('FLIXIE_APP_STORE_ID', defaultValue: '6779375028');
 
   static Future<void> recordCompletedWatchPlan(
     String userId, {
@@ -74,8 +76,17 @@ class AppReviewService {
   /// The Settings action deliberately opens the store listing rather than
   /// requesting the quota-limited native prompt.
   static Future<bool> openStoreListing() async {
-    if (Platform.isIOS && _appStoreId.isEmpty) return false;
+    if (Platform.isIOS && !RegExp(r'^\d+$').hasMatch(_appStoreId)) return false;
     try {
+      if (Platform.isIOS) {
+        // HTTPS can fall back to the web when the App Store is unavailable,
+        // including in the simulator; custom store schemes cannot.
+        return await launchUrl(
+          Uri.https('apps.apple.com', '/app/id$_appStoreId',
+              {'action': 'write-review'}),
+          mode: LaunchMode.externalApplication,
+        );
+      }
       await InAppReview.instance.openStoreListing(
         appStoreId: Platform.isIOS ? _appStoreId : null,
       );

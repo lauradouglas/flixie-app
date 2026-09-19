@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -338,7 +339,7 @@ class _AddShowToListSheetState extends State<AddShowToListSheet> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: FlixieColors.background,
+      backgroundColor: context.colors.background,
       builder: (_) => const _CreateShowListSheet(),
     );
     if (!mounted || created == null) return;
@@ -528,9 +529,9 @@ class _CreateShowListSheetState extends State<_CreateShowListSheet> {
                 if (_loadingFriends)
                   const Center(child: CircularProgressIndicator())
                 else if (_friends.isEmpty)
-                  const Text(
+                  Text(
                     'No accepted friends available.',
-                    style: TextStyle(color: FlixieColors.medium),
+                    style: TextStyle(color: context.colors.medium),
                   )
                 else
                   Wrap(
@@ -538,19 +539,18 @@ class _CreateShowListSheetState extends State<_CreateShowListSheet> {
                     runSpacing: 7,
                     children: _friends
                         .map(
-                          (friend) => FilterChip(
-                            label: Text('@${friend.username}'),
-                            selected: _selectedFriendIds.contains(friend.id),
-                            onSelected: _submitting
-                                ? null
-                                : (selected) => setState(() {
-                                      if (selected) {
-                                        _selectedFriendIds.add(friend.id);
-                                      } else {
-                                        _selectedFriendIds.remove(friend.id);
-                                      }
-                                    }),
-                          ),
+                          (friend) => FlixiePill.filter(
+                              label: Text('@${friend.username}'),
+                              selected: _selectedFriendIds.contains(friend.id),
+                              onSelected: _submitting
+                                  ? null
+                                  : (selected) => setState(() {
+                                        if (selected) {
+                                          _selectedFriendIds.add(friend.id);
+                                        } else {
+                                          _selectedFriendIds.remove(friend.id);
+                                        }
+                                      })),
                         )
                         .toList(growable: false),
                   ),
@@ -660,15 +660,15 @@ class _SelectedShowSummary extends StatelessWidget {
           child: Container(
             width: 56,
             height: 76,
-            color: FlixieColors.surface,
+            color: context.colors.surface,
             child: imageUrl == null
-                ? const Icon(Icons.live_tv_outlined, color: FlixieColors.medium)
+                ? Icon(Icons.live_tv_outlined, color: context.colors.medium)
                 : Image.network(
                     imageUrl,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Icon(
+                    errorBuilder: (_, __, ___) => Icon(
                       Icons.broken_image_outlined,
-                      color: FlixieColors.medium,
+                      color: context.colors.medium,
                     ),
                   ),
           ),
@@ -691,8 +691,7 @@ class _SelectedShowSummary extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   parts.join('  •  '),
-                  style:
-                      const TextStyle(color: FlixieColors.medium, fontSize: 12),
+                  style: TextStyle(color: context.colors.medium, fontSize: 12),
                 ),
               ],
             ],
@@ -721,10 +720,10 @@ class _ShowListPosterStack extends StatelessWidget {
         width: 64,
         height: 44,
         decoration: BoxDecoration(
-          color: FlixieColors.surfaceElevated,
+          color: context.colors.surfaceElevated,
           borderRadius: BorderRadius.circular(8),
         ),
-        child: const Icon(Icons.live_tv_outlined, color: FlixieColors.medium),
+        child: Icon(Icons.live_tv_outlined, color: context.colors.medium),
       );
     }
 
@@ -745,12 +744,12 @@ class _ShowListPosterStack extends StatelessWidget {
                 errorBuilder: (_, __, ___) => Container(
                   width: 28,
                   height: 44,
-                  color: FlixieColors.surfaceElevated,
+                  color: context.colors.surfaceElevated,
                   alignment: Alignment.center,
-                  child: const Icon(
+                  child: Icon(
                     Icons.image_not_supported_outlined,
                     size: 12,
-                    color: FlixieColors.medium,
+                    color: context.colors.medium,
                   ),
                 ),
               ),

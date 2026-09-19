@@ -70,11 +70,11 @@ class FriendMiniStats extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Text(
-              'STATS',
+              'Stats',
               style: textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
-                letterSpacing: 1.5,
+                color: context.colors.textPrimary,
+                letterSpacing: 0,
               ),
             ),
           ],

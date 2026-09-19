@@ -1,3 +1,8 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
+import 'package:flixie_app/core/api/api_client.dart';
+import 'dart:math';
+import 'package:flixie_app/features/watchlist/domain/tonight_filters.dart';
+import 'package:flixie_app/features/watchlist/presentation/widgets/tonight_filters_panel.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/models/show.dart';
 import 'package:flixie_app/features/settings/presentation/pages/settings_screen.dart'
@@ -39,7 +44,6 @@ import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_
 import 'package:flixie_app/models/friend_recommendation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flixie_app/models/profile_avatar.dart';
-import 'package:flixie_app/features/settings/presentation/widgets/watch_providers_sheet.dart';
 
 class WatchlistScreen extends StatefulWidget {
   const WatchlistScreen({super.key});
@@ -62,6 +66,108 @@ class _WatchlistScreenState extends State<WatchlistScreen>
   String _sortBy =
       'recent'; // recent, titleAsc, titleDesc, ratingDesc, yearAsc, yearDesc
   int _selectedTab = 0; // 0 = All, 1 = Watch now, 2 = Upcoming, 3 = Watched
+
+  final _tonightPanelKey = GlobalKey();
+  WatchlistMood _mood = WatchlistMood.any;
+  Set<String> _avoid = {};
+  String _watchRequest = '';
+  bool _findingToday = false;
+  String? _experienceMessage;
+  bool _hasUncheckedExclusions = false;
+  bool _experienceLoading = false;
+  String? _experienceError, _experienceRequestKey;
+  int _experienceGeneration = 0;
+  final Map<String, ExperienceFit> _experienceFits = {};
+  bool get _usesExperience =>
+      _findingToday ||
+      _mood != WatchlistMood.any ||
+      _avoid.isNotEmpty ||
+      _watchRequest.isNotEmpty;
+  String _experienceKey(Object item) => item is WatchlistMovie
+      ? 'movie:${item.movieId}'
+      : 'show:${(item as _WatchlistShowEntry).showId}';
+  bool _fitsExperience(String key) =>
+      !_usesExperience || (_experienceFits[key]?.eligible ?? false);
+
+  Future<void> _loadExperience(String requestKey) async {
+    if (!mounted || !_usesExperience || requestKey != _experienceRequestKey) {
+      return;
+    }
+    final generation = ++_experienceGeneration;
+    setState(() {
+      _experienceLoading = true;
+      _experienceError = null;
+      _experienceFits.clear();
+    });
+    final titles = <Map<String, dynamic>>[
+      for (final item in _allWatchlist)
+        {'id': item.movieId, 'mediaType': 'movie'},
+      for (final item in _allShowWatchlist)
+        {'id': item.showId, 'mediaType': 'show'},
+    ];
+    final preferences = {
+      'mood': _mood.id,
+      'avoid': _avoid.toList(),
+      'request': _watchRequest,
+      'includePossible': true,
+      'includeUnknownContent': false
+    };
+    final fits = <String, ExperienceFit>{};
+    String? message;
+    var unchecked = false;
+    try {
+      for (var i = 0; i < titles.length; i += 25) {
+        final data = await ApiClient.post('/recommendations/watchlist-fit',
+            body: {
+              ...preferences,
+              'titles': titles.sublist(i, min(i + 25, titles.length))
+            });
+        if (!mounted ||
+            generation != _experienceGeneration ||
+            requestKey != _experienceRequestKey) {
+          return;
+        }
+        message = data['message'] as String?;
+        for (final row in data['results'] as List) {
+          unchecked |= (row['unknownAvoids'] as List? ?? []).isNotEmpty;
+          fits['${row['mediaType']}:${row['id']}'] =
+              ExperienceFit.fromJson(Map<String, dynamic>.from(row));
+        }
+      }
+      if (!mounted || generation != _experienceGeneration) return;
+      setState(() {
+        _experienceMessage = message;
+        _hasUncheckedExclusions = unchecked;
+        _experienceFits.addAll(fits);
+        _experienceLoading = false;
+      });
+    } catch (_) {
+      if (!mounted || generation != _experienceGeneration) return;
+      setState(() {
+        _experienceLoading = false;
+        _experienceError =
+            'Couldn’t find your picks right now. Your choices are saved.';
+      });
+    }
+    _filterWatchlist();
+  }
+
+  bool _tonightServices = false, _includeRentals = false;
+  Set<int>? _selectedProviderIds;
+  List<WatchProvider> _savedProviders = [];
+  List<WatchProvider> _searchProviders = [];
+
+  bool _matchesTonightServices(List<WatchProvider> offers) {
+    if (!_tonightServices) return true;
+    final ids = _selectedProviderIds ?? _userWatchProviderIds;
+    return matchesWatchServices(offers,
+        selectedIds: ids,
+        selectedNames: [..._savedProviders, ..._searchProviders]
+            .where((p) => ids.contains(p.id))
+            .map((p) => p.matchKey)
+            .toSet(),
+        includeRentals: _includeRentals);
+  }
 
   // Active filters
   String? _filterGenre; // null = all genres
@@ -158,7 +264,10 @@ class _WatchlistScreenState extends State<WatchlistScreen>
     _refreshing = true;
     try {
       await context.read<AuthProvider>().refreshUserData();
-      if (mounted) _loadWatchlist();
+      if (mounted) {
+        _experienceRequestKey = null;
+        _loadWatchlist();
+      }
     } catch (_) {
       if (mounted) {
         setState(() => _loadError = 'Couldn’t refresh your watchlist');
@@ -353,6 +462,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
         _userWatchProviderIds = {
           ...userProviderIds,
         };
+        _savedProviders = savedProviders;
         _userWatchProviderMatchKeys = savedProviders
             .where((provider) => _userWatchProviderIds.contains(provider.id))
             .map((provider) => provider.matchKey)
@@ -475,6 +585,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
         _userWatchProviderIds = {
           ...?authProvider.cachedUserWatchProviderIds,
         };
+        _savedProviders = savedProviders;
         _userWatchProviderMatchKeys = savedProviders
             .where((provider) => _userWatchProviderIds.contains(provider.id))
             .map((provider) => provider.matchKey)
@@ -502,11 +613,36 @@ class _WatchlistScreenState extends State<WatchlistScreen>
   }
 
   void _filterWatchlist() {
+    if (!_usesExperience && _experienceRequestKey != null) {
+      _experienceGeneration++;
+      _experienceRequestKey = null;
+      _experienceLoading = false;
+      _experienceError = null;
+      _experienceFits.clear();
+    }
+    final key = jsonEncode([
+      _mood.id,
+      _avoid.toList()..sort(),
+      _watchRequest,
+      context.read<AuthProvider>().dbUser?.id,
+      _allWatchlist.map((e) => e.movieId).toList(),
+      _allShowWatchlist.map((e) => e.showId).toList()
+    ]);
+    if (_usesExperience && key != _experienceRequestKey) {
+      _experienceRequestKey = key;
+      _experienceFits.clear();
+      Future.microtask(() => _loadExperience(key));
+    }
     final query = _searchController.text.toLowerCase();
     setState(() {
       _filteredWatchlist = _allWatchlist.where((item) {
         final m = item.movie;
         if (m == null) return false;
+        if (!_fitsExperience('movie:${item.movieId}') ||
+            !_matchesTonightServices(
+                _movieWatchProviders[item.movieId] ?? [])) {
+          return false;
+        }
         if (_friendsOnly &&
             !(_recommendationsByMovieId[item.movieId]?.any((f) => f.watched) ??
                 false)) {
@@ -515,7 +651,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
         // Text search
         if (!m.title.toLowerCase().contains(query)) return false;
         // Genre filter
-        if (_filterGenre != null && !m.genres.contains(_filterGenre)) {
+        if (!_matchesGenre(m.genres)) {
           return false;
         }
         // Min rating filter
@@ -529,19 +665,22 @@ class _WatchlistScreenState extends State<WatchlistScreen>
           if (year != _filterYear) return false;
         }
         // Max runtime filter
-        if (_filterMaxRuntime != null &&
-            (m.runtime == null || m.runtime! > _filterMaxRuntime!)) {
+        if (!fitsWatchTime(m.runtime, _filterMaxRuntime)) {
           return false;
         }
         return true;
       }).toList();
       _filteredShowWatchlist = _allShowWatchlist.where((item) {
         if (!item.title.toLowerCase().contains(query)) return false;
+        if (!_fitsExperience('show:${item.showId}') ||
+            !_matchesTonightServices(_showWatchProviders[item.showId] ?? [])) {
+          return false;
+        }
         if (_friendsOnly &&
             !(_friendsByShowId[item.showId]?.any((f) => f.watched) ?? false)) {
           return false;
         }
-        if (_filterGenre != null && !item.genres.contains(_filterGenre)) {
+        if (!_matchesGenre(item.genres)) {
           return false;
         }
         if (_filterYear != null &&
@@ -554,8 +693,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                 item.voteAverage! < _filterMinRating!)) {
           return false;
         }
-        if (_filterMaxRuntime != null &&
-            (item.runtime == null || item.runtime! > _filterMaxRuntime!)) {
+        if (!fitsWatchTime(item.runtime, _filterMaxRuntime)) {
           return false;
         }
         return true;
@@ -564,6 +702,9 @@ class _WatchlistScreenState extends State<WatchlistScreen>
 
       // Apply sorting
       switch (_sortBy) {
+        case 'runtimeAsc':
+          _filteredWatchlist.sort(_compareWatchlistItems);
+          break;
         case 'recent':
           _filteredWatchlist.sort((a, b) {
             final dateA = DateTime.tryParse(a.createdAt ?? '') ??
@@ -607,8 +748,14 @@ class _WatchlistScreenState extends State<WatchlistScreen>
     });
   }
 
+  bool _matchesGenre(List<String> genres) =>
+      _filterGenre == null ||
+      (_filterGenre == 'Rom com'
+          ? genres.contains('Comedy') && genres.contains('Romance')
+          : genres.contains(_filterGenre));
+
   List<String> _allGenres() {
-    final genres = <String>{};
+    final genres = <String>{'Rom com'};
     for (final item in _allWatchlist) {
       genres.addAll(item.movie?.genres ?? []);
     }
@@ -632,6 +779,8 @@ class _WatchlistScreenState extends State<WatchlistScreen>
   }
 
   bool get _hasActiveFilters =>
+      _usesExperience ||
+      _tonightServices ||
       _filterGenre != null ||
       _filterMinRating != null ||
       _filterYear != null ||
@@ -694,7 +843,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
           FlixieToast(
             type: FlixieToastType.success,
             content: Text('${selected.name} added to watchlist'),
-            backgroundColor: FlixieColors.surfaceElevated,
+            backgroundColor: context.colors.surfaceElevated,
           ),
         );
       }
@@ -705,7 +854,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
         FlixieToast(
           type: FlixieToastType.error,
           content: const Text('Failed to add movie to watchlist'),
-          backgroundColor: FlixieColors.danger,
+          backgroundColor: context.colors.danger,
         ),
       );
     }
@@ -858,7 +1007,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
           FlixieToast(
             type: FlixieToastType.success,
             content: Text('${item.movie?.title ?? "Movie"} marked as watched'),
-            backgroundColor: FlixieColors.surfaceElevated,
+            backgroundColor: context.colors.surfaceElevated,
           ),
         );
       }
@@ -869,7 +1018,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
           FlixieToast(
             type: FlixieToastType.error,
             content: const Text('Failed to mark as watched'),
-            backgroundColor: FlixieColors.danger,
+            backgroundColor: context.colors.danger,
           ),
         );
       }
@@ -918,16 +1067,16 @@ class _WatchlistScreenState extends State<WatchlistScreen>
         final markWatched = await showFlixiePromptSheet<bool>(
           context: context,
           builder: (ctx) => FlixiePromptSheetContent(
-            title: const Text('Did you watch it?',
-                style: TextStyle(color: FlixieColors.light)),
+            title: Text('Did you watch it?',
+                style: TextStyle(color: context.colors.light)),
             content: Text(
                 'Want to add ${item.movie?.title ?? "this movie"} to your watched list?',
-                style: const TextStyle(color: FlixieColors.medium)),
+                style: TextStyle(color: context.colors.medium)),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('No',
-                    style: TextStyle(color: FlixieColors.medium)),
+                child:
+                    Text('No', style: TextStyle(color: context.colors.medium)),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(ctx, true),
@@ -959,7 +1108,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                 type: FlixieToastType.success,
                 content: Text(
                     '${item.movie?.title ?? "Movie"} added to watched list'),
-                backgroundColor: FlixieColors.surfaceElevated,
+                backgroundColor: context.colors.surfaceElevated,
               ),
             );
           }
@@ -972,7 +1121,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
           FlixieToast(
             type: FlixieToastType.error,
             content: const Text('Failed to remove from watchlist'),
-            backgroundColor: FlixieColors.danger,
+            backgroundColor: context.colors.danger,
           ),
         );
       }
@@ -1006,7 +1155,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
               ElevatedButton(
                 onPressed: () => Navigator.pop(dialogContext, true),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: FlixieColors.danger,
+                  backgroundColor: context.colors.danger,
                 ),
                 child: const Text('Clear watched'),
               ),
@@ -1038,7 +1187,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
           content: Text(
             '${watchedItems.length} watched ${watchedItems.length == 1 ? 'movie' : 'movies'} removed from your watchlist',
           ),
-          backgroundColor: FlixieColors.surfaceElevated,
+          backgroundColor: context.colors.surfaceElevated,
         ),
       );
     } catch (e) {
@@ -1047,7 +1196,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
         FlixieToast(
           type: FlixieToastType.error,
           content: const Text('Failed to clear watched movies'),
-          backgroundColor: FlixieColors.danger,
+          backgroundColor: context.colors.danger,
         ),
       );
     }
@@ -1107,7 +1256,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
             type: FlixieToastType.success,
             content:
                 Text('${item.movie?.title ?? "Movie"} added to favourites'),
-            backgroundColor: FlixieColors.surfaceElevated,
+            backgroundColor: context.colors.surfaceElevated,
           ),
         );
       }
@@ -1125,7 +1274,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
             FlixieToast(
               type: FlixieToastType.error,
               content: const Text('Failed to add to favourites'),
-              backgroundColor: FlixieColors.danger,
+              backgroundColor: context.colors.danger,
             ),
           );
         }
@@ -1191,8 +1340,10 @@ class _WatchlistScreenState extends State<WatchlistScreen>
 
   String _sortByLabel() {
     switch (_sortBy) {
+      case 'runtimeAsc':
+        return 'Shortest first';
       case 'recent':
-        return 'Date Added';
+        return 'Date added';
       case 'titleAsc':
         return 'Title A–Z';
       case 'titleDesc':
@@ -1204,7 +1355,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
       case 'yearAsc':
         return 'Year (Oldest)';
       default:
-        return 'Date Added';
+        return 'Date added';
     }
   }
 
@@ -1216,7 +1367,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
             children: [
               Text(
                   '${_allWatchlist.length + _allShowWatchlist.length} saved titles',
-                  style: const TextStyle(color: FlixieColors.light)),
+                  style: TextStyle(color: context.colors.light)),
               TextButton(
                   onPressed: () => context.push('/watch-history'),
                   child: const Text('Watch history')),
@@ -1229,56 +1380,6 @@ class _WatchlistScreenState extends State<WatchlistScreen>
     if (mounted) _loadWatchlist();
   }
 
-  bool _checkingServices = false;
-
-  Future<void> _toggleServices() async {
-    if (_checkingServices) return;
-    if (_selectedTab == 1) {
-      setState(() => _selectedTab = 0);
-      return;
-    }
-    final auth = context.read<AuthProvider>();
-    final user = auth.dbUser;
-    if (user == null) return;
-    _checkingServices = true;
-    try {
-      // An empty local availability cache does not mean no saved subscriptions.
-      var ids = auth.cachedUserWatchProviderIds;
-      if (ids == null) {
-        final saved = await UserService.getUserWatchProviders(user.id);
-        if (!mounted || auth.dbUser?.id != user.id) return;
-        ids = saved.map((provider) => provider.id).toSet();
-        auth.updateCachedUserWatchProviderIds(ids);
-      }
-      if (!mounted) return;
-      if (ids.isEmpty) {
-        await showModalBottomSheet<void>(
-            context: context,
-            useRootNavigator: true,
-            useSafeArea: true,
-            isScrollControlled: true,
-            builder: (context) => SizedBox(
-                height: MediaQuery.sizeOf(context).height * .85,
-                child: WatchProvidersSheet(userId: user.id)));
-        if (!mounted || auth.dbUser?.id != user.id) return;
-        ids = auth.cachedUserWatchProviderIds ?? const <int>{};
-        if (ids.isEmpty) return;
-      }
-      setState(() {
-        _userWatchProviderIds = {...ids!};
-        _selectedTab = 1;
-      });
-      _loadWatchProviderAvailability(_allWatchlist);
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Couldn’t load your services. Please try again.')));
-      }
-    } finally {
-      _checkingServices = false;
-    }
-  }
-
   void _clearFilters() {
     _searchController.clear();
     setState(() {
@@ -1289,27 +1390,38 @@ class _WatchlistScreenState extends State<WatchlistScreen>
       _filterMinRating = null;
       _filterYear = null;
       _filterMaxRuntime = null;
+      _mood = WatchlistMood.any;
+      _avoid = {};
+      _watchRequest = '';
+      _findingToday = false;
+      _experienceMessage = null;
+      _hasUncheckedExclusions = false;
+      _experienceGeneration++;
+      _experienceRequestKey = null;
+      _experienceLoading = false;
+      _experienceError = null;
+      _experienceFits.clear();
+      _tonightServices = false;
+      _includeRentals = false;
+      _selectedProviderIds = null;
+      _searchProviders = [];
     });
     _filterWatchlist();
   }
 
-  Widget _buildSortFilterRow() => Padding(
+  Widget _buildSortFilterRow({VoidCallback? onChange}) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Wrap(
             spacing: 8,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               _buildCheckboxFilter(
-                label: 'On my services',
-                selected: _selectedTab == 1,
-                onChanged: (_) => _toggleServices(),
-              ),
-              _buildCheckboxFilter(
                 label: 'Friends watched',
                 selected: _friendsOnly,
                 onChanged: (value) {
                   setState(() => _friendsOnly = value);
                   _filterWatchlist();
+                  onChange?.call();
                 },
               ),
               TextButton.icon(
@@ -1325,11 +1437,11 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                         PopupMenuItem(value: 2, child: Text('Upcoming')),
                         PopupMenuItem(value: 3, child: Text('Watched'))
                       ],
-                  child: const SizedBox(
+                  child: SizedBox(
                       width: 44,
                       height: 44,
-                      child:
-                          Icon(Icons.filter_list, color: FlixieColors.light))),
+                      child: Icon(Icons.filter_list,
+                          color: context.colors.light))),
               IconButton(
                   tooltip: 'Refresh watchlist',
                   onPressed: _refreshWatchlist,
@@ -1347,26 +1459,26 @@ class _WatchlistScreenState extends State<WatchlistScreen>
 
   Widget _buildSearchBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
       child: TextField(
         controller: _searchController,
-        style: const TextStyle(color: FlixieColors.textPrimary, fontSize: 15),
+        style: TextStyle(color: context.colors.textPrimary, fontSize: 15),
         textInputAction: TextInputAction.search,
         decoration: InputDecoration(
           hintText: 'Search watchlist',
-          hintStyle: const TextStyle(color: FlixieColors.medium),
-          prefixIcon: const Icon(Icons.search_rounded,
-              color: FlixieColors.medium, size: 21),
+          hintStyle: TextStyle(color: context.colors.medium),
+          prefixIcon: Icon(Icons.search_rounded,
+              color: context.colors.medium, size: 21),
           suffixIcon: _searchController.text.isEmpty
               ? null
               : IconButton(
                   tooltip: 'Clear search',
-                  icon: const Icon(Icons.close_rounded,
-                      color: FlixieColors.medium, size: 20),
+                  icon: Icon(Icons.close_rounded,
+                      color: context.colors.medium, size: 20),
                   onPressed: () => _searchController.clear(),
                 ),
           filled: true,
-          fillColor: FlixieColors.surfaceElevated,
+          fillColor: context.colors.surfaceElevated,
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
           enabledBorder: OutlineInputBorder(
@@ -1390,17 +1502,17 @@ class _WatchlistScreenState extends State<WatchlistScreen>
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
-        toolbarHeight: (MediaQuery.textScalerOf(context).scale(30) + 16)
-            .clamp(56.0, double.infinity),
-        title: const Text('Watchlist',
+        toolbarHeight: (MediaQuery.textScalerOf(context).scale(24) + 12)
+            .clamp(48.0, double.infinity),
+        title: Text('Watchlist',
             style: TextStyle(
                 fontFamily: FlixieTypography.fontFamily,
-                color: Colors.white,
+                color: context.colors.white,
                 fontSize: 24,
                 fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add_rounded, color: Colors.white),
+            icon: Icon(Icons.add_rounded, color: context.colors.white),
             tooltip: 'Add movie',
             onPressed: _openAddMovieSheet,
           ),
@@ -1492,6 +1604,10 @@ class _WatchlistScreenState extends State<WatchlistScreen>
     final showItems = _visibleShowWatchlist();
     final items = <Object>[...movieItems, ...showItems];
     if (_mediaFilter == 0) items.sort(_compareWatchlistItems);
+    if (_usesExperience) {
+      items.sort((a, b) => _experienceFits[_experienceKey(a)]!
+          .compareTo(_experienceFits[_experienceKey(b)]!));
+    }
     final user = context.read<AuthProvider>().dbUser;
     final hasItems = _allWatchlist.isNotEmpty || _allShowWatchlist.isNotEmpty;
 
@@ -1499,10 +1615,95 @@ class _WatchlistScreenState extends State<WatchlistScreen>
       if (_loadError != null)
         TextButton(
             onPressed: _refreshWatchlist, child: Text('$_loadError · Retry')),
+      if (_experienceError != null)
+        TextButton(
+            onPressed: () {
+              _experienceRequestKey = null;
+              _filterWatchlist();
+            },
+            child: Text('$_experienceError Retry')),
       _buildStatsRow(),
       _buildSearchBar(),
       _buildMediaFilter(),
-      _buildSortFilterRow(),
+      if (hasItems)
+        TonightFiltersPanel(
+          key: _tonightPanelKey,
+          minutes: _filterMaxRuntime,
+          mood: _mood,
+          avoid: _avoid,
+          genre: _filterGenre,
+          genres: _allGenres(),
+          onGenre: (genre) {
+            _filterGenre = genre;
+            _findingToday = false;
+            _watchRequest = '';
+            _mood = WatchlistMood.any;
+            _avoid = {};
+            _filterWatchlist();
+          },
+          providers: {
+            for (final p in [..._savedProviders, ..._searchProviders]) p.id: p
+          }.values.toList(),
+          selectedProviders: _selectedProviderIds ?? _userWatchProviderIds,
+          savedProviderIds: _userWatchProviderIds,
+          servicesOnly: _tonightServices,
+          rentals: _includeRentals,
+          count: items.length,
+          region: user?.watchProviderRegion ?? 'GB',
+          loading: _experienceLoading ||
+              _tonightServices &&
+                  (_loadingWatchProviderAvailability ||
+                      _loadingShowWatchProviderAvailability),
+          onTime: (value) {
+            _filterMaxRuntime = value;
+            _filterWatchlist();
+          },
+          onMood: (value) {
+            _mood = value;
+            _filterWatchlist();
+          },
+          onServices: (catalog, ids, enabled, rentals) {
+            _searchProviders = catalog;
+            _selectedProviderIds = {...ids};
+            _tonightServices = enabled;
+            _includeRentals = rentals;
+            if (_selectedTab == 1) _selectedTab = 0;
+            _filterWatchlist();
+          },
+          onSort: _openFilterSheet,
+          sortLabel: _usesExperience ? 'Best fit' : _sortByLabel(),
+          onMore: () => showModalBottomSheet<void>(
+              context: context,
+              useRootNavigator: true,
+              useSafeArea: true,
+              isScrollControlled: true,
+              constraints: BoxConstraints(
+                  maxHeight: MediaQuery.sizeOf(context).height * .8),
+              builder: (context) => SingleChildScrollView(
+                  child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        Text('More watchlist filters',
+                            style: Theme.of(context).textTheme.titleLarge),
+                        StatefulBuilder(
+                            builder: (context, update) => _buildSortFilterRow(
+                                onChange: () => update(() {}))),
+                      ])))),
+          onClear: _clearFilters,
+          onPick: () => _pickFromTonight(items),
+        ),
+      if (_usesExperience && !_experienceLoading && _experienceMessage != null)
+        Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text(_experienceMessage!)),
+      if (_usesExperience &&
+          !_experienceLoading &&
+          items.isEmpty &&
+          (_avoid.isNotEmpty || _hasUncheckedExclusions))
+        const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text(
+                'Some titles were left out because we couldn’t check the content you want to avoid.')),
       if (_friendsOnly && _loadingFriends)
         const Padding(
             padding: EdgeInsets.all(16), child: Text('Checking friends…')),
@@ -1513,7 +1714,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
         TextButton(
             onPressed: () => _loadFriendRecommendations(_allWatchlist),
             child: const Text('Some friends couldn’t load · Retry')),
-      if (_selectedTab == 1 &&
+      if ((_selectedTab == 1 || _tonightServices) &&
           !_loadingWatchProviderAvailability &&
           !_loadingShowWatchProviderAvailability &&
           (_movieWatchProviders.length < _allWatchlist.length ||
@@ -1527,17 +1728,23 @@ class _WatchlistScreenState extends State<WatchlistScreen>
     ];
 
     if (items.isEmpty) {
-      final emptyLabel = switch (_selectedTab) {
-        1 => _loadingWatchProviderAvailability ||
-                _loadingShowWatchProviderAvailability
-            ? 'Checking your providers...'
-            : 'Nothing you can watch right now',
-        2 => 'No upcoming titles in your watchlist',
-        3 => 'No watched movies in your watchlist',
-        _ => hasItems || _searchController.text.isNotEmpty
-            ? 'No watchlist matches'
-            : 'Your watchlist is empty',
-      };
+      final emptyLabel = _experienceLoading
+          ? 'Finding your picks…'
+          : _experienceError != null
+              ? 'Your picks couldn’t load'
+              : _usesExperience
+                  ? 'Nothing fits all of this yet. Try a different description or adjust your filters.'
+                  : switch (_selectedTab) {
+                      1 => _loadingWatchProviderAvailability ||
+                              _loadingShowWatchProviderAvailability
+                          ? 'Checking your providers...'
+                          : 'Nothing you can watch right now',
+                      2 => 'No upcoming titles in your watchlist',
+                      3 => 'No watched movies in your watchlist',
+                      _ => hasItems || _searchController.text.isNotEmpty
+                          ? 'No watchlist matches'
+                          : 'Your watchlist is empty',
+                    };
       return ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
@@ -1596,15 +1803,81 @@ class _WatchlistScreenState extends State<WatchlistScreen>
         final item = items[index - header.length];
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: item is WatchlistMovie
-              ? _buildWatchlistRow(item, user)
-              : _buildShowWatchlistRow(item as _WatchlistShowEntry),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            if (_usesExperience &&
+                _experienceFits[_experienceKey(item)] != null)
+              Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text([
+                    ..._experienceFits[_experienceKey(item)]!.reasons,
+                  ].join(' · '))),
+            item is WatchlistMovie
+                ? _buildWatchlistRow(item, user)
+                : _buildShowWatchlistRow(item as _WatchlistShowEntry),
+          ]),
         );
       },
     );
   }
 
+  Future<void> _pickFromTonight(List<Object> items) async {
+    if (items.isEmpty) return;
+    final item =
+        _usesExperience ? items.first : items[Random().nextInt(items.length)];
+    final movie = item is WatchlistMovie ? item : null;
+    final show = item is _WatchlistShowEntry ? item : null;
+    final title = movie?.movie?.title ?? show!.title;
+    final runtime = movie?.movie?.runtime ?? show?.runtime;
+    await showModalBottomSheet<void>(
+        context: context,
+        useRootNavigator: true,
+        useSafeArea: true,
+        isScrollControlled: true,
+        constraints:
+            BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .8),
+        builder: (sheetContext) => SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Tonight’s pick',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 12),
+                  Text(title, style: Theme.of(context).textTheme.headlineSmall),
+                  const SizedBox(height: 12),
+                  Text([
+                    if (runtime != null && runtime > 0)
+                      '$runtime min${show != null ? ' per episode (estimated)' : ''}',
+                    if (_mood != WatchlistMood.any)
+                      ...(_experienceFits[_experienceKey(item)]?.reasons ?? []),
+                    _usesExperience
+                        ? 'Best available fit from ${items.length} matching titles'
+                        : 'Randomly chosen from your ${items.length} matching titles'
+                  ].join(' · ')),
+                  const SizedBox(height: 20),
+                  FilledButton(
+                      onPressed: () {
+                        Navigator.pop(sheetContext);
+                        context.push(movie != null
+                            ? '/movies/${movie.movieId}'
+                            : '/shows/${show!.showId}');
+                      },
+                      child: const Text('View watch options')),
+                ])));
+  }
+
   int _compareWatchlistItems(Object first, Object second) {
+    if (_sortBy == 'runtimeAsc') {
+      int value(Object item) =>
+          (item is WatchlistMovie
+              ? item.movie?.runtime
+              : (item as _WatchlistShowEntry).runtime) ??
+          999999;
+      final comparison = value(first).compareTo(value(second));
+      if (comparison != 0) return comparison;
+    }
     final firstTitle = first is WatchlistMovie
         ? first.movie?.title ?? ''
         : (first as _WatchlistShowEntry).title;
@@ -1671,7 +1944,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                     onChanged: (value) => onChanged(value ?? false),
                     activeColor: FlixieColors.primary,
                     checkColor: Colors.white,
-                    side: const BorderSide(color: FlixieColors.light),
+                    side: BorderSide(color: context.colors.light),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(3)),
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -1685,7 +1958,9 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                         style: TextStyle(
                           fontFamily: FlixieTypography.fontFamily,
                           fontSize: 13,
-                          color: selected ? Colors.white : FlixieColors.light,
+                          color: selected
+                              ? context.colors.white
+                              : context.colors.light,
                         )),
                   ),
                 ),
@@ -1701,7 +1976,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
           decoration: BoxDecoration(
             border: Border(
                 bottom: BorderSide(
-                    color: FlixieColors.light.withValues(alpha: .2))),
+                    color: context.colors.light.withValues(alpha: .2))),
           ),
           child: SizedBox(
             width: double.infinity,
@@ -1714,7 +1989,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                       border: Border(
                           bottom: BorderSide(
                         color: _mediaFilter == index
-                            ? FlixieColors.primaryText
+                            ? context.colors.primaryText
                             : Colors.transparent,
                         width: 3,
                       )),
@@ -1722,8 +1997,8 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                     child: TextButton(
                       style: TextButton.styleFrom(
                         foregroundColor: _mediaFilter == index
-                            ? Colors.white
-                            : FlixieColors.light,
+                            ? context.colors.white
+                            : context.colors.light,
                         minimumSize: const Size(48, 48),
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 12),
@@ -1757,8 +2032,16 @@ class _WatchlistScreenState extends State<WatchlistScreen>
       watchlistItem: item,
       isWatched: isWatched,
       availableProviders: providers,
-      userWatchProviderIds: _userWatchProviderIds,
-      userWatchProviderMatchKeys: _userWatchProviderMatchKeys,
+      userWatchProviderIds: _tonightServices
+          ? (_selectedProviderIds ?? _userWatchProviderIds)
+          : _userWatchProviderIds,
+      userWatchProviderMatchKeys: _tonightServices
+          ? [..._savedProviders, ..._searchProviders]
+              .where((p) => (_selectedProviderIds ?? _userWatchProviderIds)
+                  .contains(p.id))
+              .map((p) => p.matchKey)
+              .toSet()
+          : _userWatchProviderMatchKeys,
       canWatchNow: canWatchNow,
       isLoadingProviders: isLoadingProviders,
       providersFailed: !isLoadingProviders &&
@@ -1802,6 +2085,8 @@ class _WatchlistScreenState extends State<WatchlistScreen>
       metadataOverride: [
         if (item.firstAirDate?.isNotEmpty == true)
           item.firstAirDate!.split('-').first,
+        if (item.runtime != null && item.runtime! > 0)
+          '${item.runtime} min / episode (est.)',
         if (item.numberOfSeasons != null)
           '${item.numberOfSeasons} seasons'
         else if (item.numberOfEpisodes != null)
@@ -1814,8 +2099,16 @@ class _WatchlistScreenState extends State<WatchlistScreen>
       onMarkAsWatched: details,
       onRemove: () => _removeShowFromWatchlist(item),
       availableProviders: _showWatchProviders[item.showId] ?? const [],
-      userWatchProviderIds: _userWatchProviderIds,
-      userWatchProviderMatchKeys: _userWatchProviderMatchKeys,
+      userWatchProviderIds: _tonightServices
+          ? (_selectedProviderIds ?? _userWatchProviderIds)
+          : _userWatchProviderIds,
+      userWatchProviderMatchKeys: _tonightServices
+          ? [..._savedProviders, ..._searchProviders]
+              .where((p) => (_selectedProviderIds ?? _userWatchProviderIds)
+                  .contains(p.id))
+              .map((p) => p.matchKey)
+              .toSet()
+          : _userWatchProviderMatchKeys,
       region: context.read<AuthProvider>().dbUser?.watchProviderRegion ?? 'GB',
       isLoadingProviders: _loadingShowWatchProviderAvailability &&
           !_showWatchProviders.containsKey(item.showId),
@@ -1914,14 +2207,20 @@ class _WatchlistShowEntry {
       title.trim().isEmpty ||
       posterPath == null ||
       firstAirDate == null ||
-      numberOfSeasons == null;
+      numberOfSeasons == null ||
+      runtime == null ||
+      genres.isEmpty;
 
   _WatchlistShowEntry withShow(TvShow show) => _WatchlistShowEntry.fromJson({
         'showId': showId,
         'removed': removed,
         'watched': watched,
         'createdAt': createdAt,
-        'show': show.toJson(),
+        'show': {
+          ...show.toJson(),
+          if (show.genres.isEmpty) 'genres': genres,
+          if (show.episodeRuntime == null) 'episodeRuntime': runtime,
+        },
       });
 
   factory _WatchlistShowEntry.fromJson(Map<String, dynamic> json) {
@@ -1943,7 +2242,7 @@ class _WatchlistShowEntry {
       numberOfSeasons:
           _watchlistInt(show['numberOfSeasons'] ?? show['number_of_seasons']),
       voteAverage: double.tryParse('${show['voteAverage'] ?? ''}'),
-      runtime: _watchlistInt(show['runtime']),
+      runtime: TvShow.fromJson(show).episodeRuntime,
       genres: (show['genres'] as List? ?? const [])
           .map((g) => g is Map ? '${g['name'] ?? ''}' : '$g')
           .where((g) => g.isNotEmpty)
@@ -2029,9 +2328,9 @@ class _WatchlistMovieSearchSheetState
       expand: false,
       builder: (context, scrollController) {
         return Container(
-          decoration: const BoxDecoration(
-            color: FlixieColors.background,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            color: context.colors.background,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(
             children: [
@@ -2040,7 +2339,7 @@ class _WatchlistMovieSearchSheetState
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: FlixieColors.medium.withValues(alpha: 0.45),
+                  color: context.colors.medium.withValues(alpha: 0.45),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -2048,19 +2347,19 @@ class _WatchlistMovieSearchSheetState
                 padding: const EdgeInsets.fromLTRB(16, 0, 8, 12),
                 child: Row(
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         'Add to Watchlist',
                         style: TextStyle(
-                          color: FlixieColors.white,
+                          color: context.colors.white,
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close_rounded,
-                          color: FlixieColors.light),
+                      icon: Icon(Icons.close_rounded,
+                          color: context.colors.light),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ],
@@ -2072,26 +2371,26 @@ class _WatchlistMovieSearchSheetState
                   controller: _controller,
                   autofocus: true,
                   onChanged: _onSearchChanged,
-                  style: const TextStyle(color: FlixieColors.textPrimary),
+                  style: TextStyle(color: context.colors.textPrimary),
                   textInputAction: TextInputAction.search,
                   decoration: InputDecoration(
                     hintText: 'Search movies',
-                    hintStyle: const TextStyle(color: FlixieColors.medium),
-                    prefixIcon: const Icon(Icons.search_rounded,
-                        color: FlixieColors.medium),
+                    hintStyle: TextStyle(color: context.colors.medium),
+                    prefixIcon: Icon(Icons.search_rounded,
+                        color: context.colors.medium),
                     suffixIcon: _query.isEmpty
                         ? null
                         : IconButton(
                             tooltip: 'Clear search',
-                            icon: const Icon(Icons.close_rounded,
-                                color: FlixieColors.medium),
+                            icon: Icon(Icons.close_rounded,
+                                color: context.colors.medium),
                             onPressed: () {
                               _controller.clear();
                               _onSearchChanged('');
                             },
                           ),
                     filled: true,
-                    fillColor: FlixieColors.surfaceElevated,
+                    fillColor: context.colors.surfaceElevated,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(
@@ -2121,10 +2420,10 @@ class _WatchlistMovieSearchSheetState
 
   Widget _buildResults(ScrollController scrollController) {
     if (_query.length < 3) {
-      return const Center(
+      return Center(
         child: Text(
           'Search for a movie to add',
-          style: TextStyle(color: FlixieColors.medium),
+          style: TextStyle(color: context.colors.medium),
         ),
       );
     }
@@ -2139,7 +2438,7 @@ class _WatchlistMovieSearchSheetState
       return Center(
         child: Text(
           'No movies found for "$_query"',
-          style: const TextStyle(color: FlixieColors.medium),
+          style: TextStyle(color: context.colors.medium),
         ),
       );
     }
@@ -2182,7 +2481,7 @@ class _WatchlistMovieSearchResultTile extends StatelessWidget {
     final vote = movie.voteAverage;
 
     return Material(
-      color: FlixieColors.surfaceElevated,
+      color: context.colors.surfaceElevated,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
@@ -2213,8 +2512,8 @@ class _WatchlistMovieSearchResultTile extends StatelessWidget {
                   children: [
                     Text(
                       movie.name,
-                      style: const TextStyle(
-                        color: FlixieColors.textPrimary,
+                      style: TextStyle(
+                        color: context.colors.textPrimary,
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
                         height: 1.2,
@@ -2226,27 +2525,27 @@ class _WatchlistMovieSearchResultTile extends StatelessWidget {
                         if (year != null)
                           Text(
                             year,
-                            style: const TextStyle(
-                              color: FlixieColors.medium,
+                            style: TextStyle(
+                              color: context.colors.medium,
                               fontSize: 12,
                             ),
                           ),
                         if (year != null && vote != null && vote > 0)
-                          const Text(
+                          Text(
                             '  •  ',
                             style: TextStyle(
-                              color: FlixieColors.medium,
+                              color: context.colors.medium,
                               fontSize: 12,
                             ),
                           ),
                         if (vote != null && vote > 0) ...[
-                          const Icon(Icons.star_rounded,
-                              color: FlixieColors.tertiary, size: 13),
+                          Icon(Icons.star_rounded,
+                              color: context.colors.tertiary, size: 13),
                           const SizedBox(width: 2),
                           Text(
                             vote.toStringAsFixed(1),
-                            style: const TextStyle(
-                              color: FlixieColors.tertiary,
+                            style: TextStyle(
+                              color: context.colors.tertiary,
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
                             ),
@@ -2262,7 +2561,7 @@ class _WatchlistMovieSearchResultTile extends StatelessWidget {
                 isAdded
                     ? Icons.check_circle_rounded
                     : Icons.add_circle_outline_rounded,
-                color: isAdded ? FlixieColors.success : FlixieColors.primary,
+                color: isAdded ? context.colors.success : FlixieColors.primary,
               ),
             ],
           ),
@@ -2427,33 +2726,22 @@ class WatchlistMovieRow extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(movie.title,
-                                style: const TextStyle(
-                                    color: FlixieColors.textPrimary,
+                                style: TextStyle(
+                                    color: context.colors.textPrimary,
                                     fontSize: 19,
                                     fontWeight: FontWeight.w700)),
                             const SizedBox(height: 6),
                             Text(metadata,
-                                style: const TextStyle(
-                                    color: FlixieColors.light, fontSize: 13)),
+                                style: TextStyle(
+                                    color: context.colors.light, fontSize: 13)),
                             const SizedBox(height: 7),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: FlixieColors.surfaceElevated,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(isShow ? 'Show' : 'Movie',
-                                  style: const TextStyle(
-                                      color: FlixieColors.primaryText,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600)),
-                            ),
+                            FlixiePill.label(
+                                label: Text(isShow ? 'Show' : 'Movie')),
                           ]),
                     ))),
             PopupMenuButton<String>(
               tooltip: 'More actions',
-              color: FlixieColors.surfaceElevated,
+              color: context.colors.surfaceElevated,
               onSelected: (value) {
                 switch (value) {
                   case 'details':
@@ -2497,11 +2785,11 @@ class WatchlistMovieRow extends StatelessWidget {
               child: Semantics(
                   label: 'Actions for ${movie.title}',
                   button: true,
-                  child: const SizedBox(
+                  child: SizedBox(
                       width: 44,
                       height: 44,
                       child: Icon(Icons.more_horiz_rounded,
-                          color: FlixieColors.light))),
+                          color: context.colors.light))),
             ),
           ]),
           const SizedBox(height: 8),
@@ -2522,7 +2810,7 @@ class WatchlistMovieRow extends StatelessWidget {
               onRetry: onRetryProviders,
               onEditPreferences: onEditPreferences),
           const SizedBox(height: 12),
-          const Divider(height: 1, color: FlixieColors.tabBarBorder),
+          Divider(height: 1, color: context.colors.tabBarBorder),
         ]),
       ),
     );
@@ -2536,7 +2824,7 @@ Future<void> _watchlistDetailSheet(
     useRootNavigator: true,
     useSafeArea: true,
     isScrollControlled: true,
-    backgroundColor: FlixieColors.surface,
+    backgroundColor: context.colors.surface,
     builder: (context) => ConstrainedBox(
       constraints:
           BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .8),
@@ -2547,8 +2835,8 @@ Future<void> _watchlistDetailSheet(
             Row(children: [
               Expanded(
                   child: Text(title,
-                      style: const TextStyle(
-                          color: FlixieColors.white,
+                      style: TextStyle(
+                          color: context.colors.white,
                           fontSize: 22,
                           fontWeight: FontWeight.w700))),
               IconButton(
@@ -2599,10 +2887,10 @@ class _FriendsViewing extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return const Padding(
-          padding: EdgeInsets.symmetric(vertical: 12),
+      return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
           child: Text('Checking friends…',
-              style: TextStyle(color: FlixieColors.light)));
+              style: TextStyle(color: context.colors.light)));
     }
     if (failed) {
       return TextButton.icon(
@@ -2629,7 +2917,7 @@ class _FriendsViewing extends StatelessWidget {
         useRootNavigator: true,
         useSafeArea: true,
         isScrollControlled: true,
-        backgroundColor: FlixieColors.background,
+        backgroundColor: context.colors.background,
         builder: (sheetContext) => ConstrainedBox(
           constraints: BoxConstraints(
               maxHeight: MediaQuery.sizeOf(sheetContext).height * .85),
@@ -2640,30 +2928,29 @@ class _FriendsViewing extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(children: [
-                    const Expanded(
+                    Expanded(
                         child: Text('Friends who watched',
                             style: TextStyle(
                                 fontFamily: FlixieTypography.fontFamily,
-                                color: FlixieColors.white,
+                                color: context.colors.white,
                                 fontSize: 20,
                                 fontWeight: FontWeight.w800))),
                     IconButton(
                         tooltip: 'Close',
                         onPressed: () => Navigator.pop(sheetContext),
-                        icon:
-                            const Icon(Icons.close, color: FlixieColors.light)),
+                        icon: Icon(Icons.close, color: context.colors.light)),
                   ]),
                   Text(
                       '$title · ${watched.length} watched · ${rated.length} rated',
-                      style: const TextStyle(
-                          color: FlixieColors.light, fontSize: 13)),
+                      style:
+                          TextStyle(color: context.colors.light, fontSize: 13)),
                   const SizedBox(height: 20),
-                  const Divider(height: 1, color: FlixieColors.tabBarBorder),
+                  Divider(height: 1, color: context.colors.tabBarBorder),
                   if (friends.isEmpty)
-                    const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 20),
+                    Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 20),
                         child: Text('No friends watched yet',
-                            style: TextStyle(color: FlixieColors.light))),
+                            style: TextStyle(color: context.colors.light))),
                   for (final friend in friends) ...[
                     Padding(
                         padding: const EdgeInsets.symmetric(vertical: 16),
@@ -2683,15 +2970,15 @@ class _FriendsViewing extends StatelessWidget {
                                             true
                                         ? friend.displayName!
                                         : friend.username,
-                                    style: const TextStyle(
-                                        color: FlixieColors.white,
+                                    style: TextStyle(
+                                        color: context.colors.white,
                                         fontSize: 15,
                                         fontWeight: FontWeight.w600)),
                                 const SizedBox(height: 3),
                                 Text(
                                     '$state · ${friend.rating == null ? 'Not rated yet' : scopeLabel}',
-                                    style: const TextStyle(
-                                        color: FlixieColors.light,
+                                    style: TextStyle(
+                                        color: context.colors.light,
                                         fontSize: 13)),
                               ]);
                           final rating = Text(
@@ -2700,8 +2987,8 @@ class _FriendsViewing extends StatelessWidget {
                                   : '${friend.rating! == friend.rating!.roundToDouble() ? friend.rating!.toInt() : friend.rating}/10',
                               style: TextStyle(
                                   color: friend.rating == null
-                                      ? FlixieColors.light
-                                      : FlixieColors.warning,
+                                      ? context.colors.light
+                                      : context.colors.warning,
                                   fontSize: 16,
                                   fontWeight: FontWeight.w800));
                           final stacked = constraints.maxWidth < 360 &&
@@ -2728,21 +3015,21 @@ class _FriendsViewing extends StatelessWidget {
                                 ],
                               ]);
                         })),
-                    const Divider(height: 1, color: FlixieColors.tabBarBorder),
+                    Divider(height: 1, color: context.colors.tabBarBorder),
                   ],
                   const SizedBox(height: 16),
                   Text(
                       average == null
                           ? 'No friends’ ratings yet'
                           : 'Friends’ average ${average.toStringAsFixed(1)}/10 · Based on ${rated.length} ${rated.length == 1 ? 'rating' : 'ratings'}',
-                      style: const TextStyle(
-                          color: FlixieColors.light, fontSize: 13)),
+                      style:
+                          TextStyle(color: context.colors.light, fontSize: 13)),
                   if (isShow) ...[
                     const SizedBox(height: 8),
-                    const Text(
+                    Text(
                         'Show-level ratings only. Season and episode ratings are separate. Watched means marked watched, not necessarily every episode completed.',
-                        style:
-                            TextStyle(color: FlixieColors.light, fontSize: 12)),
+                        style: TextStyle(
+                            color: context.colors.light, fontSize: 12)),
                   ],
                 ]),
           ),
@@ -2759,11 +3046,11 @@ class _FriendsViewing extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(watched.isEmpty ? 'No friends watched yet' : summary,
-                        style: const TextStyle(
-                            color: FlixieColors.white, fontSize: 13)),
+                        style: TextStyle(
+                            color: context.colors.white, fontSize: 13)),
                     Text(ratingLabel,
-                        style: const TextStyle(
-                            color: FlixieColors.light, fontSize: 12)),
+                        style: TextStyle(
+                            color: context.colors.light, fontSize: 12)),
                   ]);
               if (constraints.maxWidth < 360 ||
                   MediaQuery.textScalerOf(context).scale(14) > 20) {
@@ -2774,7 +3061,7 @@ class _FriendsViewing extends StatelessWidget {
               return Row(children: [
                 if (watched.isNotEmpty) ...[avatars, const SizedBox(width: 8)],
                 Expanded(child: text),
-                const Icon(Icons.chevron_right, color: FlixieColors.light)
+                Icon(Icons.chevron_right, color: context.colors.light)
               ]);
             }),
           )),
@@ -2819,10 +3106,10 @@ class _WatchProvidersInline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Padding(
-          padding: EdgeInsets.symmetric(vertical: 12),
+      return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
           child: Text('Checking availability…',
-              style: TextStyle(color: FlixieColors.light)));
+              style: TextStyle(color: context.colors.light)));
     }
     if (failed) {
       return TextButton.icon(
@@ -2834,7 +3121,8 @@ class _WatchProvidersInline extends StatelessWidget {
     final streamIcon = Icon(
       Icons.play_arrow_outlined,
       size: 18,
-      color: canStream ? const Color(0xFF9FE3C5) : FlixieColors.danger,
+      color:
+          canStream ? context.colors.providerIncluded : context.colors.danger,
       semanticLabel: canStream
           ? 'Streaming available to you'
           : 'No streaming option on your services',
@@ -2844,7 +3132,7 @@ class _WatchProvidersInline extends StatelessWidget {
         return a.displayPriority.compareTo(b.displayPriority);
       });
     const labelStyle = TextStyle(fontSize: 13, fontWeight: FontWeight.w700);
-    const optionsStyle = TextStyle(color: FlixieColors.light, fontSize: 12);
+    final optionsStyle = TextStyle(color: context.colors.light, fontSize: 12);
     Widget logo(WatchProvider provider) => Tooltip(
           message: '${provider.providerName} · ${_label(provider)}',
           excludeFromSemantics: true,
@@ -2860,7 +3148,7 @@ class _WatchProvidersInline extends StatelessWidget {
                 border: Border.all(
                   color: userWatchProviderIds.contains(provider.id) ||
                           userWatchProviderMatchKeys.contains(provider.matchKey)
-                      ? const Color(0xFF9FE3C5)
+                      ? context.colors.providerIncluded
                       : Colors.transparent,
                   width: 2,
                 ),
@@ -2925,23 +3213,23 @@ class _WatchProvidersInline extends StatelessWidget {
 
     void openOptions() => _watchlistDetailSheet(context, 'Where to watch', [
           Row(children: [
-            const Icon(Icons.location_on_outlined,
-                size: 18, color: FlixieColors.light),
+            Icon(Icons.location_on_outlined,
+                size: 18, color: context.colors.light),
             const SizedBox(width: 8),
             Expanded(
                 child: Text(countryName,
-                    style: const TextStyle(
-                        color: FlixieColors.white, fontSize: 14))),
+                    style:
+                        TextStyle(color: context.colors.white, fontSize: 14))),
             if (onEditPreferences != null)
               TextButton(
                   onPressed: onEditPreferences, child: const Text('Change')),
           ]),
           const SizedBox(height: 12),
           if (offers.isEmpty)
-            const Padding(
-                padding: EdgeInsets.symmetric(vertical: 20),
+            Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
                 child: Text('No providers found in this country.',
-                    style: TextStyle(color: FlixieColors.light))),
+                    style: TextStyle(color: context.colors.light))),
           for (final provider in offers) ...[
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 14),
@@ -2954,8 +3242,8 @@ class _WatchProvidersInline extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                       Text(provider.providerName,
-                          style: const TextStyle(
-                              color: FlixieColors.white,
+                          style: TextStyle(
+                              color: context.colors.white,
                               fontSize: 15,
                               fontWeight: FontWeight.w600)),
                       const SizedBox(height: 4),
@@ -2963,29 +3251,29 @@ class _WatchProvidersInline extends StatelessWidget {
                           style: TextStyle(
                               fontSize: 13,
                               color: _included(provider)
-                                  ? const Color(0xFF9FE3C5)
-                                  : FlixieColors.light)),
+                                  ? context.colors.providerIncluded
+                                  : context.colors.light)),
                       if (provider.isAddOn && provider.isIncludedOffer) ...[
                         const SizedBox(height: 4),
-                        const Text('Separate add-on subscription',
+                        Text('Separate add-on subscription',
                             style: TextStyle(
-                                color: FlixieColors.light, fontSize: 12)),
+                                color: context.colors.light, fontSize: 12)),
                       ],
                     ])),
                 if (provider.verifiedWatchUri != null)
                   IconButton(
                       tooltip: 'View ${provider.providerName} watch options',
                       onPressed: () => openProvider(provider),
-                      icon: const Icon(Icons.open_in_new,
-                          size: 20, color: FlixieColors.primaryText)),
+                      icon: Icon(Icons.open_in_new,
+                          size: 20, color: context.colors.primaryText)),
               ]),
             ),
-            const Divider(height: 1, color: FlixieColors.tabBarBorder),
+            Divider(height: 1, color: context.colors.tabBarBorder),
           ],
           const SizedBox(height: 20),
-          const Text(
+          Text(
               'Availability via TMDB / JustWatch. Confirm prices and plans with the service.',
-              style: TextStyle(color: FlixieColors.light, fontSize: 12)),
+              style: TextStyle(color: context.colors.light, fontSize: 12)),
         ]);
     return Semantics(
       button: true,
@@ -3054,8 +3342,8 @@ class _WatchProvidersInline extends StatelessWidget {
               final title = Text(label,
                   style: labelStyle.copyWith(
                     color: label.startsWith('Included')
-                        ? const Color(0xFF9FE3C5)
-                        : FlixieColors.light,
+                        ? context.colors.providerIncluded
+                        : context.colors.light,
                   ));
               final logos = sorted.take(visibleCount).map(logo).toList();
               final more = Text(remaining(visibleCount), style: optionsStyle);
@@ -3102,8 +3390,8 @@ class _ProviderLogoFallback extends StatelessWidget {
   const _ProviderLogoFallback();
 
   @override
-  Widget build(BuildContext context) => const ColoredBox(
-        color: FlixieColors.surfaceElevated,
-        child: Icon(Icons.tv_rounded, size: 18, color: FlixieColors.light),
+  Widget build(BuildContext context) => ColoredBox(
+        color: context.colors.surfaceElevated,
+        child: Icon(Icons.tv_rounded, size: 18, color: context.colors.light),
       );
 }

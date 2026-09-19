@@ -21,8 +21,9 @@ class SocialSegmentedToggle extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       child: DecoratedBox(
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: FlixieColors.tabBarBorder)),
+        decoration: BoxDecoration(
+          border:
+              Border(bottom: BorderSide(color: context.colors.tabBarBorder)),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -48,7 +49,7 @@ class SocialSegmentedToggle extends StatelessWidget {
                         border: Border(
                           bottom: BorderSide(
                             color: selected
-                                ? FlixieColors.primaryTint
+                                ? context.colors.primaryTint
                                 : Colors.transparent,
                             width: 2,
                           ),
@@ -66,8 +67,8 @@ class SocialSegmentedToggle extends StatelessWidget {
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: selected
-                                    ? FlixieColors.textPrimary
-                                    : FlixieColors.light,
+                                    ? context.colors.textPrimary
+                                    : context.colors.light,
                                 fontWeight: selected
                                     ? FontWeight.w700
                                     : FontWeight.w500,
@@ -77,8 +78,8 @@ class SocialSegmentedToggle extends StatelessWidget {
                             if (count > 0)
                               Text(
                                 count > 99 ? '99+' : '$count',
-                                style: const TextStyle(
-                                  color: FlixieColors.primaryTint,
+                                style: TextStyle(
+                                  color: context.colors.primaryTint,
                                   fontWeight: FontWeight.w600,
                                   fontSize: 12,
                                 ),

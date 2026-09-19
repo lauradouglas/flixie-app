@@ -57,7 +57,7 @@ class _ChangeAvatarSheetState extends State<ChangeAvatarSheet> {
       ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
         type: FlixieToastType.success,
         content: const Text('Profile avatar updated'),
-        backgroundColor: FlixieColors.surfaceElevated,
+        backgroundColor: context.colors.surfaceElevated,
       ));
     } catch (_) {
       if (mounted) setState(() => _error = 'Unable to update avatar.');

@@ -15,10 +15,10 @@ void main() {
   }
 
   group('stats reusable widgets', () {
-    testWidgets('SectionHeader renders uppercase title', (tester) async {
+    testWidgets('SectionHeader preserves the supplied title case', (tester) async {
       await tester.pumpWidget(wrap(const SectionHeader(title: 'Top Genres')));
 
-      expect(find.text('TOP GENRES'), findsOneWidget);
+      expect(find.text('Top Genres'), findsOneWidget);
     });
 
     testWidgets('StatsCard renders label, value, and subtitle', (tester) async {

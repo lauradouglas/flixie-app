@@ -49,9 +49,9 @@ class SettingsTile extends StatelessWidget {
                     width: _kTileIconSize,
                     height: _kTileIconSize,
                     decoration: BoxDecoration(
-                      color: FlixieColors.surfaceElevated,
+                      color: context.colors.surfaceElevated,
                       border: Border.all(
-                        color: FlixieColors.tabBarBorder,
+                        color: context.colors.tabBarBorder,
                       ),
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -61,28 +61,28 @@ class SettingsTile extends StatelessWidget {
                   Expanded(
                     child: Text(
                       label,
-                      style: const TextStyle(
-                        color: FlixieColors.textPrimary,
+                      style: TextStyle(
+                        color: context.colors.textPrimary,
                         fontSize: 15,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
                   trailing ??
-                      const Icon(Icons.chevron_right,
-                          color: FlixieColors.medium, size: 20),
+                      Icon(Icons.chevron_right,
+                          color: context.colors.medium, size: 20),
                 ],
               ),
             ),
           ),
         ),
         if (!isLast)
-          const Padding(
-            padding: EdgeInsets.only(left: _kDividerLeftInset),
+          Padding(
+            padding: const EdgeInsets.only(left: _kDividerLeftInset),
             child: Divider(
               height: 1,
               thickness: 0.5,
-              color: FlixieColors.tabBarBorder,
+              color: context.colors.tabBarBorder,
             ),
           ),
       ],

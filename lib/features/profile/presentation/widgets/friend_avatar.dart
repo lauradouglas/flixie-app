@@ -39,8 +39,8 @@ class FriendAvatar extends StatelessWidget {
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: FlixieColors.light,
+            style: TextStyle(
+              color: context.colors.light,
               fontSize: 11,
             ),
           ),

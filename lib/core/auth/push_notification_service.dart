@@ -196,7 +196,7 @@ class PushNotificationService {
           _androidChannel.id,
           _androidChannel.name,
           channelDescription: _androidChannel.description,
-          icon: '@mipmap/launcher_icon',
+          icon: 'ic_stat_flixie',
           importance: Importance.high,
           priority: Priority.high,
         ),
@@ -552,7 +552,7 @@ class PushNotificationService {
   static Future<void> _initLocalNotifications(
       GlobalKey<NavigatorState> navigatorKey) async {
     const androidSettings =
-        AndroidInitializationSettings('@mipmap/launcher_icon');
+        AndroidInitializationSettings('ic_stat_flixie');
     const iosSettings = DarwinInitializationSettings();
 
     await _localNotifications.initialize(
@@ -649,7 +649,7 @@ class PushNotificationService {
   static Future<void> showBackgroundDataNotification(
       RemoteMessage message) async {
     const androidSettings =
-        AndroidInitializationSettings('@mipmap/launcher_icon');
+        AndroidInitializationSettings('ic_stat_flixie');
     const iosSettings = DarwinInitializationSettings();
     await _localNotifications.initialize(
       const InitializationSettings(
@@ -692,7 +692,7 @@ class PushNotificationService {
           _androidChannel.id,
           _androidChannel.name,
           channelDescription: _androidChannel.description,
-          icon: '@mipmap/launcher_icon',
+          icon: 'ic_stat_flixie',
           importance: Importance.high,
           priority: Priority.high,
         ),

@@ -108,12 +108,12 @@ class ContinueWatchingCard extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 posterUrl == null
-                    ? _fallback()
+                    ? _fallback(context)
                     : CachedNetworkImage(
                         imageUrl: posterUrl,
                         fit: BoxFit.cover,
-                        placeholder: (_, __) => _fallback(),
-                        errorWidget: (_, __, ___) => _fallback(),
+                        placeholder: (_, __) => _fallback(context),
+                        errorWidget: (_, __, ___) => _fallback(context),
                       ),
                 const DecoratedBox(
                   decoration: BoxDecoration(
@@ -206,12 +206,12 @@ class ContinueWatchingCard extends StatelessWidget {
     );
   }
 
-  Widget _fallback() => Container(
-        color: FlixieColors.tabBarBackgroundFocused,
+  Widget _fallback(BuildContext context) => Container(
+        color: context.colors.tabBarBackgroundFocused,
         alignment: Alignment.center,
-        child: const Icon(
+        child: Icon(
           Icons.tv_rounded,
-          color: FlixieColors.medium,
+          color: context.colors.medium,
           size: 34,
         ),
       );

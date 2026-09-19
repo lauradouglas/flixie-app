@@ -39,5 +39,25 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+    # The plugin podspec includes its privacy manifest in the source glob.
+    # Keep it in the resource bundle, but do not try to compile it.
+    if target.name == 'in_app_review'
+      target.source_build_phase.files.to_a.each do |file|
+        file.remove_from_project if file.file_ref&.path&.end_with?('.xcprivacy')
+      end
+    end
+    target.build_configurations.each do |config|
+      # Xcode's standalone verifier does not inherit Flutter's framework paths.
+      # Normal plugin compilation still validates the headers and modules.
+      if target.name == 'share_plus'
+        config.build_settings['ENABLE_MODULE_VERIFIER'] = 'NO'
+      end
+      # Keep dependency targets aligned with the app's supported iOS minimum.
+      minimum = Gem::Version.new('15.0')
+      configured = Gem::Version.new(config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] || '0')
+      if configured < minimum
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = minimum.to_s
+      end
+    end
   end
 end

@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -145,30 +146,15 @@ class _MovieListsViewState extends State<_MovieListsView> {
                                     child: Text('List name'),
                                   ),
                                 ],
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 10),
-                                  decoration: BoxDecoration(
-                                    border: Border.all(
-                                        color: FlixieColors.tabBarBorder),
-                                    borderRadius: BorderRadius.circular(22),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(Icons.sort_rounded,
-                                          color: FlixieColors.primary,
-                                          size: 17),
-                                      const SizedBox(width: 7),
-                                      Text(_sort == _ListSort.updated
-                                          ? 'Updated'
-                                          : 'Name'),
-                                      const Icon(
-                                          Icons.keyboard_arrow_down_rounded,
-                                          size: 18),
-                                    ],
-                                  ),
-                                ),
+                                child: Padding(
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 4),
+                                    child: FlixiePill.label(
+                                        compact: false,
+                                        avatar: const Icon(Icons.sort_rounded),
+                                        label: Text(_sort == _ListSort.updated
+                                            ? 'Updated'
+                                            : 'Name'))),
                               ),
                             ],
                           ),
@@ -207,8 +193,8 @@ class _MovieListsViewState extends State<_MovieListsView> {
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: FlixieColors.surface.withValues(alpha: 0.55),
-        border: Border.all(color: FlixieColors.tabBarBorder),
+        color: context.colors.surface.withValues(alpha: 0.55),
+        border: Border.all(color: context.colors.tabBarBorder),
         borderRadius: BorderRadius.circular(22),
       ),
       child: Row(
@@ -458,19 +444,20 @@ class _MovieListsViewState extends State<_MovieListsView> {
                                 runSpacing: 6,
                                 children: visibleFriends
                                     .map(
-                                      (friend) => FilterChip(
-                                        label: Text('@${friend.username}'),
-                                        selected: selectedFriendIds
-                                            .contains(friend.id),
-                                        onSelected: (selected) =>
-                                            setInnerState(() {
-                                          if (selected) {
-                                            selectedFriendIds.add(friend.id);
-                                          } else {
-                                            selectedFriendIds.remove(friend.id);
-                                          }
-                                        }),
-                                      ),
+                                      (friend) => FlixiePill.filter(
+                                          label: Text('@${friend.username}'),
+                                          selected: selectedFriendIds
+                                              .contains(friend.id),
+                                          onSelected: (selected) =>
+                                              setInnerState(() {
+                                                if (selected) {
+                                                  selectedFriendIds
+                                                      .add(friend.id);
+                                                } else {
+                                                  selectedFriendIds
+                                                      .remove(friend.id);
+                                                }
+                                              })),
                                     )
                                     .toList(growable: false),
                               ),
@@ -494,11 +481,11 @@ class _MovieListsViewState extends State<_MovieListsView> {
                             ),
                           ],
                           if (initialScope == ListScope.group)
-                            const Padding(
-                              padding: EdgeInsets.only(top: 8),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
                               child: Text(
                                 'Group lists cannot be changed to solo lists.',
-                                style: TextStyle(color: FlixieColors.medium),
+                                style: TextStyle(color: context.colors.medium),
                               ),
                             ),
                         ],
@@ -558,9 +545,9 @@ class _MovieListsViewState extends State<_MovieListsView> {
                             ),
                             const SizedBox(height: 8),
                             if (friends.isEmpty)
-                              const Text(
+                              Text(
                                 'No accepted friends available.',
-                                style: TextStyle(color: FlixieColors.medium),
+                                style: TextStyle(color: context.colors.medium),
                               )
                             else ...[
                               TextField(
@@ -589,9 +576,10 @@ class _MovieListsViewState extends State<_MovieListsView> {
                               ),
                               const SizedBox(height: 10),
                               if (visibleFriends.isEmpty)
-                                const Text(
+                                Text(
                                   'No friends match your search.',
-                                  style: TextStyle(color: FlixieColors.medium),
+                                  style:
+                                      TextStyle(color: context.colors.medium),
                                 )
                               else
                                 Wrap(
@@ -599,20 +587,20 @@ class _MovieListsViewState extends State<_MovieListsView> {
                                   runSpacing: 6,
                                   children: visibleFriends
                                       .map(
-                                        (friend) => FilterChip(
-                                          label: Text('@${friend.username}'),
-                                          selected: selectedFriendIds
-                                              .contains(friend.id),
-                                          onSelected: (selected) =>
-                                              setInnerState(() {
-                                            if (selected) {
-                                              selectedFriendIds.add(friend.id);
-                                            } else {
-                                              selectedFriendIds
-                                                  .remove(friend.id);
-                                            }
-                                          }),
-                                        ),
+                                        (friend) => FlixiePill.filter(
+                                            label: Text('@${friend.username}'),
+                                            selected: selectedFriendIds
+                                                .contains(friend.id),
+                                            onSelected: (selected) =>
+                                                setInnerState(() {
+                                                  if (selected) {
+                                                    selectedFriendIds
+                                                        .add(friend.id);
+                                                  } else {
+                                                    selectedFriendIds
+                                                        .remove(friend.id);
+                                                  }
+                                                })),
                                       )
                                       .toList(growable: false),
                                 ),
@@ -757,7 +745,7 @@ class _ListGridCard extends StatelessWidget {
     final shared = list.scope != ListScope.personal;
     final group = list.scope == ListScope.group;
     return Material(
-      color: FlixieColors.tabBarBackgroundFocused,
+      color: context.colors.tabBarBackgroundFocused,
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -766,7 +754,7 @@ class _ListGridCard extends StatelessWidget {
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: FlixieColors.tabBarBorder),
+            border: Border.all(color: context.colors.tabBarBorder),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -791,16 +779,16 @@ class _ListGridCard extends StatelessWidget {
                       list.name,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: FlixieColors.white,
+                      style: TextStyle(
+                        color: context.colors.white,
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
                         height: 1.15,
                       ),
                     ),
                   ),
-                  const Icon(Icons.chevron_right_rounded,
-                      color: FlixieColors.light, size: 20),
+                  Icon(Icons.chevron_right_rounded,
+                      color: context.colors.light, size: 20),
                 ],
               ),
               const SizedBox(height: 6),
@@ -812,12 +800,12 @@ class _ListGridCard extends StatelessWidget {
                       '${_compactListCountLabel(list)} · ${_visibilityName(list.visibility)}',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          color: FlixieColors.medium, fontSize: 11.5),
+                      style: TextStyle(
+                          color: context.colors.medium, fontSize: 11.5),
                     ),
                   ),
                   Icon(_privacyIcon(list.visibility),
-                      color: FlixieColors.medium, size: 15),
+                      color: context.colors.medium, size: 15),
                 ],
               ),
               if (shared) ...[
@@ -853,8 +841,8 @@ class _ListGridCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       _updatedLabel(list.updatedAt ?? list.createdAt),
-                      style: const TextStyle(
-                          color: FlixieColors.medium, fontSize: 10.5),
+                      style: TextStyle(
+                          color: context.colors.medium, fontSize: 10.5),
                     ),
                   ),
                   if (list.isOwner)
@@ -904,8 +892,8 @@ class _CollaboratorStack extends StatelessWidget {
             left: entry.key * 16,
             child: Container(
               padding: const EdgeInsets.all(1),
-              decoration: const BoxDecoration(
-                color: FlixieColors.background,
+              decoration: BoxDecoration(
+                color: context.colors.background,
                 shape: BoxShape.circle,
               ),
               foregroundDecoration: BoxDecoration(
@@ -940,7 +928,7 @@ class _EmptyState extends StatelessWidget {
         child: Text(
           message,
           textAlign: TextAlign.center,
-          style: const TextStyle(color: FlixieColors.medium),
+          style: TextStyle(color: context.colors.medium),
         ),
       ),
     );
@@ -968,11 +956,10 @@ class _PosterPreviewStack extends StatelessWidget {
         width: large ? 150 : 88,
         height: large ? 170 : 118,
         decoration: BoxDecoration(
-          color: FlixieColors.surfaceElevated,
+          color: context.colors.surfaceElevated,
           borderRadius: BorderRadius.circular(10),
         ),
-        child:
-            const Icon(Icons.local_movies_outlined, color: FlixieColors.medium),
+        child: Icon(Icons.local_movies_outlined, color: context.colors.medium),
       );
     }
     return SizedBox(
@@ -994,11 +981,11 @@ class _PosterPreviewStack extends StatelessWidget {
                 errorBuilder: (_, __, ___) => Container(
                   width: large ? 112 : 72,
                   height: large ? 168 : 108,
-                  color: FlixieColors.surfaceElevated,
+                  color: context.colors.surfaceElevated,
                   alignment: Alignment.center,
-                  child: const Icon(
+                  child: Icon(
                     Icons.image_not_supported_outlined,
-                    color: FlixieColors.medium,
+                    color: context.colors.medium,
                     size: 16,
                   ),
                 ),

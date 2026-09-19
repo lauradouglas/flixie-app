@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:provider/provider.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/models/activity_reaction.dart';
@@ -80,6 +81,9 @@ class _ReviewCardState extends State<ReviewCard> {
   late Map<String, int> _reactions;
   String? _myReaction;
   bool _blocked = false;
+  bool _safetyLoading = true;
+  bool _safetyFailed = false;
+  int _safetyRequest = 0;
   bool _spoilerRevealed = false;
 
   @override
@@ -88,11 +92,35 @@ class _ReviewCardState extends State<ReviewCard> {
     ReviewReactionsController.deletedReviews.addListener(_onDeleted);
     _reactions = Map<String, int>.from(widget.review.reactions);
     _myReaction = widget.review.myReaction;
-    SafetyService.blockedUsers().then<void>((_) {
-      if (mounted && SafetyService.isBlocked(widget.review.userId)) {
-        setState(() => _blocked = true);
-      }
-    }).catchError((_) {});
+    SafetyService.changes.addListener(_onSafetyChanged);
+    _loadSafety();
+  }
+
+  void _onSafetyChanged() {
+    if (!mounted) return;
+    _loadSafety();
+  }
+
+  Future<void> _loadSafety() async {
+    final request = ++_safetyRequest;
+    setState(() {
+      _safetyLoading = true;
+      _safetyFailed = false;
+    });
+    try {
+      await SafetyService.blockedUsers();
+      if (!mounted || request != _safetyRequest) return;
+      setState(() {
+        _blocked = SafetyService.isBlocked(widget.review.userId);
+        _safetyLoading = false;
+      });
+    } catch (_) {
+      if (!mounted || request != _safetyRequest) return;
+      setState(() {
+        _safetyLoading = false;
+        _safetyFailed = true;
+      });
+    }
   }
 
   void _onDeleted() {
@@ -102,6 +130,7 @@ class _ReviewCardState extends State<ReviewCard> {
   @override
   void dispose() {
     ReviewReactionsController.deletedReviews.removeListener(_onDeleted);
+    SafetyService.changes.removeListener(_onSafetyChanged);
     super.dispose();
   }
 
@@ -192,17 +221,30 @@ class _ReviewCardState extends State<ReviewCard> {
         SafetyService.isBlocked(widget.review.userId)) {
       return const SizedBox.shrink();
     }
+    if (_safetyLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Text('Loading review…'),
+      );
+    }
+    if (_safetyFailed) {
+      return TextButton.icon(
+        onPressed: _loadSafety,
+        icon: const Icon(Icons.refresh),
+        label: const Text('Couldn’t load review · Retry'),
+      );
+    }
     final review = widget.review;
     final hasSpoilers = review.containsSpoilers;
 
     final rating = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.star_rounded, color: FlixieColors.warning, size: 20),
+        Icon(Icons.star_rounded, color: context.colors.warning, size: 20),
         const SizedBox(width: 4),
         Text('${review.rating}/10',
-            style: const TextStyle(
-                color: FlixieColors.white,
+            style: TextStyle(
+                color: context.colors.white,
                 fontWeight: FontWeight.w700,
                 fontSize: 16)),
       ],
@@ -210,7 +252,7 @@ class _ReviewCardState extends State<ReviewCard> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Material(
-        color: FlixieColors.surface,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(14),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -240,14 +282,15 @@ class _ReviewCardState extends State<ReviewCard> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(_getDisplayName(),
-                                style: const TextStyle(
-                                    color: FlixieColors.white,
+                                style: TextStyle(
+                                    color: context.colors.white,
                                     fontSize: 14,
                                     fontWeight: FontWeight.w700)),
                             const SizedBox(height: 2),
                             Text(_formatDate(review.createdAt),
-                                style: const TextStyle(
-                                    color: FlixieColors.medium, fontSize: 12)),
+                                style: TextStyle(
+                                    color: context.colors.medium,
+                                    fontSize: 12)),
                           ],
                         )),
                         if (!stacked) rating,
@@ -279,8 +322,8 @@ class _ReviewCardState extends State<ReviewCard> {
                                 }
                               }
                             },
-                            itemBuilder: (_) => const [
-                              PopupMenuItem(
+                            itemBuilder: (_) => [
+                              const PopupMenuItem(
                                 value: 'report',
                                 child: Text('Report review'),
                               ),
@@ -288,7 +331,8 @@ class _ReviewCardState extends State<ReviewCard> {
                                 value: 'block',
                                 child: Text(
                                   'Block user',
-                                  style: TextStyle(color: FlixieColors.danger),
+                                  style:
+                                      TextStyle(color: context.colors.danger),
                                 ),
                               ),
                             ],
@@ -305,8 +349,8 @@ class _ReviewCardState extends State<ReviewCard> {
                 if (review.title.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Text(review.title,
-                      style: const TextStyle(
-                          color: FlixieColors.white,
+                      style: TextStyle(
+                          color: context.colors.white,
                           fontWeight: FontWeight.w700,
                           fontSize: 17)),
                 ],
@@ -323,17 +367,17 @@ class _ReviewCardState extends State<ReviewCard> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 12),
                         child: Row(children: [
-                          const Icon(Icons.visibility_off_outlined,
-                              color: FlixieColors.light, size: 18),
+                          Icon(Icons.visibility_off_outlined,
+                              color: context.colors.light, size: 18),
                           const SizedBox(width: 8),
-                          const Expanded(
+                          Expanded(
                               child: Text('Spoiler review',
                                   style: TextStyle(
-                                      color: FlixieColors.light,
+                                      color: context.colors.light,
                                       fontSize: 13))),
                           Text(_spoilerRevealed ? 'Hide' : 'Reveal',
-                              style: const TextStyle(
-                                  color: FlixieColors.light,
+                              style: TextStyle(
+                                  color: context.colors.light,
                                   fontWeight: FontWeight.w600,
                                   fontSize: 13)),
                         ]),
@@ -347,21 +391,21 @@ class _ReviewCardState extends State<ReviewCard> {
                   Text(review.body,
                       maxLines: 4,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          color: FlixieColors.light,
+                      style: TextStyle(
+                          color: context.colors.light,
                           fontSize: 14,
                           height: 1.5)),
                 ],
                 if (review.recommended) ...[
                   const SizedBox(height: 12),
-                  const Row(children: [
+                  Row(children: [
                     Icon(Icons.thumb_up_alt_rounded,
-                        color: FlixieColors.success, size: 16),
-                    SizedBox(width: 7),
+                        color: context.colors.success, size: 16),
+                    const SizedBox(width: 7),
                     Expanded(
                         child: Text('Recommends',
                             style: TextStyle(
-                                color: FlixieColors.success,
+                                color: context.colors.success,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600))),
                   ]),
@@ -435,6 +479,40 @@ class _ReviewDetailSheetState extends State<ReviewDetailSheet> {
   late String? _myReaction;
   String? _reactingType;
   bool _spoilerRevealed = false;
+
+  bool _safetyActionRunning = false;
+
+  Future<void> _reportReview() async {
+    if (_safetyActionRunning) return;
+    setState(() => _safetyActionRunning = true);
+    final review = widget.review;
+    try {
+      await SafetyActions.report(
+        context,
+        targetType: review.showId == null ? 'MOVIE_REVIEW' : 'SHOW_REVIEW',
+        targetId: review.id,
+        reportedUserId: review.userId,
+        contentPreview: '${review.title}\n${review.body}',
+      );
+    } finally {
+      if (mounted) setState(() => _safetyActionRunning = false);
+    }
+  }
+
+  Future<void> _blockAuthor() async {
+    if (_safetyActionRunning) return;
+    setState(() => _safetyActionRunning = true);
+    try {
+      final blocked = await SafetyActions.block(
+        context,
+        userId: widget.review.userId,
+        username: widget.displayName,
+      );
+      if (blocked && mounted) Navigator.pop(context);
+    } finally {
+      if (mounted) setState(() => _safetyActionRunning = false);
+    }
+  }
 
   bool _deleting = false;
   Future<void> _deleteReview() async {
@@ -556,9 +634,9 @@ class _ReviewDetailSheetState extends State<ReviewDetailSheet> {
     return Container(
       constraints:
           BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .88),
-      decoration: const BoxDecoration(
-        color: FlixieColors.background,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      decoration: BoxDecoration(
+        color: context.colors.background,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: SafeArea(
           top: false,
@@ -573,7 +651,7 @@ class _ReviewDetailSheetState extends State<ReviewDetailSheet> {
                             width: 42,
                             height: 4,
                             decoration: BoxDecoration(
-                                color: FlixieColors.medium,
+                                color: context.colors.medium,
                                 borderRadius: BorderRadius.circular(2)))),
                     Positioned(
                         right: 8,
@@ -594,12 +672,12 @@ class _ReviewDetailSheetState extends State<ReviewDetailSheet> {
                             MediaQuery.textScalerOf(context).scale(15) > 21;
                         final rating =
                             Row(mainAxisSize: MainAxisSize.min, children: [
-                          const Icon(Icons.star_rounded,
-                              color: FlixieColors.warning, size: 22),
+                          Icon(Icons.star_rounded,
+                              color: context.colors.warning, size: 22),
                           const SizedBox(width: 4),
                           Text('${review.rating}/10',
-                              style: const TextStyle(
-                                  color: FlixieColors.white,
+                              style: TextStyle(
+                                  color: context.colors.white,
                                   fontSize: 18,
                                   fontWeight: FontWeight.w700)),
                         ]);
@@ -621,14 +699,14 @@ class _ReviewDetailSheetState extends State<ReviewDetailSheet> {
                                             CrossAxisAlignment.start,
                                         children: [
                                       Text(widget.displayName,
-                                          style: const TextStyle(
-                                              color: FlixieColors.white,
+                                          style: TextStyle(
+                                              color: context.colors.white,
                                               fontSize: 15,
                                               fontWeight: FontWeight.w700)),
                                       const SizedBox(height: 3),
                                       Text(widget.formattedDate,
-                                          style: const TextStyle(
-                                              color: FlixieColors.medium,
+                                          style: TextStyle(
+                                              color: context.colors.medium,
                                               fontSize: 13)),
                                     ])),
                                 if (!stacked) rating,
@@ -639,24 +717,47 @@ class _ReviewDetailSheetState extends State<ReviewDetailSheet> {
                                     child: rating),
                             ]);
                       }),
+                      if (widget.currentUserId != null &&
+                          widget.currentUserId != review.userId)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Wrap(
+                            spacing: 12,
+                            runSpacing: 4,
+                            children: [
+                              TextButton.icon(
+                                onPressed:
+                                    _safetyActionRunning ? null : _reportReview,
+                                icon: const Icon(Icons.flag_outlined),
+                                label: const Text('Report review'),
+                              ),
+                              TextButton.icon(
+                                onPressed:
+                                    _safetyActionRunning ? null : _blockAuthor,
+                                icon: const Icon(Icons.block),
+                                label: const Text('Block user'),
+                              ),
+                            ],
+                          ),
+                        ),
                       if (review.title.isNotEmpty) ...[
                         const SizedBox(height: 20),
                         Text(review.title,
-                            style: const TextStyle(
-                                color: FlixieColors.white,
+                            style: TextStyle(
+                                color: context.colors.white,
                                 fontWeight: FontWeight.w800,
                                 fontSize: 24)),
                       ],
                       if (review.recommended) ...[
                         const SizedBox(height: 8),
-                        const Row(children: [
+                        Row(children: [
                           Icon(Icons.thumb_up_alt_rounded,
-                              color: FlixieColors.success, size: 18),
-                          SizedBox(width: 8),
+                              color: context.colors.success, size: 18),
+                          const SizedBox(width: 8),
                           Expanded(
                               child: Text('Recommends',
                                   style: TextStyle(
-                                      color: FlixieColors.success,
+                                      color: context.colors.success,
                                       fontSize: 14,
                                       fontWeight: FontWeight.w600))),
                         ]),
@@ -676,8 +777,8 @@ class _ReviewDetailSheetState extends State<ReviewDetailSheet> {
                       ],
                       if (!review.containsSpoilers || _spoilerRevealed)
                         Text(review.body,
-                            style: const TextStyle(
-                                color: FlixieColors.light,
+                            style: TextStyle(
+                                color: context.colors.light,
                                 fontSize: 16,
                                 height: 1.5)),
                       const SizedBox(height: 24),
@@ -685,12 +786,12 @@ class _ReviewDetailSheetState extends State<ReviewDetailSheet> {
                           widget.currentUserId == review.userId)
                         TextButton.icon(
                             onPressed: _deleting ? null : _deleteReview,
-                            icon: const Icon(Icons.delete_outline,
-                                color: FlixieColors.danger),
+                            icon: Icon(Icons.delete_outline,
+                                color: context.colors.danger),
                             label: Text(
                                 _deleting ? 'Deleting…' : 'Delete review',
-                                style: const TextStyle(
-                                    color: FlixieColors.danger))),
+                                style:
+                                    TextStyle(color: context.colors.danger))),
                       _ReactionStrip(
                           reactions: _reactions,
                           myReaction: _myReaction,
@@ -726,10 +827,10 @@ class _ReactionStrip extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'React to this review',
           style: TextStyle(
-            color: FlixieColors.medium,
+            color: context.colors.medium,
             fontSize: 14,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.5,
@@ -759,11 +860,11 @@ class _ReactionStrip extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        const Center(
+        Center(
           child: Text(
             'Tap again to remove your reaction',
             style: TextStyle(
-              color: FlixieColors.medium,
+              color: context.colors.medium,
               fontSize: 12,
             ),
           ),
@@ -826,44 +927,26 @@ class _ReactionChipState extends State<_ReactionChip>
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      button: true,
-      selected: widget.isActive,
-      label: '${widget.emoji}, ${widget.count} reactions',
-      child: Material(
-        color:
-            widget.isActive ? FlixieColors.primary : FlixieColors.tabBarBorder,
-        borderRadius: BorderRadius.circular(24),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(24),
-          onTap: widget.onTap,
-          child: Container(
-            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
+        label: '${widget.emoji}, ${widget.count} reactions',
+        child: FlixiePill.action(
+            selected: widget.isActive,
+            onPressed: widget.onTap,
+            label: Row(mainAxisSize: MainAxisSize.min, children: [
               if (widget.isLoading)
                 const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: FlixieColors.white))
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
               else
                 ScaleTransition(
                     scale: _scale,
                     child: Text(widget.emoji,
-                        style: const TextStyle(fontSize: 24))),
+                        style: const TextStyle(fontSize: 20))),
               if (widget.count > 0) ...[
                 const SizedBox(width: 6),
-                Text('${widget.count}',
-                    style: const TextStyle(
-                        color: FlixieColors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700)),
-              ],
-            ]),
-          ),
-        ),
-      ),
-    );
+                Text('${widget.count}')
+              ]
+            ])));
   }
 }
 
@@ -894,35 +977,10 @@ class _ReactionPreview extends StatelessWidget {
           ...top.map((e) {
             final emoji = reviewReactionEmoji(e.key);
             final isMe = myReaction == e.key;
-            return Container(
-              margin: const EdgeInsets.only(right: 6),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: isMe
-                    ? FlixieColors.primary.withValues(alpha: 0.15)
-                    : FlixieColors.tabBarBorder,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isMe ? FlixieColors.primary : Colors.transparent,
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(emoji, style: const TextStyle(fontSize: 13)),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${e.value}',
-                    style: TextStyle(
-                      color: isMe ? FlixieColors.primary : FlixieColors.medium,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            );
+            return Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: FlixiePill.label(
+                    selected: isMe, label: Text('$emoji ${e.value}')));
           }),
         ],
       ),

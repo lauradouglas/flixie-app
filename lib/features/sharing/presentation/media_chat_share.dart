@@ -68,21 +68,20 @@ class MediaChatShare {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: FlixieColors.medium.withValues(alpha: 0.4),
+                color: context.colors.medium.withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             const SizedBox(height: 8),
             ListTile(
-              leading:
-                  const Icon(Icons.person_rounded, color: FlixieColors.light),
-              title: const Text(
+              leading: Icon(Icons.person_rounded, color: context.colors.light),
+              title: Text(
                 'Share to friend',
-                style: TextStyle(color: FlixieColors.light),
+                style: TextStyle(color: context.colors.light),
               ),
-              subtitle: const Text(
+              subtitle: Text(
                 'Send directly to one friend',
-                style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+                style: TextStyle(color: context.colors.medium, fontSize: 12),
               ),
               onTap: () {
                 Navigator.pop(ctx);
@@ -92,13 +91,13 @@ class MediaChatShare {
             ListTile(
               leading: const Icon(Icons.groups_2_outlined,
                   color: FlixieColors.primary),
-              title: const Text(
+              title: Text(
                 'Share to group chat',
-                style: TextStyle(color: FlixieColors.light),
+                style: TextStyle(color: context.colors.light),
               ),
-              subtitle: const Text(
+              subtitle: Text(
                 'Post in one of your groups with a message',
-                style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+                style: TextStyle(color: context.colors.medium, fontSize: 12),
               ),
               onTap: () {
                 Navigator.pop(ctx);
@@ -205,16 +204,16 @@ class MediaChatShare {
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: FlixieColors.medium.withValues(alpha: 0.4),
+                        color: context.colors.medium.withValues(alpha: 0.4),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
                   ),
                   const SizedBox(height: 14),
-                  const Text(
+                  Text(
                     'Share to friend',
                     style: TextStyle(
-                      color: FlixieColors.white,
+                      color: context.colors.white,
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
                     ),
@@ -231,10 +230,10 @@ class MediaChatShare {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  const Text(
+                  Text(
                     'Choose a friend',
                     style: TextStyle(
-                      color: FlixieColors.medium,
+                      color: context.colors.medium,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 1.1,
@@ -270,13 +269,13 @@ class MediaChatShare {
                             decoration: BoxDecoration(
                               color: isSelected
                                   ? FlixieColors.primary.withValues(alpha: 0.14)
-                                  : FlixieColors.tabBarBackgroundFocused,
+                                  : context.colors.tabBarBackgroundFocused,
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
                                 color: isSelected
                                     ? FlixieColors.primary
                                         .withValues(alpha: 0.45)
-                                    : FlixieColors.tabBarBorder,
+                                    : context.colors.tabBarBorder,
                               ),
                             ),
                             child: Row(
@@ -292,8 +291,8 @@ class MediaChatShare {
                                 Expanded(
                                   child: Text(
                                     friend.displayName,
-                                    style: const TextStyle(
-                                      color: FlixieColors.light,
+                                    style: TextStyle(
+                                      color: context.colors.light,
                                       fontSize: 14,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -306,9 +305,9 @@ class MediaChatShare {
                                     size: 20,
                                   )
                                 else
-                                  const Icon(
+                                  Icon(
                                     Icons.radio_button_unchecked_rounded,
-                                    color: FlixieColors.medium,
+                                    color: context.colors.medium,
                                     size: 20,
                                   ),
                               ],
@@ -324,7 +323,7 @@ class MediaChatShare {
                     minLines: 2,
                     maxLines: 3,
                     enabled: !sending,
-                    style: const TextStyle(color: FlixieColors.light),
+                    style: TextStyle(color: context.colors.light),
                     decoration: const InputDecoration(
                       labelText: 'Message',
                       hintText: 'You should watch this.',
@@ -454,16 +453,16 @@ class MediaChatShare {
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: FlixieColors.medium.withValues(alpha: 0.4),
+                        color: context.colors.medium.withValues(alpha: 0.4),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
                   ),
                   const SizedBox(height: 14),
-                  const Text(
+                  Text(
                     'Share to group chat',
                     style: TextStyle(
-                      color: FlixieColors.white,
+                      color: context.colors.white,
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
                     ),
@@ -480,10 +479,10 @@ class MediaChatShare {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  const Text(
+                  Text(
                     'Choose a group',
                     style: TextStyle(
-                      color: FlixieColors.medium,
+                      color: context.colors.medium,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 1.1,
@@ -511,13 +510,13 @@ class MediaChatShare {
                             decoration: BoxDecoration(
                               color: isSelected
                                   ? FlixieColors.primary.withValues(alpha: 0.14)
-                                  : FlixieColors.tabBarBackgroundFocused,
+                                  : context.colors.tabBarBackgroundFocused,
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
                                 color: isSelected
                                     ? FlixieColors.primary
                                         .withValues(alpha: 0.45)
-                                    : FlixieColors.tabBarBorder,
+                                    : context.colors.tabBarBorder,
                               ),
                             ),
                             child: Row(
@@ -529,7 +528,7 @@ class MediaChatShare {
                                     color: isSelected
                                         ? FlixieColors.primary
                                             .withValues(alpha: 0.22)
-                                        : FlixieColors.surfaceElevated,
+                                        : context.colors.surfaceElevated,
                                     shape: BoxShape.circle,
                                   ),
                                   alignment: Alignment.center,
@@ -545,7 +544,7 @@ class MediaChatShare {
                                     style: TextStyle(
                                       color: isSelected
                                           ? FlixieColors.primary
-                                          : FlixieColors.light,
+                                          : context.colors.light,
                                       fontSize: 11,
                                       fontWeight: FontWeight.w800,
                                     ),
@@ -561,8 +560,8 @@ class MediaChatShare {
                                         group.name,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: FlixieColors.light,
+                                        style: TextStyle(
+                                          color: context.colors.light,
                                           fontSize: 14,
                                           fontWeight: FontWeight.w700,
                                         ),
@@ -572,8 +571,8 @@ class MediaChatShare {
                                         const SizedBox(height: 2),
                                         Text(
                                           group.abbreviation!.toUpperCase(),
-                                          style: const TextStyle(
-                                            color: FlixieColors.medium,
+                                          style: TextStyle(
+                                            color: context.colors.medium,
                                             fontSize: 11,
                                           ),
                                         ),
@@ -588,9 +587,9 @@ class MediaChatShare {
                                     size: 20,
                                   )
                                 else
-                                  const Icon(
+                                  Icon(
                                     Icons.radio_button_unchecked_rounded,
-                                    color: FlixieColors.medium,
+                                    color: context.colors.medium,
                                     size: 20,
                                   ),
                               ],
@@ -606,7 +605,7 @@ class MediaChatShare {
                     minLines: 2,
                     maxLines: 3,
                     enabled: !sending,
-                    style: const TextStyle(color: FlixieColors.light),
+                    style: TextStyle(color: context.colors.light),
                     decoration: const InputDecoration(
                       labelText: 'Message',
                       hintText: 'Has anyone ever seen this?',

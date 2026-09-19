@@ -110,7 +110,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
           FlixieToast(
             type: FlixieToastType.error,
             content: const Text('Failed to dismiss notification.'),
-            backgroundColor: FlixieColors.danger,
+            backgroundColor: context.colors.danger,
           ),
         );
       }
@@ -334,7 +334,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   ? '$subject accepted successfully.'
                   : '$subject declined successfully.',
             ),
-            backgroundColor: FlixieColors.surfaceElevated,
+            backgroundColor: context.colors.surfaceElevated,
           ),
         );
       }
@@ -349,7 +349,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   ? 'Failed to accept. Please try again.'
                   : 'Failed to decline. Please try again.',
             ),
-            backgroundColor: FlixieColors.danger,
+            backgroundColor: context.colors.danger,
           ),
         );
       }
@@ -464,12 +464,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline,
-                color: FlixieColors.danger, size: 48),
+            Icon(Icons.error_outline, color: context.colors.danger, size: 48),
             const SizedBox(height: 16),
             Text(_error!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: FlixieColors.light)),
+                style: TextStyle(color: context.colors.light)),
             const SizedBox(height: 24),
             ElevatedButton(
                 onPressed: () => _load(showSpinner: true),
@@ -490,8 +489,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: Container(
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: FlixieColors.tabBarBorder)),
+        decoration: BoxDecoration(
+          border:
+              Border(bottom: BorderSide(color: context.colors.tabBarBorder)),
         ),
         child: Row(
           children: filters.map((entry) {
@@ -516,7 +516,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                             bottom: BorderSide(
                                 width: 3,
                                 color: selected
-                                    ? FlixieColors.primaryText
+                                    ? context.colors.primaryText
                                     : Colors.transparent)),
                       ),
                       child: Text(
@@ -526,8 +526,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: selected
-                              ? FlixieColors.primaryText
-                              : FlixieColors.light,
+                              ? context.colors.primaryText
+                              : context.colors.light,
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                         ),
@@ -694,13 +694,13 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     children: [
                       Icon(Icons.notifications_none,
                           size: 64,
-                          color: FlixieColors.medium.withValues(alpha: 0.6)),
+                          color: context.colors.medium.withValues(alpha: 0.6)),
                       const SizedBox(height: 16),
                       Text(
                         _emptyTitle,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: FlixieColors.light,
+                        style: TextStyle(
+                          color: context.colors.light,
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
                         ),
@@ -709,8 +709,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
                       Text(
                         _emptyBody,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: FlixieColors.medium,
+                        style: TextStyle(
+                          color: context.colors.medium,
                           fontSize: 13,
                           height: 1.5,
                         ),
@@ -747,8 +747,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
   Widget _buildSectionHeader(String title) {
     return Text(
       title,
-      style: const TextStyle(
-        color: FlixieColors.medium,
+      style: TextStyle(
+        color: context.colors.medium,
         fontSize: 11,
         fontWeight: FontWeight.w700,
         letterSpacing: 1.2,
@@ -768,10 +768,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 22),
         decoration: BoxDecoration(
-          color: FlixieColors.danger,
+          color: context.colors.danger,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Icon(Icons.delete_outline, color: Colors.white),
+        child: Icon(Icons.delete_outline, color: context.colors.white),
       ),
       child: card,
     );

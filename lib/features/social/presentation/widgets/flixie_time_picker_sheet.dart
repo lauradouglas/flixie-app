@@ -28,7 +28,7 @@ class _FlixieTimePickerSheetState extends State<FlixieTimePickerSheet> {
     );
     return SafeArea(
       child: Material(
-        color: FlixieColors.background,
+        color: context.colors.background,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         clipBehavior: Clip.antiAlias,
         child: Padding(
@@ -40,17 +40,17 @@ class _FlixieTimePickerSheetState extends State<FlixieTimePickerSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: FlixieColors.medium,
+                  color: context.colors.medium,
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
               const SizedBox(height: 18),
-              const Align(
+              Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
                   'Choose a time',
                   style: TextStyle(
-                    color: FlixieColors.textPrimary,
+                    color: context.colors.textPrimary,
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
                   ),

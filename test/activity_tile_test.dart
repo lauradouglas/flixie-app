@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -41,6 +42,30 @@ ActivityListItem _item({
 }
 
 void main() {
+  testWidgets('opening media dismisses compact activity sheet', (tester) async {
+    final router = GoRouter(routes: [
+      GoRoute(
+          path: '/',
+          builder: (_, __) => Scaffold(
+              body: ActivityTile(
+                  item: _item(type: ActivityListType.movieRating, rating: 9),
+                  compact: true))),
+      GoRoute(
+          path: '/movies/:id',
+          builder: (_, __) => const Scaffold(body: Text('Movie destination'))),
+    ]);
+    addTearDown(router.dispose);
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.tap(find.byType(ActivityTile));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Close activity'), findsOneWidget);
+    await tester.tap(find.textContaining('View film'));
+    await tester.pumpAndSettle();
+    expect(find.text('Movie destination'), findsOneWidget);
+    expect(find.byTooltip('Close activity'), findsNothing);
+    expect(find.byType(BottomSheet), findsNothing);
+  });
+
   testWidgets('renders watched activity with shared card header',
       (tester) async {
     final item = _item(type: ActivityListType.movieWatched);

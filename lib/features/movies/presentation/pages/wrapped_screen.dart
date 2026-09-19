@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -80,38 +81,24 @@ class _WrappedViewState extends State<_WrappedView> {
   }
 
   Widget _buildYearSelector() {
-    return Container(
-      height: 40,
-      padding: const EdgeInsets.symmetric(horizontal: 13),
-      decoration: BoxDecoration(
-        color: FlixieColors.surfaceElevated,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: FlixieColors.primary.withValues(alpha: .3),
-        ),
-      ),
-      child: DropdownButton<int>(
-        value: _year,
-        underline: const SizedBox(),
-        dropdownColor: FlixieColors.tabBarBackgroundFocused,
-        icon: const Icon(
-          Icons.keyboard_arrow_down_rounded,
-          color: FlixieColors.light,
-        ),
-        style: const TextStyle(
-          color: FlixieColors.white,
-          fontWeight: FontWeight.w700,
-        ),
-        items: List.generate(
-          DateTime.now().year - widget.joinYear + 1,
-          (i) => DateTime.now().year - i,
-        ).map((y) => DropdownMenuItem(value: y, child: Text('$y'))).toList(),
-        onChanged: (value) {
-          if (value == null) return;
-          setState(() => _year = value);
-          context.read<MovieWrappedProvider>().loadYear(value);
-        },
-      ),
+    return PopupMenuButton<int>(
+      tooltip: 'Choose year',
+      initialValue: _year,
+      onSelected: (value) {
+        setState(() => _year = value);
+        context.read<MovieWrappedProvider>().loadYear(value);
+      },
+      itemBuilder: (_) => List.generate(
+              DateTime.now().year - widget.joinYear + 1,
+              (i) => DateTime.now().year - i)
+          .map((y) => PopupMenuItem(value: y, child: Text('$y')))
+          .toList(),
+      child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: FlixiePill.label(
+              compact: false,
+              label: Text('$_year'),
+              avatar: const Icon(Icons.keyboard_arrow_down_rounded))),
     );
   }
 
@@ -128,7 +115,7 @@ class _WrappedViewState extends State<_WrappedView> {
                   child: Text(
                     provider.error ?? 'No wrapped data for $_year.',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: FlixieColors.medium),
+                    style: TextStyle(color: context.colors.medium),
                   ),
                 ),
               )

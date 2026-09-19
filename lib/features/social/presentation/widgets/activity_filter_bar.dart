@@ -1,6 +1,6 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 
-import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/models/activity_list_item.dart';
 
 enum ActivityFeedFilter {
@@ -54,26 +54,11 @@ class ActivityFilterBar extends StatelessWidget {
           itemBuilder: (_, index) {
             final filter = ActivityFeedFilter.values[index];
             final active = selected == filter;
-            return ChoiceChip(
-              selected: active,
-              onSelected: (_) => onChanged(filter),
-              showCheckmark: false,
-              label: Text(filter.label),
-              labelStyle: TextStyle(
-                color: active ? Colors.black : FlixieColors.light,
-                fontWeight: FontWeight.w700,
-              ),
-              selectedColor: FlixieColors.primary,
-              backgroundColor: FlixieColors.surface,
-              side: BorderSide(
-                color:
-                    active ? FlixieColors.primary : FlixieColors.tabBarBorder,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-            );
+            return FlixiePill.choice(
+                selected: active,
+                onSelected: (_) => onChanged(filter),
+                showCheckmark: false,
+                label: Text(filter.label));
           },
         ),
       );

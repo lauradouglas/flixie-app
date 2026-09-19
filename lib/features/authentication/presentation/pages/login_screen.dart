@@ -56,7 +56,7 @@ class _LoginScreenState extends State<LoginScreen> {
         FlixieToast(
           type: FlixieToastType.error,
           content: Text(auth.errorMessage ?? 'Sign in failed.'),
-          backgroundColor: FlixieColors.danger,
+          backgroundColor: context.colors.danger,
         ),
       );
     }
@@ -111,35 +111,39 @@ class _LoginScreenState extends State<LoginScreen> {
                 },
               ),
               const SizedBox(height: 16),
-              Row(
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
                 children: [
-                  Expanded(
-                    child: CheckboxListTile(
-                      value: _rememberMe,
-                      onChanged: (value) => setState(
-                        () => _rememberMe = value ?? false,
-                      ),
-                      title: Text(
-                        'Remember me',
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: FlixieColors.textPrimary,
-                          fontWeight: FontWeight.w500,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Checkbox(
+                        value: _rememberMe,
+                        onChanged: (value) => setState(
+                          () => _rememberMe = value ?? false,
                         ),
+                        activeColor: FlixieColors.primary,
+                        checkColor: Colors.white,
                       ),
-                      controlAffinity: ListTileControlAffinity.leading,
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      activeColor: FlixieColors.primary,
-                      checkColor: Colors.white,
-                      side: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.18),
-                      ),
-                    ),
+                      Flexible(
+                          child: GestureDetector(
+                        onTap: () => setState(() => _rememberMe = !_rememberMe),
+                        child: Text(
+                          'Remember me',
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: context.colors.textPrimary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      )),
+                    ],
                   ),
                   TextButton(
                     onPressed: () => context.push('/auth/forgot-password'),
                     style: TextButton.styleFrom(
-                      foregroundColor: FlixieColors.primaryTint,
+                      foregroundColor: context.colors.primaryTint,
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                     ),
                     child: const Text(
@@ -156,20 +160,21 @@ class _LoginScreenState extends State<LoginScreen> {
                 onPressed: isLoading ? null : _submit,
               ),
               const SizedBox(height: 22),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Text(
                     "Don't have an account?",
                     style: textTheme.bodyMedium?.copyWith(
-                      color: FlixieColors.light,
+                      color: context.colors.light,
                     ),
                     textAlign: TextAlign.center,
                   ),
                   TextButton(
                     onPressed: () => context.push('/auth/signup'),
                     style: TextButton.styleFrom(
-                      foregroundColor: FlixieColors.primaryTint,
+                      foregroundColor: context.colors.primaryTint,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                     ),
                     child: const Text(

@@ -1,3 +1,5 @@
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flixie_app/app/theme/appearance_controller.dart';
 import 'dart:convert';
 import 'package:flixie_app/core/analytics/analytics_consent.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
@@ -44,6 +46,10 @@ void main() {
   testWidgets(
       'country retry stays visible and saved selection updates availability region',
       (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final appearance =
+        AppearanceController(await SharedPreferences.getInstance());
+    addTearDown(appearance.dispose);
     final auth = CountryAuth();
     addTearDown(auth.dispose);
     var loads = 0;
@@ -51,6 +57,8 @@ void main() {
     await http.runWithClient(() async {
       await tester.pumpWidget(MultiProvider(
           providers: [
+            ChangeNotifierProvider<AppearanceController>.value(
+                value: appearance),
             ChangeNotifierProvider<AuthProvider>.value(value: auth),
             ChangeNotifierProvider<AnalyticsController>(
                 create: (_) => SettingsAnalytics())

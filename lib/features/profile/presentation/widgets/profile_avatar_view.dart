@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:flixie_app/models/profile_avatar.dart';
@@ -95,9 +96,19 @@ class _ProfileAvatarViewState extends State<ProfileAvatarView> {
 
   Widget _fallback() => CircleAvatar(
         radius: widget.size / 2,
-        backgroundColor: widget.fallbackColor.withValues(alpha: 0.25),
-        child: Text(widget.fallbackText,
-            style: TextStyle(color: widget.fallbackColor)),
+        backgroundColor: context.colors.surfaceElevated,
+        child: Padding(
+          padding: EdgeInsets.all(widget.size * .18),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(widget.fallbackText.trim().toUpperCase(),
+                style: TextStyle(
+                  color: context.colors.primaryText,
+                  fontSize: widget.size * .36,
+                  fontWeight: FontWeight.w700,
+                )),
+          ),
+        ),
       );
 
   @override

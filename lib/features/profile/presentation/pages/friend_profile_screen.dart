@@ -67,9 +67,9 @@ class _EmptyProfileTab extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 48),
         child: Column(
           children: [
-            Icon(icon, color: FlixieColors.medium, size: 40),
+            Icon(icon, color: context.colors.medium, size: 40),
             const SizedBox(height: 12),
-            Text(text, style: const TextStyle(color: FlixieColors.medium)),
+            Text(text, style: TextStyle(color: context.colors.medium)),
           ],
         ),
       );
@@ -127,9 +127,9 @@ class _FriendRecentReviewCardState extends State<_FriendRecentReviewCard> {
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: FlixieColors.surface,
+            color: context.colors.surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: FlixieColors.tabBarBorder),
+            border: Border.all(color: context.colors.tabBarBorder),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -141,20 +141,20 @@ class _FriendRecentReviewCardState extends State<_FriendRecentReviewCard> {
                   height: 114,
                   child: posterUrl.isEmpty
                       ? Container(
-                          color: FlixieColors.surfaceElevated,
-                          child: const Icon(
+                          color: context.colors.surfaceElevated,
+                          child: Icon(
                             Icons.movie_outlined,
-                            color: FlixieColors.medium,
+                            color: context.colors.medium,
                           ),
                         )
                       : CachedNetworkImage(
                           imageUrl: posterUrl,
                           fit: BoxFit.cover,
                           errorWidget: (_, __, ___) => Container(
-                            color: FlixieColors.surfaceElevated,
-                            child: const Icon(
+                            color: context.colors.surfaceElevated,
+                            child: Icon(
                               Icons.movie_outlined,
-                              color: FlixieColors.medium,
+                              color: context.colors.medium,
                             ),
                           ),
                         ),
@@ -173,8 +173,8 @@ class _FriendRecentReviewCardState extends State<_FriendRecentReviewCard> {
                             review.movieTitle ?? 'Movie review',
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: FlixieColors.textPrimary,
+                            style: TextStyle(
+                              color: context.colors.textPrimary,
                               fontSize: 16,
                               fontWeight: FontWeight.w800,
                               height: 1.15,
@@ -184,8 +184,8 @@ class _FriendRecentReviewCardState extends State<_FriendRecentReviewCard> {
                         if (date.isNotEmpty)
                           Text(
                             date,
-                            style: const TextStyle(
-                              color: FlixieColors.medium,
+                            style: TextStyle(
+                              color: context.colors.medium,
                               fontSize: 10.5,
                             ),
                           ),
@@ -201,8 +201,8 @@ class _FriendRecentReviewCardState extends State<_FriendRecentReviewCard> {
                             children: [
                               Text(
                                 '★ ${review.rating}/10',
-                                style: const TextStyle(
-                                  color: FlixieColors.warning,
+                                style: TextStyle(
+                                  color: context.colors.warning,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -211,8 +211,8 @@ class _FriendRecentReviewCardState extends State<_FriendRecentReviewCard> {
                                 '${review.recommended ? '👍' : '👎'} ${review.recommended ? 'Recommends' : 'Doesn’t recommend'}',
                                 style: TextStyle(
                                   color: review.recommended
-                                      ? FlixieColors.success
-                                      : FlixieColors.danger,
+                                      ? context.colors.success
+                                      : context.colors.danger,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -224,7 +224,7 @@ class _FriendRecentReviewCardState extends State<_FriendRecentReviewCard> {
                           TextButton.icon(
                             onPressed: widget.onReply,
                             style: TextButton.styleFrom(
-                              foregroundColor: FlixieColors.primaryTint,
+                              foregroundColor: context.colors.primaryTint,
                               minimumSize: const Size(0, 28),
                               padding: const EdgeInsets.only(left: 6),
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -245,8 +245,8 @@ class _FriendRecentReviewCardState extends State<_FriendRecentReviewCard> {
                       review.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: FlixieColors.textPrimary,
+                      style: TextStyle(
+                        color: context.colors.textPrimary,
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                       ),
@@ -262,8 +262,8 @@ class _FriendRecentReviewCardState extends State<_FriendRecentReviewCard> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: review.containsSpoilers && !_spoilerRevealed
-                              ? FlixieColors.light.withValues(alpha: .72)
-                              : FlixieColors.light,
+                              ? context.colors.light.withValues(alpha: .72)
+                              : context.colors.light,
                           fontSize: 12.5,
                           height: 1.3,
                         ),
@@ -274,7 +274,7 @@ class _FriendRecentReviewCardState extends State<_FriendRecentReviewCard> {
                       TextButton(
                         onPressed: _handleCardTap,
                         style: TextButton.styleFrom(
-                          foregroundColor: FlixieColors.warning,
+                          foregroundColor: context.colors.warning,
                           minimumSize: const Size(0, 24),
                           padding: EdgeInsets.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -290,7 +290,7 @@ class _FriendRecentReviewCardState extends State<_FriendRecentReviewCard> {
                     TextButton.icon(
                       onPressed: widget.onViewReview,
                       style: TextButton.styleFrom(
-                        foregroundColor: FlixieColors.primaryTint,
+                        foregroundColor: context.colors.primaryTint,
                         minimumSize: const Size(0, 28),
                         padding: EdgeInsets.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -611,8 +611,8 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
               child: const Text('Cancel')),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Remove',
-                style: TextStyle(color: FlixieColors.danger)),
+            child:
+                Text('Remove', style: TextStyle(color: context.colors.danger)),
           ),
         ],
       ),
@@ -668,7 +668,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       isScrollControlled: true,
       useRootNavigator: true,
       useSafeArea: true,
-      backgroundColor: FlixieColors.surface,
+      backgroundColor: context.colors.surface,
       builder: (sheetContext) => Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
@@ -806,7 +806,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
           label: const Text('Add Friend'),
           style: ElevatedButton.styleFrom(
             backgroundColor: FlixieColors.primary,
-            foregroundColor: Colors.black,
+            foregroundColor: Colors.white,
           ),
           onPressed: _sendFriendRequest,
         );
@@ -816,8 +816,8 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
           icon: const Icon(Icons.schedule_outlined),
           label: const Text('Request Pending'),
           style: OutlinedButton.styleFrom(
-            foregroundColor: FlixieColors.warning,
-            side: const BorderSide(color: FlixieColors.warning),
+            foregroundColor: context.colors.warning,
+            side: BorderSide(color: context.colors.warning),
           ),
           onPressed: null,
         );
@@ -830,7 +830,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
               icon: const Icon(Icons.check),
               label: const Text('Accept'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: FlixieColors.success,
+                backgroundColor: context.colors.success,
                 foregroundColor: Colors.black,
               ),
               onPressed: _acceptRequest,
@@ -838,8 +838,8 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
             const SizedBox(height: 8),
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
-                foregroundColor: FlixieColors.danger,
-                side: const BorderSide(color: FlixieColors.danger),
+                foregroundColor: context.colors.danger,
+                side: BorderSide(color: context.colors.danger),
               ),
               onPressed: _declineRequest,
               icon: const Icon(Icons.close_rounded),
@@ -853,8 +853,8 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
           icon: const Icon(Icons.person_remove_outlined),
           label: const Text('Remove Friend'),
           style: OutlinedButton.styleFrom(
-            foregroundColor: FlixieColors.danger,
-            side: const BorderSide(color: FlixieColors.danger),
+            foregroundColor: context.colors.danger,
+            side: BorderSide(color: context.colors.danger),
           ),
           onPressed: _removeFriend,
         );
@@ -963,24 +963,24 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                     title: Text('Report user'),
                   ),
                 ),
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'block',
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.block, color: FlixieColors.danger),
+                    leading: Icon(Icons.block, color: context.colors.danger),
                     title: Text('Block user',
-                        style: TextStyle(color: FlixieColors.danger)),
+                        style: TextStyle(color: context.colors.danger)),
                   ),
                 ),
                 if (_friendshipStatus == _FriendshipStatus.friends)
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'remove_friend',
                     child: ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: Icon(Icons.person_remove_outlined,
-                          color: FlixieColors.danger),
+                          color: context.colors.danger),
                       title: Text('Remove friend',
-                          style: TextStyle(color: FlixieColors.danger)),
+                          style: TextStyle(color: context.colors.danger)),
                     ),
                   ),
               ],
@@ -992,7 +992,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       body: RefreshIndicator(
         onRefresh: _loadAll,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 32),
           children: [
             _modernHeader(user),
             // Notification deep links use preview mode to suppress ordinary
@@ -1005,13 +1005,14 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
               _profileActions(),
               if (_friendshipStatus == _FriendshipStatus.friends) ...[
                 const SizedBox(height: 10),
-                const Row(
+                Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.check, size: 17, color: FlixieColors.primary),
-                    SizedBox(width: 7),
+                    const Icon(Icons.check,
+                        size: 17, color: FlixieColors.primary),
+                    const SizedBox(width: 7),
                     Text('Friends',
-                        style: TextStyle(color: FlixieColors.medium)),
+                        style: TextStyle(color: context.colors.medium)),
                   ],
                 ),
               ],
@@ -1024,7 +1025,13 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
             if (_selectedTab == 0) ..._overviewContent(user),
             if (_selectedTab == 1) ..._activityContent(user),
             if (_selectedTab == 2) ..._reviewsContent(),
-          ],
+          ]
+              .map((child) => child.key == const ValueKey('profile-totals')
+                  ? child
+                  : Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: child))
+              .toList(),
         ),
       ),
     );
@@ -1046,12 +1053,12 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(showFirstName ? user.firstName! : user.username,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
-                  color: FlixieColors.white)),
+                  color: context.colors.white)),
           Text('@${user.username}',
-              style: const TextStyle(color: FlixieColors.medium)),
+              style: TextStyle(color: context.colors.medium)),
           if (user.profileBadges.isNotEmpty)
             Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -1065,13 +1072,21 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
             maxLines: _bioExpanded ? null : 2,
             overflow:
                 _bioExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
-            style: const TextStyle(color: FlixieColors.light, height: 1.4)),
+            style: TextStyle(color: context.colors.light, height: 1.4)),
         TextButton(
             onPressed: () => setState(() => _bioExpanded = !_bioExpanded),
+            style: TextButton.styleFrom(
+              foregroundColor: context.colors.light,
+              textStyle:
+                  const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+              padding: EdgeInsets.zero,
+              alignment: Alignment.centerLeft,
+              minimumSize: const Size(48, 40),
+            ),
             child: Text(_bioExpanded ? 'Read less' : 'Read more')),
       ],
       Text(_memberSinceLabel,
-          style: const TextStyle(color: FlixieColors.medium, fontSize: 12)),
+          style: TextStyle(color: context.colors.medium, fontSize: 12)),
     ]);
   }
 
@@ -1081,7 +1096,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
         height: 50,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: FlixieColors.surface.withValues(alpha: .55),
+          color: context.colors.surface.withValues(alpha: .55),
           borderRadius: BorderRadius.circular(24),
         ),
         child: const SizedBox(
@@ -1095,7 +1110,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       return Container(
         height: 50,
         decoration: BoxDecoration(
-          color: FlixieColors.surface.withValues(alpha: .55),
+          color: context.colors.surface.withValues(alpha: .55),
           borderRadius: BorderRadius.circular(24),
         ),
       );
@@ -1124,29 +1139,45 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
   }
 
   Widget _modernStats(int watched, int watchlist, int favourites) {
+    final user = _user;
+    final breakdowns = [
+      '${user?.watchedMovies?.length ?? 0} movies · ${user?.watchedShows?.length ?? 0} shows',
+      '${user?.movieWatchlist?.length ?? 0} movies · ${user?.showWatchlist?.length ?? 0} shows',
+      '${user?.favoriteMovies?.length ?? 0} movies · ${user?.favoriteShows?.length ?? 0} shows',
+    ];
     final values = [
       (watched, 'Watched', Icons.visibility_outlined),
       (watchlist, 'Watchlist', Icons.bookmark_border_rounded),
       (favourites, 'Favourites', Icons.favorite_border_rounded),
     ];
     return Padding(
+        key: const ValueKey('profile-totals'),
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(children: [
           for (var i = 0; i < values.length; i++) ...[
             Expanded(
                 child: Column(children: [
               Text('${values[i].$1}',
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w700,
-                      color: FlixieColors.white)),
+                      color: context.colors.white)),
               Text(values[i].$2,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      color: FlixieColors.medium, fontSize: 13)),
+                  style: TextStyle(color: context.colors.medium, fontSize: 13)),
+              const SizedBox(height: 5),
+              Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(breakdowns[i],
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 11,
+                          height: 1.4,
+                          color: context.colors.light))),
             ])),
             if (i < values.length - 1)
-              Container(width: 1, height: 36, color: FlixieColors.tabBarBorder),
+              Container(
+                  width: 1, height: 36, color: context.colors.tabBarBorder),
           ],
         ]));
   }
@@ -1165,7 +1196,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                     style: TextStyle(
                       color: _selectedTab == i
                           ? FlixieColors.primary
-                          : FlixieColors.light,
+                          : context.colors.light,
                       fontWeight: FontWeight.w700,
                     )),
               ),
@@ -1194,7 +1225,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       useSafeArea: true,
       isScrollControlled: true,
       showDragHandle: true,
-      backgroundColor: FlixieColors.tabBarBackgroundFocused,
+      backgroundColor: context.colors.surface,
       builder: (sheetContext) => ConstrainedBox(
         constraints: BoxConstraints(
             maxHeight: MediaQuery.sizeOf(sheetContext).height * .8),
@@ -1206,16 +1237,16 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                      const Text('You both rated',
+                      Text('You both rated',
                           style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.w700,
-                              color: FlixieColors.white)),
+                              color: context.colors.white)),
                       const SizedBox(height: 4),
                       Text(
                           '${_sharedRatings.length} films in common · Scores out of 10',
-                          style: const TextStyle(
-                              fontSize: 12, color: FlixieColors.medium)),
+                          style: TextStyle(
+                              fontSize: 12, color: context.colors.medium)),
                     ])),
                 IconButton(
                     tooltip: 'Close',
@@ -1228,7 +1259,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
             itemCount: _sharedRatings.length,
             separatorBuilder: (_, __) =>
-                const Divider(height: 1, color: FlixieColors.tabBarBorder),
+                Divider(height: 1, color: context.colors.tabBarBorder),
             itemBuilder: (_, index) {
               final rating = _sharedRatings[index];
               final mine = _myRatingValues[rating.movieId]!;
@@ -1250,9 +1281,10 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                                   width: 48,
                                   height: 72,
                                   child: path == null
-                                      ? const ColoredBox(
-                                          color: FlixieColors.surfaceElevated,
-                                          child: Icon(Icons.movie_outlined))
+                                      ? ColoredBox(
+                                          color: context.colors.surfaceElevated,
+                                          child:
+                                              const Icon(Icons.movie_outlined))
                                       : CachedNetworkImage(
                                           imageUrl: path.startsWith('http')
                                               ? path
@@ -1267,29 +1299,37 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                 Text(rating.movie?.title ?? 'Movie',
-                                    style: const TextStyle(
-                                        color: FlixieColors.white,
+                                    style: TextStyle(
+                                        color: context.colors.white,
                                         fontWeight: FontWeight.w600,
                                         fontSize: 15)),
                                 const SizedBox(height: 8),
                                 Wrap(spacing: 8, runSpacing: 6, children: [
-                                  _ComparisonScore(label: 'You', score: mine),
+                                  _ComparisonScore(
+                                      label: 'You', score: mine, isYou: true),
                                   _ComparisonScore(
                                       label: friendName, score: rating.rating),
-                                  if (mine == rating.rating)
-                                    const Padding(
-                                        padding:
-                                            EdgeInsets.symmetric(vertical: 6),
-                                        child: Text('Same score',
+                                ]),
+                                if (mine == rating.rating) ...[
+                                  const SizedBox(height: 8),
+                                  Row(children: [
+                                    Icon(Icons.auto_awesome_rounded,
+                                        size: 14,
+                                        color: context.colors.primaryText),
+                                    const SizedBox(width: 5),
+                                    Flexible(
+                                        child: Text('Taste twins',
                                             style: TextStyle(
                                                 fontSize: 11,
-                                                color:
-                                                    FlixieColors.primaryText))),
-                                ]),
+                                                fontWeight: FontWeight.w700,
+                                                color: context
+                                                    .colors.primaryText))),
+                                  ]),
+                                ],
                               ])),
                           const SizedBox(width: 4),
-                          const Icon(Icons.chevron_right_rounded,
-                              size: 18, color: FlixieColors.medium),
+                          Icon(Icons.chevron_right_rounded,
+                              size: 18, color: context.colors.medium),
                         ])),
               );
             },
@@ -1313,8 +1353,9 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     return [
       const Text('Watch together',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-      const Text('On both your movie watchlists',
-          style: TextStyle(color: FlixieColors.medium, fontSize: 13)),
+      const SizedBox(height: 4),
+      Text('Films you both want to see',
+          style: TextStyle(color: context.colors.medium, fontSize: 13)),
       const SizedBox(height: 10),
       SingleChildScrollView(
           scrollDirection: Axis.horizontal,
@@ -1345,9 +1386,9 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                                 width: 100,
                                 height: 150,
                                 child: path == null
-                                    ? const ColoredBox(
-                                        color: FlixieColors.surface,
-                                        child: Icon(Icons.movie_outlined))
+                                    ? ColoredBox(
+                                        color: context.colors.surface,
+                                        child: const Icon(Icons.movie_outlined))
                                     : CachedNetworkImage(
                                         imageUrl: path.startsWith('http')
                                             ? path
@@ -1355,15 +1396,17 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                                         fit: BoxFit.cover))),
                         const SizedBox(height: 6),
                         Text(title,
-                            style: const TextStyle(
-                                fontSize: 13, color: FlixieColors.light)),
+                            style: TextStyle(
+                                fontSize: 13, color: context.colors.light)),
                       ]))));
 
   Widget _friendShows(User user) {
     final shows = (user.favoriteShows ?? [])
         .whereType<Map<String, dynamic>>()
         .where((entry) => entry['removed'] != true)
-        .toList();
+        .toList()
+      ..sort((a, b) =>
+          ((a['rank'] as num?) ?? 999).compareTo((b['rank'] as num?) ?? 999));
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('Favourite shows',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
@@ -1371,7 +1414,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            for (final entry in shows)
+            for (final entry in shows.take(10))
               Builder(builder: (_) {
                 final show = entry['show'] as Map<String, dynamic>? ?? entry;
                 final id = entry['showId'] ?? show['id'];
@@ -1381,28 +1424,69 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                     () => context.push(showDetailPath(id as int)));
               })
           ])),
-      const SizedBox(height: 18),
     ]);
   }
+
+  Widget _sharedTasteLine(IconData icon, String label, Color color) => Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+              padding: const EdgeInsets.only(top: 1),
+              child: Icon(icon, size: 18, color: color)),
+          const SizedBox(width: 8),
+          Expanded(
+              child: Text(label,
+                  style: TextStyle(
+                      fontSize: 14, height: 1.4, color: context.colors.light))),
+        ],
+      );
 
   List<Widget> _overviewContent(User user) => [
         if (!_isSelf &&
             !_compatibilityLoading &&
             _sharedRatings.isNotEmpty) ...[
-          const Text('In common',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-          ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text('${_sharedRatings.length} films you’ve both rated'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: _showSharedRatings),
-          if (_sharedFavCount > 0)
-            Text('$_sharedFavCount shared favourite movies',
-                style: const TextStyle(color: FlixieColors.light)),
-          const SizedBox(height: 16),
+          Material(
+            color: context.colors.surface,
+            borderRadius: BorderRadius.circular(16),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: _showSharedRatings,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(children: [
+                  Expanded(
+                      child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('In common',
+                          style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: context.colors.textPrimary)),
+                      const SizedBox(height: 10),
+                      _sharedTasteLine(
+                          Icons.star_rounded,
+                          '${_sharedRatings.length} films rated by both',
+                          context.colors.warning),
+                      if (_sharedFavCount > 0) ...[
+                        const SizedBox(height: 8),
+                        _sharedTasteLine(
+                            Icons.favorite_rounded,
+                            '$_sharedFavCount shared favourites',
+                            context.colors.danger),
+                      ],
+                    ],
+                  )),
+                  const SizedBox(width: 12),
+                  Icon(Icons.chevron_right_rounded,
+                      color: context.colors.primaryText),
+                ]),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
         ],
         ..._sharedWatchlist(user),
-        if (user.favoriteShows?.isNotEmpty == true) _friendShows(user),
         ListsPreviewSection(
           userId: widget.userId,
           title: 'Shared lists',
@@ -1414,6 +1498,12 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
         if (user.favoriteMovies?.isNotEmpty == true) ...[
           const SizedBox(height: 18),
           FavoriteMoviesSection(favoriteMovies: user.favoriteMovies!),
+        ],
+        if ((user.favoriteShows ?? [])
+            .whereType<Map>()
+            .any((entry) => entry['removed'] != true)) ...[
+          const SizedBox(height: 18),
+          _friendShows(user),
         ],
         if (_reviews.isNotEmpty) ...[
           const SizedBox(height: 18),
@@ -1583,8 +1673,8 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                   if (blocked && context.mounted) context.pop();
                 }
               },
-              itemBuilder: (_) => const [
-                PopupMenuItem(
+              itemBuilder: (_) => [
+                const PopupMenuItem(
                   value: 'report',
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
@@ -1596,10 +1686,10 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                   value: 'block',
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.block, color: FlixieColors.danger),
+                    leading: Icon(Icons.block, color: context.colors.danger),
                     title: Text(
                       'Block user',
-                      style: TextStyle(color: FlixieColors.danger),
+                      style: TextStyle(color: context.colors.danger),
                     ),
                   ),
                 ),
@@ -1618,9 +1708,10 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(18),
-                      color: FlixieColors.surface,
+                      color: context.colors.surface,
                       border: Border.all(
-                        color: FlixieColors.tabBarBorder.withValues(alpha: 0.9),
+                        color:
+                            context.colors.tabBarBorder.withValues(alpha: 0.9),
                       ),
                     ),
                     child: Column(
@@ -1648,7 +1739,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: textTheme.headlineSmall?.copyWith(
-                                      color: FlixieColors.light,
+                                      color: context.colors.light,
                                       fontWeight: FontWeight.w800,
                                     ),
                                   ),
@@ -1666,7 +1757,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                                     Text(
                                       visibleFirstName,
                                       style: textTheme.bodyLarge?.copyWith(
-                                        color: FlixieColors.light,
+                                        color: context.colors.light,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -1674,16 +1765,16 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                                   const SizedBox(height: 7),
                                   Row(
                                     children: [
-                                      const Icon(
+                                      Icon(
                                         Icons.calendar_month_outlined,
                                         size: 15,
-                                        color: FlixieColors.medium,
+                                        color: context.colors.medium,
                                       ),
                                       const SizedBox(width: 5),
                                       Text(
                                         _memberSinceLabel,
                                         style: textTheme.bodySmall?.copyWith(
-                                          color: FlixieColors.medium,
+                                          color: context.colors.medium,
                                         ),
                                       ),
                                     ],
@@ -1699,7 +1790,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                           Text(
                             bioText,
                             style: textTheme.bodyMedium?.copyWith(
-                              color: FlixieColors.light,
+                              color: context.colors.light,
                               height: 1.45,
                             ),
                             maxLines: 4,
@@ -1769,7 +1860,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: FlixieColors.primary,
+                          foregroundColor: context.colors.primaryText,
                           side: const BorderSide(color: FlixieColors.primary),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
@@ -1820,7 +1911,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                           Text(
                             '${_reviews.length} total',
                             style: textTheme.bodySmall
-                                ?.copyWith(color: FlixieColors.medium),
+                                ?.copyWith(color: context.colors.medium),
                           ),
                         ],
                       ],
@@ -1838,7 +1929,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                       child: Text(
                         'No reviews yet.',
                         style: textTheme.bodySmall
-                            ?.copyWith(color: FlixieColors.medium),
+                            ?.copyWith(color: context.colors.medium),
                       ),
                     )
                   else ...[
@@ -1865,9 +1956,9 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                           onPressed: () => setState(
                               () => _showAllReviews = !_showAllReviews),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: FlixieColors.light,
-                            side: const BorderSide(
-                                color: FlixieColors.tabBarBorder),
+                            foregroundColor: context.colors.light,
+                            side:
+                                BorderSide(color: context.colors.tabBarBorder),
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -1895,24 +1986,28 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
 }
 
 class _ComparisonScore extends StatelessWidget {
-  const _ComparisonScore({required this.label, required this.score});
+  const _ComparisonScore(
+      {required this.label, required this.score, this.isYou = false});
+  final bool isYou;
   final String label;
   final int score;
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
         decoration: BoxDecoration(
-            color: FlixieColors.surfaceElevated,
-            borderRadius: BorderRadius.circular(8)),
+            color: isYou
+                ? context.colors.primaryText.withValues(alpha: .10)
+                : const Color(0xFFFFAD66).withValues(alpha: .18),
+            borderRadius: BorderRadius.circular(10)),
         child: Text.rich(
             TextSpan(children: [
               TextSpan(
                   text: '$label  ',
-                  style: const TextStyle(color: FlixieColors.light)),
+                  style: TextStyle(color: context.colors.light)),
               TextSpan(
                   text: '$score',
-                  style: const TextStyle(
-                      color: FlixieColors.primaryText,
+                  style: TextStyle(
+                      color: context.colors.primaryText,
                       fontWeight: FontWeight.w800)),
             ]),
             style: const TextStyle(fontSize: 12)),

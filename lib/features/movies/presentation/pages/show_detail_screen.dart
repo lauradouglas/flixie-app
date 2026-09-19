@@ -1,3 +1,6 @@
+import 'package:flixie_app/features/profile/presentation/widgets/favourite_ranking_sheet.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/media_detail_action.dart';
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/watch_provider_header.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/provider_tab_label.dart';
 import 'package:flixie_app/features/settings/data/episode_spoiler_preference.dart';
@@ -91,11 +94,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
   final _tabContentKey = GlobalKey();
   _ShowDetailTab _selectedTab = _ShowDetailTab.overview;
 
-  static const _background = FlixieColors.background;
   static const _primary = FlixieColors.primary;
-  static const _accent = FlixieColors.primaryTint;
-  static const _card = FlixieColors.surface;
-  static const _textSecondary = FlixieColors.light;
 
   @override
   void initState() {
@@ -440,17 +439,25 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         type: FlixieToastType.success,
         content: Text(
             savedState ? 'Added to favourites' : 'Removed from favourites'),
-        action: offerUndo
+        action: savedState
             ? SnackBarAction(
-                label: 'Undo',
+                label: 'Rank',
                 onPressed: () {
-                  if (mounted &&
-                      _updatingAction == null &&
-                      _isFavorite == savedState) {
-                    _toggleFavorite(offerUndo: false);
+                  if (mounted) {
+                    showFavouriteRankingSheet(context, shows: true);
                   }
                 })
-            : null,
+            : offerUndo
+                ? SnackBarAction(
+                    label: 'Undo',
+                    onPressed: () {
+                      if (mounted &&
+                          _updatingAction == null &&
+                          _isFavorite == savedState) {
+                        _toggleFavorite(offerUndo: false);
+                      }
+                    })
+                : null,
       ));
     } catch (error) {
       if (!mounted) return;
@@ -784,7 +791,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         builder: (context, setSheetState) => Container(
           constraints: BoxConstraints(
               maxHeight: MediaQuery.sizeOf(context).height * .85),
-          color: FlixieColors.tabBarBackgroundFocused,
+          color: context.colors.tabBarBackgroundFocused,
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
             child: Column(
@@ -794,31 +801,26 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                 Text('Rate this show',
                     style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'Choose a score for the overall series.',
-                  style: TextStyle(color: FlixieColors.medium, fontSize: 13),
+                  style: TextStyle(color: context.colors.medium, fontSize: 13),
                 ),
                 const SizedBox(height: 20),
                 Wrap(spacing: 8, runSpacing: 8, children: [
                   for (var rating = 1; rating <= 10; rating++)
-                    ChoiceChip(
-                      side: BorderSide.none,
-                      backgroundColor: FlixieColors.surfaceElevated,
-                      selectedColor: FlixieColors.primary,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      avatar: const Icon(Icons.star_outline_rounded, size: 18),
-                      label: Text('$rating'),
-                      selected: selectedRating == rating,
-                      showCheckmark: false,
-                      onSelected: (_) =>
-                          setSheetState(() => selectedRating = rating),
-                    ),
+                    FlixiePill.choice(
+                        avatar:
+                            const Icon(Icons.star_outline_rounded, size: 18),
+                        label: Text('$rating'),
+                        selected: selectedRating == rating,
+                        showCheckmark: false,
+                        onSelected: (_) =>
+                            setSheetState(() => selectedRating = rating)),
                 ]),
                 const SizedBox(height: 20),
-                const Text('Would you recommend it? (optional)',
+                Text('Would you recommend it? (optional)',
                     style: TextStyle(
-                        color: FlixieColors.light,
+                        color: context.colors.light,
                         fontSize: 16,
                         fontWeight: FontWeight.w600)),
                 const SizedBox(height: 10),
@@ -828,19 +830,14 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                     ('neutral', 'No opinion', Icons.remove_rounded),
                     ('avoid', 'No', Icons.thumb_down_alt_outlined),
                   ])
-                    ChoiceChip(
-                      side: BorderSide.none,
-                      backgroundColor: FlixieColors.surfaceElevated,
-                      selectedColor: FlixieColors.primary,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      avatar: Icon(option.$3, size: 20),
-                      label: Text(option.$2),
-                      selected: selectedRecommendation == option.$1,
-                      showCheckmark: false,
-                      onSelected: (selected) => setSheetState(() =>
-                          selectedRecommendation = selected ? option.$1 : null),
-                    ),
+                    FlixiePill.choice(
+                        avatar: Icon(option.$3, size: 20),
+                        label: Text(option.$2),
+                        selected: selectedRecommendation == option.$1,
+                        showCheckmark: false,
+                        onSelected: (selected) => setSheetState(() =>
+                            selectedRecommendation =
+                                selected ? option.$1 : null)),
                 ]),
                 const SizedBox(height: 16),
                 SizedBox(
@@ -869,17 +866,17 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     showFlixiePromptSheet<void>(
       context: context,
       builder: (context) => FlixiePromptSheetContent(
-        title: const Text(
+        title: Text(
           'FLIXSCORE',
           style: TextStyle(
-            color: FlixieColors.white,
+            color: context.colors.white,
             fontWeight: FontWeight.bold,
           ),
         ),
-        content: const Text(
+        content: Text(
           'Community ratings from Flixie. The score updates as viewers rate this show.',
           style: TextStyle(
-            color: FlixieColors.light,
+            color: context.colors.light,
             fontSize: 14,
             height: 1.5,
           ),
@@ -903,7 +900,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _background,
+      backgroundColor: context.colors.background,
       body: _isLoading
           ? const SafeArea(child: MediaDetailScreenSkeleton())
           : _error != null
@@ -1116,7 +1113,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       children: [
         Text(show.name,
             style: TextStyle(
-                color: Colors.white,
+                color: context.colors.textPrimary,
                 fontSize: compact ? 24 : 28,
                 height: 1.02,
                 fontWeight: FontWeight.w900)),
@@ -1136,7 +1133,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
               if (seasons > 0)
                 '$seasons ${seasons == 1 ? 'season' : 'seasons'}',
             ].join('  ·  '),
-            style: const TextStyle(color: FlixieColors.light, fontSize: 14)),
+            style: TextStyle(color: context.colors.light, fontSize: 14)),
         if ((show.status ?? '').isNotEmpty) ...[
           const SizedBox(height: 8),
           _StatusChip(label: show.status!),
@@ -1170,10 +1167,10 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         onPressed: onTap,
         tooltip: icon == Icons.ios_share_rounded ? 'Share show' : 'Back',
         style: IconButton.styleFrom(
-          backgroundColor: Colors.black.withValues(alpha: 0.45),
+          backgroundColor: context.colors.surface,
           shape: const CircleBorder(),
         ),
-        icon: Icon(icon, color: FlixieColors.light, size: 21),
+        icon: Icon(icon, color: context.colors.light, size: 21),
       ),
     );
   }
@@ -1199,7 +1196,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         Text(
           show.name,
           style: TextStyle(
-            color: FlixieColors.white,
+            color: context.colors.white,
             fontSize: titleSize,
             fontWeight: FontWeight.w900,
             height: 1.02,
@@ -1210,8 +1207,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
           const SizedBox(height: 6),
           Text(
             meta.join('  •  '),
-            style: const TextStyle(
-              color: FlixieColors.light,
+            style: TextStyle(
+              color: context.colors.light,
               fontSize: 16,
               fontWeight: FontWeight.w600,
             ),
@@ -1239,28 +1236,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
   }
 
   Widget _buildTaglineChip(String tagline) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: FlixieColors.secondary.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: FlixieColors.secondary.withValues(alpha: 0.45),
-          width: 1,
-        ),
-      ),
-      child: Text(
-        tagline,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          color: FlixieColors.secondary,
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
+    return FlixiePill.label(label: Text(tagline));
   }
 
   Widget _buildSynopsis(BuildContext context, TvShow show) {
@@ -1274,14 +1250,14 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       _buildSectionHeader(context, 'About the show'),
       const SizedBox(height: 10),
       Text(_showFullOverview ? text : preview,
-          style: const TextStyle(
-              color: FlixieColors.light, fontSize: 14, height: 1.7)),
+          style: TextStyle(
+              color: context.colors.light, fontSize: 14, height: 1.7)),
       if (showToggle)
         TextButton(
           onPressed: () =>
               setState(() => _showFullOverview = !_showFullOverview),
           style: TextButton.styleFrom(
-              foregroundColor: FlixieColors.primaryText,
+              foregroundColor: context.colors.primaryText,
               padding: EdgeInsets.zero,
               minimumSize: const Size(48, 44)),
           child: Text(_showFullOverview ? 'Read less' : 'Read more'),
@@ -1293,7 +1269,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     return Text(
       title,
       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            color: FlixieColors.white,
+            color: context.colors.white,
             fontWeight: FontWeight.bold,
           ),
     );
@@ -1301,7 +1277,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
 
   BoxDecoration _movieCardDecoration() {
     return BoxDecoration(
-      color: FlixieColors.surface.withValues(alpha: 0.85),
+      color: context.colors.surface.withValues(alpha: 0.85),
       borderRadius: BorderRadius.circular(16),
       border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
     );
@@ -1377,7 +1353,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                     useRootNavigator: true,
                     useSafeArea: true,
                     isScrollControlled: true,
-                    backgroundColor: FlixieColors.surface,
+                    backgroundColor: context.colors.surface,
                     showDragHandle: true,
                     builder: (sheetContext) => SizedBox(
                       width: double.infinity,
@@ -1465,11 +1441,11 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
 
   Widget _buildSeasonsAndEpisodesSection(TvShow show) {
     if (show.seasons.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 24),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
         child: Text(
             'Episode details are not available yet. Pull down to refresh.',
-            style: TextStyle(color: FlixieColors.light)),
+            style: TextStyle(color: context.colors.light)),
       );
     }
     final seasonNumber =
@@ -1527,7 +1503,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                                 style: TextStyle(
                                     color: active
                                         ? Colors.white
-                                        : FlixieColors.light)),
+                                        : context.colors.light)),
                           ]))));
             }),
       ),
@@ -1550,8 +1526,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                         : 'Season ${selected.seasonNumber}'),
                 Text(
                     '${selected.watchedEpisodeCount} of ${selected.resolvedEpisodeCount} watched',
-                    style: const TextStyle(
-                        color: FlixieColors.light, fontSize: 12)),
+                    style:
+                        TextStyle(color: context.colors.light, fontSize: 12)),
               ],
             ),
           ),
@@ -1579,10 +1555,10 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
           ),
         ],
       ),
-      const Divider(color: FlixieColors.tabBarBorder),
+      Divider(color: context.colors.tabBarBorder),
       if (episodes.isEmpty)
-        const Text('No episodes available yet.',
-            style: TextStyle(color: FlixieColors.light)),
+        Text('No episodes available yet.',
+            style: TextStyle(color: context.colors.light)),
       for (final episode in episodes)
         _EpisodeCard(
             isNext: TvShowEpisodeProgress(show).nextReleased?.id == episode.id,
@@ -1610,12 +1586,16 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         .toList();
     final watched = seasonEpisodes.where((item) => item.watched).length;
     final total = seasonEpisodes.length;
-    const lavender = Color(0xFFC7B5FF);
-    const peach = Color(0xFFFFAD66);
+    final lavender = Theme.of(context).brightness == Brightness.light
+        ? context.colors.primaryText
+        : const Color(0xFFC7B5FF);
+    final peach = context.colors.tertiary;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 2),
       decoration: BoxDecoration(
-          color: const Color(0xFF211738),
+          color: Theme.of(context).brightness == Brightness.light
+              ? context.colors.surfaceElevated
+              : const Color(0xFF211738),
           borderRadius: BorderRadius.circular(16)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -1630,8 +1610,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
           const SizedBox(width: 10),
           Expanded(
               child: Text(progress.nextLabel,
-                  style: const TextStyle(
-                      color: Colors.white,
+                  style: TextStyle(
+                      color: context.colors.white,
                       fontSize: 18,
                       fontWeight: FontWeight.w700))),
         ]),
@@ -1647,8 +1627,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                     child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
                         child: hidden
-                            ? const ColoredBox(
-                                color: FlixieColors.surface,
+                            ? ColoredBox(
+                                color: context.colors.surface,
                                 child: Icon(Icons.visibility_off_outlined,
                                     color: lavender, size: 22))
                             : _EpisodeStill(path: episode.stillPath))),
@@ -1659,18 +1639,18 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                         children: [
                       Text(
                           'Season ${episode.seasonNumber} · Episode ${episode.episodeNumber}',
-                          style: const TextStyle(
-                              color: Colors.white,
+                          style: TextStyle(
+                              color: context.colors.white,
                               fontWeight: FontWeight.w600)),
                       const SizedBox(height: 4),
                       Text(hidden ? 'Spoilers tucked away' : episode.name,
-                          style: const TextStyle(color: FlixieColors.light)),
+                          style: TextStyle(color: context.colors.light)),
                       if (episode.runtime != null)
                         Text('${episode.runtime} min',
-                            style: const TextStyle(color: FlixieColors.light)),
+                            style: TextStyle(color: context.colors.light)),
                       if (next == null)
                         Text('Expected ${_dateLabel(episode.airDate)}',
-                            style: const TextStyle(color: FlixieColors.light)),
+                            style: TextStyle(color: context.colors.light)),
                     ])),
               ])),
         ],
@@ -1679,7 +1659,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
             next == null
                 ? '$watched of $total episodes watched'
                 : '$watched of $total watched this season',
-            style: const TextStyle(color: FlixieColors.light, fontSize: 13)),
+            style: TextStyle(color: context.colors.light, fontSize: 13)),
         if (total > 0) ...[
           const SizedBox(height: 8),
           LinearProgressIndicator(
@@ -1687,7 +1667,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
               minHeight: 6,
               borderRadius: BorderRadius.circular(6),
               color: lavender,
-              backgroundColor: FlixieColors.surface),
+              backgroundColor: context.colors.surface),
         ],
         if (next != null) ...[
           const SizedBox(height: 12),
@@ -1696,7 +1676,10 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
               child: FilledButton.icon(
                   style: FilledButton.styleFrom(
                       backgroundColor: lavender,
-                      foregroundColor: const Color(0xFF1A102B),
+                      foregroundColor:
+                          Theme.of(context).brightness == Brightness.light
+                              ? Colors.white
+                              : const Color(0xFF1A102B),
                       minimumSize: const Size(48, 46),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 12),
@@ -1793,12 +1776,12 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                                 season.seasonNumber == 0
                                     ? 'Specials'
                                     : season.name,
-                                style: const TextStyle(
-                                    color: Colors.white,
+                                style: TextStyle(
+                                    color: context.colors.white,
                                     fontWeight: FontWeight.w600)),
                             Text('${season.resolvedEpisodeCount} episodes',
-                                style: const TextStyle(
-                                    color: FlixieColors.light, fontSize: 12)),
+                                style: TextStyle(
+                                    color: context.colors.light, fontSize: 12)),
                           ]),
                       Text(
                           season.watchedEpisodeCount == 0
@@ -1808,15 +1791,15 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                                           season.resolvedEpisodeCount
                                   ? 'Watched'
                                   : '${season.watchedEpisodeCount} of ${season.resolvedEpisodeCount} watched',
-                          style: const TextStyle(
-                              color: FlixieColors.light, fontSize: 12)),
+                          style: TextStyle(
+                              color: context.colors.light, fontSize: 12)),
                     ])),
                 const SizedBox(width: 8),
-                const Icon(Icons.chevron_right,
-                    size: 18, color: FlixieColors.light),
+                Icon(Icons.chevron_right,
+                    size: 18, color: context.colors.light),
               ])),
         ),
-        const Divider(height: 1, color: FlixieColors.tabBarBorder),
+        Divider(height: 1, color: context.colors.tabBarBorder),
       ],
       if (show.seasons.length > 2)
         TextButton(
@@ -1832,7 +1815,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.background,
+      backgroundColor: context.colors.background,
       clipBehavior: Clip.antiAlias,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
@@ -1853,7 +1836,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                     AspectRatio(
                       aspectRatio: 16 / 9,
                       child: still == null
-                          ? const ColoredBox(color: FlixieColors.surface)
+                          ? ColoredBox(color: context.colors.surface)
                           : CachedNetworkImage(
                               imageUrl: still,
                               fit: BoxFit.cover,
@@ -1867,7 +1850,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                             end: Alignment.bottomCenter,
                             colors: [
                               Colors.black.withValues(alpha: 0.08),
-                              FlixieColors.background.withValues(alpha: 0.92),
+                              context.colors.background.withValues(alpha: 0.92),
                             ],
                           ),
                         ),
@@ -1918,8 +1901,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                       const SizedBox(height: 6),
                       Text(
                         episode.name,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: context.colors.white,
                           fontSize: 24,
                           fontWeight: FontWeight.w900,
                           height: 1.08,
@@ -1961,10 +1944,10 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                       ),
                       if ((episode.overview ?? '').isNotEmpty) ...[
                         const SizedBox(height: 22),
-                        const Text(
+                        Text(
                           'Overview',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: context.colors.white,
                             fontSize: 17,
                             fontWeight: FontWeight.w800,
                           ),
@@ -1972,8 +1955,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                         const SizedBox(height: 8),
                         Text(
                           episode.overview!,
-                          style: const TextStyle(
-                            color: FlixieColors.light,
+                          style: TextStyle(
+                            color: context.colors.light,
                             fontSize: 15,
                             height: 1.42,
                           ),
@@ -2017,7 +2000,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                 hasOptions
                     ? 'No ${_providerTabLabel(_watchProviderTab).toLowerCase()} options listed. Check the other options above.'
                     : 'No watch options listed yet.',
-                style: const TextStyle(color: FlixieColors.light))),
+                style: TextStyle(
+                    color: context.colors.light, fontSize: 14, height: 1.7))),
       if (providers.length > 2)
         TextButton(
             onPressed: () => _showAllProviderOptions(providers),
@@ -2039,8 +2023,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                 border: Border(
                     bottom: BorderSide(
                         color: selected
-                            ? FlixieColors.primaryText
-                            : FlixieColors.tabBarBorder,
+                            ? context.colors.primaryText
+                            : context.colors.tabBarBorder,
                         width: selected ? 3 : 1))),
             alignment: Alignment.center,
             child: ProviderTabLabel(
@@ -2116,9 +2100,9 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         provider: provider,
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 9),
-          decoration: const BoxDecoration(
-              border:
-                  Border(bottom: BorderSide(color: FlixieColors.tabBarBorder))),
+          decoration: BoxDecoration(
+              border: Border(
+                  bottom: BorderSide(color: context.colors.tabBarBorder))),
           child: Row(children: [
             Container(
                 width: 40,
@@ -2128,45 +2112,46 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                     borderRadius: BorderRadius.circular(7),
                     border: Border.all(
                         color: owned
-                            ? FlixieColors.success
-                            : FlixieColors.tabBarBorder,
+                            ? context.colors.success
+                            : context.colors.tabBarBorder,
                         width: owned ? 2 : 1)),
                 child: ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: provider.logoPath.isEmpty
-                        ? const Icon(Icons.tv, color: FlixieColors.light)
+                        ? Icon(Icons.tv, color: context.colors.light)
                         : CachedNetworkImage(
                             imageUrl: provider.logoUrl,
                             fit: BoxFit.cover,
-                            errorWidget: (_, __, ___) => const Icon(Icons.tv,
-                                color: FlixieColors.light)))),
+                            errorWidget: (_, __, ___) =>
+                                Icon(Icons.tv, color: context.colors.light)))),
             const SizedBox(width: 12),
             Expanded(
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                   Text(provider.providerName,
-                      style: const TextStyle(
-                          color: Colors.white,
+                      style: TextStyle(
+                          color: context.colors.white,
                           fontWeight: FontWeight.w600,
                           fontSize: 14)),
                   const SizedBox(height: 4),
                   Text(label,
                       style: TextStyle(
-                          color:
-                              owned ? FlixieColors.success : FlixieColors.light,
+                          color: owned
+                              ? context.colors.success
+                              : context.colors.light,
                           fontSize: 12)),
                 ])),
             if (owned)
-              const Padding(
-                  padding: EdgeInsets.only(left: 10),
+              Padding(
+                  padding: const EdgeInsets.only(left: 10),
                   child: Icon(Icons.check_circle,
-                      color: FlixieColors.success, size: 20)),
+                      color: context.colors.success, size: 20)),
             if (provider.verifiedWatchUri != null)
-              const Padding(
-                  padding: EdgeInsets.only(left: 12),
+              Padding(
+                  padding: const EdgeInsets.only(left: 12),
                   child: Icon(Icons.open_in_new,
-                      color: FlixieColors.primaryText, size: 18)),
+                      color: context.colors.primaryText, size: 18)),
           ]),
         ));
   }
@@ -2179,7 +2164,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       isScrollControlled: true,
       constraints:
           BoxConstraints.tightFor(width: MediaQuery.sizeOf(context).width),
-      backgroundColor: FlixieColors.background,
+      backgroundColor: context.colors.background,
       showDragHandle: true,
       builder: (sheetContext) => ConstrainedBox(
         constraints: BoxConstraints(
@@ -2194,19 +2179,19 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('${_providerTabLabel(_watchProviderTab)} options',
-                    style: const TextStyle(
-                        color: FlixieColors.white,
+                    style: TextStyle(
+                        color: context.colors.white,
                         fontSize: 18,
                         fontWeight: FontWeight.w800)),
                 const SizedBox(height: 12),
                 Column(
                   children: providers.map(_buildCompactProviderCard).toList(),
                 ),
-                const Padding(
-                    padding: EdgeInsets.only(top: 12),
+                Padding(
+                    padding: const EdgeInsets.only(top: 12),
                     child: Text('Availability by JustWatch · Opens TMDB',
                         style: TextStyle(
-                            color: FlixieColors.light, fontSize: 12))),
+                            color: context.colors.light, fontSize: 12))),
               ],
             ),
           ),
@@ -2232,7 +2217,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                   : Icons.star_outline_rounded,
               label: 'Rate',
               badge: _userRating != null ? '${_userRating!}/10' : null,
-              color: FlixieColors.tertiary,
+              color: context.colors.tertiary,
               isActive: _userRating != null,
               isLoading: _isRatingLoading,
               onTap: _updatingAction != null || _isRatingLoading
@@ -2244,7 +2229,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
             child: _statusActionItem(
               icon: _inWatchlist ? Icons.bookmark : Icons.bookmark_outline,
               label: 'Watchlist',
-              color: FlixieColors.warning,
+              color: context.colors.warning,
               isActive: _inWatchlist,
               isLoading: _updatingAction == _ShowAction.watchlist,
               onTap: _updatingAction != null ? null : _toggleWatchlist,
@@ -2254,7 +2239,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
             child: _statusActionItem(
               icon: _isFavorite ? Icons.favorite : Icons.favorite_outline,
               label: 'Favourite',
-              color: FlixieColors.danger,
+              color: context.colors.danger,
               isActive: _isFavorite,
               isLoading: _updatingAction == _ShowAction.favorite,
               onTap: _updatingAction != null ? null : _toggleFavorite,
@@ -2266,7 +2251,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                   ? Icons.playlist_add_check_rounded
                   : Icons.playlist_add_rounded,
               label: 'List',
-              color: FlixieColors.secondary,
+              color: context.colors.secondary,
               isActive: _myListsContainingShow.isNotEmpty,
               isLoading: _listsContainingShowLoading,
               onTap: _updatingAction != null ? null : _showAddToListSheet,
@@ -2314,58 +2299,13 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     required bool isLoading,
     required VoidCallback? onTap,
   }) {
-    final iconColor = isActive ? color : FlixieColors.medium;
-
-    return Tooltip(
-      message: label,
-      child: Semantics(
-        button: true,
+    return MediaDetailAction(
+        icon: icon,
         label: label,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 6),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: 38,
-                  height: 34,
-                  child: Center(
-                    child: isLoading
-                        ? SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(iconColor),
-                            ),
-                          )
-                        : Icon(icon, size: 27, color: iconColor),
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  child: Text(
-                    badge ?? label,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: isActive ? color : FlixieColors.light,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
-                      height: 1.05,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+        badge: badge,
+        isActive: isActive,
+        isLoading: isLoading,
+        onTap: onTap);
   }
 
   Widget _buildProgressSection(TvShow show) {
@@ -2401,8 +2341,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                       children: [
                         Text(
                           title,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: context.colors.white,
                             fontSize: 17,
                             fontWeight: FontWeight.w800,
                             height: 1.15,
@@ -2413,8 +2353,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                           total == 0
                               ? 'Episode progress is not available yet'
                               : '$watched of $total episodes watched',
-                          style: const TextStyle(
-                            color: FlixieColors.medium,
+                          style: TextStyle(
+                            color: context.colors.medium,
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
@@ -2423,25 +2363,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: FlixieColors.success.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: FlixieColors.success.withValues(alpha: 0.24),
-                      ),
-                    ),
-                    child: Text(
-                      percentLabel,
-                      style: const TextStyle(
-                        color: FlixieColors.success,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
+                  FlixiePill.label(label: Text(percentLabel)),
                 ],
               ),
               const SizedBox(height: 14),
@@ -2451,8 +2373,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                   value: total == 0 ? 0 : percent,
                   minHeight: 5,
                   backgroundColor: Colors.white.withValues(alpha: 0.08),
-                  valueColor:
-                      const AlwaysStoppedAnimation(FlixieColors.success),
+                  valueColor: AlwaysStoppedAnimation(context.colors.success),
                 ),
               ),
             ],
@@ -2480,7 +2401,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
       decoration: BoxDecoration(
-        color: FlixieColors.surface.withValues(alpha: 0.85),
+        color: context.colors.surface.withValues(alpha: 0.85),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
         boxShadow: [
@@ -2496,23 +2417,23 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Your show dashboard',
                       style: TextStyle(
-                        color: FlixieColors.white,
+                        color: context.colors.white,
                         fontSize: 17,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    SizedBox(height: 3),
+                    const SizedBox(height: 3),
                     Text(
                       'Ratings, status, and episode progress in one place.',
                       style: TextStyle(
-                        color: FlixieColors.medium,
+                        color: context.colors.medium,
                         fontSize: 12,
                       ),
                     ),
@@ -2523,9 +2444,9 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
               IconButton(
                 tooltip: 'About FlixScore',
                 onPressed: () => _showFlixScoreInfo(context),
-                icon: const Icon(
+                icon: Icon(
                   Icons.info_outline_rounded,
-                  color: FlixieColors.medium,
+                  color: context.colors.medium,
                   size: 20,
                 ),
               ),
@@ -2549,14 +2470,14 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                   title: 'Ratings',
                   value: _formatVoteCount(voteCount),
                   icon: Icons.people_outline_rounded,
-                  color: FlixieColors.tertiary,
+                  color: context.colors.tertiary,
                   onTap: () => _showFlixScoreInfo(context),
                 ),
                 _DashboardTile(
                   title: 'Your rating',
                   value: _userRating != null ? '${_userRating!}/10' : '+ Rate',
                   icon: Icons.star_rounded,
-                  color: FlixieColors.warning,
+                  color: context.colors.warning,
                   onTap: _isRatingLoading ? null : _showRatingSheet,
                 ),
                 if (_userRating != null)
@@ -2564,7 +2485,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                     title: 'Share your rating',
                     value: '${_userRating!}/10',
                     icon: Icons.ios_share_rounded,
-                    color: FlixieColors.primaryText,
+                    color: context.colors.primaryText,
                     onTap: () {
                       final user = context.read<AuthProvider>().dbUser;
                       if (user == null) return;
@@ -2596,10 +2517,10 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                           ? Icons.bookmark_rounded
                           : Icons.radio_button_unchecked_rounded,
                   color: _isWatched
-                      ? FlixieColors.success
+                      ? context.colors.success
                       : _inWatchlist
-                          ? FlixieColors.warning
-                          : FlixieColors.medium,
+                          ? context.colors.warning
+                          : context.colors.medium,
                 ),
                 _DashboardTile(
                   title: 'Episodes',
@@ -2607,7 +2528,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                       ? 'No episodes'
                       : '$watched/$totalEpisodes',
                   icon: Icons.tv_rounded,
-                  color: FlixieColors.light,
+                  color: context.colors.light,
                 ),
               ];
 
@@ -2667,7 +2588,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         ]),
         Text(
           '${summary.friendCount} ${summary.friendCount == 1 ? 'friend' : 'friends'} interacted',
-          style: const TextStyle(color: FlixieColors.medium, fontSize: 11),
+          style: TextStyle(color: context.colors.medium, fontSize: 11),
         ),
         const SizedBox(height: 10),
         if (summary.friendCount > 3)
@@ -2675,7 +2596,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
-                color: FlixieColors.surface.withValues(alpha: 0.58),
+                color: context.colors.surface.withValues(alpha: 0.58),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.white.withValues(alpha: 0.1))),
             child: Row(
@@ -2713,14 +2634,14 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
   Widget _showFriendMetric(int value, String label) => Expanded(
         child: Column(children: [
           Text('$value',
-              style: const TextStyle(
-                  color: Colors.white,
+              style: TextStyle(
+                  color: context.colors.white,
                   fontSize: 14,
                   fontWeight: FontWeight.w800)),
           Text(label,
               maxLines: 1,
               overflow: TextOverflow.fade,
-              style: const TextStyle(color: FlixieColors.medium, fontSize: 9)),
+              style: TextStyle(color: context.colors.medium, fontSize: 9)),
         ]),
       );
 
@@ -2762,28 +2683,28 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         maxChildSize: .92,
         builder: (context, controller) => Container(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          decoration: const BoxDecoration(
-              color: FlixieColors.background,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          decoration: BoxDecoration(
+              color: context.colors.background,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(20))),
           child: Column(children: [
             Container(
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                    color: FlixieColors.medium,
+                    color: context.colors.medium,
                     borderRadius: BorderRadius.circular(2))),
             const SizedBox(height: 14),
             Row(children: [
               Expanded(
                   child: Text('${summary.friendCount} friends interacted',
-                      style: const TextStyle(
-                          color: Colors.white,
+                      style: TextStyle(
+                          color: context.colors.white,
                           fontSize: 18,
                           fontWeight: FontWeight.w800))),
               IconButton(
                   onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close_rounded,
-                      color: FlixieColors.light)),
+                  icon: Icon(Icons.close_rounded, color: context.colors.light)),
             ]),
             Expanded(
                 child: ListView(
@@ -2886,54 +2807,26 @@ class _ShowScoreBadge extends StatelessWidget {
     final voteCount = show.voteCount ?? 0;
     final hasScore = score != null && score > 0 && voteCount > 0;
     final color = !hasScore
-        ? FlixieColors.medium
+        ? context.colors.medium
         : score >= 8
-            ? FlixieColors.success
+            ? context.colors.success
             : score >= 7
-                ? FlixieColors.tertiary
+                ? context.colors.tertiary
                 : score >= 6
-                    ? FlixieColors.warning
-                    : FlixieColors.danger;
+                    ? context.colors.warning
+                    : context.colors.danger;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(999),
         onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.48),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: color.withValues(alpha: 0.65)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.star_rounded, color: color, size: 17),
-              const SizedBox(width: 6),
-              Text(
-                hasScore
-                    ? '${score.toStringAsFixed(1)}/10'
-                    : 'No FlixScore yet',
-                style: const TextStyle(
-                  color: FlixieColors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(width: 6),
-              const Text(
-                'FlixScore',
-                style: TextStyle(
-                  color: FlixieColors.light,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
+        child: FlixiePill.label(
+            compact: false,
+            avatar: Icon(Icons.star_rounded, color: color),
+            label: Text(hasScore
+                ? '${score.toStringAsFixed(1)}/10  FlixScore'
+                : 'No FlixScore yet')),
       ),
     );
   }
@@ -2954,8 +2847,8 @@ class _InfoCell extends StatelessWidget {
         children: [
           Text(
             label.toUpperCase(),
-            style: const TextStyle(
-              color: _ShowDetailScreenState._textSecondary,
+            style: TextStyle(
+              color: context.colors.light,
               fontSize: 10,
               fontWeight: FontWeight.w900,
             ),
@@ -2965,8 +2858,8 @@ class _InfoCell extends StatelessWidget {
             (value == null || value!.isEmpty) ? '-' : value!,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: context.colors.white,
               fontSize: 13,
               fontWeight: FontWeight.w800,
             ),
@@ -2998,7 +2891,7 @@ class _DashboardTile extends StatelessWidget {
       constraints: const BoxConstraints(minHeight: 86),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: FlixieColors.tabBarBackgroundFocused.withValues(alpha: 0.72),
+        color: context.colors.tabBarBackgroundFocused.withValues(alpha: 0.72),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
       ),
@@ -3011,8 +2904,8 @@ class _DashboardTile extends StatelessWidget {
             value,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: FlixieColors.white,
+            style: TextStyle(
+              color: context.colors.white,
               fontSize: 15,
               fontWeight: FontWeight.w800,
               height: 1.08,
@@ -3023,8 +2916,8 @@ class _DashboardTile extends StatelessWidget {
             title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: FlixieColors.medium,
+            style: TextStyle(
+              color: context.colors.medium,
               fontSize: 11,
               fontWeight: FontWeight.w700,
             ),
@@ -3059,42 +2952,8 @@ class _CompactPillButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: FlixieColors.primary.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: FlixieColors.primary.withValues(alpha: 0.4),
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                color: FlixieColors.primary,
-                size: 17,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: FlixieColors.primary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    return FlixiePill.action(
+        label: Text(label), avatar: Icon(icon), onPressed: onTap);
   }
 }
 
@@ -3117,7 +2976,7 @@ class _EpisodeCard extends StatelessWidget {
     final date = DateTime.tryParse(episode.airDate ?? '');
     final upcoming = date != null && date.isAfter(DateTime.now());
     return ColoredBox(
-        color: isNext ? FlixieColors.surfaceElevated : Colors.transparent,
+        color: isNext ? context.colors.surfaceElevated : Colors.transparent,
         child: Column(children: [
           Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
@@ -3132,11 +2991,11 @@ class _EpisodeCard extends StatelessWidget {
                               child: ClipRRect(
                                   borderRadius: BorderRadius.circular(5),
                                   child: hideSpoilers
-                                      ? const ColoredBox(
-                                          color: FlixieColors.surface,
+                                      ? ColoredBox(
+                                          color: context.colors.surface,
                                           child: Icon(
                                               Icons.visibility_off_outlined,
-                                              color: FlixieColors.light))
+                                              color: context.colors.light))
                                       : _EpisodeStill(
                                           path: episode.stillPath))),
                           const SizedBox(width: 12),
@@ -3146,16 +3005,16 @@ class _EpisodeCard extends StatelessWidget {
                                   children: [
                                 Text(
                                     '${isNext ? 'Up next · ' : ''}Episode ${episode.episodeNumber}',
-                                    style: const TextStyle(
-                                        color: FlixieColors.light,
+                                    style: TextStyle(
+                                        color: context.colors.light,
                                         fontSize: 11)),
                                 const SizedBox(height: 4),
                                 Text(
                                     hideSpoilers
                                         ? 'Title hidden'
                                         : episode.name,
-                                    style: const TextStyle(
-                                        color: Colors.white,
+                                    style: TextStyle(
+                                        color: context.colors.white,
                                         fontWeight: FontWeight.w600,
                                         fontSize: 14)),
                                 const SizedBox(height: 5),
@@ -3167,8 +3026,8 @@ class _EpisodeCard extends StatelessWidget {
                                             : episode.watched
                                                 ? 'Watched'
                                                 : 'Not watched',
-                                    style: const TextStyle(
-                                        color: FlixieColors.light,
+                                    style: TextStyle(
+                                        color: context.colors.light,
                                         fontSize: 12)),
                               ])),
                         ]))),
@@ -3193,7 +3052,7 @@ class _EpisodeCard extends StatelessWidget {
                           shape: const CircleBorder(),
                           materialTapTargetSize: MaterialTapTargetSize.padded)),
               ])),
-          const Divider(height: 1, color: FlixieColors.tabBarBorder),
+          Divider(height: 1, color: context.colors.tabBarBorder),
         ]));
   }
 }
@@ -3209,29 +3068,7 @@ class _EpisodeInfoChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: FlixieColors.medium, size: 14),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: const TextStyle(
-              color: FlixieColors.light,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
+    return FlixiePill.label(label: Text(label), avatar: Icon(icon));
   }
 }
 
@@ -3259,7 +3096,7 @@ class _CastTile extends StatelessWidget {
                 width: width,
                 height: width * 1.5,
                 child: image == null
-                    ? const ColoredBox(color: _ShowDetailScreenState._card)
+                    ? ColoredBox(color: context.colors.surface)
                     : CachedNetworkImage(imageUrl: image, fit: BoxFit.cover),
               ),
             ),
@@ -3270,8 +3107,8 @@ class _CastTile extends StatelessWidget {
                 credit.name,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    color: Colors.white,
+                style: TextStyle(
+                    color: context.colors.white,
                     fontWeight: FontWeight.w800,
                     fontSize: 15,
                     height: 1.16),
@@ -3283,8 +3120,7 @@ class _CastTile extends StatelessWidget {
                 credit.character ?? credit.role ?? '',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    color: _ShowDetailScreenState._textSecondary, fontSize: 13),
+                style: TextStyle(color: context.colors.light, fontSize: 13),
               ),
             ],
           ],
@@ -3317,7 +3153,7 @@ class _SimilarShowCard extends StatelessWidget {
                 width: 180,
                 height: 102,
                 child: (backdrop ?? fallbackPoster) == null
-                    ? const ColoredBox(color: _ShowDetailScreenState._card)
+                    ? ColoredBox(color: context.colors.surface)
                     : CachedNetworkImage(
                         imageUrl: backdrop ?? fallbackPoster!,
                         fit: BoxFit.cover,
@@ -3329,13 +3165,12 @@ class _SimilarShowCard extends StatelessWidget {
               show.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.w900),
+              style: TextStyle(
+                  color: context.colors.white, fontWeight: FontWeight.w900),
             ),
             Text(
               '${show.voteAverage?.toStringAsFixed(1) ?? '-'} • ${show.numberOfSeasons ?? show.seasons.length} Seasons',
-              style: const TextStyle(
-                  color: _ShowDetailScreenState._textSecondary, fontSize: 12),
+              style: TextStyle(color: context.colors.light, fontSize: 12),
             ),
           ],
         ),
@@ -3359,7 +3194,7 @@ class _FriendActivityList extends StatelessWidget {
         Text(
           'Friends Activity',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: FlixieColors.white,
+                color: context.colors.white,
                 fontWeight: FontWeight.bold,
               ),
         ),
@@ -3368,7 +3203,7 @@ class _FriendActivityList extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: FlixieColors.surface.withValues(alpha: 0.85),
+            color: context.colors.surface.withValues(alpha: 0.85),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
           ),
@@ -3378,20 +3213,19 @@ class _FriendActivityList extends StatelessWidget {
                 contentPadding: EdgeInsets.zero,
                 leading: CircleAvatar(
                   backgroundColor:
-                      _ShowDetailScreenState._accent.withValues(alpha: 0.24),
+                      context.colors.primaryText.withValues(alpha: 0.24),
                   child: Text(activity.userName.characters.first.toUpperCase()),
                 ),
                 title: Text(
                   '${activity.userName} ${activity.details ?? activity.action}',
-                  style: const TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.w800),
+                  style: TextStyle(
+                      color: context.colors.white, fontWeight: FontWeight.w800),
                 ),
                 subtitle: activity.rating == null
                     ? null
                     : Text(
                         '${activity.rating!.toStringAsFixed(0)}/10',
-                        style: const TextStyle(
-                            color: _ShowDetailScreenState._textSecondary),
+                        style: TextStyle(color: context.colors.light),
                       ),
               );
             }).toList(),
@@ -3424,12 +3258,12 @@ class _ShowTabsHeaderDelegate extends SliverPersistentHeaderDelegate {
       _ShowDetailTab.activity: 'My Activity',
     };
     return ColoredBox(
-      color: FlixieColors.background,
+      color: context.colors.background,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
         decoration: BoxDecoration(
-          border: Border(
-              bottom: BorderSide(color: Colors.white.withValues(alpha: .12))),
+          border:
+              Border(bottom: BorderSide(color: context.colors.tabBarBorder)),
         ),
         clipBehavior: Clip.antiAlias,
         child: ListView(
@@ -3447,7 +3281,7 @@ class _ShowTabsHeaderDelegate extends SliverPersistentHeaderDelegate {
                   border: Border(
                       bottom: BorderSide(
                           color: active
-                              ? FlixieColors.primaryText
+                              ? context.colors.primaryText
                               : Colors.transparent,
                           width: 3)),
                 ),
@@ -3456,7 +3290,9 @@ class _ShowTabsHeaderDelegate extends SliverPersistentHeaderDelegate {
                     button: true,
                     child: Text(entry.value,
                         style: TextStyle(
-                          color: active ? Colors.white : FlixieColors.light,
+                          color: active
+                              ? context.colors.textPrimary
+                              : context.colors.light,
                           fontWeight:
                               active ? FontWeight.w800 : FontWeight.w500,
                         ))),
@@ -3590,8 +3426,9 @@ class _ImageFallback extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ColoredBox(
-        color: FlixieColors.surface,
-        child: Center(child: Icon(icon, color: FlixieColors.medium, size: 30)),
+        color: context.colors.surface,
+        child:
+            Center(child: Icon(icon, color: context.colors.medium, size: 30)),
       );
 }
 
@@ -3600,22 +3437,9 @@ class _StatusChip extends StatelessWidget {
   final String label;
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-        decoration: BoxDecoration(
-          color: FlixieColors.success.withValues(alpha: .1),
-          borderRadius: BorderRadius.circular(8),
-          border:
-              Border.all(color: FlixieColors.success.withValues(alpha: .55)),
-        ),
-        child: Text(label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-                color: FlixieColors.success,
-                fontSize: 11,
-                fontWeight: FontWeight.w700)),
-      );
+  Widget build(BuildContext context) {
+    return FlixiePill.label(label: Text(label));
+  }
 }
 
 class _ErrorState extends StatelessWidget {
@@ -3632,13 +3456,12 @@ class _ErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline,
-                color: FlixieColors.danger, size: 44),
+            Icon(Icons.error_outline, color: context.colors.danger, size: 44),
             const SizedBox(height: 12),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: FlixieColors.light),
+              style: TextStyle(color: context.colors.light),
             ),
             const SizedBox(height: 16),
             ElevatedButton(onPressed: onRetry, child: const Text('Retry')),

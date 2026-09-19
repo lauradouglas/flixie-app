@@ -28,8 +28,8 @@ class MediaReviewsSection extends StatelessWidget {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Text(reviews.isEmpty ? 'Reviews' : 'Reviews ${reviews.length}',
-                    style: const TextStyle(
-                        color: FlixieColors.white,
+                    style: TextStyle(
+                        color: context.colors.white,
                         fontSize: 20,
                         fontWeight: FontWeight.w800)),
                 TextButton.icon(
@@ -39,20 +39,21 @@ class MediaReviewsSection extends StatelessWidget {
               ]),
           const SizedBox(height: 12),
           if (loading)
-            const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
+            Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Text('Loading reviews…',
-                    style: TextStyle(color: FlixieColors.light)))
+                    style: TextStyle(color: context.colors.light)))
           else if (failed)
             TextButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh),
                 label: const Text('Couldn’t load reviews · Retry'))
           else if (reviews.isEmpty)
-            const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
+            Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Text('No reviews yet. What did you think?',
-                    style: TextStyle(color: FlixieColors.light, fontSize: 13))),
+                    style:
+                        TextStyle(color: context.colors.light, fontSize: 13))),
           for (final review in reviews.take(4))
             ReviewCard(
                 key: ValueKey(review.id),
@@ -70,7 +71,7 @@ class MediaReviewsSection extends StatelessWidget {
         useRootNavigator: true,
         useSafeArea: true,
         isScrollControlled: true,
-        backgroundColor: FlixieColors.background,
+        backgroundColor: context.colors.background,
         builder: (context) => SizedBox(
             height: MediaQuery.sizeOf(context).height * .85,
             child: Column(children: [
@@ -79,8 +80,8 @@ class MediaReviewsSection extends StatelessWidget {
                   child: Row(children: [
                     Expanded(
                         child: Text('All Reviews (${reviews.length})',
-                            style: const TextStyle(
-                                color: FlixieColors.white,
+                            style: TextStyle(
+                                color: context.colors.white,
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold))),
                     IconButton(
@@ -88,7 +89,7 @@ class MediaReviewsSection extends StatelessWidget {
                         onPressed: () => Navigator.pop(context),
                         icon: const Icon(Icons.close)),
                   ])),
-              const Divider(height: 1, color: FlixieColors.tabBarBorder),
+              Divider(height: 1, color: context.colors.tabBarBorder),
               Expanded(
                   child: ListView.builder(
                       padding: const EdgeInsets.all(16),

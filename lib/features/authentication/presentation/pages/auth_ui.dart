@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'dart:ui';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -155,7 +156,7 @@ class AuthScaffold extends StatelessWidget {
                               Text(
                                 topLabel,
                                 style: textTheme.headlineSmall?.copyWith(
-                                  color: FlixieColors.textPrimary,
+                                  color: context.colors.textPrimary,
                                   fontWeight: FontWeight.w700,
                                 ),
                                 textAlign: TextAlign.center,
@@ -166,7 +167,7 @@ class AuthScaffold extends StatelessWidget {
                               Text(
                                 subtitle,
                                 style: textTheme.titleMedium?.copyWith(
-                                  color: FlixieColors.light
+                                  color: context.colors.light
                                       .withValues(alpha: 0.92),
                                   height: 1.35,
                                 ),
@@ -212,10 +213,10 @@ class AuthCard extends StatelessWidget {
         child: Container(
           padding: padding,
           decoration: BoxDecoration(
-            color: FlixieColors.surfaceElevated.withValues(alpha: 0.84),
+            color: context.colors.surfaceElevated.withValues(alpha: 0.84),
             borderRadius: BorderRadius.circular(28),
             border: Border.all(
-              color: FlixieColors.tabBarBorder.withValues(alpha: 0.7),
+              color: context.colors.tabBarBorder.withValues(alpha: 0.7),
             ),
             boxShadow: [
               BoxShadow(
@@ -370,9 +371,9 @@ class PasswordStrengthBar extends StatelessWidget {
       PasswordStrengthLevel.strong => 'Strong',
     };
     final color = switch (strength) {
-      PasswordStrengthLevel.weak => FlixieColors.danger,
-      PasswordStrengthLevel.medium => FlixieColors.warning,
-      PasswordStrengthLevel.strong => FlixieColors.success,
+      PasswordStrengthLevel.weak => context.colors.danger,
+      PasswordStrengthLevel.medium => context.colors.warning,
+      PasswordStrengthLevel.strong => context.colors.success,
     };
 
     return Row(
@@ -389,7 +390,7 @@ class PasswordStrengthBar extends StatelessWidget {
                     borderRadius: BorderRadius.circular(999),
                     color: active
                         ? color
-                        : FlixieColors.tabBarBorder.withValues(alpha: 0.8),
+                        : context.colors.tabBarBorder.withValues(alpha: 0.8),
                   ),
                 ),
               );
@@ -400,7 +401,7 @@ class PasswordStrengthBar extends StatelessWidget {
         Text(
           password.isEmpty ? 'Weak' : label,
           style: TextStyle(
-            color: password.isEmpty ? FlixieColors.light : color,
+            color: password.isEmpty ? context.colors.light : color,
             fontWeight: FontWeight.w600,
             fontSize: 12,
           ),
@@ -454,7 +455,7 @@ class _PasswordFieldState extends State<PasswordField> {
         onPressed: () => setState(() => _obscure = !_obscure),
         icon: Icon(
           _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-          color: FlixieColors.light,
+          color: context.colors.light,
         ),
       ),
     );
@@ -492,11 +493,12 @@ class _AuthTextFieldState extends State<AuthTextField> {
           obscureText: widget.obscureText,
           autofillHints: widget.autofillHints,
           textCapitalization: widget.textCapitalization,
-          style: const TextStyle(
-            color: FlixieColors.textPrimary,
+          style: TextStyle(
+            color: context.colors.textPrimary,
             fontSize: 16,
           ),
           decoration: buildAuthInputDecoration(
+            context,
             label: widget.label,
             prefixIcon: widget.prefixIcon,
             suffixIcon: widget.suffixIcon,
@@ -508,7 +510,8 @@ class _AuthTextFieldState extends State<AuthTextField> {
   }
 }
 
-InputDecoration buildAuthInputDecoration({
+InputDecoration buildAuthInputDecoration(
+  BuildContext context, {
   required String label,
   IconData? prefixIcon,
   Widget? suffixIcon,
@@ -519,24 +522,25 @@ InputDecoration buildAuthInputDecoration({
     hintText: label,
     floatingLabelBehavior: FloatingLabelBehavior.never,
     hintStyle: TextStyle(
-      color: FlixieColors.light.withValues(alpha: 0.86),
+      color: context.colors.light.withValues(alpha: 0.86),
       fontSize: 16,
     ),
     labelStyle: TextStyle(
-      color: FlixieColors.light.withValues(alpha: 0.86),
+      color: context.colors.light.withValues(alpha: 0.86),
       fontSize: 16,
     ),
     filled: true,
     fillColor: (isFocused
-            ? FlixieColors.surfaceElevated
-            : FlixieColors.tabBarBackgroundFocused)
+            ? context.colors.surfaceElevated
+            : context.colors.tabBarBackgroundFocused)
         .withValues(alpha: 0.9),
     prefixIcon: prefixIcon == null
         ? null
         : Icon(
             prefixIcon,
             size: 22,
-            color: isFocused ? FlixieColors.primaryTint : FlixieColors.medium,
+            color:
+                isFocused ? context.colors.primaryTint : context.colors.medium,
           ),
     suffixIcon: suffixIcon,
     contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
@@ -547,7 +551,7 @@ InputDecoration buildAuthInputDecoration({
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(18),
       borderSide: BorderSide(
-        color: FlixieColors.tabBarBorder.withValues(alpha: 0.9),
+        color: context.colors.tabBarBorder.withValues(alpha: 0.9),
       ),
     ),
     focusedBorder: OutlineInputBorder(
@@ -559,11 +563,11 @@ InputDecoration buildAuthInputDecoration({
     ),
     errorBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(18),
-      borderSide: const BorderSide(color: FlixieColors.danger),
+      borderSide: BorderSide(color: context.colors.danger),
     ),
     focusedErrorBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(18),
-      borderSide: const BorderSide(color: FlixieColors.danger, width: 1.4),
+      borderSide: BorderSide(color: context.colors.danger, width: 1.4),
     ),
   );
 }
@@ -674,47 +678,8 @@ class AuthChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOut,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: selected
-                  ? FlixieColors.primary
-                  : FlixieColors.tabBarBorder.withValues(alpha: 0.9),
-              width: selected ? 1.4 : 1,
-            ),
-            color: selected
-                ? FlixieColors.primary.withValues(alpha: 0.16)
-                : FlixieColors.tabBarBackgroundFocused.withValues(alpha: 0.9),
-            boxShadow: [
-              if (selected)
-                BoxShadow(
-                  color: FlixieColors.primary.withValues(alpha: 0.14),
-                  blurRadius: 14,
-                  spreadRadius: 0.5,
-                ),
-            ],
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color:
-                  selected ? FlixieColors.textPrimary : FlixieColors.lightTint,
-              fontSize: 14,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-            ),
-          ),
-        ),
-      ),
-    );
+    return FlixiePill.choice(
+        label: Text(label), selected: selected, onSelected: (_) => onTap());
   }
 }
 
@@ -759,17 +724,17 @@ class MovieSelectionCard extends StatelessWidget {
             height: 122,
             child: movie.poster == null
                 ? Container(
-                    color: FlixieColors.surfaceElevated,
-                    child: const Icon(Icons.movie_outlined,
-                        color: FlixieColors.light),
+                    color: context.colors.surfaceElevated,
+                    child:
+                        Icon(Icons.movie_outlined, color: context.colors.light),
                   )
                 : CachedNetworkImage(
                     imageUrl: '$posterBaseUrl${movie.poster}',
                     fit: BoxFit.cover,
                     errorWidget: (_, __, ___) => Container(
-                      color: FlixieColors.surfaceElevated,
-                      child: const Icon(Icons.movie_outlined,
-                          color: FlixieColors.light),
+                      color: context.colors.surfaceElevated,
+                      child: Icon(Icons.movie_outlined,
+                          color: context.colors.light),
                     ),
                   ),
           ),
@@ -869,7 +834,7 @@ class _MovieSearchSheetState extends State<MovieSearchSheet> {
             Text(
               widget.title,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: FlixieColors.textPrimary,
+                    color: context.colors.textPrimary,
                     fontWeight: FontWeight.w700,
                   ),
             ),
@@ -877,8 +842,8 @@ class _MovieSearchSheetState extends State<MovieSearchSheet> {
               const SizedBox(height: 4),
               Text(
                 widget.initialResultsLabel!,
-                style: const TextStyle(
-                  color: FlixieColors.medium,
+                style: TextStyle(
+                  color: context.colors.medium,
                   fontSize: 13,
                 ),
               ),
@@ -945,7 +910,7 @@ class OnboardingProgressIndicator extends StatelessWidget {
                   : null,
               color: active
                   ? null
-                  : FlixieColors.tabBarBorder.withValues(alpha: 0.75),
+                  : context.colors.tabBarBorder.withValues(alpha: 0.75),
             ),
           ),
         );
@@ -991,7 +956,7 @@ class SecondaryButton extends StatelessWidget {
     return OutlinedButton(
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
-        foregroundColor: FlixieColors.textPrimary,
+        foregroundColor: context.colors.textPrimary,
         side: BorderSide(color: Colors.white.withValues(alpha: 0.25)),
         minimumSize: const Size.fromHeight(52),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
@@ -1021,9 +986,9 @@ class _AuthBackButton extends StatelessWidget {
             shape: BoxShape.circle,
             border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
           ),
-          child: const Icon(
+          child: Icon(
             Icons.arrow_back_rounded,
-            color: FlixieColors.textPrimary,
+            color: context.colors.textPrimary,
           ),
         ),
       ),
@@ -1037,15 +1002,17 @@ class _AuthBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF170B32),
-            Color(0xFF28104D),
-            Color(0xFF120821),
-          ],
+          colors: Theme.of(context).brightness == Brightness.light
+              ? [
+                  context.colors.background,
+                  context.colors.surfaceElevated,
+                  context.colors.background
+                ]
+              : const [Color(0xFF170B32), Color(0xFF28104D), Color(0xFF120821)],
         ),
       ),
       child: Stack(
@@ -1071,7 +1038,7 @@ class _AuthBackground extends StatelessWidget {
             bottom: -90,
             right: -70,
             child: _buildGlow(
-              color: FlixieColors.primaryTint.withValues(alpha: 0.16),
+              color: context.colors.primaryTint.withValues(alpha: 0.16),
               size: 260,
             ),
           ),

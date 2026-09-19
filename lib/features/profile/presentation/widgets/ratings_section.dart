@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -19,7 +20,7 @@ class RatingsSection extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.tabBarBackgroundFocused,
+      backgroundColor: context.colors.tabBarBackgroundFocused,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -39,8 +40,8 @@ class RatingsSection extends StatelessWidget {
           title: 'My ratings',
           uppercase: false,
           accentHeight: 22,
-          titleStyle: const TextStyle(
-            color: FlixieColors.white,
+          titleStyle: TextStyle(
+            color: context.colors.white,
             fontSize: 18,
             fontWeight: FontWeight.w800,
             letterSpacing: .5,
@@ -55,7 +56,8 @@ class RatingsSection extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 12),
             child: Text(
               'No ratings yet.',
-              style: textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
+              style:
+                  textTheme.bodySmall?.copyWith(color: context.colors.medium),
             ),
           )
         else ...[
@@ -107,10 +109,10 @@ class _RatingCard extends StatelessWidget {
                       : Container(
                           width: 100,
                           height: 150,
-                          color: FlixieColors.tabBarBorder,
-                          child: const Icon(
+                          color: context.colors.tabBarBorder,
+                          child: Icon(
                             Icons.movie,
-                            color: FlixieColors.medium,
+                            color: context.colors.medium,
                             size: 40,
                           ),
                         ),
@@ -118,33 +120,9 @@ class _RatingCard extends StatelessWidget {
                 Positioned(
                   top: 4,
                   right: 4,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.7),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.star,
-                          color: FlixieColors.tertiary,
-                          size: 12,
-                        ),
-                        const SizedBox(width: 2),
-                        Text(
-                          '${rating.rating}',
-                          style: const TextStyle(
-                            color: FlixieColors.light,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  child: FlixiePill.label(
+                      label: Text('${rating.rating}'),
+                      avatar: Icon(Icons.star, color: context.colors.tertiary)),
                 ),
               ],
             ),
@@ -155,8 +133,8 @@ class _RatingCard extends StatelessWidget {
                 movie?.title ?? 'Unknown',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: FlixieColors.light,
+                style: TextStyle(
+                  color: context.colors.light,
                   fontSize: 12,
                 ),
               ),
@@ -223,7 +201,7 @@ class _AllRatingsSheetState extends State<_AllRatingsSheet> {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: FlixieColors.medium.withValues(alpha: 0.4),
+              color: context.colors.medium.withValues(alpha: 0.4),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -239,21 +217,7 @@ class _AllRatingsSheetState extends State<_AllRatingsSheet> {
                   ),
                 ),
                 const Spacer(),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: FlixieColors.tertiary.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '${widget.ratings.length}',
-                    style: const TextStyle(
-                      color: FlixieColors.tertiary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
+                FlixiePill.label(label: Text('${widget.ratings.length}')),
               ],
             ),
           ),
@@ -262,15 +226,14 @@ class _AllRatingsSheetState extends State<_AllRatingsSheet> {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: TextField(
               controller: _searchController,
-              style: const TextStyle(color: FlixieColors.light),
+              style: TextStyle(color: context.colors.light),
               decoration: InputDecoration(
                 hintText: 'Search ratings...',
                 hintStyle: TextStyle(
-                    color: FlixieColors.medium.withValues(alpha: 0.6)),
-                prefixIcon:
-                    const Icon(Icons.search, color: FlixieColors.medium),
+                    color: context.colors.medium.withValues(alpha: 0.6)),
+                prefixIcon: Icon(Icons.search, color: context.colors.medium),
                 filled: true,
-                fillColor: FlixieColors.tabBarBorder.withValues(alpha: 0.3),
+                fillColor: context.colors.tabBarBorder.withValues(alpha: 0.3),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
@@ -291,7 +254,7 @@ class _AllRatingsSheetState extends State<_AllRatingsSheet> {
                           ? 'No ratings yet.'
                           : 'No ratings found.',
                       style: textTheme.bodyMedium?.copyWith(
-                        color: FlixieColors.medium,
+                        color: context.colors.medium,
                       ),
                     ),
                   )
@@ -333,7 +296,7 @@ class _RatingListTile extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: FlixieColors.tabBarBorder.withValues(alpha: 0.2),
+            color: context.colors.tabBarBorder.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -350,10 +313,10 @@ class _RatingListTile extends StatelessWidget {
                     : Container(
                         width: 50,
                         height: 75,
-                        color: FlixieColors.tabBarBorder,
-                        child: const Icon(
+                        color: context.colors.tabBarBorder,
+                        child: Icon(
                           Icons.movie,
-                          color: FlixieColors.medium,
+                          color: context.colors.medium,
                           size: 24,
                         ),
                       ),
@@ -365,8 +328,8 @@ class _RatingListTile extends StatelessWidget {
                   children: [
                     Text(
                       movie?.title ?? 'Unknown',
-                      style: const TextStyle(
-                        color: FlixieColors.light,
+                      style: TextStyle(
+                        color: context.colors.light,
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                       ),
@@ -377,8 +340,8 @@ class _RatingListTile extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         movie!.releaseDate!.split('-')[0],
-                        style: const TextStyle(
-                          color: FlixieColors.medium,
+                        style: TextStyle(
+                          color: context.colors.medium,
                           fontSize: 13,
                         ),
                       ),
@@ -387,33 +350,9 @@ class _RatingListTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: FlixieColors.primary.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.star,
-                      color: FlixieColors.tertiary,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${rating.rating}',
-                      style: const TextStyle(
-                        color: FlixieColors.light,
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              FlixiePill.label(
+                  label: Text('${rating.rating}'),
+                  avatar: Icon(Icons.star, color: context.colors.tertiary)),
             ],
           ),
         ),

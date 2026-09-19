@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -242,20 +243,19 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: FlixieColors.background,
+        backgroundColor: context.colors.background,
         elevation: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Watch History',
+            Text('Watch History',
                 style: TextStyle(
-                    color: Colors.white,
+                    color: context.colors.white,
                     fontSize: 22,
                     fontWeight: FontWeight.bold)),
             if (!_loading)
               Text('${_all.length} movies watched',
-                  style: const TextStyle(
-                      color: FlixieColors.medium, fontSize: 12)),
+                  style: TextStyle(color: context.colors.medium, fontSize: 12)),
           ],
         ),
         actions: [
@@ -263,15 +263,15 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
             margin: const EdgeInsets.only(right: 8),
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: FlixieColors.tabBarBackgroundFocused,
+              color: context.colors.tabBarBackgroundFocused,
               borderRadius: BorderRadius.circular(8),
             ),
             child: DropdownButton<String>(
               value: _sortBy,
               underline: const SizedBox(),
-              dropdownColor: FlixieColors.tabBarBackgroundFocused,
-              style: const TextStyle(color: Colors.white, fontSize: 13),
-              icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+              dropdownColor: context.colors.tabBarBackgroundFocused,
+              style: TextStyle(color: context.colors.white, fontSize: 13),
+              icon: Icon(Icons.arrow_drop_down, color: context.colors.white),
               items: const [
                 DropdownMenuItem(
                     value: 'dateDesc', child: Text('Newest First')),
@@ -293,14 +293,13 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: TextField(
               controller: _searchController,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: context.colors.white),
               decoration: InputDecoration(
                 hintText: 'Search watched movies...',
-                hintStyle: const TextStyle(color: FlixieColors.medium),
-                prefixIcon:
-                    const Icon(Icons.search, color: FlixieColors.medium),
+                hintStyle: TextStyle(color: context.colors.medium),
+                prefixIcon: Icon(Icons.search, color: context.colors.medium),
                 filled: true,
-                fillColor: FlixieColors.tabBarBackgroundFocused,
+                fillColor: context.colors.tabBarBackgroundFocused,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: BorderSide.none,
@@ -355,13 +354,13 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.history, size: 64, color: FlixieColors.medium),
+          Icon(Icons.history, size: 64, color: context.colors.medium),
           const SizedBox(height: 16),
           Text(
             _searchController.text.isNotEmpty
                 ? 'No movies found'
                 : 'No watch history yet',
-            style: const TextStyle(color: FlixieColors.medium, fontSize: 16),
+            style: TextStyle(color: context.colors.medium, fontSize: 16),
           ),
         ],
       ),
@@ -427,7 +426,7 @@ class _WatchedMovieCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: FlixieColors.tabBarBackgroundFocused,
+          color: context.colors.tabBarBackgroundFocused,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -452,7 +451,7 @@ class _WatchedMovieCard extends StatelessWidget {
                       top: 6,
                       right: 6,
                       child: PopupMenuButton<String>(
-                        color: FlixieColors.surfaceElevated,
+                        color: context.colors.surfaceElevated,
                         onSelected: (value) {
                           if (value == 'log') onLogAgain();
                           if (value == 'edit') onEditEntry?.call();
@@ -480,30 +479,17 @@ class _WatchedMovieCard extends StatelessWidget {
                             color: Colors.black.withValues(alpha: 0.68),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.more_horiz,
-                              color: Colors.white, size: 18),
+                          child: Icon(Icons.more_horiz,
+                              color: context.colors.white, size: 18),
                         ),
                       ),
                     ),
                     Positioned(
                       left: 7,
                       bottom: 7,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 7, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.72),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          '${entry.watches.isEmpty ? 1 : entry.watches.length}× watched',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
+                      child: FlixiePill.label(
+                          label: Text(
+                              '${entry.watches.isEmpty ? 1 : entry.watches.length}× watched')),
                     ),
                   ],
                 ),
@@ -522,8 +508,8 @@ class _WatchedMovieCard extends StatelessWidget {
                         movie.title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: context.colors.white,
                           fontWeight: FontWeight.w700,
                           fontSize: 15,
                           height: 1.24,
@@ -534,14 +520,14 @@ class _WatchedMovieCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          const Icon(Icons.check_circle,
-                              size: 12, color: FlixieColors.success),
+                          Icon(Icons.check_circle,
+                              size: 12, color: context.colors.success),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
                               formattedDate,
-                              style: const TextStyle(
-                                color: FlixieColors.medium,
+                              style: TextStyle(
+                                color: context.colors.medium,
                                 fontSize: 11,
                               ),
                               overflow: TextOverflow.ellipsis,
@@ -554,8 +540,8 @@ class _WatchedMovieCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         'Your rating: ${entry.rating!.toStringAsFixed(1)}/10${entry.review != null ? ' • Reviewed' : ''}',
-                        style: const TextStyle(
-                          color: FlixieColors.tertiary,
+                        style: TextStyle(
+                          color: context.colors.tertiary,
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                         ),
@@ -589,8 +575,8 @@ class _PosterFallback extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: const Color(0xFF1E2D40),
-      child: const Center(
-        child: Icon(Icons.movie_outlined, color: FlixieColors.medium),
+      child: Center(
+        child: Icon(Icons.movie_outlined, color: context.colors.medium),
       ),
     );
   }

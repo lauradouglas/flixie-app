@@ -38,6 +38,7 @@ class TvShow {
   final TvShowFriendSummary? friendSummary;
   final List<WatchProvider> watchProviders;
   final int? watchedEpisodeCount;
+  final int? episodeRuntime;
 
   const TvShow({
     required this.id,
@@ -76,6 +77,7 @@ class TvShow {
     this.friendSummary,
     this.watchProviders = const [],
     this.watchedEpisodeCount,
+    this.episodeRuntime,
   });
 
   TvShow withEpisodeProgress(Map<int, TvEpisode> changes) {
@@ -105,6 +107,7 @@ class TvShow {
         status: status,
         originalLanguage: originalLanguage,
         originCountry: originCountry,
+        episodeRuntime: episodeRuntime,
         genres: genres,
         networks: networks,
         createdBy: createdBy,
@@ -185,6 +188,7 @@ class TvShow {
         json['originalLanguage'] ?? json['original_language'],
       ),
       originCountry: _stringList(json['originCountry'] ?? json['countries']),
+      episodeRuntime: _episodeRuntime(json),
       genres: _nameList(json['genres']),
       networks: _nameList(json['networks'] ?? json['network']),
       createdBy: _creatorNames(
@@ -253,6 +257,7 @@ class TvShow {
       'popularity': popularity,
       'voteAverage': voteAverage,
       'voteCount': voteCount,
+      'episodeRuntime': episodeRuntime,
       'genres': genres,
       'numberOfSeasons': numberOfSeasons,
       'numberOfEpisodes': numberOfEpisodes,
@@ -852,4 +857,20 @@ bool? _boolValue(dynamic value) {
   if (value is bool) return value;
   if (value is String) return bool.tryParse(value);
   return null;
+}
+
+// Use the longest known episode duration rather than promising the shortest fits.
+int? _episodeRuntime(Map<String, dynamic> json) {
+  final values = <int>[
+    for (final key in ['episodeRuntime', 'runtime'])
+      if (_intValue(json[key]) case final int n when n > 0) n,
+    for (final value in (json['episode_run_time'] ??
+        json['episodeRunTime'] ??
+        const []) as List)
+      if (_intValue(value) case final int n when n > 0) n,
+    for (final episode in (json['episodes'] as List? ?? const []))
+      if (episode is Map)
+        if (_intValue(episode['runtime']) case final int n when n > 0) n,
+  ];
+  return values.isEmpty ? null : (values..sort()).last;
 }

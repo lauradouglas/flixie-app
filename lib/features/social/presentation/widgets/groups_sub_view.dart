@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -195,7 +196,7 @@ class _GroupsSubViewState extends State<GroupsSubView> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.tabBarBackgroundFocused,
+      backgroundColor: context.colors.tabBarBackgroundFocused,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -215,8 +216,7 @@ class _GroupsSubViewState extends State<GroupsSubView> {
 
     if (_error != null) {
       return Center(
-        child:
-            Text(_error!, style: const TextStyle(color: FlixieColors.medium)),
+        child: Text(_error!, style: TextStyle(color: context.colors.medium)),
       );
     }
 
@@ -274,7 +274,7 @@ class _GroupsSubViewState extends State<GroupsSubView> {
               TextButton(
                 onPressed: _showCreateGroupSheet,
                 style: TextButton.styleFrom(
-                  foregroundColor: FlixieColors.primary,
+                  foregroundColor: context.colors.primaryText,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   minimumSize: Size.zero,
@@ -296,7 +296,7 @@ class _GroupsSubViewState extends State<GroupsSubView> {
                   style: Theme.of(context)
                       .textTheme
                       .bodyMedium
-                      ?.copyWith(color: FlixieColors.medium),
+                      ?.copyWith(color: context.colors.medium),
                 ),
               ),
             )
@@ -316,10 +316,10 @@ class _GroupsSubViewState extends State<GroupsSubView> {
   // implemented, moderated, and ready for App Review.
   Widget _buildRequestsTab(List<Group> pendingGroups) {
     if (pendingGroups.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           'No pending invitations',
-          style: TextStyle(color: FlixieColors.medium),
+          style: TextStyle(color: context.colors.medium),
         ),
       );
     }
@@ -361,17 +361,17 @@ class _GroupsTabBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       child: Row(
         children: [
-          _tab(0, 'My Groups'),
+          _tab(context, 0, 'My Groups'),
           const SizedBox(width: 8),
           // TODO(release): Restore Discover when public group discovery is
           // implemented and moderated.
-          _tab(1, 'Requests'),
+          _tab(context, 1, 'Requests'),
         ],
       ),
     );
   }
 
-  Widget _tab(int index, String label) {
+  Widget _tab(BuildContext context, int index, String label) {
     final selected = index == selectedIndex;
     final showBadge = index == 1 && pendingCount > 0;
     return GestureDetector(
@@ -382,10 +382,11 @@ class _GroupsTabBar extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected
               ? FlixieColors.primary
-              : FlixieColors.tabBarBackgroundFocused,
+              : context.colors.tabBarBackgroundFocused,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? FlixieColors.primary : FlixieColors.tabBarBorder,
+            color:
+                selected ? FlixieColors.primary : context.colors.tabBarBorder,
           ),
         ),
         child: Row(
@@ -394,27 +395,14 @@ class _GroupsTabBar extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                color: selected ? Colors.black : FlixieColors.medium,
+                color: selected ? Colors.white : context.colors.medium,
                 fontWeight: FontWeight.w600,
                 fontSize: 13,
               ),
             ),
             if (showBadge) ...[
               const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: FlixieColors.success,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  '$pendingCount',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold),
-                ),
-              ),
+              FlixiePill.label(label: Text('$pendingCount')),
             ],
           ],
         ),

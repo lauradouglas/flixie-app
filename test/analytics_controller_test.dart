@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flixie_app/app/router/router.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
@@ -159,12 +160,10 @@ void main() {
     expect(backend.events.first.name, 'content_opened');
     expect(backend.events.first.parameters, {
       'content_type': 'movie',
-      'content_id': 42,
       'source': 'home',
     });
     expect(backend.events.last.parameters, {
       'content_type': 'show',
-      'content_id': 9,
       'source': 'unknown',
     });
   });
@@ -198,6 +197,9 @@ void main() {
     );
     expect(backend.events.first.parameters?['genre'], 'Adventure');
     expect(backend.events[1].parameters?['content_type'], 'show');
+    for (final event in backend.events) {
+      expect(event.parameters, isNot(contains('content_id')));
+    }
   });
 
   test('person opens include attribution without identity data', () async {
@@ -215,9 +217,7 @@ void main() {
 
     expect(backend.events.single.name, 'person_opened');
     expect(backend.events.single.parameters, {
-      'person_id': 88,
       'source': 'person_credits',
-      'parent_content_id': 42,
       'parent_content_type': 'movie',
     });
   });
@@ -252,7 +252,10 @@ void main() {
       backend.events.map((event) => event.name),
       ['recommendation_impression', 'recommendation_opened'],
     );
-    expect(backend.events.first.parameters, attribution.analyticsParameters);
+    expect(
+        backend.events.first.parameters,
+        Map<String, Object>.from(attribution.analyticsParameters)
+          ..remove('content_id'));
   });
 
   test('rating can retain recommendation attribution', () async {
@@ -281,7 +284,8 @@ void main() {
     expect(backend.events.single.name, 'rating_added');
     expect(
       backend.events.single.parameters,
-      {'source': 'just_for_you', ...attribution.analyticsParameters},
+      {'source': 'just_for_you', ...attribution.analyticsParameters}
+        ..remove('content_id'),
     );
   });
 
@@ -311,10 +315,10 @@ void main() {
     expect(backend.events.map((event) => event.name),
         ['watch_plan_created', 'watch_logged']);
     for (final event in backend.events) {
-      expect(event.parameters, containsPair('watch_plan_id', 'plan-1'));
+      expect(event.parameters, isNot(contains('watch_plan_id')));
       expect(event.parameters, containsPair('plan_type', 'group'));
       expect(event.parameters, containsPair('participant_count', 4));
-      expect(event.parameters, containsPair('content_id', 42));
+      expect(event.parameters, isNot(contains('content_id')));
     }
   });
 
@@ -419,13 +423,16 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider<AnalyticsController>.value(
         value: controller,
-        child: const MaterialApp(
-          home: AnalyticsConsentPrompt(child: Scaffold()),
+        child: MaterialApp(
+          navigatorKey: rootNavigatorKey,
+          home: const AnalyticsConsentPrompt(child: Scaffold()),
         ),
       ),
     );
     await tester.pumpAndSettle();
 
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
     expect(find.text('Decline'), findsOneWidget);
     expect(find.text('Allow analytics'), findsOneWidget);
     final declineSize =
@@ -434,6 +441,7 @@ void main() {
         tester.getSize(find.widgetWithText(FilledButton, 'Allow analytics'));
     expect(declineSize.width, allowSize.width);
 
+    await tester.ensureVisible(find.text('Decline'));
     await tester.tap(find.text('Decline'));
     await tester.pumpAndSettle();
     expect(store.value, AnalyticsConsent.declined);

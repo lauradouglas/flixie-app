@@ -60,14 +60,14 @@ class VideoCard extends StatelessWidget {
                   height: 146,
                   width: 270,
                   decoration: BoxDecoration(
-                    color: FlixieColors.surface,
+                    color: context.colors.surface,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: CachedNetworkImage(
                     imageUrl: video.thumbnailUrl,
                     fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) => _thumbnailFallback(),
+                    errorWidget: (_, __, ___) => _thumbnailFallback(context),
                   ),
                 ),
                 Positioned.fill(
@@ -90,8 +90,8 @@ class VideoCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               video.name,
-              style: const TextStyle(
-                color: FlixieColors.light,
+              style: TextStyle(
+                color: context.colors.light,
                 fontSize: 12.5,
                 fontWeight: FontWeight.w600,
               ),
@@ -104,13 +104,13 @@ class VideoCard extends StatelessWidget {
     );
   }
 
-  Widget _thumbnailFallback() {
+  Widget _thumbnailFallback(BuildContext context) {
     return Container(
-      color: FlixieColors.surfaceElevated,
-      child: const Center(
+      color: context.colors.surfaceElevated,
+      child: Center(
         child: Icon(
           Icons.play_circle_outline,
-          color: FlixieColors.medium,
+          color: context.colors.medium,
           size: 48,
         ),
       ),

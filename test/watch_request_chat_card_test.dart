@@ -76,7 +76,7 @@ void main() {
           onAccept: accept,
           onDecline: decline ?? () {});
   Widget app(Widget child, {double scale = 1}) => MaterialApp(
-      theme: ThemeData(fontFamily: 'Manrope'),
+      theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Manrope'),
       home: Scaffold(
           backgroundColor: const Color(0xff100a20),
           body: MediaQuery(

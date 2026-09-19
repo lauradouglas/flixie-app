@@ -12,6 +12,7 @@ abstract final class FlixieTypography {
     fontFamily: fontFamily,
     fontSize: 30,
     height: 1.2,
+    letterSpacing: -0.6,
     fontWeight: FontWeight.w800,
   );
 
@@ -19,6 +20,7 @@ abstract final class FlixieTypography {
     fontFamily: fontFamily,
     fontSize: 26,
     height: 1.23,
+    letterSpacing: -0.26,
     fontWeight: FontWeight.w800,
   );
 
@@ -46,14 +48,14 @@ abstract final class FlixieTypography {
   static const TextStyle bodyLarge = TextStyle(
     fontFamily: fontFamily,
     fontSize: 16,
-    height: 1.44,
+    height: 1.5,
     fontWeight: FontWeight.w500,
   );
 
   static const TextStyle body = TextStyle(
     fontFamily: fontFamily,
-    fontSize: 15,
-    height: 1.47,
+    fontSize: 16,
+    height: 1.5,
     fontWeight: FontWeight.w400,
   );
 
@@ -76,7 +78,7 @@ abstract final class FlixieTypography {
     fontSize: 12,
     height: 1.33,
     fontWeight: FontWeight.w700,
-    letterSpacing: 1.1,
+    letterSpacing: 0.96,
   );
 
   static const TextStyle compactLabel = TextStyle(
@@ -88,8 +90,8 @@ abstract final class FlixieTypography {
 
   static const TextStyle button = TextStyle(
     fontFamily: fontFamily,
-    fontSize: 15,
-    height: 1.33,
+    fontSize: 16,
+    height: 1.375,
     fontWeight: FontWeight.w700,
   );
 
@@ -119,8 +121,8 @@ abstract final class FlixieTypography {
         color: secondary,
         fontWeight: FontWeight.w600,
       ),
-      bodyLarge: bodyLarge.copyWith(color: secondary),
-      bodyMedium: body.copyWith(color: secondary),
+      bodyLarge: bodyLarge.copyWith(color: primary),
+      bodyMedium: body.copyWith(color: primary),
       bodySmall: metadata.copyWith(color: muted),
       labelLarge: button.copyWith(color: primary),
       labelMedium: compactLabel.copyWith(color: secondary),

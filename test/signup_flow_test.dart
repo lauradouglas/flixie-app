@@ -1,3 +1,6 @@
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'dart:convert';
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart'
@@ -61,6 +64,7 @@ model.User _createdUser({String username = 'Movie_User.99'}) => model.User(
     );
 
 Map<String, Object?> _expectedBody() => <String, Object?>{
+      'termsAccepted': true,
       'firstName': 'Laura',
       'lastName': 'Douglas',
       'username': 'Movie_User.99',
@@ -85,12 +89,82 @@ void main() {
   });
 
   Future<bool> signUp(AuthProvider provider) => provider.signUp(
+        termsAccepted: true,
         email: 'laura@example.com',
         password: 'Password1!',
         firstName: 'Laura',
         lastName: 'Douglas',
         username: 'Movie_User.99',
       );
+
+  test('account terms are verified remotely and accepted explicitly', () async {
+    final provider = AuthProvider(authService, MovieService(),
+        prefetchAfterAuth: false, profileCreator: (_) async => _createdUser());
+    var accepted = false;
+    await http.runWithClient(() async {
+      expect(await provider.verifyTerms(), isFalse);
+      expect(provider.termsVerified, isFalse);
+      expect(await provider.verifyTerms(accept: true), isTrue);
+      expect(provider.termsVerified, isTrue);
+      expect(await provider.verifyTerms(), isTrue);
+    },
+        () => MockClient((request) async {
+              expect(request.url.path, '/users/me/terms');
+              if (request.method == 'POST') {
+                expect(jsonDecode(request.body),
+                    {'termsAccepted': true, 'version': '2026-09-16'});
+                accepted = true;
+              }
+              return http.Response(
+                  jsonEncode({'accepted': accepted, 'version': '2026-09-16'}),
+                  200);
+            }));
+    provider.dispose();
+  });
+
+  test('failed terms save does not unlock the account', () async {
+    final provider = AuthProvider(authService, MovieService(),
+        prefetchAfterAuth: false, profileCreator: (_) async => _createdUser());
+    await http.runWithClient(() async {
+      await expectLater(
+          provider.verifyTerms(accept: true), throwsA(isA<ApiException>()));
+      expect(provider.termsVerified, isFalse);
+    },
+        () => MockClient(
+            (_) async => http.Response('{"error":"unavailable"}', 503)));
+    provider.dispose();
+  });
+
+  test('signup without agreement creates neither identity nor profile',
+      () async {
+    var profileCalls = 0;
+    final provider = AuthProvider(authService, MovieService(),
+        prefetchAfterAuth: false, profileCreator: (body) async {
+      profileCalls++;
+      return _createdUser();
+    });
+    expect(
+        await provider.signUp(
+            termsAccepted: false,
+            email: 'test@example.com',
+            password: 'Password1!',
+            firstName: 'Test',
+            lastName: 'User',
+            username: 'tester'),
+        isFalse);
+    expect(
+        await provider.beginAvatarSignUp(
+            termsAccepted: false,
+            email: 'test@example.com',
+            password: 'Password1!',
+            firstName: 'Test',
+            lastName: 'User',
+            username: 'tester'),
+        isFalse);
+    expect(authService.signupCalls, 0);
+    expect(profileCalls, 0);
+    provider.dispose();
+  });
 
   test('successful signup creates Firebase then forwards token and safe body',
       () async {
@@ -112,6 +186,8 @@ void main() {
     expect(receivedToken, 'fresh-signup-token');
     expect(receivedBody, _expectedBody());
     expect(provider.dbUser?.username, 'Movie_User.99');
+    expect(provider.status, AuthStatus.authenticated);
+    expect(provider.termsVerified, isTrue);
   });
 
   test('username availability path URL-encodes the username', () {
@@ -134,6 +210,7 @@ void main() {
     );
 
     final result = await provider.signUp(
+      termsAccepted: true,
       email: 'laura@example.com',
       password: 'Password1!',
       firstName: 'Laura',
@@ -205,6 +282,8 @@ void main() {
     expect(await signUp(provider), isFalse);
     expect(authService.signupCalls, 1);
     expect(authService.hasUser, isTrue);
+    expect(provider.termsVerified, isFalse,
+        reason: 'failed profile creation cannot confirm saved consent');
 
     expect(await signUp(provider), isTrue);
     expect(authService.signupCalls, 1,
@@ -281,6 +360,7 @@ void main() {
 
     expect(
       await provider.beginAvatarSignUp(
+        termsAccepted: true,
         email: 'laura@example.com',
         password: 'Password1!',
         firstName: 'Laura',
@@ -292,11 +372,21 @@ void main() {
     expect(order, ['profile'],
         reason: 'the backend user must exist before avatar/setup screens');
     expect(provider.dbUser?.id, 'profile-1');
+    final authenticatedConsent = <bool>[];
+    provider.addListener(() {
+      if (provider.status == AuthStatus.authenticated) {
+        authenticatedConsent.add(provider.termsVerified);
+      }
+    });
     expect(await provider.completeAvatarSignUp(1), isFalse);
     expect(await provider.completeAvatarSignUp(1), isTrue);
     expect(order, ['profile', 'avatar', 'avatar']);
     expect(authService.signupCalls, 1);
     expect(provider.dbUser?.avatar?.id, 1);
+    expect(provider.termsVerified, isTrue);
+    expect(authenticatedConsent, isNotEmpty);
+    expect(authenticatedConsent, everyElement(isTrue),
+        reason: 'no authenticated notification may briefly route to terms');
   });
 
   test('avatar signup does not continue when backend rejects the user',
@@ -324,6 +414,7 @@ void main() {
 
     expect(
       await provider.beginAvatarSignUp(
+        termsAccepted: true,
         email: 'laura@example.com',
         password: 'Password1!',
         firstName: 'Laura',

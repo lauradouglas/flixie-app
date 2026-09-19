@@ -56,9 +56,9 @@ class _ListPickerLoadingSplashState extends State<ListPickerLoadingSplash>
       top: true,
       child: Container(
         height: MediaQuery.sizeOf(context).height * 0.62,
-        decoration: const BoxDecoration(
-          color: FlixieColors.background,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        decoration: BoxDecoration(
+          color: context.colors.background,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         ),
         child: Center(
           child: Column(
@@ -90,11 +90,11 @@ class _ListPickerLoadingSplashState extends State<ListPickerLoadingSplash>
                       ),
                       Transform.rotate(
                         angle: _controller.value * 6.283,
-                        child: const Align(
+                        child: Align(
                           alignment: Alignment.topCenter,
                           child: Icon(
                             Icons.auto_awesome_rounded,
-                            color: FlixieColors.warning,
+                            color: context.colors.warning,
                             size: 24,
                           ),
                         ),
@@ -104,10 +104,10 @@ class _ListPickerLoadingSplashState extends State<ListPickerLoadingSplash>
                 ),
               ),
               const SizedBox(height: 14),
-              const Text(
+              Text(
                 'Getting your lists ready',
                 style: TextStyle(
-                  color: FlixieColors.white,
+                  color: context.colors.white,
                   fontSize: 20,
                   fontWeight: FontWeight.w900,
                 ),
@@ -115,8 +115,8 @@ class _ListPickerLoadingSplashState extends State<ListPickerLoadingSplash>
               const SizedBox(height: 7),
               Text(
                 widget.message,
-                style: const TextStyle(
-                  color: FlixieColors.medium,
+                style: TextStyle(
+                  color: context.colors.medium,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -175,9 +175,9 @@ class _ListPickerSheetState extends State<ListPickerSheet> {
       top: true,
       child: Container(
         height: MediaQuery.sizeOf(context).height * 0.72,
-        decoration: const BoxDecoration(
-          color: FlixieColors.background,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        decoration: BoxDecoration(
+          color: context.colors.background,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -188,7 +188,7 @@ class _ListPickerSheetState extends State<ListPickerSheet> {
                 height: 4,
                 margin: const EdgeInsets.only(top: 12, bottom: 14),
                 decoration: BoxDecoration(
-                  color: FlixieColors.medium.withValues(alpha: 0.7),
+                  color: context.colors.medium.withValues(alpha: 0.7),
                   borderRadius: BorderRadius.circular(99),
                 ),
               ),
@@ -201,16 +201,16 @@ class _ListPickerSheetState extends State<ListPickerSheet> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Add to lists',
+                        Text('Add to lists',
                             style: TextStyle(
-                                color: FlixieColors.white,
+                                color: context.colors.white,
                                 fontSize: 22,
                                 fontWeight: FontWeight.w800)),
                         const SizedBox(height: 4),
                         Text(
                             'Choose every list this ${widget.mediaLabel} belongs in.',
-                            style: const TextStyle(
-                                color: FlixieColors.medium, fontSize: 13)),
+                            style: TextStyle(
+                                color: context.colors.medium, fontSize: 13)),
                       ],
                     ),
                   ),
@@ -219,7 +219,7 @@ class _ListPickerSheetState extends State<ListPickerSheet> {
                     icon: const Icon(Icons.add, size: 17),
                     label: const Text('New list'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: FlixieColors.primary,
+                      foregroundColor: context.colors.primaryText,
                       side: const BorderSide(color: FlixieColors.primary),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 9),
@@ -243,13 +243,13 @@ class _ListPickerSheetState extends State<ListPickerSheet> {
             const SizedBox(height: 12),
             Expanded(
               child: widget.items.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text('You haven’t created any lists yet.',
-                          style: TextStyle(color: FlixieColors.medium)))
+                          style: TextStyle(color: context.colors.medium)))
                   : filtered.isEmpty
-                      ? const Center(
+                      ? Center(
                           child: Text('No matching lists.',
-                              style: TextStyle(color: FlixieColors.medium)))
+                              style: TextStyle(color: context.colors.medium)))
                       : ListView.separated(
                           padding: const EdgeInsets.fromLTRB(22, 0, 22, 16),
                           itemCount: filtered.length,
@@ -317,7 +317,7 @@ class _PickerListRow extends StatelessWidget {
         item.scope == ListScope.friends ||
         item.collaborators.isNotEmpty;
     return Material(
-      color: FlixieColors.surface.withValues(alpha: 0.65),
+      color: context.colors.surface.withValues(alpha: 0.65),
       borderRadius: BorderRadius.circular(14),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -329,7 +329,7 @@ class _PickerListRow extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color:
-                  selected ? FlixieColors.primary : FlixieColors.tabBarBorder,
+                  selected ? FlixieColors.primary : context.colors.tabBarBorder,
               width: selected ? 1.4 : 1,
             ),
           ),
@@ -345,23 +345,23 @@ class _PickerListRow extends StatelessWidget {
                     Text(item.name,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            color: FlixieColors.white,
+                        style: TextStyle(
+                            color: context.colors.white,
                             fontSize: 14,
                             fontWeight: FontWeight.w800)),
                     const SizedBox(height: 5),
                     Row(
                       children: [
                         Icon(_visibilityIcon(item.visibility, isGroup, shared),
-                            color: FlixieColors.medium, size: 14),
+                            color: context.colors.medium, size: 14),
                         const SizedBox(width: 5),
                         Expanded(
                           child: Text(
                             '${item.countLabel} · ${_visibilityLabel(item.visibility, item.collaborators.length, item.groupName, isGroup, shared)}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                color: FlixieColors.medium, fontSize: 12),
+                            style: TextStyle(
+                                color: context.colors.medium, fontSize: 12),
                           ),
                         ),
                       ],
@@ -384,11 +384,11 @@ class _PickerListRow extends StatelessWidget {
                   border: Border.all(
                       color: selected
                           ? FlixieColors.primary
-                          : FlixieColors.medium),
+                          : context.colors.medium),
                 ),
                 child: selected
-                    ? const Icon(Icons.check_rounded,
-                        color: FlixieColors.white, size: 18)
+                    ? Icon(Icons.check_rounded,
+                        color: context.colors.white, size: 18)
                     : null,
               ),
             ],
@@ -410,9 +410,9 @@ class _Posters extends StatelessWidget {
       width: 92,
       height: 72,
       child: posters.isEmpty
-          ? const ColoredBox(
-              color: FlixieColors.surfaceElevated,
-              child: Icon(Icons.movie_outlined, color: FlixieColors.medium))
+          ? ColoredBox(
+              color: context.colors.surfaceElevated,
+              child: Icon(Icons.movie_outlined, color: context.colors.medium))
           : Stack(
               children: posters.asMap().entries.map((entry) {
                 return Positioned(
@@ -424,9 +424,9 @@ class _Posters extends StatelessWidget {
                       width: 52,
                       height: 72,
                       fit: BoxFit.cover,
-                      errorWidget: (_, __, ___) => const ColoredBox(
-                        color: FlixieColors.surfaceElevated,
-                        child: SizedBox(width: 52, height: 72),
+                      errorWidget: (_, __, ___) => ColoredBox(
+                        color: context.colors.surfaceElevated,
+                        child: const SizedBox(width: 52, height: 72),
                       ),
                     ),
                   ),
@@ -457,7 +457,7 @@ class _AvatarStack extends StatelessWidget {
               padding: const EdgeInsets.all(1),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: FlixieColors.background,
+                color: context.colors.background,
                 border: Border.all(color: FlixieColors.primary, width: 1.4),
               ),
               child: ProfileAvatarView(

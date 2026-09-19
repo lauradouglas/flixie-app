@@ -50,7 +50,7 @@ class _SkeletonBoxState extends State<SkeletonBox>
         width: widget.width,
         height: widget.height,
         decoration: BoxDecoration(
-          color: FlixieColors.tabBarBorder.withValues(alpha: _anim.value),
+          color: context.colors.tabBarBorder.withValues(alpha: _anim.value),
           borderRadius: BorderRadius.circular(widget.borderRadius),
         ),
       ),
@@ -198,7 +198,7 @@ class _HomeBootLoadingScreenState extends State<HomeBootLoadingScreen>
                       _orbitingSpark(
                         turn,
                         Icons.auto_awesome_rounded,
-                        FlixieColors.tertiary,
+                        context.colors.tertiary,
                       ),
                       _orbitingSpark(
                         turn + 2.1,
@@ -208,7 +208,7 @@ class _HomeBootLoadingScreenState extends State<HomeBootLoadingScreen>
                       _orbitingSpark(
                         turn + 4.2,
                         Icons.people_alt_rounded,
-                        FlixieColors.success,
+                        context.colors.success,
                       ),
                     ],
                   ),
@@ -216,11 +216,11 @@ class _HomeBootLoadingScreenState extends State<HomeBootLoadingScreen>
               },
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Getting the good stuff',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: FlixieColors.white,
+                color: context.colors.white,
                 fontSize: 24,
                 fontWeight: FontWeight.w900,
               ),
@@ -237,8 +237,8 @@ class _HomeBootLoadingScreenState extends State<HomeBootLoadingScreen>
                     _messages[index],
                     key: ValueKey(index),
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: FlixieColors.medium,
+                    style: TextStyle(
+                      color: context.colors.medium,
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
@@ -263,7 +263,7 @@ class _HomeBootLoadingScreenState extends State<HomeBootLoadingScreen>
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: FlixieColors.surfaceElevated,
+              color: context.colors.surfaceElevated,
               shape: BoxShape.circle,
               border: Border.all(color: color.withValues(alpha: .45)),
             ),
@@ -641,13 +641,13 @@ class ErrorRetryWidget extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.wifi_off_outlined,
-                size: 48, color: FlixieColors.medium),
+            Icon(Icons.wifi_off_outlined,
+                size: 48, color: context.colors.medium),
             const SizedBox(height: 16),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: FlixieColors.medium, fontSize: 15),
+              style: TextStyle(color: context.colors.medium, fontSize: 15),
             ),
             const SizedBox(height: 20),
             ElevatedButton.icon(

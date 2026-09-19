@@ -32,7 +32,9 @@ dependencies:
   # Firebase
   firebase_core: ^3.6.0
   firebase_auth: ^5.3.1
-  firebase_app_check: ^0.3.1+7
+  # Android-only SafetyNet removal; see third_party/firebase_app_check/FLIXIE_PATCH.md.
+  firebase_app_check:
+    path: third_party/firebase_app_check
   firebase_messaging: ^15.1.6
   cloud_firestore: ^5.4.4
   firebase_storage: ^12.4.10
@@ -81,9 +83,6 @@ flutter:
     - assets/icon/
     - assets/splash/
 
-flutter_launcher_icons:
-  android: "launcher_icon"
-  ios: true
-  image_path: "assets/icon/logo_icon.png"
-  adaptive_icon_background: "#172B4D" # Your background color
-  adaptive_icon_foreground: "assets/icon/flixie_text_1024.png"
+# Native icons are maintained directly, including Apple appearances and Android
+# monochrome layers. See docs/app-logo-installation.md; do not run the legacy
+# flutter_launcher_icons generator over these resources.

@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -196,7 +197,7 @@ class _LibraryImportScreenState extends State<LibraryImportScreen> {
           if (!didPop) _leave();
         },
         child: Scaffold(
-          backgroundColor: FlixieColors.background,
+          backgroundColor: context.colors.background,
           appBar: AppBar(
               toolbarHeight:
                   56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
@@ -229,15 +230,15 @@ class _LibraryImportScreenState extends State<LibraryImportScreen> {
                                 : c.doneCount > 0
                                     ? 'Your processed titles are saved. Existing Flixie ratings are kept. You can continue with any remaining titles below.'
                                     : 'Existing Flixie ratings are kept. Duplicate entries are combined. Nothing is imported until you choose Import.',
-                            style: const TextStyle(
-                                color: FlixieColors.light, height: 1.5)),
+                            style: TextStyle(
+                                color: context.colors.light, height: 1.5)),
                         if (_error != null || c.error != null) ...[
                           const SizedBox(height: 16),
                           Semantics(
                               liveRegion: true,
                               child: Text(_error ?? c.error!,
-                                  style: const TextStyle(
-                                      color: FlixieColors.danger))),
+                                  style:
+                                      TextStyle(color: context.colors.danger))),
                         ],
                         if (data == null) ...[
                           const SizedBox(height: 20),
@@ -248,9 +249,9 @@ class _LibraryImportScreenState extends State<LibraryImportScreen> {
                               icon: Icons.file_upload_outlined,
                               onPressed: busy ? null : _chooseFiles),
                           const SizedBox(height: 8),
-                          const Text('ZIP or CSV · up to 20 MB',
+                          Text('ZIP or CSV · up to 20 MB',
                               textAlign: TextAlign.center,
-                              style: TextStyle(color: FlixieColors.medium)),
+                              style: TextStyle(color: context.colors.medium)),
                           const SizedBox(height: 24),
                           _ExportHelp(
                               title: 'Letterboxd',
@@ -269,10 +270,10 @@ class _LibraryImportScreenState extends State<LibraryImportScreen> {
                               onSecondaryTap: () =>
                                   _open(imdbWatchlistExportUrl)),
                           const SizedBox(height: 24),
-                          const Text(
+                          Text(
                               'Your passwords stay with IMDb and Letterboxd. Only title details and the ratings or watchlist entries you choose are sent to Flixie.',
                               style: TextStyle(
-                                  color: FlixieColors.light, height: 1.5)),
+                                  color: context.colors.light, height: 1.5)),
                         ] else ...[
                           const SizedBox(height: 20),
                           Text('${data.rows.length} titles found',
@@ -301,10 +302,10 @@ class _LibraryImportScreenState extends State<LibraryImportScreen> {
                                   : (v) => setState(() {
                                         c.includeWatchlist = v!;
                                       })),
-                          const Text(
+                          Text(
                               'Ratings keep their original rating date where available and add an undated watch if needed. Watchlist-only imports stay on your watchlist. TV episodes are not marked watched.',
                               style: TextStyle(
-                                  color: FlixieColors.light, height: 1.4)),
+                                  color: context.colors.light, height: 1.4)),
                           if (data.notices.isNotEmpty)
                             Padding(
                                 padding: const EdgeInsets.only(top: 12),
@@ -338,9 +339,9 @@ class _LibraryImportScreenState extends State<LibraryImportScreen> {
                                 child: Text(c.paused
                                     ? 'Pausing after this title…'
                                     : 'Pause')),
-                            const Text(
+                            Text(
                                 'Keep this screen open while importing. If you leave, your progress is saved here.',
-                                style: TextStyle(color: FlixieColors.light)),
+                                style: TextStyle(color: context.colors.light)),
                           ] else ...[
                             if (c.doneCount > 0) ...[
                               const SizedBox(height: 16),
@@ -348,13 +349,13 @@ class _LibraryImportScreenState extends State<LibraryImportScreen> {
                                   liveRegion: true,
                                   child: Text(
                                       '${c.doneCount} titles processed · ${data.rows.where((r) => r.result?['rating'] == 'added').length} ratings added · ${data.rows.where((r) => r.result?['watchlist'] == 'added').length} watchlist entries added',
-                                      style: const TextStyle(
-                                          color: FlixieColors.success,
+                                      style: TextStyle(
+                                          color: context.colors.success,
                                           height: 1.5))),
                               Text(
                                   '${data.rows.where((r) => r.result?['rating'] == 'kept').length} existing ratings and ${data.rows.where((r) => r.result?['watchlist'] == 'kept').length} existing watchlist entries kept.',
-                                  style: const TextStyle(
-                                      color: FlixieColors.light)),
+                                  style:
+                                      TextStyle(color: context.colors.light)),
                             ],
                             if (c.pendingCount > 0)
                               TextButton(
@@ -373,8 +374,8 @@ class _LibraryImportScreenState extends State<LibraryImportScreen> {
                                   padding: const EdgeInsets.only(top: 12),
                                   child: Text(
                                       '${data.rows.where((r) => r.status == 'review').length} titles need a match. You can import the ready titles first.',
-                                      style: const TextStyle(
-                                          color: FlixieColors.warning))),
+                                      style: TextStyle(
+                                          color: context.colors.warning))),
                             if (data.rows.isEmpty)
                               const Text(
                                   'No supported ratings or watchlist entries were found. See the export notes above, or choose another file.'),
@@ -402,7 +403,7 @@ class _LibraryImportScreenState extends State<LibraryImportScreen> {
                               'done': 'Processed',
                               'skipped': 'Skipped'
                             }.entries)
-                              ChoiceChip(
+                              FlixiePill.choice(
                                   label: Text(filter.value),
                                   selected: _filter == filter.key,
                                   onSelected: (_) => setState(() {
@@ -429,8 +430,8 @@ class _LibraryImportScreenState extends State<LibraryImportScreen> {
                                       ? Icons.help_outline
                                       : Icons.movie_outlined,
                               color: done
-                                  ? FlixieColors.success
-                                  : FlixieColors.light),
+                                  ? context.colors.success
+                                  : context.colors.light),
                           title: Text(
                               '${row.title}${row.year == null ? '' : ' (${row.year})'}'),
                           subtitle: Text([
@@ -491,8 +492,7 @@ class _ExportHelp extends StatelessWidget {
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(title, style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 8),
-        Text(text,
-            style: const TextStyle(color: FlixieColors.light, height: 1.5)),
+        Text(text, style: TextStyle(color: context.colors.light, height: 1.5)),
         TextButton.icon(
             onPressed: onTap,
             icon: const Icon(Icons.open_in_new, size: 18),
@@ -557,7 +557,7 @@ class _ImportMatchScreenState extends State<_ImportMatchScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        backgroundColor: FlixieColors.background,
+        backgroundColor: context.colors.background,
         appBar: AppBar(
             toolbarHeight:
                 56 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2),
@@ -572,9 +572,9 @@ class _ImportMatchScreenState extends State<_ImportMatchScreen> {
                 '${widget.row.title}${widget.row.year == null ? '' : ' (${widget.row.year})'}',
                 style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
-            const Text(
+            Text(
                 'Check the title and year. Search for an alternative title if you cannot find it.',
-                style: TextStyle(color: FlixieColors.light)),
+                style: TextStyle(color: context.colors.light)),
             const SizedBox(height: 20),
             TextField(
                 controller: _query,
@@ -592,7 +592,7 @@ class _ImportMatchScreenState extends State<_ImportMatchScreen> {
               Padding(
                   padding: const EdgeInsets.only(top: 16),
                   child: Text(_error!,
-                      style: const TextStyle(color: FlixieColors.danger))),
+                      style: TextStyle(color: context.colors.danger))),
             const SizedBox(height: 20),
             if (_candidates.isEmpty && !_busy)
               const Text(

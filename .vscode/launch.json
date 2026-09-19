@@ -70,6 +70,17 @@
                 "web-server",
                 "--web-port=5000"
             ]
+        },
+        {
+            "name": "flixie-app (Mobile - Production API)",
+            "cwd": "${workspaceFolder}",
+            "request": "launch",
+            "type": "dart",
+            "toolArgs": [
+                "--dart-define-from-file",
+                ".firebase.json",
+                "--dart-define=USE_PROD_API=true"
+            ]
         }
     ]
 }

@@ -23,11 +23,11 @@ class HomeWatchPlanCard extends StatelessWidget {
         .firstOrNull;
     final suggestions =
         selected != null ? [selected] : plan.candidates.take(3).toList();
-    final tone = state.colorRole.color;
+    final tone = context.colors.adapt(state.colorRole.color);
     // The brand purple works for borders and controls, but compact status copy
     // needs the contrast-safe text token against this dark card surface.
     final statusTextColor =
-        tone == FlixieColors.primary ? FlixieColors.primaryText : tone;
+        tone == FlixieColors.primary ? context.colors.primaryText : tone;
     return Semantics(
       button: true,
       label:
@@ -45,7 +45,7 @@ class HomeWatchPlanCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: Color.alphaBlend(
                     tone.withValues(alpha: .08),
-                    FlixieColors.surface,
+                    context.colors.surface,
                   ),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: tone.withValues(alpha: .25)),
@@ -70,7 +70,8 @@ class HomeWatchPlanCard extends StatelessWidget {
                                     color: statusTextColor,
                                     shape: BoxShape.circle),
                                 child: Icon(state.statusIcon,
-                                    color: FlixieColors.background, size: 17)),
+                                    color: context.colors.background,
+                                    size: 17)),
                             const SizedBox(width: 8),
                             Expanded(
                                 child: Column(
@@ -78,23 +79,23 @@ class HomeWatchPlanCard extends StatelessWidget {
                                         CrossAxisAlignment.start,
                                     children: [
                                   Text(status,
-                                      style: const TextStyle(
-                                          color: Colors.white,
+                                      style: TextStyle(
+                                          color: context.colors.white,
                                           fontSize: 14,
                                           fontWeight: FontWeight.w700,
                                           height: 1.2)),
                                   const SizedBox(height: 4),
                                   Text(state.title,
-                                      style: const TextStyle(
-                                          color: FlixieColors.light,
+                                      style: TextStyle(
+                                          color: context.colors.light,
                                           fontSize: 12,
                                           height: 1.25)),
                                 ])),
                           ]),
                       const SizedBox(height: 8),
                       Text(state.supportingText,
-                          style: const TextStyle(
-                              color: FlixieColors.light,
+                          style: TextStyle(
+                              color: context.colors.light,
                               fontSize: 12,
                               height: 1.35)),
                     ],
@@ -106,8 +107,8 @@ class HomeWatchPlanCard extends StatelessWidget {
                           ? statusTextColor
                           : tone.withValues(alpha: .24),
                       foregroundColor: state.requiresAttention
-                          ? FlixieColors.background
-                          : Colors.white,
+                          ? context.colors.background
+                          : context.colors.white,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8)),
                       textStyle: const TextStyle(
@@ -187,7 +188,7 @@ class HomeWatchPlanEmptyCard extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: FlixieColors.surfaceElevated.withValues(alpha: .65),
+              color: context.colors.surfaceElevated.withValues(alpha: .65),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: FlixieColors.primary.withValues(alpha: .55),
@@ -195,8 +196,8 @@ class HomeWatchPlanEmptyCard extends StatelessWidget {
             ),
             child: Column(
               children: [
-                const Row(children: [
-                  SizedBox(
+                Row(children: [
+                  const SizedBox(
                     width: 58,
                     height: 87,
                     child: DecoratedBox(
@@ -208,27 +209,27 @@ class HomeWatchPlanEmptyCard extends StatelessWidget {
                           color: FlixieColors.primary, size: 28),
                     ),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('WATCH TOGETHER',
                             style: TextStyle(
-                                color: FlixieColors.primaryText,
+                                color: context.colors.primaryText,
                                 fontSize: 11,
                                 fontWeight: FontWeight.w900,
                                 letterSpacing: .8)),
-                        SizedBox(height: 5),
-                        Text('Plan your next watch',
+                        const SizedBox(height: 5),
+                        const Text('Plan your next watch',
                             style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 17,
                                 fontWeight: FontWeight.w800)),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Text('Pick movies and decide with friends.',
                             style: TextStyle(
-                                color: FlixieColors.light,
+                                color: context.colors.light,
                                 fontSize: 13,
                                 height: 1.25)),
                       ],

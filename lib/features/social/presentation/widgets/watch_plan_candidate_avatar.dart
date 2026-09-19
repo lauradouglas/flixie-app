@@ -33,7 +33,7 @@ class WatchPlanCandidateAvatar extends StatelessWidget {
           child: DecoratedBox(
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: FlixieColors.surface, width: 1.5),
+              border: Border.all(color: context.colors.surface, width: 1.5),
             ),
             child: ProfileAvatarView(
               avatar: avatar,

@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/models/activity_list_item.dart';
@@ -111,19 +112,18 @@ class _ActivityFeedCardState extends State<ActivityFeedCard> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                       Text(name,
-                          style: const TextStyle(
-                              color: FlixieColors.textPrimary,
+                          style: TextStyle(
+                              color: context.colors.textPrimary,
                               fontSize: 16,
                               fontWeight: FontWeight.w800)),
                       const SizedBox(height: 3),
                       Text('$_label${_age.isEmpty ? '' : ' · $_age'}',
-                          style: const TextStyle(
-                              color: FlixieColors.light, fontSize: 13)),
+                          style: TextStyle(
+                              color: context.colors.light, fontSize: 13)),
                     ])),
                 PopupMenuButton<String>(
                     tooltip: 'Activity options',
-                    icon:
-                        const Icon(Icons.more_horiz, color: FlixieColors.light),
+                    icon: Icon(Icons.more_horiz, color: context.colors.light),
                     onSelected: (value) => value == 'profile'
                         ? widget.onProfile()
                         : widget.onOpen?.call(),
@@ -149,16 +149,16 @@ class _ActivityFeedCardState extends State<ActivityFeedCard> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                       Text(item.mediaTitle ?? 'Shared activity',
-                          style: const TextStyle(
-                              color: FlixieColors.textPrimary,
+                          style: TextStyle(
+                              color: context.colors.textPrimary,
                               fontSize: 22,
                               fontWeight: FontWeight.w800)),
                       if (item.mediaRating != null) ...[
                         const SizedBox(height: 4),
                         Text(
                             '★ ${item.mediaRating! == item.mediaRating!.roundToDouble() ? item.mediaRating!.toStringAsFixed(0) : item.mediaRating!.toStringAsFixed(1)} / 10',
-                            style: const TextStyle(
-                                color: FlixieColors.warning,
+                            style: TextStyle(
+                                color: context.colors.warning,
                                 fontWeight: FontWeight.w700)),
                       ],
                       if (item.recommended != null) ...[
@@ -169,31 +169,30 @@ class _ActivityFeedCardState extends State<ActivityFeedCard> {
                                 : 'Doesn’t recommend',
                             style: TextStyle(
                                 color: item.recommended!
-                                    ? FlixieColors.success
-                                    : FlixieColors.light,
+                                    ? context.colors.success
+                                    : context.colors.light,
                                 fontWeight: FontWeight.w700)),
                       ],
                       if (item.type == ActivityListType.watchRequest ||
                           item.type == ActivityListType.watchRequestSent) ...[
                         const SizedBox(height: 4),
-                        const Chip(
+                        const FlixiePill.label(
                             avatar: Icon(Icons.confirmation_number_outlined,
-                                size: 16, color: FlixieColors.warning),
-                            label: Text('Request',
-                                style: TextStyle(color: FlixieColors.warning))),
+                                size: 16),
+                            label: Text('Request')),
                       ],
                       if (item.listName?.isNotEmpty == true)
                         TextButton(
                             onPressed: widget.onOpenList,
                             child: Text(item.listName!,
-                                style: const TextStyle(
-                                    color: FlixieColors.primaryText))),
+                                style: TextStyle(
+                                    color: context.colors.primaryText))),
                       const SizedBox(height: 4),
                       if (widget.onOpen != null)
                         TextButton(
                             onPressed: widget.onOpen,
                             style: TextButton.styleFrom(
-                                foregroundColor: FlixieColors.primaryText,
+                                foregroundColor: context.colors.primaryText,
                                 padding: EdgeInsets.zero,
                                 minimumSize: const Size(44, 44),
                                 tapTargetSize:
@@ -213,8 +212,8 @@ class _ActivityFeedCardState extends State<ActivityFeedCard> {
                       child: const Text('Show review · contains spoilers'))
                 else
                   Text(text!,
-                      style: const TextStyle(
-                          color: FlixieColors.light, height: 1.4)),
+                      style:
+                          TextStyle(color: context.colors.light, height: 1.4)),
               ],
               if (widget.onReview != null)
                 TextButton(
@@ -234,11 +233,7 @@ class _ActivityFeedCardState extends State<ActivityFeedCard> {
                         for (final reaction in ActivityReaction.values)
                           if ((widget.reactions.counts[reaction.emoji] ?? 0) >
                               0)
-                            ActionChip(
-                                backgroundColor: widget.reactions.mine ==
-                                        reaction.emoji
-                                    ? FlixieColors.primary.withValues(alpha: .2)
-                                    : Colors.transparent,
+                            FlixiePill.action(
                                 onPressed: widget.busy ||
                                         (widget.onReact == null &&
                                             widget.onReactionSelected == null)
@@ -256,15 +251,6 @@ class _ActivityFeedCardState extends State<ActivityFeedCard> {
                                       },
                                 tooltip:
                                     '${reaction.label}${widget.reactions.mine == reaction.emoji ? ' · Tap to remove' : ''}',
-                                side: BorderSide(
-                                    width:
-                                        widget.reactions.mine == reaction.emoji
-                                            ? 2.5
-                                            : 1,
-                                    color:
-                                        widget.reactions.mine == reaction.emoji
-                                            ? FlixieColors.primaryText
-                                            : FlixieColors.tabBarBorder),
                                 label: Text(
                                     '${reaction.emoji} ${widget.reactions.counts[reaction.emoji]}')),
                         if (widget.onReact != null)
@@ -274,9 +260,9 @@ class _ActivityFeedCardState extends State<ActivityFeedCard> {
                               onPressed: widget.busy ? null : _openReactions,
                               icon: const Icon(Icons.add_reaction_outlined),
                               style: IconButton.styleFrom(
-                                  foregroundColor: FlixieColors.light,
-                                  side: const BorderSide(
-                                      color: FlixieColors.tabBarBorder))),
+                                  foregroundColor: context.colors.light,
+                                  side: BorderSide(
+                                      color: context.colors.tabBarBorder))),
                       ])),
                   if (widget.onReply != null) ...[
                     const SizedBox(width: 8),
@@ -285,7 +271,7 @@ class _ActivityFeedCardState extends State<ActivityFeedCard> {
                         icon: const Icon(Icons.chat_bubble_outline),
                         label: const Text('Reply'),
                         style: TextButton.styleFrom(
-                            foregroundColor: FlixieColors.light)),
+                            foregroundColor: context.colors.light)),
                   ],
                 ]),
               ],

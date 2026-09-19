@@ -66,8 +66,10 @@ class ChatService {
   // ---------------------------------------------------------------------------
 
   /// Real-time stream of messages (newest-first, capped at 50).
-  static Stream<List<ChatMessage>> messagesStream(String conversationId) {
-    return _db
+  static Stream<List<ChatMessage>> messagesStream(
+      String conversationId) async* {
+    await ApiClient.get('/users/me/chat-identity');
+    yield* _db
         .collection('conversations')
         .doc(conversationId)
         .collection('messages')
@@ -85,8 +87,9 @@ class ChatService {
   }
 
   /// All direct and group conversations visible to [userId], updated live.
-  static Stream<List<Conversation>> conversationsStream(String userId) {
-    return _db
+  static Stream<List<Conversation>> conversationsStream(String userId) async* {
+    await ApiClient.get('/users/me/chat-identity');
+    yield* _db
         .collection('conversations')
         .where('memberIds', arrayContains: userId)
         .snapshots()
@@ -107,6 +110,7 @@ class ChatService {
   /// Fetch the members subcollection once and return a userId→username map.
   static Future<Map<String, String>> fetchMemberUsernames(
       String conversationId) async {
+    await ApiClient.get('/users/me/chat-identity');
     final snap = await _db
         .collection('conversations')
         .doc(conversationId)
@@ -129,8 +133,10 @@ class ChatService {
   }
 
   /// Real-time unread count for a user in a conversation.
-  static Stream<int> unreadCountStream(String conversationId, String userId) {
-    return _db
+  static Stream<int> unreadCountStream(
+      String conversationId, String userId) async* {
+    await ApiClient.get('/users/me/chat-identity');
+    yield* _db
         .collection('conversations')
         .doc(conversationId)
         .collection('members')
@@ -144,6 +150,7 @@ class ChatService {
   /// moviePosterUrl, expiresAt, pgGroupRequestId, createdBy, status, etc.)
   static Future<Map<String, Map<String, dynamic>>> fetchWatchRequestDocs(
       String conversationId) async {
+    await ApiClient.get('/users/me/chat-identity');
     final snap = await _db
         .collection('conversations')
         .doc(conversationId)

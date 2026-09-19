@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flixie_app/features/watch_plans/presentation/widgets/shared/watch_plan_components.dart';
 import 'package:flixie_app/features/watch_plans/presentation/widgets/group_plan/watch_plan_movie_options.dart';
@@ -198,10 +199,10 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
       child: widget.embedded
           ? _screenBody(request)
           : Scaffold(
-              backgroundColor: FlixieColors.background,
+              backgroundColor: context.colors.background,
               appBar: AppBar(
-                backgroundColor: FlixieColors.background,
-                foregroundColor: FlixieColors.textPrimary,
+                backgroundColor: context.colors.background,
+                foregroundColor: context.colors.textPrimary,
                 leading: request == null
                     ? null
                     : IconButton(
@@ -261,7 +262,7 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: FlixieColors.surface,
+      backgroundColor: context.colors.surface,
       builder: (_) => MovieWatchRequestSheet(
         movieId: null,
         movieTitle: null,
@@ -285,29 +286,13 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
         runSpacing: 4,
         children: [
           for (final past in [false, true])
-            ChoiceChip(
-              label: Text(past
-                  ? 'Past · ${_requests.where((plan) => plan.isArchived).length}'
-                  : 'Active · ${_requests.where((plan) => plan.isActive).length}'),
-              selected: _past == past,
-              onSelected: (_) => setState(() => _past = past),
-              showCheckmark: true,
-              checkmarkColor: FlixieColors.medium,
-              labelPadding: const EdgeInsets.symmetric(horizontal: 12),
-              padding: EdgeInsets.zero,
-              selectedColor: FlixieColors.primary.withValues(alpha: .22),
-              backgroundColor: FlixieColors.tabBarBackgroundFocused,
-              side: BorderSide(
-                color: FlixieColors.primary.withValues(
-                  alpha: _past == past ? 1 : .3,
-                ),
-              ),
-              labelStyle: TextStyle(
-                color: _past == past ? Colors.white : FlixieColors.medium,
-                fontWeight: FontWeight.w700,
-              ),
-              shape: const StadiumBorder(),
-            ),
+            FlixiePill.choice(
+                label: Text(past
+                    ? 'Past · ${_requests.where((plan) => plan.isArchived).length}'
+                    : 'Active · ${_requests.where((plan) => plan.isActive).length}'),
+                selected: _past == past,
+                onSelected: (_) => setState(() => _past = past),
+                showCheckmark: true),
         ],
       ),
       if (widget.embedded && (plans.isNotEmpty || _past)) ...[
@@ -357,30 +342,32 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
               _status(state),
               const SizedBox(height: 7),
               Text(request.movieTitle ?? _optionLabel(request),
-                  style: const TextStyle(
-                      color: FlixieColors.textPrimary,
+                  style: TextStyle(
+                      color: context.colors.textPrimary,
                       fontSize: 19,
                       fontWeight: FontWeight.w800)),
               const SizedBox(height: 5),
               Text(_groupName(request),
-                  style: const TextStyle(
-                      color: FlixieColors.primaryText,
+                  style: TextStyle(
+                      color: context.colors.primaryText,
                       fontSize: 13,
                       fontWeight: FontWeight.w700)),
               const SizedBox(height: 3),
-              Text(_timing(request), style: _body),
+              Text(_timing(request),
+                  style: _body.copyWith(color: context.colors.light)),
               if (request.isActive) ...[
                 const SizedBox(height: 3),
-                Text(_replyLabel(request), style: _body),
+                Text(_replyLabel(request),
+                    style: _body.copyWith(color: context.colors.light)),
               ],
               const SizedBox(height: 9),
               _avatars(_activeMembers(request), 34),
             ]),
           ),
-          const Padding(
-            padding: EdgeInsets.only(top: 36),
+          Padding(
+            padding: const EdgeInsets.only(top: 36),
             child:
-                Icon(Icons.chevron_right_rounded, color: FlixieColors.medium),
+                Icon(Icons.chevron_right_rounded, color: context.colors.medium),
           ),
         ]),
         border: state.color.withValues(alpha: .45),
@@ -401,9 +388,9 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       _hero(request, members),
       _creationMessage(request),
-      const Divider(height: 30, color: FlixieColors.tabBarBorder),
+      Divider(height: 30, color: context.colors.tabBarBorder),
       _actionCard(request),
-      const Divider(height: 30, color: FlixieColors.tabBarBorder),
+      Divider(height: 30, color: context.colors.tabBarBorder),
       _progress(request, members),
     ]);
   }
@@ -428,13 +415,15 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(title,
-                  style: const TextStyle(
-                      color: FlixieColors.textPrimary,
+                  style: TextStyle(
+                      color: context.colors.textPrimary,
                       fontSize: 21,
                       fontWeight: FontWeight.w900)),
               const SizedBox(height: 2),
               Text(_groupName(request),
-                  maxLines: 1, overflow: TextOverflow.ellipsis, style: _body),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: _body.copyWith(color: context.colors.light)),
               const SizedBox(height: 12),
               _scheduleFact(
                   Icons.calendar_month_outlined, _format(request.scheduledFor)),
@@ -450,10 +439,10 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
           ),
         ]),
         _creationMessage(request),
-        const Divider(height: 30, color: FlixieColors.tabBarBorder),
+        Divider(height: 30, color: context.colors.tabBarBorder),
         Text('Confirmed attendees (${members.length})',
-            style: const TextStyle(
-                color: FlixieColors.textPrimary,
+            style: TextStyle(
+                color: context.colors.textPrimary,
                 fontSize: 15,
                 fontWeight: FontWeight.w800)),
         const SizedBox(height: 12),
@@ -467,12 +456,12 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
                       member.memberId == _userId ? 'You' : member.displayName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          color: FlixieColors.textPrimary,
+                      style: TextStyle(
+                          color: context.colors.textPrimary,
                           fontWeight: FontWeight.w700)),
                 ),
-                const Icon(Icons.check_circle_rounded,
-                    color: FlixieColors.success, size: 24),
+                Icon(Icons.check_circle_rounded,
+                    color: context.colors.success, size: 24),
               ]),
             )),
         const SizedBox(height: 8),
@@ -504,43 +493,32 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
           _outline('Already watched? Log your watch',
               Icons.check_circle_outline, () => _logWatch(request)),
           const SizedBox(height: 6),
-          const Text(
+          Text(
               'Went early? Record when you watched, your rating and an optional review.',
-              style: _body),
+              style: _body.copyWith(color: context.colors.light)),
         ],
       ]),
     );
   }
 
   Widget _scheduleFact(IconData icon, String label) => Row(children: [
-        Icon(icon, size: 19, color: FlixieColors.secondary),
+        Icon(icon, size: 19, color: context.colors.secondary),
         const SizedBox(width: 10),
         Expanded(
           child: Text(label,
-              maxLines: 2, overflow: TextOverflow.ellipsis, style: _body),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: _body.copyWith(color: context.colors.light)),
         ),
       ]);
 
-  Widget _scheduledPill() => Align(
+  Widget _scheduledPill() {
+    return const Align(
         alignment: Alignment.centerLeft,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-          decoration: BoxDecoration(
-            color: FlixieColors.success,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: const Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.check_circle_rounded,
-                color: FlixieColors.background, size: 17),
-            SizedBox(width: 6),
-            Text('Scheduled',
-                style: TextStyle(
-                    color: FlixieColors.background,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900)),
-          ]),
-        ),
-      );
+        child: FlixiePill.label(
+            label: Text('Scheduled'),
+            avatar: Icon(Icons.check_circle_rounded)));
+  }
 
   Widget _inviteDetail(GroupWatchRequest request, List<GroupMember> members) {
     final selected = _selectedCandidate(request);
@@ -563,8 +541,8 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(
                 title,
-                style: const TextStyle(
-                    color: FlixieColors.textPrimary,
+                style: TextStyle(
+                    color: context.colors.textPrimary,
                     fontSize: 21,
                     fontWeight: FontWeight.w900),
               ),
@@ -588,15 +566,15 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
           WatchPlanMovieOptions(candidates: request.candidates),
         ],
         _creationMessage(request),
-        const Divider(height: 30, color: FlixieColors.tabBarBorder),
-        const Text('Group members',
+        Divider(height: 30, color: context.colors.tabBarBorder),
+        Text('Group members',
             style: TextStyle(
-                color: FlixieColors.textPrimary,
+                color: context.colors.textPrimary,
                 fontSize: 15,
                 fontWeight: FontWeight.w800)),
         const SizedBox(height: 12),
         _memberRoster(members),
-        const Divider(height: 30, color: FlixieColors.tabBarBorder),
+        Divider(height: 30, color: context.colors.tabBarBorder),
         _invite(request),
       ]),
     );
@@ -609,8 +587,8 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
       padding: const EdgeInsets.only(top: 16),
       child: Text(
         '“$message”',
-        style: const TextStyle(
-          color: FlixieColors.textPrimary,
+        style: TextStyle(
+          color: context.colors.textPrimary,
           fontSize: 14,
           height: 1.5,
         ),
@@ -619,33 +597,21 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
   }
 
   Widget _planFact(IconData icon, String label) => Row(children: [
-        Icon(icon, size: 19, color: FlixieColors.primaryText),
+        Icon(icon, size: 19, color: context.colors.primaryText),
         const SizedBox(width: 10),
         Expanded(
           child: Text(label,
-              maxLines: 2, overflow: TextOverflow.ellipsis, style: _body),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: _body.copyWith(color: context.colors.light)),
         ),
       ]);
 
-  Widget _groupPlanPill() => Align(
+  Widget _groupPlanPill() {
+    return const Align(
         alignment: Alignment.centerLeft,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: FlixieColors.primary.withValues(alpha: .14),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-                color: FlixieColors.primaryText.withValues(alpha: .45)),
-          ),
-          child: const Text(
-            'Group',
-            style: TextStyle(
-                color: FlixieColors.primaryText,
-                fontSize: 12,
-                fontWeight: FontWeight.w800),
-          ),
-        ),
-      );
+        child: FlixiePill.label(label: Text('Group')));
+  }
 
   Widget _detailPoster(String? path, String title, double width) {
     final poster = _poster(path, title, width);
@@ -656,15 +622,15 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
         top: 4,
         left: 4,
         child: Material(
-          color: FlixieColors.background.withValues(alpha: .86),
+          color: context.colors.background.withValues(alpha: .86),
           shape: const CircleBorder(),
           child: IconButton(
             tooltip: 'Back to Watch Plans',
             constraints: const BoxConstraints.tightFor(width: 44, height: 44),
             padding: EdgeInsets.zero,
             onPressed: () => setState(() => _selectedId = null),
-            icon: const Icon(Icons.arrow_back_rounded,
-                color: FlixieColors.textPrimary, size: 23),
+            icon: Icon(Icons.arrow_back_rounded,
+                color: context.colors.textPrimary, size: 23),
           ),
         ),
       ),
@@ -673,7 +639,8 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
 
   Widget _memberRoster(List<GroupMember> members) {
     if (members.isEmpty) {
-      return const Text('Member details unavailable', style: _body);
+      return Text('Member details unavailable',
+          style: _body.copyWith(color: context.colors.light));
     }
     return Wrap(
       spacing: 18,
@@ -689,8 +656,8 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        color: FlixieColors.textPrimary,
+                    style: TextStyle(
+                        color: context.colors.textPrimary,
                         fontSize: 12,
                         fontWeight: FontWeight.w700),
                   ),
@@ -717,23 +684,25 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
             const SizedBox(height: 8),
             Text(
               title,
-              style: const TextStyle(
-                  color: FlixieColors.textPrimary,
+              style: TextStyle(
+                  color: context.colors.textPrimary,
                   fontSize: 25,
                   fontWeight: FontWeight.w900),
             ),
             if (widget.groupId == null) ...[
               const SizedBox(height: 2),
               Text(_groupName(request),
-                  style: const TextStyle(
-                      color: FlixieColors.primaryText,
+                  style: TextStyle(
+                      color: context.colors.primaryText,
                       fontWeight: FontWeight.w700)),
             ],
             const SizedBox(height: 6),
-            Text(_timing(request), style: _body),
+            Text(_timing(request),
+                style: _body.copyWith(color: context.colors.light)),
             if (request.location?.trim().isNotEmpty == true) ...[
               const SizedBox(height: 2),
-              Text(request.location!, style: _body),
+              Text(request.location!,
+                  style: _body.copyWith(color: context.colors.light)),
             ],
             const SizedBox(height: 10),
             _avatars(members, 38),
@@ -765,11 +734,12 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
 
   Widget _invite(GroupWatchRequest request) =>
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Will you join?', style: _sectionTitle),
+        Text('Will you join?',
+            style: _sectionTitle.copyWith(color: context.colors.textPrimary)),
         const SizedBox(height: 6),
-        const Text(
+        Text(
           'Join to choose films. You’ll approve any proposed time separately.',
-          style: _body,
+          style: _body.copyWith(color: context.colors.light),
         ),
         const SizedBox(height: 18),
         _primary('I’m in', Icons.check_rounded,
@@ -792,9 +762,11 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
     final count = _activeMembers(request).length;
     return _detailSection(
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('What could you watch?', style: _sectionTitle),
+      Text('What could you watch?',
+          style: _sectionTitle.copyWith(color: context.colors.textPrimary)),
       const SizedBox(height: 6),
-      const Text('Select every title you would happily watch.', style: _body),
+      Text('Select every title you would happily watch.',
+          style: _body.copyWith(color: context.colors.light)),
       const SizedBox(height: 16),
       ...request.candidates.map((candidate) {
         final selected = choices.contains(candidate.id);
@@ -825,10 +797,11 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
         b.selectedByUserIds.length.compareTo(a.selectedByUserIds.length));
     return _detailSection(
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Choose the final movie', style: _sectionTitle),
+      Text('Choose the final movie',
+          style: _sectionTitle.copyWith(color: context.colors.textPrimary)),
       const SizedBox(height: 6),
-      const Text('The group’s strongest matches are shown first.',
-          style: _body),
+      Text('The group’s strongest matches are shown first.',
+          style: _body.copyWith(color: context.colors.light)),
       const SizedBox(height: 16),
       ...candidates.map((candidate) => Padding(
             padding: const EdgeInsets.only(bottom: 10),
@@ -854,15 +827,16 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
     final approved = response?.status.toUpperCase() == 'ACCEPTED';
     return _detailSection(
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Does this time work?', style: _sectionTitle),
+      Text('Does this time work?',
+          style: _sectionTitle.copyWith(color: context.colors.textPrimary)),
       const SizedBox(height: 10),
       Row(children: [
-        const Icon(Icons.calendar_month_rounded, color: FlixieColors.secondary),
+        Icon(Icons.calendar_month_rounded, color: context.colors.secondary),
         const SizedBox(width: 9),
         Expanded(
           child: Text(_format(iso),
-              style: const TextStyle(
-                  color: FlixieColors.secondary,
+              style: TextStyle(
+                  color: context.colors.secondary,
                   fontSize: 18,
                   fontWeight: FontWeight.w800)),
         ),
@@ -894,11 +868,12 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
             .every((item) => item.status.toUpperCase() == 'ACCEPTED');
     return _detailSection(
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Review time change', style: _sectionTitle),
+        Text('Review time change',
+            style: _sectionTitle.copyWith(color: context.colors.textPrimary)),
         const SizedBox(height: 6),
-        const Text(
+        Text(
           'Your current schedule stays confirmed until everyone accepts the new time and the plan creator confirms it.',
-          style: _body,
+          style: _body.copyWith(color: context.colors.light),
         ),
         const SizedBox(height: 16),
         _timeComparison(
@@ -962,14 +937,15 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
         decoration: BoxDecoration(
           color: highlighted
               ? FlixieColors.primary.withValues(alpha: .12)
-              : FlixieColors.surfaceElevated,
+              : context.colors.surfaceElevated,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Icon(icon,
               size: 21,
-              color:
-                  highlighted ? FlixieColors.secondary : FlixieColors.medium),
+              color: highlighted
+                  ? context.colors.secondary
+                  : context.colors.medium),
           const SizedBox(width: 10),
           Expanded(
             child:
@@ -977,19 +953,20 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
               Text(label,
                   style: TextStyle(
                       color: highlighted
-                          ? FlixieColors.secondary
-                          : FlixieColors.medium,
+                          ? context.colors.secondary
+                          : context.colors.medium,
                       fontSize: 12,
                       fontWeight: FontWeight.w800)),
               const SizedBox(height: 3),
               Text(_format(date),
-                  style: const TextStyle(
-                      color: FlixieColors.textPrimary,
+                  style: TextStyle(
+                      color: context.colors.textPrimary,
                       fontSize: 16,
                       fontWeight: FontWeight.w800)),
               if (location?.trim().isNotEmpty == true) ...[
                 const SizedBox(height: 2),
-                Text(location!, style: _body),
+                Text(location!,
+                    style: _body.copyWith(color: context.colors.light)),
               ],
             ]),
           ),
@@ -1000,11 +977,12 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
     final date = DateTime.tryParse(request.scheduledFor ?? '')?.toLocal();
     return _detailSection(
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('You’re all set', style: _sectionTitle),
+      Text('You’re all set',
+          style: _sectionTitle.copyWith(color: context.colors.textPrimary)),
       const SizedBox(height: 6),
       Text(
           '${request.movieTitle ?? 'Your movie'} is set for ${_format(request.scheduledFor)}.',
-          style: _body),
+          style: _body.copyWith(color: context.colors.light)),
       const SizedBox(height: 18),
       _primary(
         'Add to calendar',
@@ -1029,11 +1007,10 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
   Widget _postWatch(GroupWatchRequest request) => _detailSection(
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('How did ${request.movieTitle ?? 'it'} go?',
-              style: _sectionTitle),
+              style: _sectionTitle.copyWith(color: context.colors.textPrimary)),
           const SizedBox(height: 6),
-          const Text(
-              'Log your viewing, or let the group know you couldn’t make it.',
-              style: _body),
+          Text('Log your viewing, or let the group know you couldn’t make it.',
+              style: _body.copyWith(color: context.colors.light)),
           const SizedBox(height: 18),
           if (request.hasMissedFor(_userId))
             _notice('You didn’t make it. No watch entry was added.')
@@ -1068,12 +1045,12 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
       Row(children: [
         Expanded(
           child: Text(isScheduleResponse ? 'Group responses' : 'Group progress',
-              style: _sectionTitle),
+              style: _sectionTitle.copyWith(color: context.colors.textPrimary)),
         ),
         if (!isScheduleResponse)
           Text('${members.length} ${members.length == 1 ? 'person' : 'people'}',
-              style: const TextStyle(
-                  color: FlixieColors.medium, fontWeight: FontWeight.w700)),
+              style: TextStyle(
+                  color: context.colors.medium, fontWeight: FontWeight.w700)),
       ]),
       const SizedBox(height: 14),
       ...members.map((member) {
@@ -1093,8 +1070,8 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
                   member.memberId == _userId ? 'You' : member.displayName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      color: FlixieColors.textPrimary,
+                  style: TextStyle(
+                      color: context.colors.textPrimary,
                       fontWeight: FontWeight.w700)),
             ),
             const SizedBox(width: 8),
@@ -1151,7 +1128,7 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
       isScrollControlled: true,
       useSafeArea: true,
       useRootNavigator: true,
-      backgroundColor: FlixieColors.surface,
+      backgroundColor: context.colors.surface,
       builder: (_) => MovieSearchSheet(
         title: 'Add a movie option',
         searchMovies: (query) async {
@@ -1332,47 +1309,47 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
   _PlanState _state(GroupWatchRequest request) {
     if (request.isArchived) {
       return request.status == WatchRequestStatus.completed
-          ? const _PlanState(_Stage.recap, 'Watched', FlixieColors.success,
+          ? _PlanState(_Stage.recap, 'Watched', context.colors.success,
               Icons.check_circle_rounded)
-          : _PlanState(_Stage.closed, request.statusLabel, FlixieColors.medium,
-              Icons.block_rounded);
+          : _PlanState(_Stage.closed, request.statusLabel,
+              context.colors.medium, Icons.block_rounded);
     }
     if (request.selectedCandidateId != null &&
         request.activeScheduleProposal != null) {
-      return const _PlanState(_Stage.proposal, 'Time proposal',
-          FlixieColors.secondary, Icons.schedule_rounded);
+      return _PlanState(_Stage.proposal, 'Time proposal',
+          context.colors.secondary, Icons.schedule_rounded);
     }
     final scheduled = DateTime.tryParse(request.scheduledFor ?? '')?.toLocal();
     if (scheduled != null) {
       return scheduled.isAfter(DateTime.now())
-          ? const _PlanState(_Stage.scheduled, 'Scheduled',
-              FlixieColors.success, Icons.event_available_rounded)
-          : const _PlanState(_Stage.postWatch, 'Ready to log',
-              FlixieColors.warning, Icons.rate_review_outlined);
+          ? _PlanState(_Stage.scheduled, 'Scheduled', context.colors.success,
+              Icons.event_available_rounded)
+          : _PlanState(_Stage.postWatch, 'Ready to log', context.colors.warning,
+              Icons.rate_review_outlined);
     }
     if (!_accepted(request) && request.userId != _userId) {
-      return const _PlanState(_Stage.invite, 'Needs a reply',
-          FlixieColors.warning, Icons.mark_email_unread_outlined);
+      return _PlanState(_Stage.invite, 'Needs a reply', context.colors.warning,
+          Icons.mark_email_unread_outlined);
     }
     if (request.selectedCandidateId == null && request.candidates.isNotEmpty) {
       if (request.userId == _userId && _everyonePicked(request)) {
-        return const _PlanState(_Stage.finalMovie, 'Choose final movie',
-            FlixieColors.primaryText, Icons.movie_filter_rounded);
+        return _PlanState(_Stage.finalMovie, 'Choose final movie',
+            context.colors.primaryText, Icons.movie_filter_rounded);
       }
-      return const _PlanState(_Stage.picking, 'Picking movies',
-          FlixieColors.primaryText, Icons.how_to_vote_outlined);
+      return _PlanState(_Stage.picking, 'Picking movies',
+          context.colors.primaryText, Icons.how_to_vote_outlined);
     }
     if (request.selectedCandidateId != null &&
         request.proposedDate?.isNotEmpty == true) {
-      return const _PlanState(_Stage.proposal, 'Time proposal',
-          FlixieColors.secondary, Icons.schedule_rounded);
+      return _PlanState(_Stage.proposal, 'Time proposal',
+          context.colors.secondary, Icons.schedule_rounded);
     }
     if (request.selectedCandidateId != null && request.userId == _userId) {
-      return const _PlanState(_Stage.chooseTime, 'Choose a time',
-          FlixieColors.secondary, Icons.calendar_month_rounded);
+      return _PlanState(_Stage.chooseTime, 'Choose a time',
+          context.colors.secondary, Icons.calendar_month_rounded);
     }
-    return const _PlanState(_Stage.waitingMovie, 'Waiting for creator',
-        FlixieColors.medium, Icons.hourglass_top_rounded);
+    return _PlanState(_Stage.waitingMovie, 'Waiting for creator',
+        context.colors.medium, Icons.hourglass_top_rounded);
   }
 
   bool _accepted(GroupWatchRequest request) =>
@@ -1418,63 +1395,71 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
   ) {
     final stage = _state(request).stage;
     if (stage == _Stage.scheduled) {
-      return ('Confirmed', FlixieColors.success, Icons.check_circle_rounded);
+      return ('Confirmed', context.colors.success, Icons.check_circle_rounded);
     }
     if (stage == _Stage.proposal) {
       return switch (timeResponse?.status.toUpperCase()) {
         'ACCEPTED' => (
             'Accepted',
-            FlixieColors.success,
+            context.colors.success,
             Icons.check_circle_rounded
           ),
         'DECLINED' => (
             'Can’t make it',
-            FlixieColors.warning,
+            context.colors.warning,
             Icons.cancel_outlined
           ),
-        _ => ('Pending', FlixieColors.warning, Icons.schedule_rounded),
+        _ => ('Pending', context.colors.warning, Icons.schedule_rounded),
       };
     }
     if (response?.missedAt != null) {
-      return ('Didn’t make it', FlixieColors.medium, Icons.event_busy_outlined);
+      return (
+        'Didn’t make it',
+        context.colors.medium,
+        Icons.event_busy_outlined
+      );
     }
     if (response?.watchedAt != null) {
-      return ('Watched', FlixieColors.success, Icons.check_circle_rounded);
+      return ('Watched', context.colors.success, Icons.check_circle_rounded);
     }
     if (stage == _Stage.postWatch) {
-      return ('Still to respond', FlixieColors.medium, Icons.schedule_rounded);
+      return (
+        'Still to respond',
+        context.colors.medium,
+        Icons.schedule_rounded
+      );
     }
     if (timeResponse != null) {
       return switch (timeResponse.status.toUpperCase()) {
         'ACCEPTED' => (
             'Time approved',
-            FlixieColors.success,
+            context.colors.success,
             Icons.check_circle_rounded
           ),
         'DECLINED' => (
             'Needs another time',
-            FlixieColors.warning,
+            context.colors.warning,
             Icons.edit_calendar_outlined
           ),
-        _ => ('Time pending', FlixieColors.medium, Icons.schedule_rounded),
+        _ => ('Time pending', context.colors.medium, Icons.schedule_rounded),
       };
     }
     if (member.memberId == request.userId) {
-      return ('Plan owner', FlixieColors.success, Icons.check_circle_rounded);
+      return ('Plan owner', context.colors.success, Icons.check_circle_rounded);
     }
     return switch (response?.status) {
       'ACCEPTED' => (
           'Joined',
-          FlixieColors.success,
+          context.colors.success,
           Icons.check_circle_rounded
         ),
       'DECLINED' => (
           'Not attending',
-          FlixieColors.medium,
+          context.colors.medium,
           Icons.cancel_outlined
         ),
-      'MAYBE' => ('Maybe', FlixieColors.warning, Icons.help_outline_rounded),
-      _ => ('Pending', FlixieColors.medium, Icons.schedule_rounded),
+      'MAYBE' => ('Maybe', context.colors.warning, Icons.help_outline_rounded),
+      _ => ('Pending', context.colors.medium, Icons.schedule_rounded),
     };
   }
 
@@ -1484,16 +1469,16 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
     final unanimous = participantCount > 0 && approvals >= participantCount;
     return Material(
       color: unanimous
-          ? FlixieColors.success.withValues(alpha: .08)
-          : FlixieColors.background.withValues(alpha: .35),
+          ? context.colors.success.withValues(alpha: .08)
+          : context.colors.background.withValues(alpha: .35),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
         side: BorderSide(
           color: unanimous
-              ? FlixieColors.success
+              ? context.colors.success
               : selected
                   ? FlixieColors.primary
-                  : FlixieColors.tabBarBorder,
+                  : context.colors.tabBarBorder,
           width: unanimous || selected ? 2 : 1,
         ),
       ),
@@ -1510,8 +1495,8 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(candidate.title ?? 'Movie option',
-                        style: const TextStyle(
-                            color: FlixieColors.textPrimary,
+                        style: TextStyle(
+                            color: context.colors.textPrimary,
                             fontWeight: FontWeight.w800)),
                     const SizedBox(height: 4),
                     Text(
@@ -1520,8 +1505,8 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
                           : '$approvals of $participantCount would watch',
                       style: TextStyle(
                           color: unanimous
-                              ? FlixieColors.success
-                              : FlixieColors.medium,
+                              ? context.colors.success
+                              : context.colors.medium,
                           fontSize: 12,
                           fontWeight: FontWeight.w700),
                     ),
@@ -1532,7 +1517,9 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
             else
               Icon(
                   selected ? Icons.check_circle_rounded : Icons.circle_outlined,
-                  color: selected ? FlixieColors.success : FlixieColors.medium),
+                  color: selected
+                      ? context.colors.success
+                      : context.colors.medium),
           ]),
         ),
       ),
@@ -1541,7 +1528,8 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
 
   Widget _avatars(List<GroupMember> members, double size) {
     if (members.isEmpty) {
-      return const Text('Member details unavailable', style: _body);
+      return Text('Member details unavailable',
+          style: _body.copyWith(color: context.colors.light));
     }
     return Wrap(
       spacing: 6,
@@ -1579,7 +1567,7 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
                   shape: BoxShape.circle,
                   border: Border.all(
                     color: member.isOwner
-                        ? FlixieColors.warning
+                        ? context.colors.warning
                         : FlixieColors.primary,
                     width: 2,
                   ),
@@ -1611,9 +1599,10 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
           {String? action, IconData? icon, FutureOr<void> Function()? onTap}) =>
       _detailSection(
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title, style: _sectionTitle),
+        Text(title,
+            style: _sectionTitle.copyWith(color: context.colors.textPrimary)),
         const SizedBox(height: 6),
-        Text(body, style: _body),
+        Text(body, style: _body.copyWith(color: context.colors.light)),
         if (action != null && icon != null && onTap != null) ...[
           const SizedBox(height: 18),
           _primary(action, icon, onTap),
@@ -1625,12 +1614,16 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
       Padding(
         padding: const EdgeInsets.symmetric(vertical: 72, horizontal: 24),
         child: Column(children: [
-          const Icon(Icons.movie_filter_outlined,
-              color: FlixieColors.primaryText, size: 38),
+          Icon(Icons.movie_filter_outlined,
+              color: context.colors.primaryText, size: 38),
           const SizedBox(height: 14),
-          Text(title, textAlign: TextAlign.center, style: _sectionTitle),
+          Text(title,
+              textAlign: TextAlign.center,
+              style: _sectionTitle.copyWith(color: context.colors.textPrimary)),
           const SizedBox(height: 7),
-          Text(body, textAlign: TextAlign.center, style: _body),
+          Text(body,
+              textAlign: TextAlign.center,
+              style: _body.copyWith(color: context.colors.light)),
           if (action != null && onTap != null) ...[
             const SizedBox(height: 20),
             FilledButton(onPressed: onTap, child: Text(action)),
@@ -1642,14 +1635,15 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
         width: double.infinity,
         padding: const EdgeInsets.all(13),
         decoration: BoxDecoration(
-          color: FlixieColors.surfaceElevated,
+          color: context.colors.surfaceElevated,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(children: [
-          const Icon(Icons.schedule_rounded,
-              color: FlixieColors.medium, size: 20),
+          Icon(Icons.schedule_rounded, color: context.colors.medium, size: 20),
           const SizedBox(width: 9),
-          Expanded(child: Text(text, style: _body)),
+          Expanded(
+              child: Text(text,
+                  style: _body.copyWith(color: context.colors.light))),
         ]),
       );
 
@@ -1777,13 +1771,13 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
         FlixieToast(
             type: FlixieToastType.error,
             content: Text(message),
-            backgroundColor: FlixieColors.danger),
+            backgroundColor: context.colors.danger),
       );
 
   void _showSuccess(String message) =>
       ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
         type: FlixieToastType.success,
-        backgroundColor: FlixieColors.surfaceElevated,
+        backgroundColor: context.colors.surfaceElevated,
         content: Text(message),
       ));
 }

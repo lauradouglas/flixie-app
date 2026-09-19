@@ -66,11 +66,11 @@ class _FriendsActivityScreenState extends State<FriendsActivityScreen> {
   @override
   Widget build(BuildContext context) {
     return FlixiePageScaffold(
-      appBar: const FlixieTitleAppBar(
+      appBar: FlixieTitleAppBar(
         title: Text(
           'Friend Activity',
           style: TextStyle(
-            color: FlixieColors.light,
+            color: context.colors.light,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -91,15 +91,15 @@ class _FriendsActivityScreenState extends State<FriendsActivityScreen> {
                 : _items.isEmpty
                     ? ListView(
                         padding: const EdgeInsets.all(24),
-                        children: const [
-                          SizedBox(height: 160),
+                        children: [
+                          const SizedBox(height: 160),
                           Icon(Icons.people_outline_rounded,
-                              size: 52, color: FlixieColors.medium),
-                          SizedBox(height: 12),
+                              size: 52, color: context.colors.medium),
+                          const SizedBox(height: 12),
                           Text(
                             'No friend activity in the last two weeks.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: FlixieColors.medium),
+                            style: TextStyle(color: context.colors.medium),
                           ),
                         ],
                       )
@@ -114,19 +114,19 @@ class _FriendsActivityScreenState extends State<FriendsActivityScreen> {
                                 const Icon(Icons.calendar_today_outlined,
                                     size: 16, color: FlixieColors.primary),
                                 const SizedBox(width: 8),
-                                const Expanded(
+                                Expanded(
                                   child: Text(
                                     'Last 14 days · ratings and recommendations first',
                                     style: TextStyle(
-                                      color: FlixieColors.medium,
+                                      color: context.colors.medium,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                 ),
                                 Text(
                                   '${_items.length}',
-                                  style: const TextStyle(
-                                    color: FlixieColors.light,
+                                  style: TextStyle(
+                                    color: context.colors.light,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),

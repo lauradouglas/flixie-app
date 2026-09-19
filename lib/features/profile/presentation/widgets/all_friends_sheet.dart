@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
@@ -134,7 +135,7 @@ class _AllFriendsSheetState extends State<AllFriendsSheet>
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: FlixieColors.medium.withValues(alpha: 0.4),
+                color: context.colors.medium.withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -152,7 +153,7 @@ class _AllFriendsSheetState extends State<AllFriendsSheet>
             TabBar(
               controller: _tabController,
               labelColor: FlixieColors.primary,
-              unselectedLabelColor: FlixieColors.medium,
+              unselectedLabelColor: context.colors.medium,
               indicatorColor: FlixieColors.primary,
               isScrollable: true,
               tabAlignment: TabAlignment.start,
@@ -178,7 +179,7 @@ class _AllFriendsSheetState extends State<AllFriendsSheet>
                       const SizedBox(width: 6),
                       _TabBadge(
                         count: _pendingFriends.length,
-                        color: FlixieColors.warning,
+                        color: context.colors.warning,
                       ),
                     ],
                   ),
@@ -191,7 +192,7 @@ class _AllFriendsSheetState extends State<AllFriendsSheet>
                       const SizedBox(width: 6),
                       _TabBadge(
                         count: _sentUsers.length,
-                        color: FlixieColors.medium,
+                        color: context.colors.medium,
                       ),
                     ],
                   ),
@@ -254,7 +255,7 @@ class _AllFriendsSheetState extends State<AllFriendsSheet>
                             return _FriendListTile(
                               user: user,
                               subtitle: 'Request sent',
-                              accentColor: FlixieColors.medium,
+                              accentColor: context.colors.medium,
                               onTap: () => context.push('/friends/${user.id}'),
                             );
                           },
@@ -276,17 +277,7 @@ class _TabBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        '$count',
-        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-      ),
-    );
+    return FlixiePill.label(label: Text('$count'));
   }
 }
 
@@ -304,7 +295,7 @@ class _EmptyTab extends StatelessWidget {
           style: Theme.of(context)
               .textTheme
               .bodyMedium
-              ?.copyWith(color: FlixieColors.medium),
+              ?.copyWith(color: context.colors.medium),
         ),
       ),
     );
@@ -324,14 +315,14 @@ class _PendingRequestTile extends StatelessWidget {
   final VoidCallback onDecline;
   final VoidCallback onTap;
 
-  Color get _avatarColor {
+  Color _avatarColor(BuildContext context) {
     final hex = user.iconColor?['hexCode'] as String?;
     if (hex != null) {
       try {
         return Color(int.parse(hex.replaceFirst('#', 'FF'), radix: 16));
       } catch (_) {}
     }
-    return FlixieColors.warning;
+    return context.colors.warning;
   }
 
   @override
@@ -348,7 +339,7 @@ class _PendingRequestTile extends StatelessWidget {
                   (user.username.isNotEmpty
                       ? user.username[0].toUpperCase()
                       : '?'),
-              fallbackColor: _avatarColor,
+              fallbackColor: _avatarColor(context),
               size: 40,
               profileBadges: user.profileBadges,
             ),
@@ -362,13 +353,14 @@ class _PendingRequestTile extends StatelessWidget {
                 children: [
                   Text(
                     '@${user.username}',
-                    style: const TextStyle(color: FlixieColors.light),
+                    style: TextStyle(color: context.colors.light),
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const Text(
+                  Text(
                     'Wants to be your friend',
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: FlixieColors.warning, fontSize: 12),
+                    style:
+                        TextStyle(color: context.colors.warning, fontSize: 12),
                   ),
                 ],
               ),
@@ -379,8 +371,8 @@ class _PendingRequestTile extends StatelessWidget {
             children: [
               IconButton(
                 onPressed: onAccept,
-                icon: const Icon(Icons.check_circle_outline,
-                    color: FlixieColors.success),
+                icon: Icon(Icons.check_circle_outline,
+                    color: context.colors.success),
                 tooltip: 'Accept',
                 iconSize: 20,
                 constraints: const BoxConstraints(),
@@ -389,8 +381,7 @@ class _PendingRequestTile extends StatelessWidget {
               const SizedBox(width: 4),
               IconButton(
                 onPressed: onDecline,
-                icon: const Icon(Icons.cancel_outlined,
-                    color: FlixieColors.danger),
+                icon: Icon(Icons.cancel_outlined, color: context.colors.danger),
                 tooltip: 'Decline',
                 iconSize: 20,
                 constraints: const BoxConstraints(),
@@ -440,13 +431,13 @@ class _FriendListTile extends StatelessWidget {
         size: 40,
         profileBadges: user.profileBadges,
       ),
-      title: Text(user.displayName,
-          style: const TextStyle(color: FlixieColors.light)),
+      title:
+          Text(user.displayName, style: TextStyle(color: context.colors.light)),
       subtitle: Text(
         subtitle,
         style: TextStyle(color: accentColor, fontSize: 12),
       ),
-      trailing: const Icon(Icons.chevron_right, color: FlixieColors.medium),
+      trailing: Icon(Icons.chevron_right, color: context.colors.medium),
     );
   }
 }

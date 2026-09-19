@@ -1,3 +1,5 @@
+import 'package:flixie_app/features/profile/presentation/widgets/favourite_ranking_sheet.dart';
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/features/social/presentation/pages/social_screen.dart'
     show showProfileCreateGroupSheet;
 import 'package:flixie_app/features/profile/presentation/controllers/review_reactions_controller.dart';
@@ -489,8 +491,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               label: auth.unreadNotificationCount < 100
                   ? Text('${auth.unreadNotificationCount}')
                   : const Text('99+'),
-              backgroundColor: FlixieColors.tertiary,
-              textColor: Colors.black,
+              backgroundColor: FlixieColors.primaryShade,
+              textColor: Colors.white,
+              textStyle:
+                  const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
               child: const Icon(Icons.notifications_outlined),
             ),
             onPressed: () async {
@@ -539,6 +543,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             watched: watchedCount,
                             watchlist: watchlistCount,
                             favorites: favoritesCount,
+                            breakdowns: [
+                              '${dbUser?.watchedMovies?.length ?? 0} movies · ${dbUser?.watchedShows?.length ?? 0} shows',
+                              '${dbUser?.movieWatchlist?.length ?? 0} movies · ${dbUser?.showWatchlist?.length ?? 0} shows',
+                              '${favoriteMovies.length} movies · ${favoriteShows.length} shows',
+                            ],
                             onWatchHistory: () =>
                                 context.push('/watch-history'),
                             onWatchlist: () => context.push('/watchlist'),
@@ -560,28 +569,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 actionLabel: 'View stats'),
                             Text(
                                 '${_wrapped!.insights!['monthMovies']} movie watches · ${_wrapped!.insights!['monthEpisodes']} episodes',
-                                style:
-                                    const TextStyle(color: FlixieColors.light)),
+                                style: TextStyle(color: context.colors.light)),
                             if (_wrapped!.insights!['milestone'] != null)
                               Padding(
                                 padding: const EdgeInsets.only(top: 14),
                                 child: Row(children: [
-                                  const Icon(Icons.star_outline_rounded,
-                                      color: FlixieColors.warning),
+                                  Icon(Icons.star_outline_rounded,
+                                      color: context.colors.warning),
                                   const SizedBox(width: 10),
                                   Expanded(
                                       child: Column(
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
-                                        const Text('Latest milestone',
+                                        Text('Latest milestone',
                                             style: TextStyle(
-                                                color: FlixieColors.medium,
+                                                color: context.colors.medium,
                                                 fontSize: 12)),
                                         Text(
                                             '${_wrapped!.insights!['milestone']['count']} unique films watched',
-                                            style: const TextStyle(
-                                                color: FlixieColors.white,
+                                            style: TextStyle(
+                                                color: context.colors.white,
                                                 fontWeight: FontWeight.w600)),
                                       ])),
                                 ]),
@@ -765,9 +773,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         delegate: SliverChildBuilderDelegate((context, index) {
       if (index == 0) {
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Your activity',
+          Text('Your activity',
               style: TextStyle(
-                  color: FlixieColors.white,
+                  color: context.colors.white,
                   fontSize: 20,
                   fontWeight: FontWeight.w700)),
           const SizedBox(height: 8),
@@ -777,21 +785,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 for (final filter in _ActivityFilter.values)
                   Padding(
                       padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        selected: filter == _activityFilter,
-                        showCheckmark: false,
-                        label: Text(filter == _ActivityFilter.lists
-                            ? 'Watchlist'
-                            : _activityFilterLabel(filter)),
-                        onSelected: (_) {
-                          setState(() {
-                            _activityFilter = filter;
-                            _activity = [];
-                            _activityCursor = null;
-                          });
-                          _loadActivity();
-                        },
-                      )),
+                      child: FlixiePill.choice(
+                          selected: filter == _activityFilter,
+                          showCheckmark: false,
+                          label: Text(filter == _ActivityFilter.lists
+                              ? 'Watchlist'
+                              : _activityFilterLabel(filter)),
+                          onSelected: (_) {
+                            setState(() {
+                              _activityFilter = filter;
+                              _activity = [];
+                              _activityCursor = null;
+                            });
+                            _loadActivity();
+                          })),
               ])),
           const SizedBox(height: 12),
           if (_activityLoading)
@@ -806,7 +813,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 filtered.isEmpty
                     ? 'No activity yet.'
                     : 'Showing ${filtered.take(_activityLimit).length} activities',
-                style: const TextStyle(color: FlixieColors.medium)),
+                style: TextStyle(color: context.colors.medium)),
           const SizedBox(height: 12),
         ]);
       }
@@ -823,17 +830,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _activityRequestRunning ? 'Loading…' : 'Load 20 more'))
                 : filtered.isEmpty
                     ? const SizedBox.shrink()
-                    : const Center(
+                    : Center(
                         child: Text('You’re up to date',
-                            style: TextStyle(color: FlixieColors.medium))));
+                            style: TextStyle(color: context.colors.medium))));
       }
       final row = rows[index - 1];
       if (row is String) {
         return Padding(
             padding: const EdgeInsets.symmetric(vertical: 10),
             child: Text(row,
-                style: const TextStyle(
-                    color: FlixieColors.white,
+                style: TextStyle(
+                    color: context.colors.white,
                     fontSize: 16,
                     fontWeight: FontWeight.w700)));
       }
@@ -888,8 +895,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         const SizedBox(height: 10),
         if (groups.isEmpty)
-          const Text('No groups yet.',
-              style: TextStyle(color: FlixieColors.medium))
+          Text('No groups yet.', style: TextStyle(color: context.colors.medium))
         else
           ...groups.take(3).map((group) => GroupCard(
                 compact: true,
@@ -915,7 +921,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: Material(
-              color: FlixieColors.tabBarBackgroundFocused,
+              color: context.colors.tabBarBackgroundFocused,
               borderRadius: BorderRadius.circular(14),
               child: ListTile(
                 onTap: () => context.push('/watch-requests'),
@@ -923,7 +929,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 subtitle: const Text('Awaiting your reply'),
                 leading: CircleAvatar(
                     radius: 14,
-                    backgroundColor: FlixieColors.warning,
+                    backgroundColor: context.colors.warning,
                     child: Text('$needsReply',
                         style: const TextStyle(
                             color: Colors.black, fontWeight: FontWeight.w700))),
@@ -998,7 +1004,12 @@ class _FavouritesLibrary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final movieItems = movies.whereType<FavoriteMovie>().map((favorite) {
+    final rankedMovies = movies
+        .whereType<FavoriteMovie>()
+        .where((e) => e.removed != true)
+        .toList()
+      ..sort((a, b) => (a.rank ?? 999).compareTo(b.rank ?? 999));
+    final movieItems = rankedMovies.map((favorite) {
       final movie = favorite.movie ?? const <String, dynamic>{};
       return _FavouriteDisplayItem(
         title: movie['title']?.toString() ?? 'Movie',
@@ -1006,7 +1017,13 @@ class _FavouritesLibrary extends StatelessWidget {
         route: '/movies/${favorite.movieId}',
       );
     }).toList(growable: false);
-    final showItems = shows.map((raw) {
+    final rankedShows = shows
+        .whereType<Map>()
+        .where((e) => e['removed'] != true)
+        .toList()
+      ..sort((a, b) => ((a['rank'] as num?)?.toInt() ?? 999)
+          .compareTo((b['rank'] as num?)?.toInt() ?? 999));
+    final showItems = rankedShows.map((raw) {
       final outer =
           raw is Map<String, dynamic> ? raw : const <String, dynamic>{};
       final show = outer['show'] is Map<String, dynamic>
@@ -1039,6 +1056,7 @@ class _FavouritesLibrary extends StatelessWidget {
             title: 'Favourite movies',
             items: movieItems,
             limit: maxFavouriteMovies,
+            onRank: () => showFavouriteRankingSheet(context, shows: false),
           ),
         if (movieItems.isNotEmpty &&
             (peopleItems.isNotEmpty || showItems.isNotEmpty))
@@ -1048,6 +1066,7 @@ class _FavouritesLibrary extends StatelessWidget {
             title: 'Favourite shows',
             items: showItems,
             limit: maxFavouriteShows,
+            onRank: () => showFavouriteRankingSheet(context, shows: true),
           ),
         if (showItems.isNotEmpty && peopleItems.isNotEmpty)
           const SizedBox(height: 18),
@@ -1080,8 +1099,10 @@ class _FavouritePosterRail extends StatelessWidget {
     required this.items,
     this.limit,
     this.circular = false,
+    this.onRank,
   });
 
+  final VoidCallback? onRank;
   final String title;
   final List<_FavouriteDisplayItem> items;
   final int? limit;
@@ -1096,118 +1117,201 @@ class _FavouritePosterRail extends StatelessWidget {
         builder: (context) => SizedBox(
             height: MediaQuery.sizeOf(context).height * .8,
             child: Column(children: [
-              ListTile(
-                  title: Text(title),
-                  subtitle: limit == null
-                      ? null
-                      : Text('${items.length} of $limit favourites'),
-                  trailing: IconButton(
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 8, 12),
+                child: Row(children: [
+                  Expanded(
+                      child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title,
+                          style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: context.colors.textPrimary)),
+                      const SizedBox(height: 4),
+                      Text(
+                          limit == null
+                              ? '${items.length} favourites'
+                              : '${items.length} of $limit favourites',
+                          style: TextStyle(
+                              fontSize: 13, color: context.colors.light)),
+                    ],
+                  )),
+                  IconButton(
                       tooltip: 'Close',
                       icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context))),
+                      onPressed: () => Navigator.pop(context)),
+                ]),
+              ),
               Expanded(
-                  child: ListView.builder(
-                      itemCount: items.length,
-                      itemBuilder: (context, index) {
-                        final item = items[index];
-                        return ListTile(
-                            title: Text(item.title),
-                            trailing: const Icon(Icons.chevron_right),
-                            onTap: item.route == null
-                                ? null
-                                : () => context.push(item.route!));
-                      })),
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                  itemCount: items.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (sheetContext, index) {
+                    final item = items[index];
+                    final raw = item.imagePath;
+                    final url = raw == null
+                        ? null
+                        : raw.startsWith('http')
+                            ? raw
+                            : 'https://image.tmdb.org/t/p/w185$raw';
+                    return Material(
+                      color: context.colors.surfaceElevated,
+                      borderRadius: BorderRadius.circular(14),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: item.route == null
+                            ? null
+                            : () {
+                                final router = GoRouter.of(context);
+                                Navigator.pop(sheetContext);
+                                router.push(item.route!);
+                              },
+                        child: Padding(
+                          padding: const EdgeInsets.all(10),
+                          child: Row(children: [
+                            if (!circular) ...[
+                              SizedBox(
+                                  width: 26,
+                                  child: Text('${index + 1}',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w800,
+                                          color: context.colors.primaryText))),
+                              const SizedBox(width: 10),
+                            ],
+                            ClipRRect(
+                              borderRadius:
+                                  BorderRadius.circular(circular ? 50 : 6),
+                              child: SizedBox(
+                                  width: 44,
+                                  height: circular ? 44 : 66,
+                                  child: url == null
+                                      ? const Icon(Icons.movie_outlined)
+                                      : Image.network(url,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) =>
+                                              const Icon(
+                                                  Icons.movie_outlined))),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                                child: Text(item.title,
+                                    style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                        color: context.colors.textPrimary))),
+                            const SizedBox(width: 8),
+                            Icon(Icons.chevron_right,
+                                size: 20, color: context.colors.light),
+                          ]),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
             ])));
   }
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height:
-          (circular ? 158 : 208) + MediaQuery.textScalerOf(context).scale(30),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          FlixieSectionHeader(
-            title: title,
-            trailingLabel: '${items.length} · See all',
-            onTrailingTap: () => _showAll(context),
-            uppercase: false,
-            accentHeight: 0,
-            titleStyle: const TextStyle(
-              color: FlixieColors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              letterSpacing: .5,
-            ),
-          ),
-          const SizedBox(height: 10),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
           Expanded(
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: items.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 10),
-              itemBuilder: (context, index) {
-                final item = items[index];
-                final rawPath = item.imagePath;
-                final imageUrl = rawPath == null
-                    ? null
-                    : rawPath.startsWith('http')
-                        ? rawPath
-                        : 'https://image.tmdb.org/t/p/w342$rawPath';
-                return SizedBox(
-                  width: 104,
-                  child: InkWell(
-                    onTap: item.route == null
-                        ? null
-                        : () => context.push(item.route!),
-                    borderRadius: BorderRadius.circular(12),
-                    child: Column(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(
-                            circular ? 999 : 10,
-                          ),
-                          child: SizedBox(
-                            width: circular ? 96 : 104,
-                            height: circular ? 96 : 146,
-                            child: imageUrl == null
-                                ? const ColoredBox(
-                                    color: FlixieColors.surfaceElevated,
-                                    child: Icon(
-                                      Icons.favorite_outline_rounded,
-                                      color: FlixieColors.medium,
-                                    ),
-                                  )
-                                : Image.network(
-                                    imageUrl,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => const Icon(
-                                      Icons.image_not_supported_outlined,
-                                    ),
-                                  ),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          item.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: FlixieColors.light,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
+              child: Text(title,
+                  style: TextStyle(
+                      color: context.colors.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800))),
+          if (onRank != null)
+            IconButton(
+              tooltip:
+                  title == 'Favourite shows' ? 'Rank shows' : 'Rank movies',
+              onPressed: onRank,
+              icon: Icon(Icons.format_list_numbered,
+                  color: context.colors.primaryText, size: 22),
             ),
+          TextButton(
+            onPressed: () => _showAll(context),
+            child: Text('See all',
+                style: TextStyle(color: context.colors.light, fontSize: 13)),
           ),
-        ],
-      ),
+        ]),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: (circular ? 96 : 146) +
+              6 +
+              MediaQuery.textScalerOf(context).scale(36),
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: circular ? items.length : items.length.clamp(0, 10),
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (context, index) {
+              final item = items[index];
+              final rawPath = item.imagePath;
+              final imageUrl = rawPath == null
+                  ? null
+                  : rawPath.startsWith('http')
+                      ? rawPath
+                      : 'https://image.tmdb.org/t/p/w342$rawPath';
+              return SizedBox(
+                width: 104,
+                child: InkWell(
+                  onTap: item.route == null
+                      ? null
+                      : () => context.push(item.route!),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Column(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(
+                          circular ? 999 : 10,
+                        ),
+                        child: SizedBox(
+                          width: circular ? 96 : 104,
+                          height: circular ? 96 : 146,
+                          child: imageUrl == null
+                              ? ColoredBox(
+                                  color: context.colors.surfaceElevated,
+                                  child: Icon(
+                                    Icons.favorite_outline_rounded,
+                                    color: context.colors.medium,
+                                  ),
+                                )
+                              : Image.network(
+                                  imageUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const Icon(
+                                    Icons.image_not_supported_outlined,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        item.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: context.colors.light,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1227,8 +1331,8 @@ class _RecentReviewsSummary extends StatelessWidget {
           title: 'Recent reviews',
           uppercase: false,
           accentHeight: 0,
-          titleStyle: const TextStyle(
-            color: FlixieColors.white,
+          titleStyle: TextStyle(
+            color: context.colors.white,
             fontSize: 18,
             fontWeight: FontWeight.w800,
             letterSpacing: .5,
@@ -1260,7 +1364,7 @@ class _ProfileReviewCard extends StatelessWidget {
             ? movieDetailPath(review.movieId!)
             : null;
     return Material(
-      color: FlixieColors.surface,
+      color: context.colors.surface,
       borderRadius: BorderRadius.circular(14),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -1298,8 +1402,8 @@ class _ProfileReviewCard extends StatelessWidget {
                               ? 'Show review'
                               : 'Movie review'))),
                   Text(review.title,
-                      style: const TextStyle(
-                          color: FlixieColors.white,
+                      style: TextStyle(
+                          color: context.colors.white,
                           fontSize: 15,
                           fontWeight: FontWeight.w700)),
                   if (date != null)
@@ -1320,14 +1424,14 @@ class _ProfileReviewCard extends StatelessWidget {
                               'Nov',
                               'Dec'
                             ][date.month - 1]} ${date.year}',
-                            style: const TextStyle(
-                                color: FlixieColors.medium, fontSize: 12))),
+                            style: TextStyle(
+                                color: context.colors.medium, fontSize: 12))),
                   const SizedBox(height: 6),
                   Text(review.body,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          color: FlixieColors.light,
+                      style: TextStyle(
+                          color: context.colors.light,
                           fontSize: 13,
                           height: 1.4)),
                   Wrap(
@@ -1335,11 +1439,10 @@ class _ProfileReviewCard extends StatelessWidget {
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text('★ ${review.rating}/10',
-                            style:
-                                const TextStyle(color: FlixieColors.warning)),
+                            style: TextStyle(color: context.colors.warning)),
                         if (review.recommended)
-                          const Icon(Icons.thumb_up_alt_outlined,
-                              color: FlixieColors.success, size: 16),
+                          Icon(Icons.thumb_up_alt_outlined,
+                              color: context.colors.success, size: 16),
                         TextButton(
                             onPressed: () => showReviewDetailSheet(context,
                                 review: review,
@@ -1434,10 +1537,10 @@ class _ProfileStatsContent extends StatelessWidget {
     Widget heading(String title) => Padding(
           padding: const EdgeInsets.only(top: 22, bottom: 12),
           child: Text(title,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
-                  color: FlixieColors.white)),
+                  color: context.colors.white)),
         );
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       if (failed)
@@ -1446,10 +1549,10 @@ class _ProfileStatsContent extends StatelessWidget {
             icon: const Icon(Icons.refresh),
             label: const Text('Couldn’t refresh stats. Retry')),
       Text('Movie watching · ${data.year}',
-          style: const TextStyle(
+          style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w700,
-              color: FlixieColors.white)),
+              color: context.colors.white)),
       const SizedBox(height: 14),
       Wrap(spacing: 28, runSpacing: 12, children: [
         _StatsValue('${data.rewatchCount}', 'Watches'),
@@ -1473,8 +1576,8 @@ class _ProfileStatsContent extends StatelessWidget {
                     padding: const EdgeInsets.only(right: 12),
                     child: Column(children: [
                       Text('${counts[i]}',
-                          style: const TextStyle(
-                              color: FlixieColors.light, fontSize: 12)),
+                          style: TextStyle(
+                              color: context.colors.light, fontSize: 12)),
                       const SizedBox(height: 4),
                       SizedBox(
                           height: 70,
@@ -1487,14 +1590,14 @@ class _ProfileStatsContent extends StatelessWidget {
                                     : counts[i] / maxMonth * 70,
                                 decoration: BoxDecoration(
                                     color: counts[i] == 0
-                                        ? FlixieColors.surfaceElevated
-                                        : FlixieColors.primaryText,
+                                        ? context.colors.surfaceElevated
+                                        : context.colors.primaryText,
                                     borderRadius: BorderRadius.circular(4)),
                               ))),
                       const SizedBox(height: 6),
                       Text(months[i],
-                          style: const TextStyle(
-                              color: FlixieColors.light, fontSize: 12)),
+                          style: TextStyle(
+                              color: context.colors.light, fontSize: 12)),
                     ]),
                   ))),
           ])),
@@ -1502,8 +1605,7 @@ class _ProfileStatsContent extends StatelessWidget {
         Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text('${months[now.month - 1]} in progress',
-                style:
-                    const TextStyle(color: FlixieColors.medium, fontSize: 12))),
+                style: TextStyle(color: context.colors.medium, fontSize: 12))),
       if (data.insights != null)
         _ExtraViewingStats(
             insights: data.insights!,
@@ -1511,7 +1613,7 @@ class _ProfileStatsContent extends StatelessWidget {
             movies: data.totalMoviesWatched),
       heading('Your ratings · All time'),
       Material(
-          color: FlixieColors.surface,
+          color: context.colors.surface,
           borderRadius: BorderRadius.circular(14),
           child: InkWell(
             onTap: onSeeRatings,
@@ -1522,15 +1624,14 @@ class _ProfileStatsContent extends StatelessWidget {
                   Expanded(
                       child: Text(
                           '$average / 10 average · ${ratings.length} movie ratings',
-                          style: const TextStyle(color: FlixieColors.light))),
-                  const Icon(Icons.chevron_right,
-                      color: FlixieColors.primaryText),
+                          style: TextStyle(color: context.colors.light))),
+                  Icon(Icons.chevron_right, color: context.colors.primaryText),
                 ])),
           )),
       Padding(
           padding: const EdgeInsets.only(top: 10),
           child: Text('$reviewCount movie and show reviews · All time',
-              style: const TextStyle(color: FlixieColors.medium))),
+              style: TextStyle(color: context.colors.medium))),
       if (data.topMovies.isNotEmpty && data.topMovies.first.watchCount > 1) ...[
         heading('Most watched again'),
         ListTile(
@@ -1566,11 +1667,11 @@ class _ProfileStatsContent extends StatelessWidget {
               LinearProgressIndicator(
                   value: maxGenre <= 0 ? 0 : genre.count / maxGenre,
                   minHeight: 5,
-                  color: FlixieColors.primaryText,
-                  backgroundColor: FlixieColors.surfaceElevated),
+                  color: context.colors.primaryText,
+                  backgroundColor: context.colors.surfaceElevated),
             ]))),
-        const Text('Viewing counts by genre; movies can have several genres.',
-            style: TextStyle(color: FlixieColors.medium, fontSize: 12)),
+        Text('Viewing counts by genre; movies can have several genres.',
+            style: TextStyle(color: context.colors.medium, fontSize: 12)),
       ],
       if (favoriteGenres.isNotEmpty) ...[
         heading('Your taste'),
@@ -1624,12 +1725,12 @@ class _StatsValue extends StatelessWidget {
   Widget build(BuildContext context) =>
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(value,
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.w700,
-                color: FlixieColors.white)),
+                color: context.colors.white)),
         Text(label,
-            style: const TextStyle(color: FlixieColors.medium, fontSize: 13)),
+            style: TextStyle(color: context.colors.medium, fontSize: 13)),
       ]);
 }
 
@@ -1651,23 +1752,21 @@ class _RecentRatingTile extends StatelessWidget {
                     width: 88,
                     height: 132,
                     child: path == null
-                        ? const ColoredBox(
-                            color: FlixieColors.surfaceElevated,
-                            child: Icon(Icons.movie_outlined))
+                        ? ColoredBox(
+                            color: context.colors.surfaceElevated,
+                            child: const Icon(Icons.movie_outlined))
                         : CachedNetworkImage(
                             imageUrl: 'https://image.tmdb.org/t/p/w342$path',
                             fit: BoxFit.cover))),
             const SizedBox(height: 5),
             Text(rating.movie?.title ?? 'Movie',
-                style:
-                    const TextStyle(color: FlixieColors.light, fontSize: 12)),
+                style: TextStyle(color: context.colors.light, fontSize: 12)),
             Row(children: [
-              const Icon(Icons.star_rounded,
-                  color: FlixieColors.warning, size: 15),
+              Icon(Icons.star_rounded, color: context.colors.warning, size: 15),
               const SizedBox(width: 3),
               Text('${rating.rating}/10',
-                  style: const TextStyle(
-                      color: FlixieColors.light,
+                  style: TextStyle(
+                      color: context.colors.light,
                       fontSize: 11.5,
                       fontWeight: FontWeight.w700))
             ]),
@@ -1702,24 +1801,12 @@ class _SocialSectionHeader extends StatelessWidget {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Text(title,
-                    style: const TextStyle(
-                        color: FlixieColors.white,
+                    style: TextStyle(
+                        color: context.colors.white,
                         fontSize: 17,
                         fontWeight: FontWeight.w800)),
                 if (count != null) ...[
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: FlixieColors.primary.withValues(alpha: .16),
-                      borderRadius: BorderRadius.circular(99),
-                    ),
-                    child: Text('$count',
-                        style: const TextStyle(
-                            color: FlixieColors.primary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800)),
-                  ),
+                  FlixiePill.label(label: Text('$count')),
                 ],
               ],
             ),
@@ -1747,7 +1834,7 @@ class _ProfileWatchPlanCard extends StatelessWidget {
     final title = request.movie?.title ?? request.groupName ?? 'Watch plan';
 
     return Material(
-      color: FlixieColors.surface.withValues(alpha: .72),
+      color: context.colors.surface.withValues(alpha: .72),
       borderRadius: BorderRadius.circular(15),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -1755,7 +1842,7 @@ class _ProfileWatchPlanCard extends StatelessWidget {
         child: Container(
           height: 126,
           decoration: BoxDecoration(
-            border: Border.all(color: FlixieColors.tabBarBorder),
+            border: Border.all(color: context.colors.tabBarBorder),
             borderRadius: BorderRadius.circular(15),
           ),
           child: Row(
@@ -1764,18 +1851,18 @@ class _ProfileWatchPlanCard extends StatelessWidget {
                 width: 86,
                 height: double.infinity,
                 child: poster == null
-                    ? const ColoredBox(
-                        color: FlixieColors.surfaceElevated,
+                    ? ColoredBox(
+                        color: context.colors.surfaceElevated,
                         child: Icon(Icons.movie_outlined,
-                            color: FlixieColors.medium),
+                            color: context.colors.medium),
                       )
                     : CachedNetworkImage(
                         imageUrl: poster,
                         fit: BoxFit.cover,
-                        errorWidget: (_, __, ___) => const ColoredBox(
-                          color: FlixieColors.surfaceElevated,
+                        errorWidget: (_, __, ___) => ColoredBox(
+                          color: context.colors.surfaceElevated,
                           child: Icon(Icons.movie_outlined,
-                              color: FlixieColors.medium),
+                              color: context.colors.medium),
                         ),
                       ),
               ),
@@ -1803,8 +1890,8 @@ class _ProfileWatchPlanCard extends StatelessWidget {
                     Text(title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            color: FlixieColors.white,
+                        style: TextStyle(
+                            color: context.colors.white,
                             fontSize: 16,
                             fontWeight: FontWeight.w800)),
                     const SizedBox(height: 5),
@@ -1813,14 +1900,13 @@ class _ProfileWatchPlanCard extends StatelessWidget {
                               context.read<AuthProvider>().dbUser?.id
                           ? 'Planned by you'
                           : 'Planned with friends',
-                      style: const TextStyle(
-                          color: FlixieColors.medium, fontSize: 12),
+                      style:
+                          TextStyle(color: context.colors.medium, fontSize: 12),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded,
-                  color: FlixieColors.medium),
+              Icon(Icons.chevron_right_rounded, color: context.colors.medium),
               const SizedBox(width: 10),
             ],
           ),
@@ -1878,12 +1964,12 @@ class _ProfileContinueWatching extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const FlixieSectionHeader(
+        FlixieSectionHeader(
           title: 'Continue watching',
           uppercase: false,
           accentHeight: 0,
           titleStyle: TextStyle(
-            color: FlixieColors.white,
+            color: context.colors.white,
             fontSize: 18,
             fontWeight: FontWeight.w800,
             letterSpacing: .5,
@@ -1905,17 +1991,17 @@ class _ProfileExtrasLoadingIndicator extends StatelessWidget {
   const _ProfileExtrasLoadingIndicator();
 
   @override
-  Widget build(BuildContext context) => const Row(
+  Widget build(BuildContext context) => Row(
         children: [
-          SizedBox(
+          const SizedBox(
             width: 18,
             height: 18,
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
-          SizedBox(width: 10),
+          const SizedBox(width: 10),
           Text(
             'Updating the rest of your profile…',
-            style: TextStyle(color: FlixieColors.medium),
+            style: TextStyle(color: context.colors.medium),
           ),
         ],
       );
@@ -1936,7 +2022,7 @@ class _WatchProvidersSummary extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: FlixieColors.surface,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -1947,10 +2033,10 @@ class _WatchProvidersSummary extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Watch providers',
                   style: TextStyle(
-                    color: FlixieColors.light,
+                    color: context.colors.light,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -1967,8 +2053,8 @@ class _WatchProvidersSummary extends StatelessWidget {
                               : ''),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: FlixieColors.medium,
+                  style: TextStyle(
+                    color: context.colors.medium,
                     fontSize: 12,
                   ),
                 ),
@@ -2033,7 +2119,7 @@ class _StatsBreakdown extends StatelessWidget {
         Text(
           'Your numbers',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: FlixieColors.light,
+                color: context.colors.light,
                 fontWeight: FontWeight.w800,
               ),
         ),
@@ -2053,9 +2139,9 @@ class _StatsBreakdown extends StatelessWidget {
             return Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
               decoration: BoxDecoration(
-                color: FlixieColors.surface,
+                color: context.colors.surface,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: FlixieColors.tabBarBorder),
+                border: Border.all(color: context.colors.tabBarBorder),
               ),
               child: Row(
                 children: [
@@ -2068,8 +2154,8 @@ class _StatsBreakdown extends StatelessWidget {
                       children: [
                         Text(
                           metric.$3,
-                          style: const TextStyle(
-                            color: FlixieColors.light,
+                          style: TextStyle(
+                            color: context.colors.light,
                             fontSize: 17,
                             fontWeight: FontWeight.w900,
                           ),
@@ -2078,8 +2164,8 @@ class _StatsBreakdown extends StatelessWidget {
                           metric.$2,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: FlixieColors.medium,
+                          style: TextStyle(
+                            color: context.colors.medium,
                             fontSize: 10,
                           ),
                         ),
@@ -2101,6 +2187,7 @@ class _ProfileDashboard extends StatelessWidget {
     required this.watched,
     required this.watchlist,
     required this.favorites,
+    required this.breakdowns,
     required this.onWatchHistory,
     required this.onWatchlist,
     required this.onFavourites,
@@ -2110,6 +2197,7 @@ class _ProfileDashboard extends StatelessWidget {
   final int watched;
   final int watchlist;
   final int favorites;
+  final List<String> breakdowns;
   final VoidCallback onWatchHistory;
   final VoidCallback onWatchlist;
   final VoidCallback onFavourites;
@@ -2128,24 +2216,27 @@ class _ProfileDashboard extends StatelessWidget {
                 icon: Icons.visibility_outlined,
                 label: 'Watched',
                 value: '$watched',
+                breakdown: breakdowns[0],
                 onTap: onWatchHistory,
               ),
             ),
-            Container(width: 1, height: 48, color: FlixieColors.tabBarBorder),
+            Container(width: 1, height: 48, color: context.colors.tabBarBorder),
             Expanded(
               child: _DashboardMetric(
                 icon: Icons.bookmark_border_rounded,
                 label: 'Watchlist',
                 value: '$watchlist',
+                breakdown: breakdowns[1],
                 onTap: onWatchlist,
               ),
             ),
-            Container(width: 1, height: 48, color: FlixieColors.tabBarBorder),
+            Container(width: 1, height: 48, color: context.colors.tabBarBorder),
             Expanded(
               child: _DashboardMetric(
                 icon: Icons.favorite_border_rounded,
                 label: 'Favourites',
                 value: '$favorites',
+                breakdown: breakdowns[2],
                 onTap: onFavourites,
               ),
             ),
@@ -2161,12 +2252,14 @@ class _DashboardMetric extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
+    required this.breakdown,
     this.onTap,
   });
 
   final IconData icon;
   final String label;
   final String value;
+  final String breakdown;
   final VoidCallback? onTap;
 
   @override
@@ -2177,16 +2270,24 @@ class _DashboardMetric extends StatelessWidget {
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         Text(value,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-                color: FlixieColors.white,
+            style: TextStyle(
+                color: context.colors.white,
                 fontWeight: FontWeight.w900,
                 fontSize: 24)),
         Text(label,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-                color: FlixieColors.medium,
+            style: TextStyle(
+                color: context.colors.medium,
                 fontSize: 13,
                 fontWeight: FontWeight.w600)),
+        const SizedBox(height: 5),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(breakdown,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 11, height: 1.4, color: context.colors.light)),
+        ),
       ]),
     );
   }
@@ -2222,13 +2323,13 @@ class _ProfileTabSelector extends StatelessWidget {
                                     width: tab == selected ? 3 : 1,
                                     color: tab == selected
                                         ? FlixieColors.primary
-                                        : FlixieColors.tabBarBorder))),
+                                        : context.colors.tabBarBorder))),
                         child: Text(_tabLabel(tab),
                             textAlign: TextAlign.center,
                             style: TextStyle(
                                 color: tab == selected
-                                    ? FlixieColors.white
-                                    : FlixieColors.light,
+                                    ? context.colors.white
+                                    : context.colors.light,
                                 fontWeight: tab == selected
                                     ? FontWeight.w700
                                     : FontWeight.w500)),
@@ -2270,9 +2371,9 @@ class _ProfileEmptyAction extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: FlixieColors.tabBarBackgroundFocused,
+        color: context.colors.tabBarBackgroundFocused,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: FlixieColors.tabBarBorder),
+        border: Border.all(color: context.colors.tabBarBorder),
       ),
       child: Row(
         children: [
@@ -2292,16 +2393,16 @@ class _ProfileEmptyAction extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: FlixieColors.white,
+                  style: TextStyle(
+                    color: context.colors.white,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   body,
-                  style: const TextStyle(
-                    color: FlixieColors.medium,
+                  style: TextStyle(
+                    color: context.colors.medium,
                     fontSize: 12,
                     height: 1.25,
                   ),
@@ -2315,7 +2416,7 @@ class _ProfileEmptyAction extends StatelessWidget {
             onPressed: onPressed,
             style: IconButton.styleFrom(
               backgroundColor: FlixieColors.primary,
-              foregroundColor: Colors.black,
+              foregroundColor: Colors.white,
             ),
             icon: const Icon(Icons.arrow_forward_rounded),
           ),
@@ -2337,7 +2438,7 @@ class _ProfileTabsDelegate extends SliverPersistentHeaderDelegate {
   Widget build(
           BuildContext context, double shrinkOffset, bool overlapsContent) =>
       ColoredBox(
-          color: FlixieColors.background,
+          color: context.colors.background,
           child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: child));
@@ -2381,7 +2482,7 @@ class _ExtraViewingStats extends StatelessWidget {
                           ratings
                               ? 'All-time movie ratings · Minimum 3 ratings per genre'
                               : 'Unique movies watched in $year',
-                          style: const TextStyle(color: FlixieColors.medium)),
+                          style: TextStyle(color: context.colors.medium)),
                       if (rows.isEmpty)
                         const Padding(
                             padding: EdgeInsets.symmetric(vertical: 20),
@@ -2409,24 +2510,24 @@ class _ExtraViewingStats extends StatelessWidget {
     final peak = distribution.fold<num>(1, (a, b) => a > b ? a : b);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const SizedBox(height: 20),
-      const Text('Your viewing',
+      Text('Your viewing',
           style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w700,
-              color: FlixieColors.white)),
+              color: context.colors.white)),
       const SizedBox(height: 4),
       Text('Based on your watch logs · $year',
-          style: const TextStyle(color: FlixieColors.medium, fontSize: 13)),
+          style: TextStyle(color: context.colors.medium, fontSize: 13)),
       const SizedBox(height: 18),
       Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
         Expanded(child: _ViewingTotal('$movies', 'Movies')),
-        Container(width: 1, height: 36, color: FlixieColors.tabBarBorder),
+        Container(width: 1, height: 36, color: context.colors.tabBarBorder),
         Expanded(child: _ViewingTotal('${insights['episodes']}', 'Episodes')),
-        Container(width: 1, height: 36, color: FlixieColors.tabBarBorder),
+        Container(width: 1, height: 36, color: context.colors.tabBarBorder),
         Expanded(child: _ViewingTotal('${insights['shows']}', 'Shows')),
       ]),
       const SizedBox(height: 22),
-      const Divider(color: FlixieColors.tabBarBorder),
+      Divider(color: context.colors.tabBarBorder),
       const SizedBox(height: 16),
       const Text('First watches & rewatches',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
@@ -2438,7 +2539,7 @@ class _ExtraViewingStats extends StatelessWidget {
             child: SizedBox(
                 height: 24,
                 child: first + repeat == 0
-                    ? const ColoredBox(color: FlixieColors.surfaceElevated)
+                    ? ColoredBox(color: context.colors.surfaceElevated)
                     : Row(children: [
                         if (first > 0)
                           Expanded(
@@ -2449,9 +2550,9 @@ class _ExtraViewingStats extends StatelessWidget {
                         if (repeat > 0)
                           Expanded(
                               flex: repeat,
-                              child: const ColoredBox(
-                                  color: FlixieColors.primaryText,
-                                  child: SizedBox.expand())),
+                              child: ColoredBox(
+                                  color: context.colors.primaryText,
+                                  child: const SizedBox.expand())),
                       ])),
           )),
       const SizedBox(height: 12),
@@ -2459,7 +2560,7 @@ class _ExtraViewingStats extends StatelessWidget {
         _WatchLegend(
             color: FlixieColors.primary, label: '$first first watches'),
         _WatchLegend(
-            color: FlixieColors.primaryText, label: '$repeat rewatches'),
+            color: context.colors.primaryText, label: '$repeat rewatches'),
       ]),
       const SizedBox(height: 12),
       SizedBox(
@@ -2469,14 +2570,15 @@ class _ExtraViewingStats extends StatelessWidget {
               overflowAlignment: OverflowBarAlignment.end,
               spacing: 12,
               children: [
-                const Text('Based on your recorded movie history.',
-                    style: TextStyle(color: FlixieColors.medium, fontSize: 12)),
+                Text('Based on your recorded movie history.',
+                    style:
+                        TextStyle(color: context.colors.medium, fontSize: 12)),
                 Text('${first + repeat} total',
-                    style: const TextStyle(
-                        color: FlixieColors.medium, fontSize: 12)),
+                    style:
+                        TextStyle(color: context.colors.medium, fontSize: 12)),
               ])),
       const SizedBox(height: 22),
-      const Divider(color: FlixieColors.tabBarBorder),
+      Divider(color: context.colors.tabBarBorder),
       const SizedBox(height: 16),
       const Text('How you rate · All time',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
@@ -2504,8 +2606,7 @@ class _ExtraViewingStats extends StatelessWidget {
                                             : distribution[i] / peak * 65,
                                         color: FlixieColors.primary))),
                             Text('${i + 1}',
-                                style: const TextStyle(
-                                    color: FlixieColors.medium)),
+                                style: TextStyle(color: context.colors.medium)),
                           ])))),
           ])),
       const SizedBox(height: 12),
@@ -2522,20 +2623,20 @@ class _ExtraViewingStats extends StatelessWidget {
                 context, entry.key, insights[entry.value] as List? ?? [],
                 ratings: entry.value == 'highestRatedGenres')),
       const SizedBox(height: 12),
-      const Divider(color: FlixieColors.tabBarBorder),
+      Divider(color: context.colors.tabBarBorder),
       ListTile(
         contentPadding: const EdgeInsets.symmetric(vertical: 8),
-        title: const Text('Watch plans',
+        title: Text('Watch plans',
             style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
-                color: FlixieColors.white)),
+                color: context.colors.white)),
         subtitle: Padding(
             padding: const EdgeInsets.only(top: 6),
             child: Text(
                 '${insights['confirmedPlans']} confirmed watches · $year')),
-        trailing: const Icon(Icons.chevron_right_rounded,
-            color: FlixieColors.primaryText),
+        trailing: Icon(Icons.chevron_right_rounded,
+            color: context.colors.primaryText),
         onTap: () => context.push('/watch-requests'),
       ),
     ]);
@@ -2549,14 +2650,14 @@ class _ViewingTotal extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Column(children: [
         Text(value,
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.w700,
-                color: FlixieColors.white)),
+                color: context.colors.white)),
         const SizedBox(height: 3),
         Text(label,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 14, color: FlixieColors.light)),
+            style: TextStyle(fontSize: 14, color: context.colors.light)),
       ]);
 }
 
@@ -2573,6 +2674,6 @@ class _WatchLegend extends StatelessWidget {
             decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
         const SizedBox(width: 7),
         Text(label,
-            style: const TextStyle(color: FlixieColors.light, fontSize: 13)),
+            style: TextStyle(color: context.colors.light, fontSize: 13)),
       ]);
 }

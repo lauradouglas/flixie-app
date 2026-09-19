@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:go_router/go_router.dart';
@@ -86,31 +87,16 @@ class _FriendsRowState extends State<FriendsRow> {
                     'Friends',
                     style: textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: FlixieColors.light,
+                      color: context.colors.light,
                     ),
                   ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: FlixieColors.primary.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      '$total',
-                      style: const TextStyle(
-                        color: FlixieColors.primary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
+                  FlixiePill.label(label: Text('$total')),
                 ],
               ),
               TextButton.icon(
                 onPressed: () => _showAddFriendSheet(context),
                 style: TextButton.styleFrom(
-                  foregroundColor: FlixieColors.primary,
+                  foregroundColor: context.colors.primaryText,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   minimumSize: Size.zero,
@@ -129,7 +115,8 @@ class _FriendsRowState extends State<FriendsRow> {
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Text(
               'No friends yet.',
-              style: textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
+              style:
+                  textTheme.bodySmall?.copyWith(color: context.colors.medium),
             ),
           )
         else
@@ -198,8 +185,8 @@ class _FriendPreviewCard extends StatelessWidget {
           Text(
             user.username,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: FlixieColors.light,
+            style: TextStyle(
+              color: context.colors.light,
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),

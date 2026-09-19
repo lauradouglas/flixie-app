@@ -10,12 +10,12 @@ class HelpSupportScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: FlixieColors.background,
+        backgroundColor: context.colors.background,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'Help & Support',
           style: TextStyle(
-            color: Colors.white,
+            color: context.colors.white,
             fontSize: 22,
             fontWeight: FontWeight.bold,
           ),
@@ -198,7 +198,7 @@ class _FaqTileState extends State<_FaqTile> {
       child: ClipRRect(
         borderRadius: borderRadius,
         child: Material(
-          color: FlixieColors.tabBarBackgroundFocused,
+          color: context.colors.tabBarBackgroundFocused,
           shape: RoundedRectangleBorder(borderRadius: borderRadius),
           clipBehavior: Clip.antiAlias,
           child: Theme(
@@ -223,8 +223,8 @@ class _FaqTileState extends State<_FaqTile> {
               ),
               title: Text(
                 widget.question,
-                style: const TextStyle(
-                  color: FlixieColors.light,
+                style: TextStyle(
+                  color: context.colors.light,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
@@ -232,8 +232,8 @@ class _FaqTileState extends State<_FaqTile> {
               children: [
                 Text(
                   widget.answer,
-                  style: const TextStyle(
-                    color: FlixieColors.medium,
+                  style: TextStyle(
+                    color: context.colors.medium,
                     fontSize: 14,
                     height: 1.5,
                   ),

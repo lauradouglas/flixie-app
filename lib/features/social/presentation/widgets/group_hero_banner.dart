@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flixie_app/models/group.dart';
@@ -48,7 +49,7 @@ class GroupHeroBanner extends StatelessWidget {
             end: Alignment.bottomRight,
             colors: [
               color.withValues(alpha: 0.22),
-              FlixieColors.tabBarBackgroundFocused,
+              context.colors.tabBarBackgroundFocused,
             ],
           ),
           borderRadius: BorderRadius.circular(16),
@@ -90,8 +91,8 @@ class GroupHeroBanner extends StatelessWidget {
                     group.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: FlixieColors.light,
+                    style: TextStyle(
+                      color: context.colors.light,
                       fontSize: 17,
                       fontWeight: FontWeight.w900,
                     ),
@@ -103,8 +104,8 @@ class GroupHeroBanner extends StatelessWidget {
                       group.description!,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: FlixieColors.medium,
+                      style: TextStyle(
+                        color: context.colors.medium,
                         fontSize: 12,
                       ),
                     ),
@@ -120,16 +121,16 @@ class GroupHeroBanner extends StatelessWidget {
                             '${_formatCount(memberCount)} member${memberCount == 1 ? '' : 's'}',
                         color: FlixieColors.primary,
                       ),
-                      const _HeroChip(
+                      _HeroChip(
                         icon: Icons.bolt_rounded,
                         label: 'Active',
-                        color: FlixieColors.success,
+                        color: context.colors.success,
                       ),
                       if (group.isPublic)
-                        const _HeroChip(
+                        _HeroChip(
                           icon: Icons.public_rounded,
                           label: 'Public',
-                          color: FlixieColors.secondary,
+                          color: context.colors.secondary,
                         ),
                     ],
                   ),
@@ -156,28 +157,7 @@ class _HeroChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.26)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: 12),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
+    return FlixiePill.label(
+        label: Text(label), avatar: Icon(icon, color: color));
   }
 }

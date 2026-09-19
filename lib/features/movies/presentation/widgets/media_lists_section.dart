@@ -62,7 +62,7 @@ class MediaListsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return const Column(
+      return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           FlixieSectionHeader(
@@ -70,19 +70,19 @@ class MediaListsSection extends StatelessWidget {
             uppercase: false,
             accentHeight: 22,
             titleStyle: TextStyle(
-              color: FlixieColors.white,
+              color: context.colors.white,
               fontSize: 18,
               fontWeight: FontWeight.w800,
             ),
             trailingLabel: 'See all',
             trailingColor: FlixieColors.primary,
           ),
-          SizedBox(height: 8),
-          SkeletonBox(width: 128, height: 13),
-          SizedBox(height: 12),
-          SkeletonBox(height: 86, borderRadius: 14),
-          SizedBox(height: 10),
-          SkeletonBox(height: 86, borderRadius: 14),
+          const SizedBox(height: 8),
+          const SkeletonBox(width: 128, height: 13),
+          const SizedBox(height: 12),
+          const SkeletonBox(height: 86, borderRadius: 14),
+          const SizedBox(height: 10),
+          const SkeletonBox(height: 86, borderRadius: 14),
         ],
       );
     }
@@ -100,8 +100,8 @@ class MediaListsSection extends StatelessWidget {
           title: title,
           uppercase: false,
           accentHeight: 22,
-          titleStyle: const TextStyle(
-            color: FlixieColors.white,
+          titleStyle: TextStyle(
+            color: context.colors.white,
             fontSize: 18,
             fontWeight: FontWeight.w800,
             letterSpacing: .5,
@@ -118,7 +118,7 @@ class MediaListsSection extends StatelessWidget {
                     (ownLists.isEmpty
                         ? 'Not in any of your lists'
                         : 'In ${ownLists.length} of your lists'),
-                style: const TextStyle(color: FlixieColors.light, fontSize: 13),
+                style: TextStyle(color: context.colors.light, fontSize: 13),
               ),
             ),
             if (showEdit)
@@ -129,7 +129,7 @@ class MediaListsSection extends StatelessWidget {
                     ? 'Add to list'
                     : editLabel),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: FlixieColors.light,
+                  foregroundColor: context.colors.light,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                   visualDensity: VisualDensity.compact,
@@ -154,9 +154,9 @@ class MediaListsSection extends StatelessWidget {
           const SizedBox(height: 8),
           Divider(color: Colors.white.withValues(alpha: 0.09)),
           const SizedBox(height: 10),
-          const Text('Saved by friends',
+          Text('Saved by friends',
               style: TextStyle(
-                  color: FlixieColors.white,
+                  color: context.colors.white,
                   fontSize: 16,
                   fontWeight: FontWeight.w700)),
           const SizedBox(height: 10),
@@ -167,8 +167,7 @@ class MediaListsSection extends StatelessWidget {
               Expanded(
                 child: Text(
                   '$friendCount ${friendCount == 1 ? 'friend' : 'friends'} added this to ${friendLists.length} lists',
-                  style: const TextStyle(
-                      color: FlixieColors.light, fontSize: 12.5),
+                  style: TextStyle(color: context.colors.light, fontSize: 12.5),
                 ),
               ),
             ],
@@ -209,7 +208,7 @@ class _ListRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final visibility = _visibilityLabel(item.visibility);
     return Material(
-      color: FlixieColors.surface.withValues(alpha: 0.58),
+      color: context.colors.surface.withValues(alpha: 0.58),
       borderRadius: BorderRadius.circular(14),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -228,8 +227,8 @@ class _ListRow extends StatelessWidget {
                     Text(item.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            color: FlixieColors.white,
+                        style: TextStyle(
+                            color: context.colors.white,
                             fontSize: 14,
                             fontWeight: FontWeight.w700)),
                     if (showOwner &&
@@ -238,14 +237,14 @@ class _ListRow extends StatelessWidget {
                       Text('by ${item.ownerUsername}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              color: FlixieColors.medium, fontSize: 12)),
+                          style: TextStyle(
+                              color: context.colors.medium, fontSize: 12)),
                     ],
                     const SizedBox(height: 5),
                     Row(
                       children: [
                         Icon(_visibilityIcon(item.visibility),
-                            color: FlixieColors.medium, size: 14),
+                            color: context.colors.medium, size: 14),
                         const SizedBox(width: 5),
                         Expanded(
                           child: Text(
@@ -254,8 +253,8 @@ class _ListRow extends StatelessWidget {
                                 : visibility,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                color: FlixieColors.medium, fontSize: 12),
+                            style: TextStyle(
+                                color: context.colors.medium, fontSize: 12),
                           ),
                         ),
                       ],
@@ -263,8 +262,8 @@ class _ListRow extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded,
-                  color: FlixieColors.light, size: 22),
+              Icon(Icons.chevron_right_rounded,
+                  color: context.colors.light, size: 22),
               const SizedBox(width: 10),
             ],
           ),
@@ -285,10 +284,10 @@ class _PosterStack extends StatelessWidget {
       width: 140,
       height: 86,
       child: posters.isEmpty
-          ? const ColoredBox(
-              color: FlixieColors.surfaceElevated,
+          ? ColoredBox(
+              color: context.colors.surfaceElevated,
               child: Icon(Icons.movie_outlined,
-                  color: FlixieColors.medium, size: 28),
+                  color: context.colors.medium, size: 28),
             )
           : Stack(
               children: posters.asMap().entries.map((entry) {
@@ -302,9 +301,9 @@ class _PosterStack extends StatelessWidget {
                       width: 58,
                       height: 86,
                       fit: BoxFit.cover,
-                      errorWidget: (_, __, ___) => const ColoredBox(
-                        color: FlixieColors.surfaceElevated,
-                        child: SizedBox(width: 58, height: 86),
+                      errorWidget: (_, __, ___) => ColoredBox(
+                        color: context.colors.surfaceElevated,
+                        child: const SizedBox(width: 58, height: 86),
                       ),
                     ),
                   ),
@@ -336,8 +335,8 @@ class _FriendAvatarStack extends StatelessWidget {
             left: entry.key * 19,
             child: Container(
               padding: const EdgeInsets.all(1),
-              decoration: const BoxDecoration(
-                  color: FlixieColors.background, shape: BoxShape.circle),
+              decoration: BoxDecoration(
+                  color: context.colors.background, shape: BoxShape.circle),
               child: ProfileAvatarView(
                 avatar: entry.value.ownerAvatar,
                 fallbackText: name.isEmpty ? '?' : name[0].toUpperCase(),

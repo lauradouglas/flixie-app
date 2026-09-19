@@ -103,7 +103,7 @@ class MovieSearchResultTile extends StatelessWidget {
                           _MovieMetadata(
                             icon: Icons.star_rounded,
                             label: rating.toStringAsFixed(1),
-                            color: FlixieColors.warning,
+                            color: context.colors.warning,
                           ),
                         ],
                       ],
@@ -112,9 +112,9 @@ class MovieSearchResultTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
-                color: FlixieColors.medium,
+                color: context.colors.medium,
               ),
             ],
           ),
@@ -140,11 +140,13 @@ class _MovieMetadata extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: color),
+        Icon(icon, size: 14, color: context.colors.adapt(color)),
         const SizedBox(width: 4),
         Text(label,
             style: TextStyle(
-                color: color, fontSize: 12, fontWeight: FontWeight.w700)),
+                color: context.colors.adapt(color),
+                fontSize: 12,
+                fontWeight: FontWeight.w700)),
       ],
     );
   }
@@ -156,8 +158,8 @@ class _MoviePlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: FlixieColors.danger.withValues(alpha: 0.2),
-      child: const Icon(Icons.movie_rounded, color: FlixieColors.danger),
+      color: context.colors.danger.withValues(alpha: 0.2),
+      child: Icon(Icons.movie_rounded, color: context.colors.danger),
     );
   }
 }

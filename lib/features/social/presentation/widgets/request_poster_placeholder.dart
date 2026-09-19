@@ -8,9 +8,10 @@ class RequestPosterPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: FlixieColors.tabBarBackground,
-      child: const Center(
-        child: Icon(Icons.movie_outlined, color: FlixieColors.medium, size: 28),
+      color: context.colors.tabBarBackground,
+      child: Center(
+        child:
+            Icon(Icons.movie_outlined, color: context.colors.medium, size: 28),
       ),
     );
   }

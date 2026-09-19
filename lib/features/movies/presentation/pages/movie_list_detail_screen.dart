@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'dart:async';
@@ -148,7 +149,7 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
     final added = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.surfaceElevated,
+      backgroundColor: context.colors.surfaceElevated,
       builder: (sheetContext) =>
           ChangeNotifierProvider<MovieListsProvider>.value(
         value: provider,
@@ -179,7 +180,7 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             style: FilledButton.styleFrom(
-              backgroundColor: FlixieColors.danger,
+              backgroundColor: context.colors.danger,
             ),
             child: const Text('Delete'),
           ),
@@ -279,7 +280,7 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
     final selected = await showModalBottomSheet<FriendshipUser>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.surfaceElevated,
+      backgroundColor: context.colors.surfaceElevated,
       builder: (_) => _AddListMemberSheet(friends: available),
     );
     if (selected == null || !mounted) return;
@@ -307,7 +308,7 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
     if (membership == null) return;
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: FlixieColors.surfaceElevated,
+      backgroundColor: context.colors.surfaceElevated,
       showDragHandle: true,
       builder: (_) => SafeArea(
         child: Padding(
@@ -321,8 +322,8 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                   Expanded(
                     child: Text(
                       '${membership.members.length} member${membership.members.length == 1 ? '' : 's'}',
-                      style: const TextStyle(
-                        color: FlixieColors.light,
+                      style: TextStyle(
+                        color: context.colors.light,
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
                       ),
@@ -358,9 +359,9 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                       ? IconButton(
                           tooltip: 'Remove member',
                           onPressed: () => _removeMember(member),
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.person_remove_outlined,
-                            color: FlixieColors.danger,
+                            color: context.colors.danger,
                           ),
                         )
                       : null,
@@ -398,10 +399,10 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
     );
 
     return Scaffold(
-      backgroundColor: FlixieColors.background,
+      backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: FlixieColors.background,
-        foregroundColor: FlixieColors.light,
+        backgroundColor: context.colors.background,
+        foregroundColor: context.colors.light,
         actions: [
           if (_canEdit)
             IconButton(
@@ -411,7 +412,7 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
             ),
           PopupMenuButton<String>(
             tooltip: 'List actions',
-            color: FlixieColors.tabBarBackgroundFocused,
+            color: context.colors.tabBarBackgroundFocused,
             onSelected: (value) async {
               if (value == 'refresh') {
                 _refresh();
@@ -715,10 +716,10 @@ class _AddListMemberSheetState extends State<_AddListMemberSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Add a friend',
               style: TextStyle(
-                color: FlixieColors.light,
+                color: context.colors.light,
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
               ),
@@ -735,12 +736,12 @@ class _AddListMemberSheetState extends State<_AddListMemberSheet> {
             ),
             const SizedBox(height: 10),
             if (visible.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Center(
                   child: Text(
                     'No friends available to add.',
-                    style: TextStyle(color: FlixieColors.medium),
+                    style: TextStyle(color: context.colors.medium),
                   ),
                 ),
               )
@@ -905,7 +906,7 @@ class _AddMovieToListSheetState extends State<_AddMovieToListSheet> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: FlixieColors.white,
+                            color: context.colors.white,
                             fontWeight: FontWeight.w800,
                           ),
                     ),
@@ -922,13 +923,13 @@ class _AddMovieToListSheetState extends State<_AddMovieToListSheet> {
                 controller: _controller,
                 autofocus: true,
                 onChanged: _onQueryChanged,
-                style: const TextStyle(color: FlixieColors.white),
+                style: TextStyle(color: context.colors.white),
                 decoration: InputDecoration(
                   hintText: 'Search movies',
-                  hintStyle: const TextStyle(color: FlixieColors.medium),
-                  prefixIcon: const Icon(
+                  hintStyle: TextStyle(color: context.colors.medium),
+                  prefixIcon: Icon(
                     Icons.search_rounded,
-                    color: FlixieColors.medium,
+                    color: context.colors.medium,
                   ),
                   suffixIcon: _controller.text.isEmpty
                       ? null
@@ -938,13 +939,13 @@ class _AddMovieToListSheetState extends State<_AddMovieToListSheet> {
                             _controller.clear();
                             _onQueryChanged('');
                           },
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.close_rounded,
-                            color: FlixieColors.medium,
+                            color: context.colors.medium,
                           ),
                         ),
                   filled: true,
-                  fillColor: FlixieColors.tabBarBackgroundFocused,
+                  fillColor: context.colors.tabBarBackgroundFocused,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
                     borderSide: BorderSide(
@@ -967,8 +968,8 @@ class _AddMovieToListSheetState extends State<_AddMovieToListSheet> {
                 const SizedBox(height: 10),
                 Text(
                   _error!,
-                  style: const TextStyle(
-                    color: FlixieColors.danger,
+                  style: TextStyle(
+                    color: context.colors.danger,
                     fontSize: 13,
                   ),
                 ),
@@ -989,18 +990,18 @@ class _AddMovieToListSheetState extends State<_AddMovieToListSheet> {
       return const Center(child: CircularProgressIndicator());
     }
     if (_controller.text.trim().length < 2) {
-      return const Center(
+      return Center(
         child: Text(
           'Search by title to add a movie.',
-          style: TextStyle(color: FlixieColors.medium),
+          style: TextStyle(color: context.colors.medium),
         ),
       );
     }
     if (_results.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           'No movies found.',
-          style: TextStyle(color: FlixieColors.medium),
+          style: TextStyle(color: context.colors.medium),
         ),
       );
     }
@@ -1044,7 +1045,7 @@ class _AddMovieResultTile extends StatelessWidget {
     final year = _extractYear(movie.releaseDate);
 
     return Material(
-      color: FlixieColors.tabBarBackgroundFocused,
+      color: context.colors.tabBarBackgroundFocused,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
@@ -1061,9 +1062,9 @@ class _AddMovieResultTile extends StatelessWidget {
                   child: posterUrl == null
                       ? Container(
                           color: const Color(0xFF1E2D40),
-                          child: const Icon(
+                          child: Icon(
                             Icons.movie_outlined,
-                            color: FlixieColors.medium,
+                            color: context.colors.medium,
                           ),
                         )
                       : CachedNetworkImage(
@@ -1071,9 +1072,9 @@ class _AddMovieResultTile extends StatelessWidget {
                           fit: BoxFit.cover,
                           errorWidget: (_, __, ___) => Container(
                             color: const Color(0xFF1E2D40),
-                            child: const Icon(
+                            child: Icon(
                               Icons.movie_outlined,
-                              color: FlixieColors.medium,
+                              color: context.colors.medium,
                             ),
                           ),
                         ),
@@ -1088,8 +1089,8 @@ class _AddMovieResultTile extends StatelessWidget {
                       movie.name,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: FlixieColors.white,
+                      style: TextStyle(
+                        color: context.colors.white,
                         fontWeight: FontWeight.w800,
                         height: 1.15,
                       ),
@@ -1098,8 +1099,8 @@ class _AddMovieResultTile extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         year,
-                        style: const TextStyle(
-                          color: FlixieColors.medium,
+                        style: TextStyle(
+                          color: context.colors.medium,
                           fontSize: 12,
                         ),
                       ),
@@ -1125,7 +1126,7 @@ class _AddMovieResultTile extends StatelessWidget {
                   onPressed: onAdd,
                   style: IconButton.styleFrom(
                     backgroundColor: FlixieColors.primary,
-                    foregroundColor: Colors.black,
+                    foregroundColor: Colors.white,
                   ),
                   icon: const Icon(Icons.add_rounded),
                 ),
@@ -1162,7 +1163,7 @@ class _ListMembersStrip extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: FlixieColors.surfaceElevated.withValues(alpha: 0.72),
+            color: context.colors.surfaceElevated.withValues(alpha: 0.72),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: FlixieColors.primary.withValues(alpha: 0.2),
@@ -1214,8 +1215,8 @@ class _ListMembersStrip extends StatelessWidget {
                           : contributorCount == 0
                               ? 'Only you can edit this list'
                               : '$contributorCount contributor${contributorCount == 1 ? '' : 's'}',
-                      style: const TextStyle(
-                        color: FlixieColors.light,
+                      style: TextStyle(
+                        color: context.colors.light,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -1225,8 +1226,8 @@ class _ListMembersStrip extends StatelessWidget {
                               ? 'Every group member can add titles'
                               : 'Everyone can add titles'
                           : 'Only the owner can edit this list',
-                      style: const TextStyle(
-                        color: FlixieColors.medium,
+                      style: TextStyle(
+                        color: context.colors.medium,
                         fontSize: 11,
                       ),
                     ),
@@ -1309,17 +1310,17 @@ class _ListHeader extends StatelessWidget {
                                     membership?.groupName ?? 'Group list',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: FlixieColors.light,
+                                    style: TextStyle(
+                                      color: context.colors.light,
                                       fontSize: 15,
                                       fontWeight: FontWeight.w800,
                                     ),
                                   ),
                                 ),
                                 if (membership?.groupId != null)
-                                  const Icon(
+                                  Icon(
                                     Icons.chevron_right_rounded,
-                                    color: FlixieColors.medium,
+                                    color: context.colors.medium,
                                     size: 18,
                                   ),
                               ],
@@ -1344,8 +1345,8 @@ class _ListHeader extends StatelessWidget {
                                         : '@${owner!.username} · ${_visibilityLabel(membership?.visibility)}',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: FlixieColors.medium,
+                                    style: TextStyle(
+                                      color: context.colors.medium,
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -1388,8 +1389,8 @@ class _ListHeader extends StatelessWidget {
                                     : '@${owner!.username} · ${_visibilityLabel(membership?.visibility)}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: FlixieColors.light,
+                                style: TextStyle(
+                                  color: context.colors.light,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -1397,23 +1398,7 @@ class _ListHeader extends StatelessWidget {
                             ),
                             if (isOwner) ...[
                               const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: FlixieColors.primary
-                                      .withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Text(
-                                  'Owner',
-                                  style: TextStyle(
-                                    color: FlixieColors.primary,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
+                              const FlixiePill.label(label: Text('Owner')),
                             ],
                           ],
                         ),
@@ -1425,8 +1410,8 @@ class _ListHeader extends StatelessWidget {
                   identity.$1,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: context.colors.white,
                     fontSize: 23,
                     height: 1.05,
                     fontWeight: FontWeight.w900,
@@ -1439,8 +1424,8 @@ class _ListHeader extends StatelessWidget {
                     identity.$2!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: FlixieColors.light,
+                    style: TextStyle(
+                      color: context.colors.light,
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1452,8 +1437,8 @@ class _ListHeader extends StatelessWidget {
                     membership!.description!.trim(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: FlixieColors.medium,
+                    style: TextStyle(
+                      color: context.colors.medium,
                       fontSize: 11.5,
                     ),
                   ),
@@ -1461,16 +1446,16 @@ class _ListHeader extends StatelessWidget {
                 const SizedBox(height: 7),
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.video_library_outlined,
-                      color: FlixieColors.medium,
+                      color: context.colors.medium,
                       size: 17,
                     ),
                     const SizedBox(width: 6),
                     Text(
                       '$movieCount ${movieCount == 1 ? 'title' : 'titles'}',
-                      style: const TextStyle(
-                        color: FlixieColors.medium,
+                      style: TextStyle(
+                        color: context.colors.medium,
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1516,12 +1501,12 @@ class _PosterCollage extends StatelessWidget {
         width: 92,
         height: 138,
         decoration: BoxDecoration(
-          color: FlixieColors.surfaceElevated,
+          color: context.colors.surfaceElevated,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Icon(
+        child: Icon(
           Icons.movie_creation_outlined,
-          color: FlixieColors.medium,
+          color: context.colors.medium,
           size: 34,
         ),
       );
@@ -1546,10 +1531,10 @@ class _PosterCollage extends StatelessWidget {
                 errorWidget: (_, __, ___) => Container(
                   width: 86,
                   height: 134,
-                  color: FlixieColors.surfaceElevated,
-                  child: const Icon(
+                  color: context.colors.surfaceElevated,
+                  child: Icon(
                     Icons.movie_outlined,
-                    color: FlixieColors.medium,
+                    color: context.colors.medium,
                   ),
                 ),
               ),
@@ -1587,10 +1572,10 @@ class _SortToolbar extends StatelessWidget {
       child: Row(
         children: [
           if (sort == _ListSort.recentlyAdded)
-            const Text(
+            Text(
               'Recently added',
               style: TextStyle(
-                color: FlixieColors.light,
+                color: context.colors.light,
                 fontSize: 15,
                 fontWeight: FontWeight.w800,
               ),
@@ -1598,8 +1583,8 @@ class _SortToolbar extends StatelessWidget {
           else
             Text(
               _mediaCountLabel(movieCount, showCount),
-              style: const TextStyle(
-                color: FlixieColors.medium,
+              style: TextStyle(
+                color: context.colors.medium,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
@@ -1607,7 +1592,7 @@ class _SortToolbar extends StatelessWidget {
           const Spacer(),
           PopupMenuButton<_ListSort>(
             tooltip: 'Sort list',
-            color: FlixieColors.tabBarBackgroundFocused,
+            color: context.colors.tabBarBackgroundFocused,
             initialValue: sort,
             onSelected: onSortChanged,
             itemBuilder: (_) => const [
@@ -1632,31 +1617,16 @@ class _SortToolbar extends StatelessWidget {
                 child: Text('Added by'),
               ),
             ],
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-              decoration: BoxDecoration(
-                color: FlixieColors.tabBarBackgroundFocused,
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.sort_rounded,
-                      color: FlixieColors.primary, size: 17),
-                  const SizedBox(width: 7),
-                  Text(_sortLabel(sort)),
-                  const SizedBox(width: 2),
-                  const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
-                ],
-              ),
-            ),
+            child: FlixiePill.label(
+                compact: false,
+                label: Text(_sortLabel(sort)),
+                avatar: const Icon(Icons.sort_rounded)),
           ),
           if (contributors.isNotEmpty) ...[
             const SizedBox(width: 8),
             PopupMenuButton<String>(
               tooltip: 'Filter by contributor',
-              color: FlixieColors.tabBarBackgroundFocused,
+              color: context.colors.tabBarBackgroundFocused,
               onSelected: (value) =>
                   onContributorChanged(value == '__all__' ? null : value),
               itemBuilder: (_) => [
@@ -1710,7 +1680,7 @@ class _SortToolbar extends StatelessWidget {
                 height: 42,
                 decoration: BoxDecoration(
                   color: selectedContributorId == null
-                      ? FlixieColors.tabBarBackgroundFocused
+                      ? context.colors.tabBarBackgroundFocused
                       : FlixieColors.primary.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(22),
                   border: Border.all(
@@ -1723,7 +1693,7 @@ class _SortToolbar extends StatelessWidget {
                   Icons.filter_list_rounded,
                   color: selectedContributorId == null
                       ? FlixieColors.primary
-                      : FlixieColors.light,
+                      : context.colors.light,
                   size: 20,
                 ),
               ),
@@ -1764,7 +1734,7 @@ class _MovieListPosterCard extends StatelessWidget {
     final isRecent = _isRecentAddition(entry.createdAt);
 
     return Material(
-      color: FlixieColors.tabBarBackgroundFocused,
+      color: context.colors.tabBarBackgroundFocused,
       borderRadius: BorderRadius.circular(12),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -1780,10 +1750,10 @@ class _MovieListPosterCard extends StatelessWidget {
                   posterUrl == null
                       ? Container(
                           color: const Color(0xFF1E2D40),
-                          child: const Center(
+                          child: Center(
                             child: Icon(
                               Icons.movie_outlined,
-                              color: FlixieColors.medium,
+                              color: context.colors.medium,
                             ),
                           ),
                         )
@@ -1792,10 +1762,10 @@ class _MovieListPosterCard extends StatelessWidget {
                           fit: BoxFit.cover,
                           errorWidget: (_, __, ___) => Container(
                             color: const Color(0xFF1E2D40),
-                            child: const Center(
+                            child: Center(
                               child: Icon(
                                 Icons.movie_outlined,
-                                color: FlixieColors.medium,
+                                color: context.colors.medium,
                               ),
                             ),
                           ),
@@ -1810,7 +1780,7 @@ class _MovieListPosterCard extends StatelessWidget {
                         child: PopupMenuButton<String>(
                           padding: EdgeInsets.zero,
                           tooltip: 'List item actions',
-                          color: FlixieColors.tabBarBackgroundFocused,
+                          color: context.colors.tabBarBackgroundFocused,
                           icon: Container(
                             width: 28,
                             height: 28,
@@ -1835,20 +1805,21 @@ class _MovieListPosterCard extends StatelessWidget {
                             }
                           },
                           itemBuilder: (_) => [
-                            const PopupMenuItem(
+                            PopupMenuItem(
                               value: 'remove',
                               height: 40,
-                              padding: EdgeInsets.symmetric(horizontal: 12),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 12),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
                                     Icons.remove_circle_outline_rounded,
-                                    color: FlixieColors.danger,
+                                    color: context.colors.danger,
                                     size: 18,
                                   ),
-                                  SizedBox(width: 9),
-                                  Text('Remove from list'),
+                                  const SizedBox(width: 9),
+                                  const Text('Remove from list'),
                                 ],
                               ),
                             ),
@@ -1897,25 +1868,10 @@ class _MovieListPosterCard extends StatelessWidget {
                       ),
                     ),
                   if (isRecent)
-                    Positioned(
+                    const Positioned(
                       left: 7,
                       top: 7,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 7, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: FlixieColors.primary,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text(
-                          'New',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
+                      child: FlixiePill.label(label: Text('New')),
                     ),
                 ],
               ),
@@ -1931,8 +1887,8 @@ class _MovieListPosterCard extends StatelessWidget {
                       _entryTitle(entry),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: FlixieColors.white,
+                      style: TextStyle(
+                        color: context.colors.white,
                         fontWeight: FontWeight.w700,
                         fontSize: 13,
                         height: 1.15,
@@ -1945,23 +1901,23 @@ class _MovieListPosterCard extends StatelessWidget {
                       if (year != null)
                         Text(
                           isShow ? '$year · Show' : year,
-                          style: const TextStyle(
-                            color: FlixieColors.medium,
+                          style: TextStyle(
+                            color: context.colors.medium,
                             fontSize: 12,
                           ),
                         ),
                       const Spacer(),
                       if (rating != null && rating > 0) ...[
-                        const Icon(
+                        Icon(
                           Icons.star_rounded,
-                          color: FlixieColors.tertiary,
+                          color: context.colors.tertiary,
                           size: 13,
                         ),
                         const SizedBox(width: 2),
                         Text(
                           rating.toStringAsFixed(1),
-                          style: const TextStyle(
-                            color: FlixieColors.tertiary,
+                          style: TextStyle(
+                            color: context.colors.tertiary,
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                           ),
@@ -1991,8 +1947,8 @@ class _MovieListPosterCard extends StatelessWidget {
                                 _addedByUsername(entry, currentUserId),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: FlixieColors.light,
+                                style: TextStyle(
+                                  color: context.colors.light,
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -2005,8 +1961,8 @@ class _MovieListPosterCard extends StatelessWidget {
                           _addedDateLabel(entry.createdAt),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: FlixieColors.medium,
+                          style: TextStyle(
+                            color: context.colors.medium,
                             fontSize: 10,
                           ),
                         ),
@@ -2042,16 +1998,16 @@ class _EmptyListState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Icons.playlist_add_rounded,
-              color: FlixieColors.medium,
+              color: context.colors.medium,
               size: 52,
             ),
             const SizedBox(height: 14),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: FlixieColors.medium),
+              style: TextStyle(color: context.colors.medium),
             ),
             if (isOwner) ...[
               const SizedBox(height: 16),

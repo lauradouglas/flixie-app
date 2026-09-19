@@ -1,3 +1,5 @@
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flixie_app/app/theme/appearance_controller.dart';
 import 'package:flixie_app/features/social/data/chat_unread_controller.dart';
 import 'dart:async';
 
@@ -110,19 +112,28 @@ void main() async {
     DeviceOrientation.landscapeRight,
   ]);
 
-  // Use a dark system overlay so the status bar blends with the dark theme
+  // Explicitly enable edge-to-edge on older Android versions as well.
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  }
+
+  // Safe-area widgets keep controls clear while backgrounds fill the window.
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: FlixieColors.tabBarBackground,
+      systemNavigationBarColor: Colors.transparent,
       systemNavigationBarIconBrightness: Brightness.light,
     ),
   );
 
+  final appearance =
+      AppearanceController(await SharedPreferences.getInstance());
+
   runApp(
     MultiProvider(
       providers: [
+        ChangeNotifierProvider<AppearanceController>.value(value: appearance),
         ChangeNotifierProvider<AnalyticsController>.value(
           value: analyticsController,
         ),
@@ -196,29 +207,36 @@ class _FlixieAppState extends State<FlixieApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = context
-        .select<AuthProvider, bool>((auth) => auth.dbUser?.darkMode ?? true);
+    final mode = context.watch<AppearanceController>().mode;
     return MaterialApp.router(
       title: 'Flixie',
       debugShowCheckedModeBanner: false,
       color: FlixieColors.background,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+      themeMode: mode,
       routerConfig: _router,
-      builder: (context, child) => GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onTap: () {
-          final focus = FocusManager.instance.primaryFocus;
-          focus?.unfocus();
-        },
-        child: AnalyticsConsentPrompt(
-          child: ColoredBox(
-            color: isDark ? FlixieColors.background : const Color(0xFFF5F7FA),
-            child: child ?? const SizedBox.shrink(),
+      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+          value: (Theme.of(context).brightness == Brightness.dark
+                  ? SystemUiOverlayStyle.light
+                  : SystemUiOverlayStyle.dark)
+              .copyWith(
+            statusBarColor: Colors.transparent,
+            systemNavigationBarColor: context.colors.tabBarBackground,
           ),
-        ),
-      ),
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () {
+              final focus = FocusManager.instance.primaryFocus;
+              focus?.unfocus();
+            },
+            child: AnalyticsConsentPrompt(
+              child: ColoredBox(
+                color: context.colors.background,
+                child: child ?? const SizedBox.shrink(),
+              ),
+            ),
+          )),
     );
   }
 }

@@ -11,12 +11,6 @@ class SectionHeader extends StatelessWidget {
     return FlixieSectionHeader(
       title: title,
       accentHeight: 18,
-      titleStyle: const TextStyle(
-        color: Colors.white,
-        fontWeight: FontWeight.bold,
-        fontSize: 13,
-        letterSpacing: 1.2,
-      ),
     );
   }
 }

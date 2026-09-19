@@ -51,13 +51,13 @@ class PersonalizedRecommendationCard extends StatelessWidget {
         child: Ink(
           height: height,
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
+            gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [FlixieColors.surfaceElevated, FlixieColors.surface],
+              colors: [context.colors.surfaceElevated, context.colors.surface],
             ),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: FlixieColors.tabBarBorder),
+            border: Border.all(color: context.colors.tabBarBorder),
             boxShadow: [
               BoxShadow(
                 color: FlixieColors.primary.withValues(alpha: 0.08),
@@ -75,7 +75,7 @@ class PersonalizedRecommendationCard extends StatelessWidget {
                 child: SizedBox(
                   width: posterWidth,
                   height: height,
-                  child: _poster(),
+                  child: _poster(context),
                 ),
               ),
               Expanded(
@@ -88,8 +88,8 @@ class PersonalizedRecommendationCard extends StatelessWidget {
                         movie.name,
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: FlixieColors.textPrimary,
+                        style: TextStyle(
+                          color: context.colors.textPrimary,
                           fontSize: 18,
                           height: 1.05,
                           fontWeight: FontWeight.w900,
@@ -100,8 +100,8 @@ class PersonalizedRecommendationCard extends StatelessWidget {
                         _metadata,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: FlixieColors.medium,
+                        style: TextStyle(
+                          color: context.colors.medium,
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
                         ),
@@ -111,13 +111,13 @@ class PersonalizedRecommendationCard extends StatelessWidget {
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            const Icon(Icons.star_rounded,
-                                color: FlixieColors.warning, size: 18),
+                            Icon(Icons.star_rounded,
+                                color: context.colors.warning, size: 18),
                             const SizedBox(width: 4),
                             Text(
                               movie.voteAverage!.toStringAsFixed(1),
-                              style: const TextStyle(
-                                color: FlixieColors.warning,
+                              style: TextStyle(
+                                color: context.colors.warning,
                                 fontSize: 15,
                                 fontWeight: FontWeight.w900,
                               ),
@@ -129,10 +129,10 @@ class PersonalizedRecommendationCard extends StatelessWidget {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Padding(
-                            padding: EdgeInsets.only(top: 1),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 1),
                             child: Icon(Icons.auto_awesome_rounded,
-                                color: FlixieColors.warning, size: 13),
+                                color: context.colors.warning, size: 13),
                           ),
                           const SizedBox(width: 5),
                           Expanded(
@@ -140,8 +140,8 @@ class PersonalizedRecommendationCard extends StatelessWidget {
                               primaryReason,
                               maxLines: 3,
                               overflow: TextOverflow.clip,
-                              style: const TextStyle(
-                                color: FlixieColors.warningTint,
+                              style: TextStyle(
+                                color: context.colors.warningTint,
                                 fontSize: 11,
                                 height: 1.2,
                                 fontWeight: FontWeight.w700,
@@ -169,8 +169,8 @@ class PersonalizedRecommendationCard extends StatelessWidget {
                                 reason,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: FlixieColors.light,
+                                style: TextStyle(
+                                  color: context.colors.light,
                                   fontSize: 9.5,
                                   height: 1.2,
                                   fontWeight: FontWeight.w500,
@@ -193,11 +193,11 @@ class PersonalizedRecommendationCard extends StatelessWidget {
                               icon: isPreviouslyWatched
                                   ? Icons.replay_circle_filled_rounded
                                   : Icons.check_circle_outline_rounded,
-                              color: FlixieColors.success,
-                              borderColor:
-                                  FlixieColors.success.withValues(alpha: 0.38),
-                              backgroundColor:
-                                  FlixieColors.success.withValues(alpha: 0.10),
+                              color: context.colors.success,
+                              borderColor: context.colors.success
+                                  .withValues(alpha: 0.38),
+                              backgroundColor: context.colors.success
+                                  .withValues(alpha: 0.10),
                               onPressed: onMarkWatched,
                             ),
                             const SizedBox(width: 5),
@@ -208,11 +208,11 @@ class PersonalizedRecommendationCard extends StatelessWidget {
                               icon: isBookmarked
                                   ? Icons.bookmark_rounded
                                   : Icons.bookmark_outline_rounded,
-                              color: FlixieColors.warning,
-                              borderColor:
-                                  FlixieColors.warning.withValues(alpha: 0.38),
-                              backgroundColor:
-                                  FlixieColors.warning.withValues(alpha: 0.10),
+                              color: context.colors.warning,
+                              borderColor: context.colors.warning
+                                  .withValues(alpha: 0.38),
+                              backgroundColor: context.colors.warning
+                                  .withValues(alpha: 0.10),
                               isBusy: isBookmarkUpdating,
                               onPressed:
                                   isBookmarkUpdating ? null : onBookmarkTap,
@@ -221,11 +221,11 @@ class PersonalizedRecommendationCard extends StatelessWidget {
                             _ActionButton(
                               tooltip: 'Not interested',
                               icon: Icons.visibility_off_outlined,
-                              color: FlixieColors.danger,
+                              color: context.colors.danger,
                               borderColor:
-                                  FlixieColors.danger.withValues(alpha: 0.72),
+                                  context.colors.danger.withValues(alpha: 0.72),
                               backgroundColor:
-                                  FlixieColors.danger.withValues(alpha: 0.08),
+                                  context.colors.danger.withValues(alpha: 0.08),
                               animateBeforeAction: true,
                               onPressed: onNotInterested,
                             ),
@@ -259,23 +259,23 @@ class PersonalizedRecommendationCard extends StatelessWidget {
     return [if (year != null) '$year', 'Movie'].join(' · ');
   }
 
-  Widget _poster() {
+  Widget _poster(BuildContext context) {
     final path = movie.poster;
-    if (path == null || path.isEmpty) return _fallbackPoster();
+    if (path == null || path.isEmpty) return _fallbackPoster(context);
     final url =
         path.startsWith('http') ? path : 'https://image.tmdb.org/t/p/w500$path';
     return CachedNetworkImage(
       imageUrl: url,
       fit: BoxFit.cover,
-      errorWidget: (_, __, ___) => _fallbackPoster(),
+      errorWidget: (_, __, ___) => _fallbackPoster(context),
     );
   }
 
-  Widget _fallbackPoster() => Container(
-        color: FlixieColors.tabBarBackgroundFocused,
+  Widget _fallbackPoster(BuildContext context) => Container(
+        color: context.colors.tabBarBackgroundFocused,
         alignment: Alignment.center,
-        child: const Icon(Icons.movie_outlined,
-            color: FlixieColors.medium, size: 38),
+        child:
+            Icon(Icons.movie_outlined, color: context.colors.medium, size: 38),
       );
 }
 
@@ -408,7 +408,7 @@ class _ActionButtonState extends State<_ActionButton>
           constraints: const BoxConstraints.tightFor(width: 32, height: 32),
           style: IconButton.styleFrom(
             backgroundColor: widget.backgroundColor ??
-                FlixieColors.navy.withValues(alpha: 0.56),
+                context.colors.navy.withValues(alpha: 0.56),
             side: BorderSide(
               color: widget.borderColor ?? Colors.white.withValues(alpha: 0.08),
             ),

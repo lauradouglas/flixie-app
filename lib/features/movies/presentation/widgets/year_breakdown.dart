@@ -27,8 +27,8 @@ class YearBreakdown extends StatelessWidget {
               SizedBox(
                 width: 40,
                 child: Text('$y',
-                    style: const TextStyle(
-                        color: Colors.white,
+                    style: TextStyle(
+                        color: context.colors.white,
                         fontSize: 13,
                         fontWeight: FontWeight.w600)),
               ),
@@ -39,7 +39,7 @@ class YearBreakdown extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: fraction,
                     minHeight: 8,
-                    backgroundColor: FlixieColors.tabBarBackgroundFocused,
+                    backgroundColor: context.colors.tabBarBackgroundFocused,
                     valueColor: AlwaysStoppedAnimation(
                         FlixieColors.primary.withValues(alpha: 0.7)),
                   ),
@@ -47,8 +47,7 @@ class YearBreakdown extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Text('$count',
-                  style: const TextStyle(
-                      color: FlixieColors.medium, fontSize: 12)),
+                  style: TextStyle(color: context.colors.medium, fontSize: 12)),
             ],
           ),
         );

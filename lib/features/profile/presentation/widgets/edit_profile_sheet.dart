@@ -113,7 +113,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: FlixieColors.medium.withValues(alpha: 0.4),
+                color: context.colors.medium.withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -148,7 +148,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
             const SizedBox(height: 8),
             Text(
               _errorMessage!,
-              style: const TextStyle(color: FlixieColors.danger, fontSize: 13),
+              style: TextStyle(color: context.colors.danger, fontSize: 13),
             ),
           ],
           const SizedBox(height: 16),
@@ -162,7 +162,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                       width: 18,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.black,
+                        color: Colors.white,
                       ),
                     )
                   : const Text('Save Changes'),

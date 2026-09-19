@@ -34,9 +34,9 @@ class _WatchFollowUpSheetState extends State<WatchFollowUpSheet> {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Container(
-        decoration: const BoxDecoration(
-          color: FlixieColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
         child: Column(
@@ -48,21 +48,21 @@ class _WatchFollowUpSheetState extends State<WatchFollowUpSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: FlixieColors.medium,
+                  color: context.colors.medium,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
             const SizedBox(height: 18),
-            const Row(
+            Row(
               children: [
                 Icon(Icons.check_circle_rounded,
-                    color: FlixieColors.success, size: 28),
-                SizedBox(width: 10),
+                    color: context.colors.success, size: 28),
+                const SizedBox(width: 10),
                 Text(
                   'Marked as watched',
                   style: TextStyle(
-                    color: FlixieColors.white,
+                    color: context.colors.white,
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
                   ),
@@ -74,7 +74,7 @@ class _WatchFollowUpSheetState extends State<WatchFollowUpSheet> {
               widget.movieTitle,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: FlixieColors.medium, fontSize: 14),
+              style: TextStyle(color: context.colors.medium, fontSize: 14),
             ),
             const SizedBox(height: 18),
             _FollowUpOption(
@@ -140,31 +140,31 @@ class _FollowUpOption extends StatelessWidget {
         decoration: BoxDecoration(
           color: value
               ? FlixieColors.primary.withValues(alpha: 0.13)
-              : FlixieColors.surfaceElevated,
+              : context.colors.surfaceElevated,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: value
                 ? FlixieColors.primary.withValues(alpha: 0.7)
-                : FlixieColors.tabBarBorder,
+                : context.colors.tabBarBorder,
           ),
         ),
         child: Row(
           children: [
             Icon(icon,
-                color: value ? FlixieColors.primary : FlixieColors.medium),
+                color: value ? FlixieColors.primary : context.colors.medium),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(title,
-                      style: const TextStyle(
-                          color: FlixieColors.light,
+                      style: TextStyle(
+                          color: context.colors.light,
                           fontWeight: FontWeight.w700)),
                   const SizedBox(height: 3),
                   Text(subtitle,
-                      style: const TextStyle(
-                          color: FlixieColors.medium, fontSize: 12)),
+                      style: TextStyle(
+                          color: context.colors.medium, fontSize: 12)),
                 ],
               ),
             ),

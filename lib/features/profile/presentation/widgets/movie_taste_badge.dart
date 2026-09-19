@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -154,16 +155,16 @@ class MovieTasteBadge extends StatelessWidget {
 
     if (compact) {
       return Row(children: [
-        Icon(personality.icon, color: FlixieColors.primaryText, size: 28),
+        Icon(personality.icon, color: context.colors.primaryText, size: 28),
         const SizedBox(width: 12),
         Expanded(
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(personality.label,
-              style: const TextStyle(
-                  color: FlixieColors.white, fontWeight: FontWeight.w700)),
+              style: TextStyle(
+                  color: context.colors.white, fontWeight: FontWeight.w700)),
           Text('Based on your favourite genres: ${genreNames.join(' · ')}',
-              style: const TextStyle(color: FlixieColors.medium, fontSize: 13)),
+              style: TextStyle(color: context.colors.medium, fontSize: 13)),
         ])),
       ]);
     }
@@ -201,10 +202,12 @@ class MovieTasteBadge extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: FlixieColors.tabBarBackgroundFocused,
+            color: context.colors.tabBarBackgroundFocused,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: personality.color.withValues(alpha: 0.35),
+              color: context.colors
+                  .adapt(personality.color)
+                  .withValues(alpha: 0.35),
               width: 1.5,
             ),
           ),
@@ -215,12 +218,14 @@ class MovieTasteBadge extends StatelessWidget {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: personality.color.withValues(alpha: 0.15),
+                  color: context.colors
+                      .adapt(personality.color)
+                      .withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   personality.icon,
-                  color: personality.color,
+                  color: context.colors.adapt(personality.color),
                   size: 26,
                 ),
               ),
@@ -235,7 +240,7 @@ class MovieTasteBadge extends StatelessWidget {
                       personality.label,
                       style: textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: personality.color,
+                        color: context.colors.adapt(personality.color),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -245,7 +250,7 @@ class MovieTasteBadge extends StatelessWidget {
                       children: genreNames
                           .map((name) => _GenreChip(
                                 name: name,
-                                color: _genreColor(name),
+                                color: _genreColor(context, name),
                               ))
                           .toList(),
                     ),
@@ -260,36 +265,36 @@ class MovieTasteBadge extends StatelessWidget {
   }
 }
 
-Color _genreColor(String name) {
-  const named = <String, Color>{
-    'action': FlixieColors.danger,
-    'adventure': FlixieColors.success,
-    'animation': Color(0xFF4DD0E1),
-    'comedy': FlixieColors.warning,
-    'crime': Color(0xFFE573A7),
-    'documentary': Color(0xFF66BB6A),
-    'drama': Color(0xFFAB76FF),
-    'family': Color(0xFFFFB86B),
+Color _genreColor(BuildContext context, String name) {
+  final named = <String, Color>{
+    'action': context.colors.danger,
+    'adventure': context.colors.success,
+    'animation': const Color(0xFF4DD0E1),
+    'comedy': context.colors.warning,
+    'crime': const Color(0xFFE573A7),
+    'documentary': const Color(0xFF66BB6A),
+    'drama': const Color(0xFFAB76FF),
+    'family': const Color(0xFFFFB86B),
     'fantasy': FlixieColors.primary,
-    'history': Color(0xFFD4A373),
-    'horror': Color(0xFFE85D75),
-    'music': Color(0xFFEC6BD6),
-    'mystery': Color(0xFF7986CB),
-    'romance': Color(0xFFFF6B9A),
-    'science fiction': Color(0xFF5B8DEF),
-    'sci-fi': Color(0xFF5B8DEF),
-    'thriller': Color(0xFFFF8A65),
-    'war': Color(0xFF9E9D6B),
-    'western': Color(0xFFC68B59),
+    'history': const Color(0xFFD4A373),
+    'horror': const Color(0xFFE85D75),
+    'music': const Color(0xFFEC6BD6),
+    'mystery': const Color(0xFF7986CB),
+    'romance': const Color(0xFFFF6B9A),
+    'science fiction': const Color(0xFF5B8DEF),
+    'sci-fi': const Color(0xFF5B8DEF),
+    'thriller': const Color(0xFFFF8A65),
+    'war': const Color(0xFF9E9D6B),
+    'western': const Color(0xFFC68B59),
   };
   final normalized = name.trim().toLowerCase();
   if (named[normalized] case final color?) return color;
-  const fallback = [
+  final fallback = [
     FlixieColors.primary,
-    FlixieColors.secondary,
-    FlixieColors.tertiary,
-    Color(0xFF5B8DEF),
-    Color(0xFFEC6BD6),
+    context.colors.secondary,
+    context.colors.tertiary,
+    const Color(0xFF5B8DEF),
+    const Color(0xFFEC6BD6),
   ];
   return fallback[normalized.hashCode.abs() % fallback.length];
 }
@@ -302,21 +307,6 @@ class _GenreChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Text(
-        name,
-        style: TextStyle(
-          fontSize: 11,
-          color: color,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
+    return FlixiePill.label(colorKey: name, label: Text(name));
   }
 }

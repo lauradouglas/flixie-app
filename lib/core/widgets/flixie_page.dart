@@ -51,10 +51,10 @@ class FlixieTitleAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     return AppBar(
       backgroundColor: backgroundColor,
-      foregroundColor: FlixieColors.light,
+      foregroundColor: context.colors.light,
       surfaceTintColor: Colors.transparent,
-      iconTheme: const IconThemeData(color: FlixieColors.light),
-      actionsIconTheme: const IconThemeData(color: FlixieColors.light),
+      iconTheme: IconThemeData(color: context.colors.light),
+      actionsIconTheme: IconThemeData(color: context.colors.light),
       elevation: 0,
       centerTitle: centerTitle,
       title: title,

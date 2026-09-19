@@ -282,6 +282,8 @@ class GroupInsightMember {
   final String name;
   final String username;
   final String? avatarUrl;
+  final ProfileAvatar? avatar;
+  final List<String> profileBadges;
   final int activityCount;
   final int rank;
   final String? badge;
@@ -291,6 +293,8 @@ class GroupInsightMember {
     required this.name,
     required this.username,
     this.avatarUrl,
+    this.avatar,
+    this.profileBadges = const [],
     this.activityCount = 0,
     this.rank = 0,
     this.badge,
@@ -315,6 +319,18 @@ class GroupInsightMember {
         user?['avatarUrl'],
         user?['avatar_url'],
       ]),
+      avatar: (json['avatar'] ?? user?['avatar']) is Map<String, dynamic>
+          ? ProfileAvatar.fromJson(
+              (json['avatar'] ?? user?['avatar']) as Map<String, dynamic>)
+          : null,
+      profileBadges:
+          ((json['profileBadges'] ?? user?['profileBadges']) as List? ??
+                  const [])
+              .map((badge) => badge is Map
+                  ? (badge['badge'] ?? '').toString()
+                  : badge.toString())
+              .where((badge) => badge.isNotEmpty)
+              .toList(),
       activityCount: _parseInt(json['activityCount'] ?? json['count']) ?? 0,
       rank: _parseInt(json['rank']) ?? 0,
       badge: json['badge'] as String?,

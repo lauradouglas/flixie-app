@@ -111,8 +111,8 @@ class _ListsPreviewSectionState extends State<ListsPreviewSection> {
                         title: widget.title,
                         uppercase: false,
                         accentHeight: 22,
-                        titleStyle: const TextStyle(
-                          color: FlixieColors.white,
+                        titleStyle: TextStyle(
+                          color: context.colors.white,
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
                           letterSpacing: .5,
@@ -121,8 +121,8 @@ class _ListsPreviewSectionState extends State<ListsPreviewSection> {
                       const SizedBox(height: 12),
                       Text(
                         widget.emptyMessage,
-                        style: const TextStyle(
-                          color: FlixieColors.medium,
+                        style: TextStyle(
+                          color: context.colors.medium,
                           fontSize: 14,
                           height: 1.35,
                         ),
@@ -161,9 +161,9 @@ class _ListsPreviewSectionState extends State<ListsPreviewSection> {
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
           decoration: BoxDecoration(
-            color: FlixieColors.tabBarBackgroundFocused,
+            color: context.colors.tabBarBackgroundFocused,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: FlixieColors.tabBarBorder),
+            border: Border.all(color: context.colors.tabBarBorder),
           ),
           child: content,
         );

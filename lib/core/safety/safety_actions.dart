@@ -25,11 +25,8 @@ class SafetyActions {
     String? reportedUserId,
     String? contentPreview,
   }) async {
-    final reason = await showModalBottomSheet<String>(
+    final reason = await showFlixiePromptSheet<String>(
       context: context,
-      useSafeArea: true,
-      backgroundColor: FlixieColors.surface,
-      showDragHandle: true,
       builder: (context) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.only(bottom: 12),
@@ -94,11 +91,8 @@ class SafetyActions {
     required String username,
     required String contentPreview,
   }) async {
-    final action = await showModalBottomSheet<String>(
+    final action = await showFlixiePromptSheet<String>(
       context: context,
-      useSafeArea: true,
-      backgroundColor: FlixieColors.surface,
-      showDragHandle: true,
       builder: (context) => Wrap(
         children: [
           ListTile(
@@ -107,10 +101,10 @@ class SafetyActions {
             onTap: () => Navigator.pop(context, 'report'),
           ),
           ListTile(
-            leading: const Icon(Icons.block, color: FlixieColors.danger),
-            title: const Text(
+            leading: Icon(Icons.block, color: context.colors.danger),
+            title: Text(
               'Block user',
-              style: TextStyle(color: FlixieColors.danger),
+              style: TextStyle(color: context.colors.danger),
             ),
             onTap: () => Navigator.pop(context, 'block'),
           ),

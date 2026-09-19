@@ -17,8 +17,8 @@ class HomeSectionHeader extends StatelessWidget {
         uppercase: false,
         maxTitleLines: 1,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        titleStyle: const TextStyle(
-          color: Colors.white,
+        titleStyle: TextStyle(
+          color: context.colors.white,
           fontSize: 18,
           fontWeight: FontWeight.w800,
           letterSpacing: 0.5,

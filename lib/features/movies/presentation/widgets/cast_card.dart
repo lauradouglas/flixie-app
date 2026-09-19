@@ -54,9 +54,9 @@ class CastCard extends StatelessWidget {
                       ? CachedNetworkImage(
                           imageUrl: member.profileImageUrl!,
                           fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) => _avatarFallback(),
+                          errorWidget: (_, __, ___) => _avatarFallback(context),
                         )
-                      : _avatarFallback(),
+                      : _avatarFallback(context),
                 ),
               ),
               const SizedBox(height: 10),
@@ -64,8 +64,8 @@ class CastCard extends StatelessWidget {
                 height: 36,
                 child: Text(
                   member.name,
-                  style: const TextStyle(
-                    color: FlixieColors.light,
+                  style: TextStyle(
+                    color: context.colors.light,
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
                     height: 1.16,
@@ -78,8 +78,8 @@ class CastCard extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   member.character,
-                  style: const TextStyle(
-                    color: FlixieColors.medium,
+                  style: TextStyle(
+                    color: context.colors.medium,
                     fontSize: 13,
                   ),
                   maxLines: 1,
@@ -93,11 +93,11 @@ class CastCard extends StatelessWidget {
     );
   }
 
-  Widget _avatarFallback() {
+  Widget _avatarFallback(BuildContext context) {
     return Container(
-      color: FlixieColors.surfaceElevated,
-      child: const Center(
-        child: Icon(Icons.person, color: FlixieColors.medium, size: 40),
+      color: context.colors.surfaceElevated,
+      child: Center(
+        child: Icon(Icons.person, color: context.colors.medium, size: 40),
       ),
     );
   }

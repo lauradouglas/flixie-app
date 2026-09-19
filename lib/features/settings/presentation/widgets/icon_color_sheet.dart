@@ -72,7 +72,7 @@ class _IconColorSheetState extends State<IconColorSheet> {
         FlixieToast(
           type: FlixieToastType.error,
           content: const Text('Failed to update colour. Please try again.'),
-          backgroundColor: FlixieColors.danger,
+          backgroundColor: context.colors.danger,
         ),
       );
     }
@@ -91,9 +91,9 @@ class _IconColorSheetState extends State<IconColorSheet> {
 
     return Container(
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
-      decoration: const BoxDecoration(
-        color: FlixieColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(
         top: false,
@@ -107,24 +107,24 @@ class _IconColorSheetState extends State<IconColorSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: FlixieColors.medium,
+                  color: context.colors.medium,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Avatar Colour',
               style: TextStyle(
-                color: Colors.white,
+                color: context.colors.white,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               'Tap a colour to apply it to your avatar.',
-              style: TextStyle(color: FlixieColors.medium, fontSize: 13),
+              style: TextStyle(color: context.colors.medium, fontSize: 13),
             ),
             const SizedBox(height: 20),
             if (_loading)
@@ -187,8 +187,8 @@ class _IconColorSheetState extends State<IconColorSheet> {
                               )
                             // Check mark when selected
                             else if (isSelected)
-                              const Icon(Icons.check_rounded,
-                                  size: 18, color: Colors.white),
+                              Icon(Icons.check_rounded,
+                                  size: 18, color: context.colors.white),
                           ],
                         ),
                       ),

@@ -24,7 +24,7 @@ class SimilarMovieCard extends StatelessWidget {
               height: 160,
               width: 120,
               decoration: BoxDecoration(
-                color: FlixieColors.surface,
+                color: context.colors.surface,
                 borderRadius: BorderRadius.circular(10),
               ),
               clipBehavior: Clip.antiAlias,
@@ -33,15 +33,15 @@ class SimilarMovieCard extends StatelessWidget {
                       imageUrl:
                           'https://image.tmdb.org/t/p/w342${movie.posterPath!}',
                       fit: BoxFit.cover,
-                      errorWidget: (_, __, ___) => _posterFallback(),
+                      errorWidget: (_, __, ___) => _posterFallback(context),
                     )
-                  : _posterFallback(),
+                  : _posterFallback(context),
             ),
             const SizedBox(height: 6),
             Text(
               movie.title,
-              style: const TextStyle(
-                color: FlixieColors.light,
+              style: TextStyle(
+                color: context.colors.light,
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),
@@ -54,13 +54,13 @@ class SimilarMovieCard extends StatelessWidget {
     );
   }
 
-  Widget _posterFallback() {
+  Widget _posterFallback(BuildContext context) {
     return Container(
-      color: FlixieColors.surfaceElevated,
-      child: const Center(
+      color: context.colors.surfaceElevated,
+      child: Center(
         child: Icon(
           Icons.movie_creation_outlined,
-          color: FlixieColors.medium,
+          color: context.colors.medium,
           size: 36,
         ),
       ),

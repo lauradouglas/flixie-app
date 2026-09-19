@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -35,10 +36,10 @@ class FriendsWatchingSection extends StatelessWidget {
       Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(children: [
-            const Expanded(
+            Expanded(
                 child: Text('Friends are watching',
                     style: TextStyle(
-                        color: Colors.white,
+                        color: context.colors.white,
                         fontSize: 20,
                         fontWeight: FontWeight.w700))),
             TextButton(
@@ -53,9 +54,10 @@ class FriendsWatchingSection extends StatelessWidget {
                   source: DetailSource.friendsWatching)),
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                     border: Border(
-                        bottom: BorderSide(color: FlixieColors.tabBarBorder))),
+                        bottom:
+                            BorderSide(color: context.colors.tabBarBorder))),
                 child: Row(children: [
                   Padding(
                       padding: const EdgeInsets.all(4),
@@ -65,7 +67,7 @@ class FriendsWatchingSection extends StatelessWidget {
                           fallbackText: item.username.isEmpty
                               ? '?'
                               : item.username[0].toUpperCase(),
-                          fallbackColor: FlixieColors.surfaceElevated,
+                          fallbackColor: context.colors.surfaceElevated,
                           size: 38)),
                   const SizedBox(width: 12),
                   Expanded(
@@ -74,27 +76,26 @@ class FriendsWatchingSection extends StatelessWidget {
                           children: [
                         Text(
                             '${item.username} ${item.mediaRating != null ? 'rated' : 'watched'} ${item.mediaTitle ?? 'a movie'}',
-                            style: const TextStyle(
-                                color: Colors.white,
+                            style: TextStyle(
+                                color: context.colors.white,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600)),
                         const SizedBox(height: 6),
                         if (item.mediaRating != null)
                           Row(children: [
-                            const Icon(Icons.star_rounded,
-                                color: FlixieColors.warning, size: 18),
+                            Icon(Icons.star_rounded,
+                                color: context.colors.warning, size: 18),
                             const SizedBox(width: 4),
                             Text('${item.mediaRating}/10',
-                                style:
-                                    const TextStyle(color: FlixieColors.light)),
+                                style: TextStyle(color: context.colors.light)),
                           ])
                         else
-                          const Text('Watched',
-                              style: TextStyle(color: FlixieColors.success)),
+                          Text('Watched',
+                              style: TextStyle(color: context.colors.success)),
                       ])),
                   const SizedBox(width: 10),
-                  const Icon(Icons.chevron_right,
-                      color: FlixieColors.light, size: 18),
+                  Icon(Icons.chevron_right,
+                      color: context.colors.light, size: 18),
                 ]),
               ),
             )),
@@ -198,17 +199,17 @@ class TrendingAmongFriendsSection extends StatelessWidget {
                                           'https://image.tmdb.org/t/p/w185${entry.posterPath}',
                                       fit: BoxFit.cover,
                                       errorWidget: (_, __, ___) => Container(
-                                        color: FlixieColors
-                                            .tabBarBackgroundFocused,
-                                        child: const Icon(Icons.movie_outlined,
-                                            color: FlixieColors.medium),
+                                        color: context
+                                            .colors.tabBarBackgroundFocused,
+                                        child: Icon(Icons.movie_outlined,
+                                            color: context.colors.medium),
                                       ),
                                     )
                                   : Container(
-                                      color:
-                                          FlixieColors.tabBarBackgroundFocused,
-                                      child: const Icon(Icons.movie_outlined,
-                                          color: FlixieColors.medium),
+                                      color: context
+                                          .colors.tabBarBackgroundFocused,
+                                      child: Icon(Icons.movie_outlined,
+                                          color: context.colors.medium),
                                     ),
                             ),
                           ),
@@ -216,22 +217,8 @@ class TrendingAmongFriendsSection extends StatelessWidget {
                             Positioned(
                               top: 6,
                               right: 6,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 7, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: FlixieColors.primary,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  '${entry.friendCount} friends',
-                                  style: const TextStyle(
-                                    color: Colors.black,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
+                              child: FlixiePill.label(
+                                  label: Text('${entry.friendCount} friends')),
                             ),
                         ],
                       ),
@@ -240,8 +227,8 @@ class TrendingAmongFriendsSection extends StatelessWidget {
                         entry.title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: FlixieColors.light,
+                        style: TextStyle(
+                          color: context.colors.light,
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                         ),

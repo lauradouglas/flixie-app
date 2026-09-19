@@ -39,9 +39,9 @@ class ExternalLinksSection extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           decoration: BoxDecoration(
-            color: FlixieColors.surface,
+            color: context.colors.surface,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: FlixieColors.tabBarBorder),
+            border: Border.all(color: context.colors.tabBarBorder),
           ),
           child: Row(
             mainAxisAlignment: fullWidth
@@ -58,8 +58,8 @@ class ExternalLinksSection extends StatelessWidget {
                       child: Text(
                         label,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: FlixieColors.white,
+                        style: TextStyle(
+                          color: context.colors.white,
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
                         ),
@@ -69,8 +69,7 @@ class ExternalLinksSection extends StatelessWidget {
                 ),
               ),
               if (fullWidth)
-                const Icon(Icons.open_in_new,
-                    color: FlixieColors.medium, size: 18),
+                Icon(Icons.open_in_new, color: context.colors.medium, size: 18),
             ],
           ),
         ),
@@ -85,7 +84,7 @@ class ExternalLinksSection extends StatelessWidget {
         Text(
           'External Links',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: FlixieColors.white,
+                color: context.colors.white,
                 fontWeight: FontWeight.bold,
               ),
         ),
@@ -118,8 +117,8 @@ class ExternalLinksSection extends StatelessWidget {
         if (hasHomepage)
           linkCard(
             fullWidth: true,
-            leading: const Icon(Icons.language,
-                color: FlixieColors.medium, size: 20),
+            leading:
+                Icon(Icons.language, color: context.colors.medium, size: 20),
             label: 'Official Website',
             onTap: () => launch(movie.homepage!),
           ),
@@ -130,8 +129,8 @@ class ExternalLinksSection extends StatelessWidget {
               if (hasInstagram)
                 Expanded(
                   child: linkCard(
-                    leading: const Icon(Icons.language,
-                        color: FlixieColors.medium, size: 20),
+                    leading: Icon(Icons.language,
+                        color: context.colors.medium, size: 20),
                     label: 'INSTAGRAM',
                     onTap: () => launch(
                         'https://www.instagram.com/${movie.instagramId}'),
@@ -141,10 +140,10 @@ class ExternalLinksSection extends StatelessWidget {
               if (hasTwitter)
                 Expanded(
                   child: linkCard(
-                    leading: const Text(
+                    leading: Text(
                       '@',
                       style: TextStyle(
-                          color: FlixieColors.medium,
+                          color: context.colors.medium,
                           fontSize: 20,
                           fontWeight: FontWeight.bold),
                     ),

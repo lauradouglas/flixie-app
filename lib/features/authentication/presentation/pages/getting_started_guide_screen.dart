@@ -176,7 +176,7 @@ class _GettingStartedGuideScreenState extends State<GettingStartedGuideScreen> {
   Widget build(BuildContext context) {
     final page = _pages[_page];
     return Scaffold(
-      backgroundColor: FlixieColors.background,
+      backgroundColor: context.colors.background,
       body: SafeArea(
         child: Column(
           children: [
@@ -228,7 +228,7 @@ class _GettingStartedGuideScreenState extends State<GettingStartedGuideScreen> {
                         decoration: BoxDecoration(
                           color: index == _page
                               ? page.accent
-                              : FlixieColors.medium.withValues(alpha: .35),
+                              : context.colors.medium.withValues(alpha: .35),
                           borderRadius: BorderRadius.circular(999),
                         ),
                       ),
@@ -241,7 +241,7 @@ class _GettingStartedGuideScreenState extends State<GettingStartedGuideScreen> {
                     child: FilledButton(
                       style: FilledButton.styleFrom(
                         backgroundColor: FlixieColors.primary,
-                        foregroundColor: FlixieColors.white,
+                        foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
@@ -316,8 +316,8 @@ class _GuidePage extends StatelessWidget {
           Text(
             data.title,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: FlixieColors.white,
+            style: TextStyle(
+              color: context.colors.white,
               fontSize: 28,
               height: 1.08,
               fontWeight: FontWeight.w900,
@@ -328,8 +328,8 @@ class _GuidePage extends StatelessWidget {
           Text(
             data.description,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: FlixieColors.light,
+            style: TextStyle(
+              color: context.colors.light,
               fontSize: 14,
               height: 1.45,
             ),
@@ -338,7 +338,7 @@ class _GuidePage extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: FlixieColors.surfaceElevated,
+              color: context.colors.surfaceElevated,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: data.accent.withValues(alpha: .24)),
             ),
@@ -452,8 +452,8 @@ class _GuideActionRow extends StatelessWidget {
               Expanded(
                 child: Text(
                   action.label,
-                  style: const TextStyle(
-                    color: FlixieColors.white,
+                  style: TextStyle(
+                    color: context.colors.white,
                     fontSize: 13,
                     height: 1.3,
                     fontWeight: FontWeight.w600,

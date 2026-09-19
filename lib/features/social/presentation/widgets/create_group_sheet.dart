@@ -150,7 +150,7 @@ class _CreateGroupSheetState extends State<CreateGroupSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: FlixieColors.medium.withValues(alpha: 0.4),
+                  color: context.colors.medium.withValues(alpha: 0.4),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -184,7 +184,7 @@ class _CreateGroupSheetState extends State<CreateGroupSheet> {
             Text(
               'Visibility',
               style: textTheme.bodyMedium
-                  ?.copyWith(color: FlixieColors.light, fontSize: 13),
+                  ?.copyWith(color: context.colors.light, fontSize: 13),
             ),
             const SizedBox(height: 8),
             Row(
@@ -209,7 +209,7 @@ class _CreateGroupSheetState extends State<CreateGroupSheet> {
                 onPressed: _submit,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: FlixieColors.primary,
-                  foregroundColor: Colors.black,
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
@@ -238,7 +238,7 @@ class _CreateGroupSheetState extends State<CreateGroupSheet> {
           width: 40,
           height: 4,
           decoration: BoxDecoration(
-            color: FlixieColors.medium.withValues(alpha: 0.4),
+            color: context.colors.medium.withValues(alpha: 0.4),
             borderRadius: BorderRadius.circular(2),
           ),
         ),
@@ -260,16 +260,16 @@ class _CreateGroupSheetState extends State<CreateGroupSheet> {
                     ),
                     Text(
                       'to "${_nameController.text}"',
-                      style: const TextStyle(
-                          color: FlixieColors.medium, fontSize: 13),
+                      style:
+                          TextStyle(color: context.colors.medium, fontSize: 13),
                     ),
                   ],
                 ),
               ),
               TextButton(
                 onPressed: _inviting ? null : _createGroupWithMembers,
-                child: const Text('Skip',
-                    style: TextStyle(color: FlixieColors.medium)),
+                child: Text('Skip',
+                    style: TextStyle(color: context.colors.medium)),
               ),
             ],
           ),
@@ -280,13 +280,13 @@ class _CreateGroupSheetState extends State<CreateGroupSheet> {
           child: TextField(
             controller: _searchController,
             onChanged: (_) => setState(() {}),
-            style: const TextStyle(color: FlixieColors.light),
+            style: TextStyle(color: context.colors.light),
             decoration: InputDecoration(
               hintText: 'Search friends…',
-              hintStyle: const TextStyle(color: FlixieColors.medium),
-              prefixIcon: const Icon(Icons.search, color: FlixieColors.medium),
+              hintStyle: TextStyle(color: context.colors.medium),
+              prefixIcon: Icon(Icons.search, color: context.colors.medium),
               filled: true,
-              fillColor: FlixieColors.tabBarBackground,
+              fillColor: context.colors.tabBarBackground,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide.none,
@@ -306,7 +306,7 @@ class _CreateGroupSheetState extends State<CreateGroupSheet> {
                         _friends.isEmpty
                             ? 'No friends to invite yet'
                             : 'No matches',
-                        style: const TextStyle(color: FlixieColors.medium),
+                        style: TextStyle(color: context.colors.medium),
                       ),
                     )
                   : ListView.builder(
@@ -325,10 +325,9 @@ class _CreateGroupSheetState extends State<CreateGroupSheet> {
                             }
                           }),
                           title: Text(friend.username,
-                              style:
-                                  const TextStyle(color: FlixieColors.light)),
+                              style: TextStyle(color: context.colors.light)),
                           activeColor: FlixieColors.primary,
-                          checkColor: Colors.black,
+                          checkColor: Colors.white,
                           secondary: CircleAvatar(
                             backgroundColor:
                                 FlixieColors.primary.withValues(alpha: 0.2),
@@ -353,7 +352,7 @@ class _CreateGroupSheetState extends State<CreateGroupSheet> {
               onPressed: _inviting ? null : _createGroupWithMembers,
               style: ElevatedButton.styleFrom(
                 backgroundColor: FlixieColors.primary,
-                foregroundColor: Colors.black,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
@@ -363,7 +362,7 @@ class _CreateGroupSheetState extends State<CreateGroupSheet> {
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.black),
+                          strokeWidth: 2, color: Colors.white),
                     )
                   : Text(
                       _selectedFriendIds.isEmpty
@@ -391,20 +390,20 @@ class _CreateGroupSheetState extends State<CreateGroupSheet> {
       maxLength: maxLength,
       maxLines: maxLines,
       validator: validator,
-      style: const TextStyle(color: FlixieColors.light),
+      style: TextStyle(color: context.colors.light),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: FlixieColors.medium, fontSize: 13),
-        counterStyle: const TextStyle(color: FlixieColors.medium),
+        labelStyle: TextStyle(color: context.colors.medium, fontSize: 13),
+        counterStyle: TextStyle(color: context.colors.medium),
         filled: true,
-        fillColor: FlixieColors.tabBarBackground,
+        fillColor: context.colors.tabBarBackground,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: FlixieColors.tabBarBorder),
+          borderSide: BorderSide(color: context.colors.tabBarBorder),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: FlixieColors.tabBarBorder),
+          borderSide: BorderSide(color: context.colors.tabBarBorder),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),

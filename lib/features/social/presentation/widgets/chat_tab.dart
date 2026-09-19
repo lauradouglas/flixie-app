@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/features/social/presentation/widgets/chat_read_observer.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -78,6 +79,7 @@ class GroupChatTabState extends State<GroupChatTab> {
   @override
   void initState() {
     super.initState();
+    SafetyService.changes.addListener(_onSafetyChanged);
     // Use addPostFrameCallback so context is fully ready
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -89,8 +91,13 @@ class GroupChatTabState extends State<GroupChatTab> {
     });
   }
 
+  void _onSafetyChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    SafetyService.changes.removeListener(_onSafetyChanged);
     _authProvider?.removeListener(_onAuthChanged);
     _messageController.dispose();
     super.dispose();
@@ -307,7 +314,7 @@ class GroupChatTabState extends State<GroupChatTab> {
           FlixieToast(
               type: FlixieToastType.error,
               content: const Text('Failed to respond'),
-              backgroundColor: FlixieColors.danger),
+              backgroundColor: context.colors.danger),
         );
       }
     } finally {
@@ -316,17 +323,7 @@ class GroupChatTabState extends State<GroupChatTab> {
   }
 
   Widget _modalCountPill(String label, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.4), width: 0.8),
-      ),
-      child: Text(label,
-          style: TextStyle(
-              color: color, fontSize: 11, fontWeight: FontWeight.w700)),
-    );
+    return FlixiePill.label(label: Text(label));
   }
 
   void _showWatchRequestDetail(
@@ -370,7 +367,7 @@ class GroupChatTabState extends State<GroupChatTab> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.tabBarBackground,
+      backgroundColor: context.colors.tabBarBackground,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -390,7 +387,7 @@ class GroupChatTabState extends State<GroupChatTab> {
                     height: 4,
                     margin: const EdgeInsets.only(top: 12, bottom: 8),
                     decoration: BoxDecoration(
-                      color: FlixieColors.medium.withValues(alpha: 0.4),
+                      color: context.colors.medium.withValues(alpha: 0.4),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -413,27 +410,27 @@ class GroupChatTabState extends State<GroupChatTab> {
                                         imageUrl: posterUrl,
                                         fit: BoxFit.cover,
                                         placeholder: (_, __) => Container(
-                                            color: FlixieColors
+                                            color: context.colors
                                                 .tabBarBackgroundFocused),
                                         errorWidget: (_, __, ___) => Container(
-                                          color: FlixieColors
-                                              .tabBarBackgroundFocused,
-                                          child: const Center(
+                                          color: context
+                                              .colors.tabBarBackgroundFocused,
+                                          child: Center(
                                               child: Icon(Icons.movie_outlined,
-                                                  color: FlixieColors.medium,
+                                                  color: context.colors.medium,
                                                   size: 28)),
                                         ),
                                       )
                                     : Container(
                                         decoration: BoxDecoration(
-                                          color: FlixieColors
-                                              .tabBarBackgroundFocused,
+                                          color: context
+                                              .colors.tabBarBackgroundFocused,
                                           borderRadius:
                                               BorderRadius.circular(10),
                                         ),
-                                        child: const Center(
+                                        child: Center(
                                             child: Icon(Icons.movie_outlined,
-                                                color: FlixieColors.medium,
+                                                color: context.colors.medium,
                                                 size: 28)),
                                       ),
                               ),
@@ -444,15 +441,15 @@ class GroupChatTabState extends State<GroupChatTab> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(movieTitle,
-                                      style: const TextStyle(
-                                          color: FlixieColors.white,
+                                      style: TextStyle(
+                                          color: context.colors.white,
                                           fontSize: 17,
                                           fontWeight: FontWeight.w700)),
                                   if (requesterUsername != null) ...[
                                     const SizedBox(height: 4),
                                     Text('Created by @$requesterUsername',
-                                        style: const TextStyle(
-                                            color: FlixieColors.medium,
+                                        style: TextStyle(
+                                            color: context.colors.medium,
                                             fontSize: 12)),
                                   ],
                                 ],
@@ -474,8 +471,8 @@ class GroupChatTabState extends State<GroupChatTab> {
                                       .withValues(alpha: 0.25)),
                             ),
                             child: Text(requestMessage,
-                                style: const TextStyle(
-                                    color: FlixieColors.light,
+                                style: TextStyle(
+                                    color: context.colors.light,
                                     fontSize: 13,
                                     fontStyle: FontStyle.italic)),
                           ),
@@ -485,9 +482,9 @@ class GroupChatTabState extends State<GroupChatTab> {
                           const SizedBox(height: 16),
                           Row(
                             children: [
-                              const Text('RESPONSES',
+                              Text('RESPONSES',
                                   style: TextStyle(
-                                      color: FlixieColors.medium,
+                                      color: context.colors.medium,
                                       fontSize: 11,
                                       fontWeight: FontWeight.w700,
                                       letterSpacing: 0.8)),
@@ -495,18 +492,18 @@ class GroupChatTabState extends State<GroupChatTab> {
                               if (req?.acceptedCount != null &&
                                   req!.acceptedCount > 0)
                                 _modalCountPill('✓ ${req.acceptedCount}',
-                                    FlixieColors.success),
+                                    context.colors.success),
                               if (req?.maybeCount != null &&
                                   req!.maybeCount > 0) ...[
                                 const SizedBox(width: 4),
                                 _modalCountPill('~ ${req.maybeCount}',
-                                    FlixieColors.warning),
+                                    context.colors.warning),
                               ],
                               if (req?.declinedCount != null &&
                                   req!.declinedCount > 0) ...[
                                 const SizedBox(width: 4),
                                 _modalCountPill('✗ ${req.declinedCount}',
-                                    FlixieColors.danger),
+                                    context.colors.danger),
                               ],
                             ],
                           ),
@@ -514,13 +511,17 @@ class GroupChatTabState extends State<GroupChatTab> {
                           for (final group in [
                             (
                               'ACCEPTED',
-                              FlixieColors.success,
+                              context.colors.success,
                               Icons.check_circle_outline
                             ),
-                            ('MAYBE', FlixieColors.warning, Icons.help_outline),
+                            (
+                              'MAYBE',
+                              context.colors.warning,
+                              Icons.help_outline
+                            ),
                             (
                               'DECLINED',
-                              FlixieColors.danger,
+                              context.colors.danger,
                               Icons.cancel_outlined
                             ),
                           ]) ...[
@@ -547,8 +548,8 @@ class GroupChatTabState extends State<GroupChatTab> {
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Text('@$name',
-                                          style: const TextStyle(
-                                              color: FlixieColors.light,
+                                          style: TextStyle(
+                                              color: context.colors.light,
                                               fontSize: 13)),
                                     ),
                                     Icon(group.$3, size: 14, color: group.$2),
@@ -564,16 +565,16 @@ class GroupChatTabState extends State<GroupChatTab> {
                             replies.isEmpty
                                 ? 'No replies yet'
                                 : 'REPLIES (${replies.length})',
-                            style: const TextStyle(
-                                color: FlixieColors.medium,
+                            style: TextStyle(
+                                color: context.colors.medium,
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
                                 letterSpacing: 0.8)),
                         const SizedBox(height: 8),
                         if (replies.isEmpty)
-                          const Text('Be the first to comment!',
+                          Text('Be the first to comment!',
                               style: TextStyle(
-                                  color: FlixieColors.medium, fontSize: 13))
+                                  color: context.colors.medium, fontSize: 13))
                         else
                           ...replies.map((r) {
                             final rUsername = r.senderUsername ??
@@ -589,13 +590,13 @@ class GroupChatTabState extends State<GroupChatTab> {
                                   CircleAvatar(
                                     radius: 14,
                                     backgroundColor:
-                                        FlixieColors.tabBarBackgroundFocused,
+                                        context.colors.tabBarBackgroundFocused,
                                     child: Text(
                                         rUsername.isNotEmpty
                                             ? rUsername[0].toUpperCase()
                                             : '?',
-                                        style: const TextStyle(
-                                            color: FlixieColors.light,
+                                        style: TextStyle(
+                                            color: context.colors.light,
                                             fontSize: 11,
                                             fontWeight: FontWeight.w700)),
                                   ),
@@ -606,14 +607,14 @@ class GroupChatTabState extends State<GroupChatTab> {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(isMe ? 'You' : '@$rUsername',
-                                            style: const TextStyle(
-                                                color: FlixieColors.medium,
+                                            style: TextStyle(
+                                                color: context.colors.medium,
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.w600)),
                                         const SizedBox(height: 2),
                                         Text(r.text,
-                                            style: const TextStyle(
-                                                color: FlixieColors.light,
+                                            style: TextStyle(
+                                                color: context.colors.light,
                                                 fontSize: 13)),
                                       ],
                                     ),
@@ -629,10 +630,10 @@ class GroupChatTabState extends State<GroupChatTab> {
                   Container(
                     padding: EdgeInsets.fromLTRB(12, 8, 12,
                         MediaQuery.of(sheetCtx).viewInsets.bottom + 8),
-                    decoration: const BoxDecoration(
-                      color: FlixieColors.tabBarBackgroundFocused,
+                    decoration: BoxDecoration(
+                      color: context.colors.tabBarBackgroundFocused,
                       border: Border(
-                          top: BorderSide(color: FlixieColors.tabBarBorder)),
+                          top: BorderSide(color: context.colors.tabBarBorder)),
                     ),
                     child: SafeArea(
                       top: false,
@@ -641,14 +642,14 @@ class GroupChatTabState extends State<GroupChatTab> {
                           Expanded(
                             child: TextField(
                               controller: replyController,
-                              style: const TextStyle(color: FlixieColors.light),
+                              style: TextStyle(color: context.colors.light),
                               textInputAction: TextInputAction.send,
                               decoration: InputDecoration(
                                 hintText: 'Reply to this Watch Plan…',
                                 hintStyle:
-                                    const TextStyle(color: FlixieColors.medium),
+                                    TextStyle(color: context.colors.medium),
                                 filled: true,
-                                fillColor: FlixieColors.tabBarBackground,
+                                fillColor: context.colors.tabBarBackground,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(20),
                                   borderSide: BorderSide.none,
@@ -694,7 +695,8 @@ class GroupChatTabState extends State<GroupChatTab> {
                                           type: FlixieToastType.error,
                                           content: const Text(
                                               'Failed to send reply'),
-                                          backgroundColor: FlixieColors.danger),
+                                          backgroundColor:
+                                              context.colors.danger),
                                     );
                                   }
                                 } finally {
@@ -728,14 +730,14 @@ class GroupChatTabState extends State<GroupChatTab> {
     if (_initError != null) {
       return Center(
           child: Text(_initError!,
-              style: const TextStyle(color: FlixieColors.medium)));
+              style: TextStyle(color: context.colors.medium)));
     }
 
     final conversationId = _conversationId!;
     final currentUserId = context.read<AuthProvider>().dbUser?.id;
 
     return ColoredBox(
-      color: const Color(0xFF0F081E),
+      color: context.colors.background,
       child: Column(
         children: [
           Expanded(
@@ -750,10 +752,10 @@ class GroupChatTabState extends State<GroupChatTab> {
                 }
                 final messages = snapshot.data ?? [];
                 if (messages.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Text(
                       'No messages yet. Say hello!',
-                      style: TextStyle(color: FlixieColors.medium),
+                      style: TextStyle(color: context.colors.medium),
                       textAlign: TextAlign.center,
                     ),
                   );

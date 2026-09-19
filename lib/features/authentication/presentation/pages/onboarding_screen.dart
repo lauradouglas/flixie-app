@@ -111,7 +111,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final movie = await showModalBottomSheet<MovieShort>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.surface,
+      backgroundColor: context.colors.surface,
       builder: (sheetContext) => Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
@@ -150,7 +150,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         FlixieToast(
           type: FlixieToastType.error,
           content: Text(favouriteValidationError),
-          backgroundColor: FlixieColors.danger,
+          backgroundColor: context.colors.danger,
         ),
       );
       return;
@@ -195,7 +195,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         FlixieToast(
           type: FlixieToastType.error,
           content: const Text('Unable to finish onboarding right now.'),
-          backgroundColor: FlixieColors.danger,
+          backgroundColor: context.colors.danger,
         ),
       );
     } finally {
@@ -229,7 +229,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             : 'Welcome to Flixie! 🎉',
         textAlign: TextAlign.center,
         style: Theme.of(context).textTheme.displaySmall?.copyWith(
-              color: FlixieColors.textPrimary,
+              color: context.colors.textPrimary,
               fontWeight: FontWeight.w800,
             ),
       ),
@@ -328,8 +328,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
-                  color: FlixieColors.textPrimary,
+                style: TextStyle(
+                  color: context.colors.textPrimary,
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
                 ),
@@ -337,14 +337,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
             Text(
               '${selected.length}/$maxCount',
-              style: const TextStyle(color: FlixieColors.light),
+              style: TextStyle(color: context.colors.light),
             ),
           ],
         ),
         const SizedBox(height: 4),
         Text(
           subtitle,
-          style: const TextStyle(color: FlixieColors.light),
+          style: TextStyle(color: context.colors.light),
         ),
         const SizedBox(height: 10),
         if (selected.isEmpty)
@@ -386,11 +386,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       children: [
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
                 'Favourite Genres',
                 style: TextStyle(
-                  color: FlixieColors.textPrimary,
+                  color: context.colors.textPrimary,
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
                 ),
@@ -398,14 +398,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
             Text(
               '${_selectedGenreIds.length} selected',
-              style: const TextStyle(color: FlixieColors.light),
+              style: TextStyle(color: context.colors.light),
             ),
           ],
         ),
         const SizedBox(height: 4),
-        const Text(
+        Text(
           'Optional',
-          style: TextStyle(color: FlixieColors.light),
+          style: TextStyle(color: context.colors.light),
         ),
         const SizedBox(height: 10),
         AppTextField(
@@ -448,15 +448,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: FlixieColors.surfaceElevated.withValues(alpha: 0.82),
+        color: context.colors.surfaceElevated.withValues(alpha: 0.82),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: FlixieColors.tabBarBorder.withValues(alpha: 0.8),
+          color: context.colors.tabBarBorder.withValues(alpha: 0.8),
         ),
       ),
       child: Row(
         children: [
-          Icon(icon, color: FlixieColors.primaryTint),
+          Icon(icon, color: context.colors.primaryTint),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -464,16 +464,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
-                    color: FlixieColors.textPrimary,
+                  style: TextStyle(
+                    color: context.colors.textPrimary,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style:
-                      const TextStyle(color: FlixieColors.light, fontSize: 12),
+                  style: TextStyle(color: context.colors.light, fontSize: 12),
                 ),
               ],
             ),

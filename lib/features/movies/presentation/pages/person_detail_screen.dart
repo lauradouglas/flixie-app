@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -41,10 +42,10 @@ class _PersonPhotoGridScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: FlixieColors.background,
+      backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: FlixieColors.background,
-        foregroundColor: FlixieColors.white,
+        backgroundColor: context.colors.background,
+        foregroundColor: context.colors.white,
         titleSpacing: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -57,8 +58,8 @@ class _PersonPhotoGridScreen extends StatelessWidget {
             ),
             Text(
               '${images.length} images',
-              style: const TextStyle(
-                color: FlixieColors.medium,
+              style: TextStyle(
+                color: context.colors.medium,
                 fontSize: 12,
               ),
             ),
@@ -97,20 +98,20 @@ class _PersonPhotoGridScreen extends StatelessWidget {
                 child: CachedNetworkImage(
                   imageUrl: images[index].thumbnailUrl,
                   fit: BoxFit.cover,
-                  placeholder: (_, __) => const ColoredBox(
-                    color: FlixieColors.surface,
-                    child: Center(
+                  placeholder: (_, __) => ColoredBox(
+                    color: context.colors.surface,
+                    child: const Center(
                       child: CircularProgressIndicator(
                         color: FlixieColors.primary,
                         strokeWidth: 2,
                       ),
                     ),
                   ),
-                  errorWidget: (_, __, ___) => const ColoredBox(
-                    color: FlixieColors.surface,
+                  errorWidget: (_, __, ___) => ColoredBox(
+                    color: context.colors.surface,
                     child: Icon(
                       Icons.broken_image_outlined,
-                      color: FlixieColors.medium,
+                      color: context.colors.medium,
                     ),
                   ),
                 ),
@@ -173,9 +174,9 @@ class _PersonPhotoViewerState extends State<_PersonPhotoViewer> {
                         color: FlixieColors.primary,
                       ),
                     ),
-                    errorWidget: (_, __, ___) => const Icon(
+                    errorWidget: (_, __, ___) => Icon(
                       Icons.broken_image_outlined,
-                      color: FlixieColors.medium,
+                      color: context.colors.medium,
                       size: 48,
                     ),
                   ),
@@ -197,21 +198,8 @@ class _PersonPhotoViewerState extends State<_PersonPhotoViewer> {
             Positioned(
               top: 14,
               right: 16,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: .65),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Text(
-                  '${_index + 1} / ${widget.images.length}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
+              child: FlixiePill.label(
+                  label: Text('${_index + 1} / ${widget.images.length}')),
             ),
             Positioned(
               left: 20,
@@ -222,11 +210,11 @@ class _PersonPhotoViewerState extends State<_PersonPhotoViewer> {
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: context.colors.white,
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
-                  shadows: [Shadow(color: Colors.black, blurRadius: 8)],
+                  shadows: const [Shadow(color: Colors.black, blurRadius: 8)],
                 ),
               ),
             ),
@@ -391,7 +379,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
           FlixieToast(
             type: FlixieToastType.error,
             content: const Text('Could not update favourite person.'),
-            backgroundColor: FlixieColors.danger,
+            backgroundColor: context.colors.danger,
           ),
         );
       }
@@ -601,19 +589,19 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
         _posterStatusBadge(
           icon: Icons.favorite_rounded,
           label: 'Favourite',
-          color: FlixieColors.danger,
+          color: context.colors.danger,
         ),
       if (_movieInWatchlist(movieId))
         _posterStatusBadge(
           icon: Icons.bookmark_rounded,
           label: 'On watchlist',
-          color: FlixieColors.warning,
+          color: context.colors.warning,
         ),
       if (_movieInWatched(movieId))
         _posterStatusBadge(
           icon: Icons.check_rounded,
           label: 'Watched',
-          color: FlixieColors.success,
+          color: context.colors.success,
         ),
     ];
   }
@@ -623,18 +611,18 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
     // Rebuild personal movie status badges when the user's lists change.
     context.watch<AuthProvider>();
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: FlixieColors.background,
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        backgroundColor: context.colors.background,
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_error != null || _person == null) {
       return Scaffold(
-        backgroundColor: FlixieColors.background,
+        backgroundColor: context.colors.background,
         appBar: AppBar(
-          backgroundColor: FlixieColors.background,
-          leading: const BackButton(color: FlixieColors.light),
+          backgroundColor: context.colors.background,
+          leading: BackButton(color: context.colors.light),
         ),
         body: Center(
           child: Padding(
@@ -642,8 +630,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline,
-                    color: FlixieColors.danger, size: 56),
+                Icon(Icons.error_outline,
+                    color: context.colors.danger, size: 56),
                 const SizedBox(height: 16),
                 Text('Failed to load person',
                     style: Theme.of(context).textTheme.titleMedium),
@@ -675,7 +663,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
         : null;
 
     return Scaffold(
-      backgroundColor: FlixieColors.background,
+      backgroundColor: context.colors.background,
       body: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(
@@ -703,12 +691,12 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                             color: Colors.black.withValues(alpha: .5),
                             shape: BoxShape.circle,
                           ),
-                          child: const SizedBox(
+                          child: SizedBox(
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: FlixieColors.danger,
+                              color: context.colors.danger,
                             ),
                           ),
                         )
@@ -720,8 +708,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                               ? 'Remove favourite'
                               : 'Add favourite',
                           color: _isFavorite
-                              ? FlixieColors.danger
-                              : FlixieColors.light,
+                              ? context.colors.danger
+                              : context.colors.light,
                           onPressed: _toggleFavorite,
                         ),
                 ),
@@ -861,8 +849,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
           person.name,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: FlixieColors.white,
+          style: TextStyle(
+            color: context.colors.white,
             fontSize: 30,
             fontWeight: FontWeight.w900,
             height: 1.04,
@@ -926,33 +914,22 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
     required String label,
     required VoidCallback onTap,
   }) {
-    return ActionChip(
-      avatar: Icon(icon, size: 15, color: FlixieColors.primaryTint),
-      label: Text(label),
-      onPressed: onTap,
-      backgroundColor: Colors.black.withValues(alpha: 0.55),
-      side: BorderSide(color: Colors.white.withValues(alpha: 0.16)),
-      labelStyle: const TextStyle(
-        color: FlixieColors.light,
-        fontSize: 11,
-        fontWeight: FontWeight.w700,
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-    );
+    return FlixiePill.action(
+        avatar: Icon(icon, size: 15), label: Text(label), onPressed: onTap);
   }
 
   Widget _heroMeta(IconData icon, String text) {
     return Row(
       children: [
-        Icon(icon, color: FlixieColors.light, size: 14),
+        Icon(icon, color: context.colors.light, size: 14),
         const SizedBox(width: 6),
         Expanded(
           child: Text(
             text,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: FlixieColors.light,
+            style: TextStyle(
+              color: context.colors.light,
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
@@ -964,19 +941,19 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
 
   Widget _buildPhotosSection(Person person) {
     if (_imagesLoading && _images.isEmpty) {
-      return const Column(
+      return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Photos',
             style: TextStyle(
-              color: FlixieColors.white,
+              color: context.colors.white,
               fontSize: 20,
               fontWeight: FontWeight.w800,
             ),
           ),
-          SizedBox(height: 10),
-          SizedBox(
+          const SizedBox(height: 10),
+          const SizedBox(
             height: 150,
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -1002,11 +979,11 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
       children: [
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
                 'Photos',
                 style: TextStyle(
-                  color: FlixieColors.white,
+                  color: context.colors.white,
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
                 ),
@@ -1052,11 +1029,11 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                     ),
                     errorWidget: (_, __, ___) => Container(
                       width: width,
-                      color: FlixieColors.surface,
+                      color: context.colors.surface,
                       alignment: Alignment.center,
-                      child: const Icon(
+                      child: Icon(
                         Icons.broken_image_outlined,
-                        color: FlixieColors.medium,
+                        color: context.colors.medium,
                       ),
                     ),
                   ),
@@ -1103,9 +1080,9 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
 
     return Container(
       decoration: BoxDecoration(
-        color: FlixieColors.surface.withValues(alpha: .55),
+        color: context.colors.surface.withValues(alpha: .55),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: FlixieColors.tabBarBorder),
+        border: Border.all(color: context.colors.tabBarBorder),
       ),
       child: Row(
         children: [
@@ -1157,8 +1134,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                   value,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: FlixieColors.white,
+                  style: TextStyle(
+                    color: context.colors.white,
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
                   ),
@@ -1171,7 +1148,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: FlixieColors.medium, fontSize: 10),
+            style: TextStyle(color: context.colors.medium, fontSize: 10),
           ),
         ],
       ),
@@ -1179,33 +1156,9 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
   }
 
   Widget _miniBadge(String label, Color color, {IconData? icon}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.35)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, color: color, size: 12),
-            const SizedBox(width: 4),
-          ],
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: color,
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
+    return FlixiePill.label(
+        label: Text(label),
+        avatar: icon == null ? null : Icon(icon, color: color));
   }
 
   Widget _posterStatusBadge({
@@ -1223,7 +1176,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
             width: 30,
             height: 30,
             decoration: BoxDecoration(
-              color: FlixieColors.background.withValues(alpha: 0.92),
+              color: context.colors.background.withValues(alpha: 0.92),
               shape: BoxShape.circle,
               border: Border.all(color: color, width: 1.5),
               boxShadow: const [
@@ -1245,10 +1198,10 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Biography',
             style: TextStyle(
-              color: FlixieColors.white,
+              color: context.colors.white,
               fontSize: 20,
               fontWeight: FontWeight.w800,
             ),
@@ -1263,16 +1216,16 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
               bio,
               maxLines: previewLines,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: FlixieColors.light,
+              style: TextStyle(
+                color: context.colors.light,
                 fontSize: 14,
                 height: 1.6,
               ),
             ),
             secondChild: Text(
               bio,
-              style: const TextStyle(
-                color: FlixieColors.light,
+              style: TextStyle(
+                color: context.colors.light,
                 fontSize: 14,
                 height: 1.6,
               ),
@@ -1315,13 +1268,13 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: FlixieColors.surface,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: FlixieColors.tabBarBorder),
+        border: Border.all(color: context.colors.tabBarBorder),
       ),
       child: Row(
         children: [
-          Icon(icon, color: FlixieColors.medium, size: 22),
+          Icon(icon, color: context.colors.medium, size: 22),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -1329,16 +1282,15 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: FlixieColors.light,
+                  style: TextStyle(
+                    color: context.colors.light,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   message,
-                  style:
-                      const TextStyle(color: FlixieColors.medium, fontSize: 12),
+                  style: TextStyle(color: context.colors.medium, fontSize: 12),
                 ),
               ],
             ),
@@ -1367,7 +1319,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
               child: Text(
                 'Known For',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: FlixieColors.white,
+                      color: context.colors.white,
                       fontWeight: FontWeight.bold,
                     ),
               ),
@@ -1412,7 +1364,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
           child: Text(
             text,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: FlixieColors.white,
+                  color: context.colors.white,
                   fontWeight: FontWeight.bold,
                 ),
           ),
@@ -1431,8 +1383,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
               padding: const EdgeInsets.only(bottom: 14),
               child: Text(
                 '${allCredits.length} credits',
-                style: const TextStyle(
-                  color: FlixieColors.medium,
+                style: TextStyle(
+                  color: context.colors.medium,
                   fontSize: 12,
                 ),
               ),
@@ -1453,8 +1405,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
             physics: const NeverScrollableScrollPhysics(),
             padding: EdgeInsets.zero,
             itemCount: filmography.length > 12 ? 12 : filmography.length,
-            separatorBuilder: (_, __) => const Divider(
-              color: FlixieColors.tabBarBorder,
+            separatorBuilder: (_, __) => Divider(
+              color: context.colors.tabBarBorder,
               height: 1,
             ),
             itemBuilder: (context, i) => _creditListRow(filmography[i]),
@@ -1467,9 +1419,9 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(
-                  color: FlixieColors.surface,
+                  color: context.colors.surface,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: FlixieColors.tabBarBorder),
+                  border: Border.all(color: context.colors.tabBarBorder),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -1541,8 +1493,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
               item.title,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: FlixieColors.light,
+              style: TextStyle(
+                color: context.colors.light,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 height: 1.25,
@@ -1552,8 +1504,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
               const SizedBox(height: 3),
               Text(
                 '${_year(item.releaseDate)!} · ${item.type == 'tv' ? 'TV' : 'Movie'}',
-                style:
-                    const TextStyle(color: FlixieColors.medium, fontSize: 11),
+                style: TextStyle(color: context.colors.medium, fontSize: 11),
               ),
             ],
             if (role != null) ...[
@@ -1562,8 +1513,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                 role,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: FlixieColors.primaryTint,
+                style: TextStyle(
+                  color: context.colors.primaryTint,
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                 ),
@@ -1632,7 +1583,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
           controller: _filmographySearchController,
           onChanged: (value) => setState(() => _filmographyQuery = value),
           onTapOutside: (_) => FocusScope.of(context).unfocus(),
-          style: const TextStyle(color: FlixieColors.white),
+          style: TextStyle(color: context.colors.white),
           textInputAction: TextInputAction.search,
           decoration: InputDecoration(
             hintText: 'Search titles or roles',
@@ -1657,9 +1608,9 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                 height: 42,
                 padding: const EdgeInsets.all(2),
                 decoration: BoxDecoration(
-                  color: FlixieColors.surface.withValues(alpha: .55),
+                  color: context.colors.surface.withValues(alpha: .55),
                   borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: FlixieColors.tabBarBorder),
+                  border: Border.all(color: context.colors.tabBarBorder),
                 ),
                 child: Row(
                   children: _MediaCreditFilter.values.map((filter) {
@@ -1682,8 +1633,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                             filter.label,
                             style: TextStyle(
                               color: selected
-                                  ? FlixieColors.white
-                                  : FlixieColors.medium,
+                                  ? context.colors.white
+                                  : context.colors.medium,
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
                             ),
@@ -1696,52 +1647,14 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
               ),
             ),
             const SizedBox(width: 8),
-            InkWell(
-              onTap: () => setState(
-                () => _showAdvancedCreditFilters = !_showAdvancedCreditFilters,
-              ),
-              borderRadius: BorderRadius.circular(22),
-              child: Container(
-                height: 42,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: FlixieColors.tabBarBorder),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.tune_rounded,
-                      color: FlixieColors.medium,
-                      size: 17,
-                    ),
-                    const SizedBox(width: 6),
-                    const Text(
-                      'Filters',
-                      style: TextStyle(
-                        color: FlixieColors.light,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    if (advancedFilterCount > 0) ...[
-                      const SizedBox(width: 5),
-                      CircleAvatar(
-                        radius: 9,
-                        backgroundColor: FlixieColors.primary,
-                        child: Text(
-                          '$advancedFilterCount',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
+            FlixiePill.action(
+              onPressed: () => setState(() =>
+                  _showAdvancedCreditFilters = !_showAdvancedCreditFilters),
+              selected: advancedFilterCount > 0,
+              avatar: const Icon(Icons.tune_rounded),
+              label: Text(advancedFilterCount > 0
+                  ? 'Filters $advancedFilterCount'
+                  : 'Filters'),
             ),
           ],
         ),
@@ -1754,24 +1667,11 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                 final selected = _creditFilter == filter;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(filter.label),
-                    selected: selected,
-                    onSelected: (_) => setState(() => _creditFilter = filter),
-                    selectedColor: FlixieColors.primary.withValues(alpha: 0.22),
-                    backgroundColor: FlixieColors.surface,
-                    labelStyle: TextStyle(
-                      color:
-                          selected ? FlixieColors.primary : FlixieColors.medium,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
-                    side: BorderSide(
-                      color: selected
-                          ? FlixieColors.primary.withValues(alpha: 0.55)
-                          : FlixieColors.tabBarBorder,
-                    ),
-                  ),
+                  child: FlixiePill.choice(
+                      label: Text(filter.label),
+                      selected: selected,
+                      onSelected: (_) =>
+                          setState(() => _creditFilter = filter)),
                 );
               }).toList(),
             ),
@@ -1784,30 +1684,13 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                 final selected = _personalCreditFilter == filter;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    avatar: Icon(
-                      filter.icon,
-                      size: 16,
-                      color: selected ? filter.color : FlixieColors.medium,
-                    ),
-                    label: Text(filter.label),
-                    selected: selected,
-                    showCheckmark: false,
-                    onSelected: (_) =>
-                        setState(() => _personalCreditFilter = filter),
-                    selectedColor: filter.color.withValues(alpha: .16),
-                    backgroundColor: FlixieColors.surface,
-                    labelStyle: TextStyle(
-                      color: selected ? filter.color : FlixieColors.medium,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
-                    side: BorderSide(
-                      color: selected
-                          ? filter.color.withValues(alpha: .65)
-                          : FlixieColors.tabBarBorder,
-                    ),
-                  ),
+                  child: FlixiePill.choice(
+                      avatar: Icon(filter.icon, size: 16),
+                      label: Text(filter.label),
+                      selected: selected,
+                      showCheckmark: false,
+                      onSelected: (_) =>
+                          setState(() => _personalCreditFilter = filter)),
                 );
               }).toList(),
             ),
@@ -1821,7 +1704,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
               PopupMenuButton<String?>(
                 initialValue: _filmographyYear,
                 onSelected: (year) => setState(() => _filmographyYear = year),
-                color: FlixieColors.surface,
+                color: context.colors.surface,
                 itemBuilder: (context) => [
                   const PopupMenuItem<String?>(
                     value: null,
@@ -1850,7 +1733,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
     return PopupMenuButton<_CreditSort>(
       initialValue: _creditSort,
       onSelected: (sort) => setState(() => _creditSort = sort),
-      color: FlixieColors.surface,
+      color: context.colors.surface,
       itemBuilder: (context) => _CreditSort.values
           .map(
             (sort) => PopupMenuItem(
@@ -1864,64 +1747,43 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
   }
 
   Widget _controlChip(IconData icon, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-      decoration: BoxDecoration(
-        color: FlixieColors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: FlixieColors.tabBarBorder),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: FlixieColors.medium, size: 16),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              color: FlixieColors.light,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+    return FlixiePill.label(
+        compact: false,
+        avatar: Icon(icon),
+        label: Row(mainAxisSize: MainAxisSize.min, children: [
+          Flexible(child: Text(label)),
           const SizedBox(width: 4),
-          const Icon(
-            Icons.keyboard_arrow_down_rounded,
-            color: FlixieColors.medium,
-            size: 16,
-          ),
-        ],
-      ),
-    );
+          const Icon(Icons.keyboard_arrow_down_rounded, size: 16)
+        ]));
   }
 
   Widget _creditListRow(_PersonFilmCredit item) {
     const thumbBase = 'https://image.tmdb.org/t/p/w185';
     final statusIcons = <Widget>[
       if (item.isMovie && _movieInWatched(item.id))
-        const Tooltip(
+        Tooltip(
           message: 'Watched',
           child: Icon(
             Icons.check_circle_rounded,
-            color: FlixieColors.success,
+            color: context.colors.success,
             size: 15,
           ),
         ),
       if (item.isMovie && _movieInWatchlist(item.id))
-        const Tooltip(
+        Tooltip(
           message: 'Watchlist',
           child: Icon(
             Icons.bookmark_rounded,
-            color: FlixieColors.warning,
+            color: context.colors.warning,
             size: 15,
           ),
         ),
       if (item.isMovie && _movieInFavorites(item.id))
-        const Tooltip(
+        Tooltip(
           message: 'Favourite',
           child: Icon(
             Icons.favorite_rounded,
-            color: FlixieColors.danger,
+            color: context.colors.danger,
             size: 15,
           ),
         ),
@@ -1962,8 +1824,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                     item.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: FlixieColors.white,
+                    style: TextStyle(
+                      color: context.colors.white,
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                     ),
@@ -1977,8 +1839,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                             '${item.year!} · ${item.isMovie ? 'Movie' : 'TV'}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: FlixieColors.medium,
+                            style: TextStyle(
+                              color: context.colors.medium,
                               fontSize: 11,
                             ),
                           ),
@@ -1996,8 +1858,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                     item.roleLabel,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: FlixieColors.primaryTint,
+                    style: TextStyle(
+                      color: context.colors.primaryTint,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
@@ -2007,24 +1869,24 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
             ),
             if (item.voteAverage > 0) ...[
               const SizedBox(width: 8),
-              const Icon(
+              Icon(
                 Icons.star_rounded,
-                color: FlixieColors.warning,
+                color: context.colors.warning,
                 size: 16,
               ),
               const SizedBox(width: 3),
               Text(
                 item.voteAverage.toStringAsFixed(1),
-                style: const TextStyle(
-                  color: FlixieColors.warning,
+                style: TextStyle(
+                  color: context.colors.warning,
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                 ),
               ),
             ],
             const SizedBox(width: 4),
-            const Icon(Icons.chevron_right_rounded,
-                color: FlixieColors.medium, size: 20),
+            Icon(Icons.chevron_right_rounded,
+                color: context.colors.medium, size: 20),
           ],
         ),
       ),
@@ -2035,7 +1897,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.background,
+      backgroundColor: context.colors.background,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -2051,7 +1913,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: FlixieColors.medium.withValues(alpha: 0.45),
+                color: context.colors.medium.withValues(alpha: 0.45),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -2063,15 +1925,15 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                     child: Text(
                       '${_creditFilter.label} Credits',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: FlixieColors.white,
+                            color: context.colors.white,
                             fontWeight: FontWeight.bold,
                           ),
                     ),
                   ),
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded,
-                        color: FlixieColors.medium),
+                    icon:
+                        Icon(Icons.close_rounded, color: context.colors.medium),
                   ),
                 ],
               ),
@@ -2081,8 +1943,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                 controller: controller,
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                 itemCount: credits.length,
-                separatorBuilder: (_, __) => const Divider(
-                  color: FlixieColors.tabBarBorder,
+                separatorBuilder: (_, __) => Divider(
+                  color: context.colors.tabBarBorder,
                   height: 1,
                 ),
                 itemBuilder: (context, index) => _creditListRow(credits[index]),
@@ -2096,20 +1958,20 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
 
   Widget _posterFallback() {
     return Container(
-      color: FlixieColors.surfaceElevated,
+      color: context.colors.surfaceElevated,
       child: Icon(Icons.movie_outlined,
-          color: FlixieColors.medium.withValues(alpha: 0.55), size: 24),
+          color: context.colors.medium.withValues(alpha: 0.55), size: 24),
     );
   }
 
   Widget _portraitFallback(String name) {
     return Container(
-      color: FlixieColors.surfaceElevated,
+      color: context.colors.surfaceElevated,
       child: Center(
         child: Text(
           name.isNotEmpty ? name[0].toUpperCase() : '?',
-          style: const TextStyle(
-            color: FlixieColors.medium,
+          style: TextStyle(
+            color: context.colors.medium,
             fontSize: 80,
             fontWeight: FontWeight.w300,
           ),
@@ -2139,7 +2001,7 @@ class _PersonStatDivider extends StatelessWidget {
     return Container(
       width: 1,
       height: 42,
-      color: FlixieColors.tabBarBorder,
+      color: context.colors.tabBarBorder,
     );
   }
 }
@@ -2161,13 +2023,6 @@ extension _PersonalCreditFilterView on _PersonalCreditFilter {
         _PersonalCreditFilter.watched => Icons.check_circle_outline_rounded,
         _PersonalCreditFilter.watchlist => Icons.bookmark_outline_rounded,
         _PersonalCreditFilter.favourites => Icons.favorite_outline_rounded,
-      };
-
-  Color get color => switch (this) {
-        _PersonalCreditFilter.all => FlixieColors.primary,
-        _PersonalCreditFilter.watched => FlixieColors.success,
-        _PersonalCreditFilter.watchlist => FlixieColors.warning,
-        _PersonalCreditFilter.favourites => FlixieColors.danger,
       };
 }
 

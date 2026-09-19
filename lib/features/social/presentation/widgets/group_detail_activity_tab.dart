@@ -1,4 +1,6 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/api/api_client.dart';
+import 'package:flixie_app/core/safety/safety_service.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/activity_reaction_bubble.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -64,7 +66,15 @@ class GroupActivityTabState extends State<GroupActivityTab>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    SafetyService.changes.addListener(_onSafetyChanged);
     _activity = widget.initialActivity;
+    _loadFeed();
+  }
+
+  void _onSafetyChanged() {
+    if (!mounted) return;
+    // Hide cached content immediately, even while a refresh is in flight.
+    setState(() {});
     _loadFeed();
   }
 
@@ -90,6 +100,7 @@ class GroupActivityTabState extends State<GroupActivityTab>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    SafetyService.changes.removeListener(_onSafetyChanged);
     _searchController.dispose();
     super.dispose();
   }
@@ -287,6 +298,7 @@ class GroupActivityTabState extends State<GroupActivityTab>
     final query = _searchController.text.trim().toLowerCase();
     final items = _activity
         .where((item) =>
+            !SafetyService.isBlocked(item.userId) &&
             _filter.matches(item) &&
             (query.isEmpty ||
                 (item.mediaTitle ?? '').toLowerCase().contains(query) ||
@@ -304,7 +316,7 @@ class GroupActivityTabState extends State<GroupActivityTab>
               const Icon(Icons.list_alt_rounded,
                   color: FlixieColors.primary, size: 32),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -312,10 +324,10 @@ class GroupActivityTabState extends State<GroupActivityTab>
                         style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
-                            color: FlixieColors.textPrimary)),
-                    SizedBox(height: 4),
+                            color: context.colors.textPrimary)),
+                    const SizedBox(height: 4),
                     Text('Save films to choose together',
-                        style: TextStyle(color: FlixieColors.light)),
+                        style: TextStyle(color: context.colors.light)),
                   ])),
               const SizedBox(width: 10),
               FilledButton(
@@ -331,22 +343,22 @@ class GroupActivityTabState extends State<GroupActivityTab>
                   padding: const EdgeInsets.only(top: 10),
                   child: Wrap(spacing: 8, runSpacing: 6, children: [
                     for (final list in widget.groupLists)
-                      ActionChip(
+                      FlixiePill.action(
                           label: Text(list.name),
                           onPressed: () => _openList(list)),
-                    ActionChip(
+                    FlixiePill.action(
                         label: const Text('New list'),
                         avatar: const Icon(Icons.add, size: 18),
                         onPressed: _creating ? null : _createList),
                   ])),
             const SizedBox(height: 22),
             Row(children: [
-              const Expanded(
+              Expanded(
                   child: Text('Latest activity',
                       style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.w800,
-                          color: FlixieColors.textPrimary))),
+                          color: context.colors.textPrimary))),
               IconButton.outlined(
                   tooltip: 'Search activity',
                   onPressed: () => setState(() {
@@ -372,16 +384,10 @@ class GroupActivityTabState extends State<GroupActivityTab>
                 ActivityFeedFilter.rated,
                 ActivityFeedFilter.reviews
               ])
-                ChoiceChip(
+                FlixiePill.choice(
                     label: Text(filter.label),
                     selected: filter == _filter,
                     showCheckmark: false,
-                    selectedColor: FlixieColors.primary,
-                    labelStyle: TextStyle(
-                        color: filter == _filter
-                            ? Colors.black
-                            : FlixieColors.light,
-                        fontWeight: FontWeight.w700),
                     onSelected: (_) => setState(() => _filter = filter)),
             ]),
             if (_reactionError != null)
@@ -391,11 +397,11 @@ class GroupActivityTabState extends State<GroupActivityTab>
                   label: Text('$_reactionError · Retry')),
             const SizedBox(height: 16),
             if (items.isEmpty)
-              const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 36),
+              Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 36),
                   child: Text('No activity to show yet.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: FlixieColors.light))),
+                      style: TextStyle(color: context.colors.light))),
             for (final item in items)
               Padding(
                   padding: const EdgeInsets.only(bottom: 14),

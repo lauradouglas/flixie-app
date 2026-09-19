@@ -42,7 +42,7 @@ class ProfileHeader extends StatelessWidget {
       useRootNavigator: true,
       useSafeArea: true,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.tabBarBackgroundFocused,
+      backgroundColor: context.colors.tabBarBackgroundFocused,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -58,7 +58,7 @@ class ProfileHeader extends StatelessWidget {
         useRootNavigator: true,
         isScrollControlled: true,
         useSafeArea: true,
-        backgroundColor: FlixieColors.background,
+        backgroundColor: context.colors.background,
         builder: (_) => const FractionallySizedBox(
           heightFactor: .9,
           child: ChangeAvatarSheet(),
@@ -90,14 +90,14 @@ class ProfileHeader extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                 Text(displayName,
-                    style: const TextStyle(
-                        color: FlixieColors.white,
+                    style: TextStyle(
+                        color: context.colors.white,
                         fontSize: 24,
                         fontWeight: FontWeight.w800)),
                 const SizedBox(height: 4),
                 Text('@$username',
-                    style: const TextStyle(
-                        color: FlixieColors.light, fontSize: 14)),
+                    style:
+                        TextStyle(color: context.colors.light, fontSize: 14)),
               ])),
         ]),
         if (profileBadges.isNotEmpty) ...[
@@ -137,8 +137,8 @@ class _ExpandableProfileBioState extends State<_ExpandableProfileBio> {
   @override
   Widget build(BuildContext context) =>
       LayoutBuilder(builder: (context, constraints) {
-        const style =
-            TextStyle(color: FlixieColors.light, fontSize: 14, height: 1.4);
+        final style =
+            TextStyle(color: context.colors.light, fontSize: 14, height: 1.4);
         final painter = TextPainter(
             text: TextSpan(text: widget.text, style: style),
             maxLines: 2,
@@ -156,6 +156,14 @@ class _ExpandableProfileBioState extends State<_ExpandableProfileBio> {
           if (overflows)
             TextButton(
                 onPressed: () => setState(() => expanded = !expanded),
+                style: TextButton.styleFrom(
+                  foregroundColor: context.colors.light,
+                  textStyle: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w500),
+                  padding: EdgeInsets.zero,
+                  alignment: Alignment.centerLeft,
+                  minimumSize: const Size(48, 40),
+                ),
                 child: Text(expanded ? 'Read less' : 'Read more')),
         ]);
       });

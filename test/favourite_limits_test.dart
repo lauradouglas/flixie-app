@@ -29,8 +29,8 @@ void main() {
   });
 
   test('favourite limits and active show filtering stay consistent', () {
-    expect(maxFavouriteMovies, 25);
-    expect(maxFavouriteShows, 25);
+    expect(maxFavouriteMovies, 10);
+    expect(maxFavouriteShows, 10);
     expect(isActiveFavouriteShow({'showId': 1, 'removed': false}), isTrue);
     expect(isActiveFavouriteShow({'showId': 2, 'removed': true}), isFalse);
   });
@@ -38,7 +38,7 @@ void main() {
   test('recognises server favourite-limit failures', () {
     expect(
       isFavouriteLimitError(
-        Exception('You can favourite up to 25 movies and 25 shows'),
+        Exception('You can favourite up to 10 movies and 10 shows'),
       ),
       isTrue,
     );

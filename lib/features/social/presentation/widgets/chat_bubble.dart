@@ -60,8 +60,8 @@ class ChatBubble extends StatelessWidget {
                     left: isMe ? 0 : 4, right: isMe ? 4 : 0, bottom: 2),
                 child: Text(
                   replyTo!,
-                  style: const TextStyle(
-                    color: FlixieColors.medium,
+                  style: TextStyle(
+                    color: context.colors.medium,
                     fontSize: 10,
                     fontStyle: FontStyle.italic,
                   ),
@@ -81,8 +81,8 @@ class ChatBubble extends StatelessWidget {
                             child: Text(isMe ? 'You' : senderUsername,
                                 textAlign:
                                     isMe ? TextAlign.right : TextAlign.left,
-                                style: const TextStyle(
-                                    color: FlixieColors.primaryTint,
+                                style: TextStyle(
+                                    color: context.colors.primaryTint,
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700)))),
                     if (isMe) ...[const SizedBox(width: 9), _senderAvatar()],
@@ -106,8 +106,8 @@ class ChatBubble extends StatelessWidget {
                         senderUsername,
                         style: TextStyle(
                           color: onSenderTap == null
-                              ? FlixieColors.medium
-                              : FlixieColors.primaryTint,
+                              ? context.colors.medium
+                              : context.colors.primaryTint,
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                         ),
@@ -145,10 +145,10 @@ class ChatBubble extends StatelessWidget {
                         horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
                       color: hasRichContent
-                          ? FlixieColors.surface
+                          ? context.colors.surface
                           : isMe
                               ? FlixieColors.primary
-                              : FlixieColors.surface,
+                              : context.colors.surface,
                       borderRadius: BorderRadius.only(
                         topLeft: const Radius.circular(16),
                         topRight: const Radius.circular(16),
@@ -163,8 +163,8 @@ class ChatBubble extends StatelessWidget {
                 if (!hasRichContent)
                   Text(
                     _timeLabel(sentAt),
-                    style: const TextStyle(
-                      color: FlixieColors.medium,
+                    style: TextStyle(
+                      color: context.colors.medium,
                       fontSize: 11,
                     ),
                   ),
@@ -174,8 +174,8 @@ class ChatBubble extends StatelessWidget {
               Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(_timeLabel(sentAt),
-                      style: const TextStyle(
-                          color: FlixieColors.medium, fontSize: 12))),
+                      style: TextStyle(
+                          color: context.colors.medium, fontSize: 12))),
           ],
         ),
       ),
@@ -213,7 +213,7 @@ class ChatBubble extends StatelessWidget {
     }
 
     final link = _firstLink(message);
-    final textColor = isMe ? Colors.white : FlixieColors.textPrimary;
+    final textColor = isMe ? Colors.white : context.colors.textPrimary;
     if (link == null) {
       return Text(
         message,
@@ -282,22 +282,21 @@ class ChatBubble extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(payload.title,
-            style: const TextStyle(
-                color: FlixieColors.textPrimary,
+            style: TextStyle(
+                color: context.colors.textPrimary,
                 fontSize: 19,
                 fontWeight: FontWeight.w800,
                 height: 1.25)),
         if (payload.rating != null) ...[
           const SizedBox(height: 8),
           Row(children: [
-            const Icon(Icons.star_rounded,
-                color: FlixieColors.warning, size: 18),
+            Icon(Icons.star_rounded, color: context.colors.warning, size: 18),
             const SizedBox(width: 4),
             Flexible(
                 child: Text(
                     '${payload.rating!.toStringAsFixed(payload.rating! % 1 == 0 ? 0 : 1)}/10',
-                    style: const TextStyle(
-                        color: FlixieColors.warning,
+                    style: TextStyle(
+                        color: context.colors.warning,
                         fontSize: 14,
                         fontWeight: FontWeight.w700))),
           ]),
@@ -307,8 +306,8 @@ class ChatBubble extends StatelessWidget {
           Text(payload.recommended! ? 'Recommends' : 'Doesn’t recommend',
               style: TextStyle(
                   color: payload.recommended!
-                      ? FlixieColors.success
-                      : FlixieColors.danger,
+                      ? context.colors.success
+                      : context.colors.danger,
                   fontSize: 13)),
         ],
       ],
@@ -319,31 +318,32 @@ class ChatBubble extends StatelessWidget {
           width: 64,
           height: 96,
           child: payload.posterUrl.isEmpty
-              ? const ColoredBox(
-                  color: FlixieColors.surfaceElevated,
-                  child: Icon(Icons.movie_outlined, color: FlixieColors.medium))
+              ? ColoredBox(
+                  color: context.colors.surfaceElevated,
+                  child:
+                      Icon(Icons.movie_outlined, color: context.colors.medium))
               : CachedNetworkImage(
                   imageUrl: payload.posterUrl,
                   fit: BoxFit.cover,
-                  errorWidget: (_, __, ___) => const ColoredBox(
-                      color: FlixieColors.surfaceElevated,
+                  errorWidget: (_, __, ___) => ColoredBox(
+                      color: context.colors.surfaceElevated,
                       child: Icon(Icons.movie_outlined,
-                          color: FlixieColors.medium)))),
+                          color: context.colors.medium)))),
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Icon(Icons.reply_rounded, size: 16, color: FlixieColors.medium),
+          Icon(Icons.reply_rounded, size: 16, color: context.colors.medium),
           const SizedBox(width: 6),
           Expanded(
               child: Text(
                   isOwnActivity
                       ? 'Replied to your ${payload.activityLabel}'
                       : 'Replied to @${payload.username}’s ${payload.activityLabel}',
-                  style: const TextStyle(
-                      color: FlixieColors.medium, fontSize: 12))),
+                  style:
+                      TextStyle(color: context.colors.medium, fontSize: 12))),
         ]),
         const SizedBox(height: 12),
         InkWell(
@@ -365,23 +365,23 @@ class ChatBubble extends StatelessWidget {
         ),
         if (payload.containsSpoilers) ...[
           const SizedBox(height: 10),
-          const Text('Contains spoilers',
-              style: TextStyle(color: FlixieColors.warning, fontSize: 13)),
+          Text('Contains spoilers',
+              style: TextStyle(color: context.colors.warning, fontSize: 13)),
         ],
         if (!payload.containsSpoilers &&
             payload.reviewTitle?.isNotEmpty == true) ...[
           const SizedBox(height: 10),
           Text(payload.reviewTitle!,
-              style: const TextStyle(
-                  color: FlixieColors.textPrimary,
+              style: TextStyle(
+                  color: context.colors.textPrimary,
                   fontWeight: FontWeight.w700)),
         ],
         if (!payload.containsSpoilers &&
             payload.reviewBody?.isNotEmpty == true) ...[
           const SizedBox(height: 5),
           Text(payload.reviewBody!,
-              style: const TextStyle(
-                  color: FlixieColors.light, fontSize: 14, height: 1.4)),
+              style: TextStyle(
+                  color: context.colors.light, fontSize: 14, height: 1.4)),
         ],
         if (payload.listName?.isNotEmpty == true)
           TextButton.icon(
@@ -390,36 +390,39 @@ class ChatBubble extends StatelessWidget {
                   : () => _openLink(context, payload.listLink!),
               icon: const Icon(Icons.playlist_add_check_rounded, size: 18),
               label: Text('Added to ${payload.listName}'),
-              style: TextButton.styleFrom(foregroundColor: FlixieColors.light)),
+              style:
+                  TextButton.styleFrom(foregroundColor: context.colors.light)),
         if (payload.message.isNotEmpty) ...[
-          const Divider(color: FlixieColors.tabBarBorder, height: 20),
+          Divider(color: context.colors.tabBarBorder, height: 20),
           Text(payload.message,
-              style: const TextStyle(
-                  color: FlixieColors.textPrimary, fontSize: 16, height: 1.4)),
+              style: TextStyle(
+                  color: context.colors.textPrimary,
+                  fontSize: 16,
+                  height: 1.4)),
         ],
       ],
     );
   }
 
   Widget _buildMovieShareCard(BuildContext context, MovieSharePayload payload) {
-    final foreground = isMe ? Colors.white : FlixieColors.textPrimary;
-    final secondary = isMe ? Colors.white : FlixieColors.primaryTint;
+    final foreground = isMe ? Colors.white : context.colors.textPrimary;
+    final secondary = isMe ? Colors.white : context.colors.primaryTint;
     final poster = ClipRRect(
       borderRadius: BorderRadius.circular(10),
       child: SizedBox(
         width: 68,
         height: 102,
         child: payload.posterUrl.isEmpty
-            ? const ColoredBox(
-                color: FlixieColors.tabBarBackground,
-                child: Icon(Icons.movie_outlined, color: FlixieColors.light))
+            ? ColoredBox(
+                color: context.colors.tabBarBackground,
+                child: Icon(Icons.movie_outlined, color: context.colors.light))
             : CachedNetworkImage(
                 imageUrl: payload.posterUrl,
                 fit: BoxFit.cover,
-                errorWidget: (_, __, ___) => const ColoredBox(
-                    color: FlixieColors.tabBarBackground,
-                    child:
-                        Icon(Icons.movie_outlined, color: FlixieColors.light)),
+                errorWidget: (_, __, ___) => ColoredBox(
+                    color: context.colors.tabBarBackground,
+                    child: Icon(Icons.movie_outlined,
+                        color: context.colors.light)),
               ),
       ),
     );
@@ -475,7 +478,7 @@ class ChatBubble extends StatelessWidget {
             const SizedBox(height: 14),
             Text(payload.prompt,
                 style: TextStyle(
-                    color: isMe ? Colors.white : FlixieColors.light,
+                    color: isMe ? Colors.white : context.colors.light,
                     fontSize: 14.5,
                     height: 1.4)),
           ],

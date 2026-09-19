@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 
-/// Shared movie/show provider label with the app's warm count badge.
+/// Shared movie/show provider label with a quiet inline count.
 class ProviderTabLabel extends StatelessWidget {
   const ProviderTabLabel(
       {super.key,
@@ -25,25 +25,16 @@ class ProviderTabLabel extends StatelessWidget {
             Text(label,
                 style: TextStyle(
                     color: selected
-                        ? FlixieColors.primaryText
-                        : FlixieColors.light,
+                        ? context.colors.primaryText
+                        : context.colors.light,
                     fontWeight: selected ? FontWeight.w700 : FontWeight.w500)),
-            Container(
-              constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
-              padding: const EdgeInsets.all(5),
-              decoration: BoxDecoration(
-                  color: count > 0
-                      ? FlixieColors.tertiary
-                      : FlixieColors.tabBarBorder,
-                  shape: BoxShape.circle),
-              child: Text('$count',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      color: count > 0 ? Colors.black : FlixieColors.light,
-                      fontSize: 10,
-                      height: 1,
-                      fontWeight: FontWeight.w700)),
-            ),
+            Text('$count',
+                style: TextStyle(
+                    color: selected
+                        ? context.colors.primaryText
+                        : context.colors.medium,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500)),
           ],
         ),
       );

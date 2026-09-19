@@ -45,15 +45,15 @@ class WatchProviderCard extends StatelessWidget {
     final logo = ClipRRect(
       borderRadius: BorderRadius.circular(9),
       child: provider.logoPath.isEmpty
-          ? _logoFallback()
+          ? _logoFallback(context)
           : CachedNetworkImage(
               imageUrl: provider.logoUrl,
               fit: BoxFit.cover,
               filterQuality: FilterQuality.high,
-              placeholder: (_, __) => const ColoredBox(
-                color: FlixieColors.surfaceElevated,
+              placeholder: (_, __) => ColoredBox(
+                color: context.colors.surfaceElevated,
               ),
-              errorWidget: (_, __, ___) => _logoFallback(),
+              errorWidget: (_, __, ___) => _logoFallback(context),
             ),
     );
 
@@ -73,12 +73,12 @@ class WatchProviderCard extends StatelessWidget {
                 padding: const EdgeInsets.all(2),
                 decoration: BoxDecoration(
                   color: showUserProviderHighlight && isUserProvider
-                      ? FlixieColors.success.withValues(alpha: 0.16)
-                      : FlixieColors.surface,
+                      ? context.colors.success.withValues(alpha: 0.16)
+                      : context.colors.surface,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: showUserProviderHighlight && isUserProvider
-                        ? FlixieColors.success.withValues(alpha: 0.5)
+                        ? context.colors.success.withValues(alpha: 0.5)
                         : Colors.white.withValues(alpha: 0.06),
                   ),
                 ),
@@ -90,8 +90,8 @@ class WatchProviderCard extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 provider.providerName,
-                style: const TextStyle(
-                  color: FlixieColors.light,
+                style: TextStyle(
+                  color: context.colors.light,
                   fontSize: 10,
                   fontWeight: FontWeight.w500,
                 ),
@@ -106,13 +106,13 @@ class WatchProviderCard extends StatelessWidget {
     );
   }
 
-  Widget _logoFallback() {
+  Widget _logoFallback(BuildContext context) {
     return Container(
-      color: FlixieColors.surfaceElevated,
-      child: const Center(
+      color: context.colors.surfaceElevated,
+      child: Center(
         child: Icon(
           Icons.play_circle_outline,
-          color: FlixieColors.medium,
+          color: context.colors.medium,
           size: 28,
         ),
       ),

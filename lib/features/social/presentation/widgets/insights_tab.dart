@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -79,13 +80,13 @@ class _GroupInsightsTabState extends State<GroupInsightsTab> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.insights_outlined,
-                  color: FlixieColors.medium, size: 40),
+              Icon(Icons.insights_outlined,
+                  color: context.colors.medium, size: 40),
               const SizedBox(height: 12),
               Text(
                 _error!,
-                style: const TextStyle(
-                  color: FlixieColors.light,
+                style: TextStyle(
+                  color: context.colors.light,
                   fontWeight: FontWeight.w700,
                   fontSize: 16,
                 ),
@@ -109,26 +110,26 @@ class _GroupInsightsTabState extends State<GroupInsightsTab> {
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 24, 16, 120),
-          children: const [
-            SizedBox(height: 64),
+          children: [
+            const SizedBox(height: 64),
             Icon(Icons.auto_graph_outlined,
-                size: 52, color: FlixieColors.medium),
-            SizedBox(height: 16),
+                size: 52, color: context.colors.medium),
+            const SizedBox(height: 16),
             Text(
               'No group insights yet',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: FlixieColors.light,
+                color: context.colors.light,
                 fontWeight: FontWeight.w700,
                 fontSize: 18,
               ),
             ),
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
             Text(
               'Start watching, rating, reviewing, or discussing movies with this group.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: FlixieColors.medium,
+                color: context.colors.medium,
                 height: 1.4,
               ),
             ),
@@ -214,20 +215,20 @@ class _InsightsTimeToggle extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: FlixieColors.surface,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: FlixieColors.tabBarBorder),
+        border: Border.all(color: context.colors.tabBarBorder),
       ),
       child: Row(
         children: [
-          _option('This month', false),
-          _option('All time', true),
+          _option(context, 'This month', false),
+          _option(context, 'All time', true),
         ],
       ),
     );
   }
 
-  Widget _option(String label, bool value) {
+  Widget _option(BuildContext context, String label, bool value) {
     final selected = allTime == value;
     return Expanded(
       child: InkWell(
@@ -250,7 +251,7 @@ class _InsightsTimeToggle extends StatelessWidget {
           child: Text(
             label,
             style: TextStyle(
-              color: selected ? FlixieColors.primary : FlixieColors.medium,
+              color: selected ? FlixieColors.primary : context.colors.medium,
               fontSize: 13,
               fontWeight: FontWeight.w800,
             ),
@@ -309,24 +310,7 @@ class InsightSectionHeader extends StatelessWidget {
         ),
         if ((meta ?? '').isNotEmpty) ...[
           const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-            decoration: BoxDecoration(
-              color: FlixieColors.primary.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: FlixieColors.primary.withValues(alpha: 0.28),
-              ),
-            ),
-            child: Text(
-              meta!,
-              style: const TextStyle(
-                color: FlixieColors.primary,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
+          FlixiePill.label(label: Text(meta!)),
         ],
       ],
     );
@@ -350,7 +334,7 @@ class InsightHighlightCard extends StatelessWidget {
       child: Container(
         height: 188,
         padding: const EdgeInsets.all(12),
-        decoration: _glassDecoration(),
+        decoration: _glassDecoration(context),
         child: Row(
           children: [
             ClipRRect(
@@ -360,17 +344,17 @@ class InsightHighlightCard extends StatelessWidget {
                 height: double.infinity,
                 child: posterUrl == null
                     ? Container(
-                        color: FlixieColors.surfaceElevated,
-                        child: const Icon(Icons.movie_outlined,
-                            color: FlixieColors.medium),
+                        color: context.colors.surfaceElevated,
+                        child: Icon(Icons.movie_outlined,
+                            color: context.colors.medium),
                       )
                     : CachedNetworkImage(
                         imageUrl: posterUrl,
                         fit: BoxFit.cover,
                         errorWidget: (_, __, ___) => Container(
-                          color: FlixieColors.surfaceElevated,
-                          child: const Icon(Icons.movie_outlined,
-                              color: FlixieColors.medium),
+                          color: context.colors.surfaceElevated,
+                          child: Icon(Icons.movie_outlined,
+                              color: context.colors.medium),
                         ),
                       ),
               ),
@@ -385,43 +369,30 @@ class InsightHighlightCard extends StatelessWidget {
                     movie.title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: FlixieColors.textPrimary,
+                    style: TextStyle(
+                      color: context.colors.textPrimary,
                       fontSize: 20,
                       height: 1.05,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                   const SizedBox(height: 9),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: FlixieColors.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(9),
-                      border: Border.all(color: FlixieColors.primary),
-                    ),
-                    child: const Text('#1 in your group',
-                        style: TextStyle(
-                            color: FlixieColors.primary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800)),
-                  ),
+                  const FlixiePill.label(label: Text('#1 in your group')),
                   const SizedBox(height: 10),
                   Wrap(
                     spacing: 8,
                     runSpacing: 5,
                     children: [
                       Text('${movie.watchCount} watches',
-                          style: const TextStyle(
-                              color: FlixieColors.light, fontSize: 11)),
+                          style: TextStyle(
+                              color: context.colors.light, fontSize: 11)),
                       Text('${movie.discussionCount} discussions',
-                          style: const TextStyle(
-                              color: FlixieColors.light, fontSize: 11)),
+                          style: TextStyle(
+                              color: context.colors.light, fontSize: 11)),
                       if (movie.averageRating > 0)
                         Text('${movie.averageRating.toStringAsFixed(1)}/10',
-                            style: const TextStyle(
-                                color: FlixieColors.warning,
+                            style: TextStyle(
+                                color: context.colors.warning,
                                 fontSize: 11,
                                 fontWeight: FontWeight.w800)),
                     ],
@@ -474,13 +445,13 @@ class InsightsPulseStrip extends StatelessWidget {
         label: 'Ratings',
         value: '$ratingCount',
         icon: Icons.star_rounded,
-        color: FlixieColors.warning,
+        color: context.colors.warning,
       ),
       _PulseTile(
         label: 'Reviews',
         value: '${insights.recentReviews.length}',
         icon: Icons.rate_review_outlined,
-        color: FlixieColors.tertiary,
+        color: context.colors.tertiary,
       ),
       _PulseTile(
         label: 'Messages',
@@ -492,16 +463,16 @@ class InsightsPulseStrip extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: _glassDecoration(),
+      decoration: _glassDecoration(context),
       child: Row(
         children: [
           for (var index = 0; index < tiles.length; index++) ...[
             Expanded(child: tiles[index]),
             if (index != tiles.length - 1)
-              const SizedBox(
+              SizedBox(
                 height: 58,
-                child:
-                    VerticalDivider(width: 1, color: FlixieColors.tabBarBorder),
+                child: VerticalDivider(
+                    width: 1, color: context.colors.tabBarBorder),
               ),
           ],
         ],
@@ -546,8 +517,8 @@ class _PulseTile extends StatelessWidget {
           Text(label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  color: FlixieColors.medium,
+              style: TextStyle(
+                  color: context.colors.medium,
                   fontSize: 10,
                   fontWeight: FontWeight.w700)),
         ],
@@ -593,7 +564,7 @@ class InsightSignalsPanel extends StatelessWidget {
             ? '-'
             : '${topRated.averageRating.toStringAsFixed(1)}/10',
         icon: Icons.auto_awesome_outlined,
-        color: FlixieColors.warning,
+        color: context.colors.warning,
       ),
       _SignalData(
         label: 'Conversation starter',
@@ -602,7 +573,7 @@ class InsightSignalsPanel extends StatelessWidget {
             ? '-'
             : _countLabel(topDiscussed.discussionCount, 'message'),
         icon: Icons.question_answer_outlined,
-        color: FlixieColors.tertiary,
+        color: context.colors.tertiary,
       ),
     ];
 
@@ -651,55 +622,16 @@ class GenreTasteCloud extends StatelessWidget {
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(12),
-          decoration: _glassDecoration(),
+          decoration: _glassDecoration(context),
           child: Wrap(
             spacing: 8,
             runSpacing: 8,
             children: genres.map((genre) {
               final isTop = genre.value == topCount;
-              return Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-                decoration: BoxDecoration(
-                  color: (isTop ? FlixieColors.primary : FlixieColors.tertiary)
-                      .withValues(alpha: isTop ? 0.2 : 0.12),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color:
-                        (isTop ? FlixieColors.primary : FlixieColors.tertiary)
-                            .withValues(alpha: 0.35),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (isTop) ...[
-                      const Icon(Icons.auto_awesome,
-                          color: FlixieColors.primary, size: 14),
-                      const SizedBox(width: 5),
-                    ],
-                    Text(
-                      genre.key,
-                      style: TextStyle(
-                        color: isTop
-                            ? FlixieColors.primary
-                            : FlixieColors.tertiary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '${genre.value}',
-                      style: const TextStyle(
-                        color: FlixieColors.medium,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              );
+              return FlixiePill.label(
+                  colorKey: genre.key,
+                  label: Text('${genre.key}  ${genre.value}'),
+                  avatar: isTop ? const Icon(Icons.auto_awesome) : null);
             }).toList(growable: false),
           ),
         ),
@@ -740,7 +672,7 @@ class _SignalTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: FlixieColors.surfaceElevated.withValues(alpha: 0.62),
+          color: context.colors.surfaceElevated.withValues(alpha: 0.62),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: signal.color.withValues(alpha: 0.22)),
         ),
@@ -777,8 +709,8 @@ class _SignalTile extends StatelessWidget {
                     movie?.title ?? 'Waiting for more data',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: FlixieColors.light,
+                    style: TextStyle(
+                      color: context.colors.light,
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
                     ),
@@ -791,8 +723,8 @@ class _SignalTile extends StatelessWidget {
               signal.value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: FlixieColors.medium,
+              style: TextStyle(
+                color: context.colors.medium,
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
               ),
@@ -853,8 +785,8 @@ class InsightMovieCard extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              FlixieColors.surfaceElevated.withValues(alpha: 0.75),
-              FlixieColors.surface.withValues(alpha: 0.95),
+              context.colors.surfaceElevated.withValues(alpha: 0.75),
+              context.colors.surface.withValues(alpha: 0.95),
             ],
           ),
           boxShadow: [
@@ -878,22 +810,22 @@ class InsightMovieCard extends StatelessWidget {
                     height: double.infinity,
                     child: posterUrl == null
                         ? Container(
-                            color: FlixieColors.tabBarBorder,
+                            color: context.colors.tabBarBorder,
                             alignment: Alignment.center,
-                            child: const Icon(
+                            child: Icon(
                               Icons.movie_outlined,
-                              color: FlixieColors.medium,
+                              color: context.colors.medium,
                             ),
                           )
                         : CachedNetworkImage(
                             imageUrl: posterUrl,
                             fit: BoxFit.cover,
                             errorWidget: (_, __, ___) => Container(
-                              color: FlixieColors.tabBarBorder,
+                              color: context.colors.tabBarBorder,
                               alignment: Alignment.center,
-                              child: const Icon(
+                              child: Icon(
                                 Icons.movie_outlined,
-                                color: FlixieColors.medium,
+                                color: context.colors.medium,
                               ),
                             ),
                           ),
@@ -902,25 +834,7 @@ class InsightMovieCard extends StatelessWidget {
                 Positioned(
                   top: 6,
                   left: 6,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.68),
-                      borderRadius: BorderRadius.circular(9),
-                      border: Border.all(
-                        color: FlixieColors.primary.withValues(alpha: 0.55),
-                      ),
-                    ),
-                    child: Text(
-                      '#$rank',
-                      style: const TextStyle(
-                        color: FlixieColors.primary,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ),
+                  child: FlixiePill.label(label: Text('#$rank')),
                 ),
               ],
             ),
@@ -933,8 +847,8 @@ class InsightMovieCard extends StatelessWidget {
                     movie.title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: FlixieColors.light,
+                    style: TextStyle(
+                      color: context.colors.light,
                       fontWeight: FontWeight.w800,
                       fontSize: 15,
                       height: 1.12,
@@ -952,12 +866,12 @@ class InsightMovieCard extends StatelessWidget {
                           label: movie.year?.toString() ??
                               _yearFromDate(movie.releaseDate),
                           icon: Icons.calendar_today_outlined,
-                          color: FlixieColors.medium,
+                          color: context.colors.medium,
                         ),
                       _MiniMetaPill(
                         label: subtitle,
                         icon: _variantIcon(variant),
-                        color: _variantColor(variant),
+                        color: _variantColor(context, variant),
                       ),
                     ],
                   ),
@@ -968,8 +882,8 @@ class InsightMovieCard extends StatelessWidget {
                       movie.latestDiscussionSnippet!,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: FlixieColors.medium,
+                      style: TextStyle(
+                        color: context.colors.medium,
                         fontSize: 11,
                         height: 1.25,
                         fontStyle: FontStyle.italic,
@@ -985,8 +899,8 @@ class InsightMovieCard extends StatelessWidget {
                       _variantFooter(variant, movie),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: FlixieColors.medium,
+                      style: TextStyle(
+                        color: context.colors.medium,
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                       ),
@@ -1015,36 +929,8 @@ class _MiniMetaPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (label.trim().isEmpty) return const SizedBox.shrink();
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 158),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withValues(alpha: 0.28)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 12, color: color),
-            const SizedBox(width: 4),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    return FlixiePill.label(
+        label: Text(label), avatar: Icon(icon, color: color));
   }
 }
 
@@ -1077,7 +963,7 @@ class _InsightReviewCardState extends State<InsightReviewCard> {
 
     return Container(
       decoration: BoxDecoration(
-        color: FlixieColors.surface.withValues(alpha: 0.7),
+        color: context.colors.surface.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: FlixieColors.primary.withValues(alpha: 0.18),
@@ -1098,19 +984,19 @@ class _InsightReviewCardState extends State<InsightReviewCard> {
                 height: 92,
                 child: posterUrl == null
                     ? Container(
-                        color: FlixieColors.tabBarBorder,
+                        color: context.colors.tabBarBorder,
                         alignment: Alignment.center,
-                        child: const Icon(Icons.movie_outlined,
-                            size: 20, color: FlixieColors.medium),
+                        child: Icon(Icons.movie_outlined,
+                            size: 20, color: context.colors.medium),
                       )
                     : CachedNetworkImage(
                         imageUrl: posterUrl,
                         fit: BoxFit.cover,
                         errorWidget: (_, __, ___) => Container(
-                          color: FlixieColors.tabBarBorder,
+                          color: context.colors.tabBarBorder,
                           alignment: Alignment.center,
-                          child: const Icon(Icons.movie_outlined,
-                              size: 20, color: FlixieColors.medium),
+                          child: Icon(Icons.movie_outlined,
+                              size: 20, color: context.colors.medium),
                         ),
                       ),
               ),
@@ -1144,8 +1030,8 @@ class _InsightReviewCardState extends State<InsightReviewCard> {
                           handle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: FlixieColors.light,
+                          style: TextStyle(
+                            color: context.colors.light,
                             fontWeight: FontWeight.w700,
                             fontSize: 13,
                           ),
@@ -1154,8 +1040,8 @@ class _InsightReviewCardState extends State<InsightReviewCard> {
                     ),
                     Text(
                       _relativeDate(review.createdAt),
-                      style: const TextStyle(
-                        color: FlixieColors.medium,
+                      style: TextStyle(
+                        color: context.colors.medium,
                         fontSize: 11,
                       ),
                     ),
@@ -1170,8 +1056,8 @@ class _InsightReviewCardState extends State<InsightReviewCard> {
                     review.movieTitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: FlixieColors.light,
+                    style: TextStyle(
+                      color: context.colors.light,
                       fontWeight: FontWeight.w800,
                       fontSize: 15,
                     ),
@@ -1185,8 +1071,8 @@ class _InsightReviewCardState extends State<InsightReviewCard> {
                     const SizedBox(width: 3),
                     Text(
                       '${review.rating.toStringAsFixed(1)}/10',
-                      style: const TextStyle(
-                        color: FlixieColors.light,
+                      style: TextStyle(
+                        color: context.colors.light,
                         fontWeight: FontWeight.w700,
                         fontSize: 12,
                       ),
@@ -1200,7 +1086,7 @@ class _InsightReviewCardState extends State<InsightReviewCard> {
                         size: 14,
                         color: review.recommended!
                             ? const Color(0xFF55D69E)
-                            : FlixieColors.medium,
+                            : context.colors.medium,
                       ),
                     ],
                     if (review.containsSpoilers) ...[
@@ -1232,7 +1118,7 @@ class _InsightReviewCardState extends State<InsightReviewCard> {
                       style: TextStyle(
                         color: review.containsSpoilers && !_spoilerRevealed
                             ? FlixieColors.primary
-                            : FlixieColors.medium,
+                            : context.colors.medium,
                         height: 1.25,
                         fontSize: 12,
                         fontStyle: review.containsSpoilers && !_spoilerRevealed
@@ -1274,7 +1160,7 @@ class InsightMemberCard extends StatelessWidget {
           : null,
       borderRadius: BorderRadius.circular(14),
       child: Container(
-        decoration: _glassDecoration(),
+        decoration: _glassDecoration(context),
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
@@ -1300,9 +1186,13 @@ class InsightMemberCard extends StatelessWidget {
                 ),
               ),
             if (rankValue != null) const SizedBox(width: 10),
-            _AvatarBubble(
-              name: avatarSeed,
-              imageUrl: member.avatarUrl,
+            ProfileAvatarView(
+              avatar: member.avatar,
+              profileBadges: member.profileBadges,
+              fallbackText: avatarSeed.trim().isEmpty
+                  ? '?'
+                  : avatarSeed.trim().characters.first,
+              fallbackColor: FlixieColors.primary,
               size: 38,
             ),
             const SizedBox(width: 10),
@@ -1311,8 +1201,8 @@ class InsightMemberCard extends StatelessWidget {
                 displayHandle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: FlixieColors.light,
+                style: TextStyle(
+                  color: context.colors.light,
                   fontWeight: FontWeight.w700,
                   fontSize: 15,
                 ),
@@ -1330,34 +1220,15 @@ class InsightMemberCard extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const Text(
+                Text(
                   'activities',
                   style: TextStyle(
-                    color: FlixieColors.medium,
+                    color: context.colors.medium,
                     fontSize: 11,
                   ),
                 ),
                 if ((member.badge ?? '').isNotEmpty)
-                  Container(
-                    margin: const EdgeInsets.only(top: 4),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: FlixieColors.tertiary.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: FlixieColors.tertiary.withValues(alpha: 0.35),
-                      ),
-                    ),
-                    child: Text(
-                      member.badge!,
-                      style: const TextStyle(
-                        color: FlixieColors.tertiary,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
+                  FlixiePill.label(label: Text(member.badge!)),
               ],
             ),
           ],
@@ -1418,15 +1289,15 @@ class _WatcherAvatarStack extends StatelessWidget {
                 height: 22,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: FlixieColors.surface,
+                  color: context.colors.surface,
                   shape: BoxShape.circle,
-                  border:
-                      Border.all(color: FlixieColors.tabBarBorder, width: 1.2),
+                  border: Border.all(
+                      color: context.colors.tabBarBorder, width: 1.2),
                 ),
                 child: Text(
                   '+${watchers.length - shown.length}',
-                  style: const TextStyle(
-                    color: FlixieColors.medium,
+                  style: TextStyle(
+                    color: context.colors.medium,
                     fontSize: 9,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1460,28 +1331,28 @@ class _AvatarBubble extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: FlixieColors.tabBarBorder, width: 1),
+        border: Border.all(color: context.colors.tabBarBorder, width: 1),
       ),
       child: ClipOval(
         child: isHttp
             ? CachedNetworkImage(
                 imageUrl: imageUrl!,
                 fit: BoxFit.cover,
-                errorWidget: (_, __, ___) => _initialAvatar(initial),
+                errorWidget: (_, __, ___) => _initialAvatar(context, initial),
               )
-            : _initialAvatar(initial),
+            : _initialAvatar(context, initial),
       ),
     );
   }
 
-  Widget _initialAvatar(String initial) {
+  Widget _initialAvatar(BuildContext context, String initial) {
     return Container(
       color: FlixieColors.primary.withValues(alpha: 0.2),
       alignment: Alignment.center,
       child: Text(
         initial,
         style: TextStyle(
-          color: FlixieColors.light,
+          color: context.colors.light,
           fontWeight: FontWeight.w700,
           fontSize: size * 0.45,
         ),
@@ -1511,9 +1382,9 @@ class _InsightsLoadingState extends StatelessWidget {
                 width: 268,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: FlixieColors.tabBarBackgroundFocused,
+                  color: context.colors.tabBarBackgroundFocused,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: FlixieColors.tabBarBorder),
+                  border: Border.all(color: context.colors.tabBarBorder),
                 ),
                 child: const Row(
                   children: [
@@ -1545,7 +1416,7 @@ class _InsightsLoadingState extends StatelessWidget {
   }
 }
 
-BoxDecoration _glassDecoration() {
+BoxDecoration _glassDecoration(BuildContext context) {
   return BoxDecoration(
     borderRadius: BorderRadius.circular(14),
     border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
@@ -1553,8 +1424,8 @@ BoxDecoration _glassDecoration() {
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
       colors: [
-        FlixieColors.surfaceElevated.withValues(alpha: 0.72),
-        FlixieColors.surface.withValues(alpha: 0.94),
+        context.colors.surfaceElevated.withValues(alpha: 0.72),
+        context.colors.surface.withValues(alpha: 0.94),
       ],
     ),
     boxShadow: [
@@ -1590,16 +1461,16 @@ IconData _variantIcon(InsightMovieCardVariant variant) {
   }
 }
 
-Color _variantColor(InsightMovieCardVariant variant) {
+Color _variantColor(BuildContext context, InsightMovieCardVariant variant) {
   switch (variant) {
     case InsightMovieCardVariant.mostWatched:
       return FlixieColors.primary;
     case InsightMovieCardVariant.mostDiscussed:
-      return FlixieColors.tertiary;
+      return context.colors.tertiary;
     case InsightMovieCardVariant.highestRated:
-      return FlixieColors.warning;
+      return context.colors.warning;
     case InsightMovieCardVariant.mostDivisive:
-      return FlixieColors.danger;
+      return context.colors.danger;
   }
 }
 

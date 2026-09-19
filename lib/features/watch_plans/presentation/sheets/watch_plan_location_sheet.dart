@@ -36,7 +36,7 @@ class _WatchPlanLocationSheetState extends State<WatchPlanLocationSheet> {
   Widget build(BuildContext context) => SizedBox(
         height: MediaQuery.sizeOf(context).height * .84,
         child: Material(
-          color: FlixieColors.background,
+          color: context.colors.background,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           child: MediaQuery(
             data: MediaQuery.of(context),
@@ -51,26 +51,26 @@ class _WatchPlanLocationSheetState extends State<WatchPlanLocationSheet> {
                             width: 54,
                             height: 6,
                             decoration: BoxDecoration(
-                                color: FlixieColors.medium,
+                                color: context.colors.medium,
                                 borderRadius: BorderRadius.circular(8)))),
                     const SizedBox(height: 24),
                     Row(children: [
-                      const Expanded(
+                      Expanded(
                           child: Text('Where are you watching?',
                               style: TextStyle(
-                                  color: FlixieColors.textPrimary,
+                                  color: context.colors.textPrimary,
                                   fontSize: 26,
                                   fontWeight: FontWeight.w800))),
                       IconButton(
                           onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.close_rounded,
-                              color: FlixieColors.light, size: 28)),
+                          icon: Icon(Icons.close_rounded,
+                              color: context.colors.light, size: 28)),
                     ]),
                     const SizedBox(height: 8),
-                    const Text(
+                    Text(
                         'Choose the kind of plan first. A specific place is optional.',
-                        style:
-                            TextStyle(color: FlixieColors.light, fontSize: 13)),
+                        style: TextStyle(
+                            color: context.colors.light, fontSize: 13)),
                     const SizedBox(height: 24),
                     _LocationKindOption(
                         kind: WatchLocationKind.home,
@@ -106,30 +106,29 @@ class _WatchPlanLocationSheetState extends State<WatchPlanLocationSheet> {
                               : _kind == WatchLocationKind.home
                                   ? 'At home'
                                   : 'Location',
-                          style: const TextStyle(
-                              color: FlixieColors.textPrimary,
+                          style: TextStyle(
+                              color: context.colors.textPrimary,
                               fontSize: 18,
                               fontWeight: FontWeight.w800)),
                       const Spacer(),
-                      const Text('OPTIONAL',
+                      Text('OPTIONAL',
                           style: TextStyle(
-                              color: FlixieColors.medium,
+                              color: context.colors.medium,
                               fontSize: 11,
                               fontWeight: FontWeight.w800))
                     ]),
                     const SizedBox(height: 12),
                     TextField(
                         controller: _locationController,
-                        style: const TextStyle(
-                            color: FlixieColors.textPrimary, fontSize: 15),
+                        style: TextStyle(
+                            color: context.colors.textPrimary, fontSize: 15),
                         decoration: InputDecoration(
                             filled: true,
-                            fillColor: FlixieColors.surfaceElevated,
+                            fillColor: context.colors.surfaceElevated,
                             hintText: _kind == WatchLocationKind.cinema
                                 ? 'e.g. ODEON Belfast'
                                 : 'e.g. My place',
-                            hintStyle:
-                                const TextStyle(color: FlixieColors.medium),
+                            hintStyle: TextStyle(color: context.colors.medium),
                             suffixIcon: const Icon(Icons.edit_outlined,
                                 color: FlixieColors.primary),
                             border: OutlineInputBorder(
@@ -141,25 +140,26 @@ class _WatchPlanLocationSheetState extends State<WatchPlanLocationSheet> {
                           width: double.infinity,
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                              color:
-                                  FlixieColors.secondary.withValues(alpha: .14),
+                              color: context.colors.secondary
+                                  .withValues(alpha: .14),
                               borderRadius: BorderRadius.circular(16)),
-                          child: const Text(
+                          child: Text(
                               'Streaming-provider matching is switched off for this plan.',
                               style: TextStyle(
-                                  color: FlixieColors.secondary, fontSize: 12)))
+                                  color: context.colors.secondary,
+                                  fontSize: 12)))
                     ],
                     const SizedBox(height: 20),
                     Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                            color: FlixieColors.surfaceElevated,
+                            color: context.colors.surfaceElevated,
                             borderRadius: BorderRadius.circular(16)),
-                        child: const Text(
+                        child: Text(
                             'Everyone in this plan will be notified that the location changed.',
                             style: TextStyle(
-                                color: FlixieColors.light, fontSize: 11))),
+                                color: context.colors.light, fontSize: 11))),
                     const SizedBox(height: 20),
                     SizedBox(
                         width: double.infinity,
@@ -204,7 +204,7 @@ class _LocationKindOption extends StatelessWidget {
                 border: Border.all(
                     color: isSelected
                         ? FlixieColors.primary
-                        : FlixieColors.tabBarBorder,
+                        : context.colors.tabBarBorder,
                     width: isSelected ? 2 : 1),
                 borderRadius: BorderRadius.circular(18)),
             child: Row(children: [
@@ -212,7 +212,7 @@ class _LocationKindOption extends StatelessWidget {
                   width: 52,
                   height: 52,
                   decoration: BoxDecoration(
-                      color: FlixieColors.surfaceElevated,
+                      color: context.colors.surfaceElevated,
                       borderRadius: BorderRadius.circular(14)),
                   child: Icon(icon, color: FlixieColors.primary)),
               const SizedBox(width: 14),
@@ -221,21 +221,21 @@ class _LocationKindOption extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                     Text(title,
-                        style: const TextStyle(
-                            color: FlixieColors.textPrimary,
+                        style: TextStyle(
+                            color: context.colors.textPrimary,
                             fontSize: 16,
                             fontWeight: FontWeight.w700)),
                     const SizedBox(height: 4),
                     Text(subtitle,
-                        style: const TextStyle(
-                            color: FlixieColors.light, fontSize: 12))
+                        style: TextStyle(
+                            color: context.colors.light, fontSize: 12))
                   ])),
               Icon(
                   isSelected
                       ? Icons.check_circle_rounded
                       : Icons.circle_outlined,
                   color:
-                      isSelected ? FlixieColors.primary : FlixieColors.medium)
+                      isSelected ? FlixieColors.primary : context.colors.medium)
             ])));
   }
 }

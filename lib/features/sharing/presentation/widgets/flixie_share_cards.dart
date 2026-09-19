@@ -21,7 +21,7 @@ class FlixieShareCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: FlixieColors.background,
+      color: context.colors.background,
       child: SizedBox(
         width: 360,
         height: 640,
@@ -33,10 +33,10 @@ class FlixieShareCard extends StatelessWidget {
               colors: [
                 Color.alphaBlend(
                   posterAccent.withValues(alpha: .16),
-                  FlixieColors.background,
+                  context.colors.background,
                 ),
-                FlixieColors.background,
-                FlixieColors.background,
+                context.colors.background,
+                context.colors.background,
               ],
               stops: const [0, .46, 1],
             ),
@@ -73,10 +73,10 @@ class RatingShareCardContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final posterHeight = showNote && data.note != null ? 300.0 : 330.0;
     final recommendationColor = data.recommended == true
-        ? FlixieColors.secondary
+        ? context.colors.secondary
         : data.recommended == false
-            ? FlixieColors.danger
-            : FlixieColors.medium;
+            ? context.colors.danger
+            : context.colors.medium;
     final recommendationLabel = data.neutralRecommendation
         ? 'has no recommendation'
         : data.recommended == true
@@ -92,7 +92,7 @@ class RatingShareCardContent extends StatelessWidget {
           radius: 1.05,
           colors: [
             posterAccent.withValues(alpha: .16),
-            FlixieColors.background,
+            context.colors.background,
           ],
         ),
       ),
@@ -103,14 +103,15 @@ class RatingShareCardContent extends StatelessWidget {
           children: [
             Row(
               children: [
-                const FlixieWordmark(fontSize: 22),
+                const FlixieWordmark(
+                    fontSize: 22, foregroundColor: Colors.white),
                 const Spacer(),
                 Text(
                   data.recommended == true ? 'RECOMMENDED' : 'RATED',
                   style: TextStyle(
                     color: data.recommended == true
-                        ? FlixieColors.secondary
-                        : FlixieColors.medium,
+                        ? context.colors.secondary
+                        : context.colors.medium,
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1.4,
@@ -124,20 +125,20 @@ class RatingShareCardContent extends StatelessWidget {
               children: [
                 Text(
                   '${data.rating}.0',
-                  style: const TextStyle(
-                    color: FlixieColors.tertiary,
+                  style: TextStyle(
+                    color: context.colors.tertiary,
                     fontSize: 76,
                     height: .8,
                     fontWeight: FontWeight.w900,
                     letterSpacing: -4,
                   ),
                 ),
-                const Padding(
-                  padding: EdgeInsets.only(left: 5, bottom: 2),
+                Padding(
+                  padding: const EdgeInsets.only(left: 5, bottom: 2),
                   child: Text(
                     '/10',
                     style: TextStyle(
-                      color: FlixieColors.light,
+                      color: context.colors.light,
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
                     ),
@@ -150,8 +151,8 @@ class RatingShareCardContent extends StatelessWidget {
               data.title,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: FlixieColors.textPrimary,
+              style: TextStyle(
+                color: context.colors.textPrimary,
                 fontSize: 30,
                 height: 1.02,
                 fontWeight: FontWeight.w800,
@@ -171,7 +172,7 @@ class RatingShareCardContent extends StatelessWidget {
                 ),
               ),
             ),
-            Divider(color: FlixieColors.light.withValues(alpha: .2)),
+            Divider(color: context.colors.light.withValues(alpha: .2)),
             const SizedBox(height: 12),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -209,8 +210,8 @@ class RatingShareCardContent extends StatelessWidget {
                                 children: [
                                   TextSpan(
                                     text: '@${data.username} ',
-                                    style: const TextStyle(
-                                      color: FlixieColors.tertiary,
+                                    style: TextStyle(
+                                      color: context.colors.tertiary,
                                       fontWeight: FontWeight.w800,
                                     ),
                                   ),
@@ -219,8 +220,8 @@ class RatingShareCardContent extends StatelessWidget {
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: FlixieColors.textPrimary,
+                              style: TextStyle(
+                                color: context.colors.textPrimary,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -234,8 +235,8 @@ class RatingShareCardContent extends StatelessWidget {
                           data.note!,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: FlixieColors.light,
+                          style: TextStyle(
+                            color: context.colors.light,
                             fontSize: 13,
                             height: 1.25,
                             fontStyle: FontStyle.italic,
@@ -265,19 +266,18 @@ class _TallPoster extends StatelessWidget {
     final url = data.posterUrl;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: FlixieColors.surfaceElevated,
+        color: context.colors.surfaceElevated,
         borderRadius: BorderRadius.circular(14),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(13),
         child: url == null
-            ? const Icon(Icons.movie_outlined,
-                size: 55, color: FlixieColors.medium)
+            ? Icon(Icons.movie_outlined, size: 55, color: context.colors.medium)
             : CachedNetworkImage(
                 imageUrl: url,
                 fit: BoxFit.cover,
-                errorWidget: (_, __, ___) => const Icon(Icons.movie_outlined,
-                    size: 55, color: FlixieColors.medium),
+                errorWidget: (_, __, ___) => Icon(Icons.movie_outlined,
+                    size: 55, color: context.colors.medium),
               ),
       ),
     );
@@ -297,10 +297,10 @@ class ReviewShareCardContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final recommendationColor = data.recommended == true
-        ? FlixieColors.secondary
+        ? context.colors.secondary
         : data.recommended == false
-            ? FlixieColors.danger
-            : FlixieColors.medium;
+            ? context.colors.danger
+            : context.colors.medium;
     final recommendationLabel = data.neutralRecommendation
         ? 'has no recommendation'
         : data.recommended == true
@@ -316,7 +316,7 @@ class ReviewShareCardContent extends StatelessWidget {
           radius: 1.05,
           colors: [
             posterAccent.withValues(alpha: .16),
-            FlixieColors.background,
+            context.colors.background,
           ],
         ),
       ),
@@ -327,14 +327,15 @@ class ReviewShareCardContent extends StatelessWidget {
           children: [
             Row(
               children: [
-                const FlixieWordmark(fontSize: 22),
+                const FlixieWordmark(
+                    fontSize: 22, foregroundColor: Colors.white),
                 const Spacer(),
                 Text(
                   data.recommended == true ? 'RECOMMENDED' : 'RATED',
                   style: TextStyle(
                     color: data.recommended == true
-                        ? FlixieColors.secondary
-                        : FlixieColors.medium,
+                        ? context.colors.secondary
+                        : context.colors.medium,
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1.4,
@@ -348,20 +349,20 @@ class ReviewShareCardContent extends StatelessWidget {
               children: [
                 Text(
                   '${data.rating}.0',
-                  style: const TextStyle(
-                    color: FlixieColors.tertiary,
+                  style: TextStyle(
+                    color: context.colors.tertiary,
                     fontSize: 76,
                     height: .8,
                     fontWeight: FontWeight.w900,
                     letterSpacing: -4,
                   ),
                 ),
-                const Padding(
-                  padding: EdgeInsets.only(left: 5, bottom: 2),
+                Padding(
+                  padding: const EdgeInsets.only(left: 5, bottom: 2),
                   child: Text(
                     '/10',
                     style: TextStyle(
-                      color: FlixieColors.light,
+                      color: context.colors.light,
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
                     ),
@@ -374,8 +375,8 @@ class ReviewShareCardContent extends StatelessWidget {
               data.title,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: FlixieColors.textPrimary,
+              style: TextStyle(
+                color: context.colors.textPrimary,
                 fontSize: 30,
                 height: 1.02,
                 fontWeight: FontWeight.w800,
@@ -391,7 +392,7 @@ class ReviewShareCardContent extends StatelessWidget {
               ),
             ),
             const Spacer(),
-            Divider(color: FlixieColors.light.withValues(alpha: .2)),
+            Divider(color: context.colors.light.withValues(alpha: .2)),
             const SizedBox(height: 12),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -429,8 +430,8 @@ class ReviewShareCardContent extends StatelessWidget {
                                 children: [
                                   TextSpan(
                                     text: '@${data.username} ',
-                                    style: const TextStyle(
-                                      color: FlixieColors.tertiary,
+                                    style: TextStyle(
+                                      color: context.colors.tertiary,
                                       fontWeight: FontWeight.w800,
                                     ),
                                   ),
@@ -439,8 +440,8 @@ class ReviewShareCardContent extends StatelessWidget {
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: FlixieColors.textPrimary,
+                              style: TextStyle(
+                                color: context.colors.textPrimary,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -454,8 +455,8 @@ class ReviewShareCardContent extends StatelessWidget {
                           data.reviewTitle!,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: FlixieColors.textPrimary,
+                          style: TextStyle(
+                            color: context.colors.textPrimary,
                             fontSize: 15,
                             fontWeight: FontWeight.w800,
                           ),
@@ -467,8 +468,8 @@ class ReviewShareCardContent extends StatelessWidget {
                           data.reviewExcerpt!,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: FlixieColors.light,
+                          style: TextStyle(
+                            color: context.colors.light,
                             fontSize: 13,
                             height: 1.25,
                           ),

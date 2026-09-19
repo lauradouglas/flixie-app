@@ -10,10 +10,10 @@ class WatchProviderHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
         children: [
-          const Expanded(
+          Expanded(
               child: Text('Where to watch',
                   style: TextStyle(
-                      color: FlixieColors.white,
+                      color: context.colors.white,
                       fontSize: 20,
                       fontWeight: FontWeight.w700))),
           const SizedBox(width: 8),
@@ -26,12 +26,12 @@ class WatchProviderHeader extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 8)),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 Text(region == 'GB' ? 'UK' : region,
-                    style: const TextStyle(
-                        color: FlixieColors.primaryText,
+                    style: TextStyle(
+                        color: context.colors.primaryText,
                         fontWeight: FontWeight.w700)),
                 const SizedBox(width: 4),
-                const Icon(Icons.keyboard_arrow_down_rounded,
-                    color: FlixieColors.primaryText, size: 22),
+                Icon(Icons.keyboard_arrow_down_rounded,
+                    color: context.colors.primaryText, size: 22),
               ]),
             ),
           ),

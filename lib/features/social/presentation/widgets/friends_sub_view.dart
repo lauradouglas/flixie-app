@@ -141,8 +141,7 @@ class _FriendsSubViewState extends State<FriendsSubView> {
 
     if (_error != null) {
       return Center(
-        child:
-            Text(_error!, style: const TextStyle(color: FlixieColors.medium)),
+        child: Text(_error!, style: TextStyle(color: context.colors.medium)),
       );
     }
 
@@ -197,8 +196,8 @@ class _FriendsSubViewState extends State<FriendsSubView> {
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 child: Text(
                   'No recent activity.',
-                  style:
-                      textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
+                  style: textTheme.bodySmall
+                      ?.copyWith(color: context.colors.medium),
                 ),
               )
             else

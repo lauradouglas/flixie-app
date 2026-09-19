@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -44,7 +45,7 @@ class SpecialAvatarFrame extends StatelessWidget {
             : isVerified
                 ? const [Color(0xFF5CC8FF), FlixieColors.primary]
                 : badges.contains('FOUNDING_FILM_FRIEND')
-                    ? const [FlixieColors.primary, FlixieColors.secondary]
+                    ? [FlixieColors.primary, FlixieColors.secondary]
                     : const [Color(0xFF9B83CC), Color(0xFF6D5A96)];
     return Container(
       padding: EdgeInsets.all(frameWidth ?? (isFounder ? 4 : 3)),
@@ -221,43 +222,11 @@ class ProfileBadgePills extends StatelessWidget {
               ),
             )
           else
-            InkWell(
-              borderRadius: BorderRadius.circular(999),
-              onTap: () => _showBadgeContext(context, badge),
-              child: Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: compact ? 8 : 10,
-                  vertical: compact ? 4 : 5,
-                ),
-                decoration: BoxDecoration(
-                  color: badge.color.withValues(alpha: .13),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: badge.color.withValues(alpha: .45)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _badgeIcon(
-                      badge.icon,
-                      badge.color,
-                      compact ? 12 : 14,
-                      peach: badge.id == 'PEACH_USER',
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      badge.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      softWrap: false,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: badge.color,
-                            fontWeight: FontWeight.w800,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            FlixiePill.action(
+                label: Text(badge.label),
+                avatar: _badgeIcon(badge.icon, badge.color, compact ? 12 : 14,
+                    peach: badge.id == 'PEACH_USER'),
+                onPressed: () => _showBadgeContext(context, badge)),
       ],
     );
   }
@@ -274,7 +243,7 @@ class ProfileBadgePills extends StatelessWidget {
   ) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: FlixieColors.surface,
+      backgroundColor: context.colors.surface,
       showDragHandle: true,
       builder: (context) => SafeArea(
         child: Padding(
@@ -307,7 +276,7 @@ class ProfileBadgePills extends StatelessWidget {
                     Text(
                       badge.label,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: FlixieColors.light,
+                            color: context.colors.light,
                             fontWeight: FontWeight.w800,
                           ),
                     ),
@@ -315,7 +284,7 @@ class ProfileBadgePills extends StatelessWidget {
                     Text(
                       badge.description,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: FlixieColors.medium,
+                            color: context.colors.medium,
                             height: 1.4,
                           ),
                     ),

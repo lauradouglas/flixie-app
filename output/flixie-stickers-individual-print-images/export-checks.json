@@ -1,0 +1,110 @@
+[
+  {
+    "file": "01-good-company-editorial.png",
+    "widthMm": 85,
+    "heightMm": 65,
+    "widthPx": 2008,
+    "heightPx": 1535,
+    "dpi": 600,
+    "textBounds": "pass"
+  },
+  {
+    "file": "02-credits-oval.png",
+    "widthMm": 85,
+    "heightMm": 58,
+    "widthPx": 2008,
+    "heightPx": 1370,
+    "dpi": 600,
+    "textBounds": "pass"
+  },
+  {
+    "file": "03-isolated-F.png",
+    "widthMm": 38,
+    "heightMm": 46,
+    "widthPx": 898,
+    "heightPx": 1087,
+    "dpi": 600,
+    "textBounds": "pass"
+  },
+  {
+    "file": "04-mint-club.png",
+    "widthMm": 60,
+    "heightMm": 60,
+    "widthPx": 1417,
+    "heightPx": 1417,
+    "dpi": 600,
+    "textBounds": "pass"
+  },
+  {
+    "file": "05-peach-company.png",
+    "widthMm": 100,
+    "heightMm": 44,
+    "widthPx": 2362,
+    "heightPx": 1039,
+    "dpi": 600,
+    "textBounds": "pass"
+  },
+  {
+    "file": "06-midnight-credits.png",
+    "widthMm": 80,
+    "heightMm": 56,
+    "widthPx": 1890,
+    "heightPx": 1323,
+    "dpi": 600,
+    "textBounds": "pass"
+  },
+  {
+    "file": "07-bone-club.png",
+    "widthMm": 60,
+    "heightMm": 60,
+    "widthPx": 1417,
+    "heightPx": 1417,
+    "dpi": 600,
+    "textBounds": "pass"
+  },
+  {
+    "file": "08-lilac-company.png",
+    "widthMm": 65,
+    "heightMm": 65,
+    "widthPx": 1535,
+    "heightPx": 1535,
+    "dpi": 600,
+    "textBounds": "pass"
+  },
+  {
+    "file": "09-credits-type-cut-source.png",
+    "widthMm": 80,
+    "heightMm": 49,
+    "widthPx": 1890,
+    "heightPx": 1157,
+    "dpi": 600,
+    "textBounds": "pass"
+  },
+  {
+    "file": "10-purple-company-strip.png",
+    "widthMm": 125,
+    "heightMm": 28,
+    "widthPx": 2953,
+    "heightPx": 661,
+    "dpi": 600,
+    "textBounds": "pass"
+  },
+  {
+    "file": "11-original-wordmark-raster-reference.png",
+    "widthMm": 65,
+    "heightMm": 45,
+    "widthPx": 1535,
+    "heightPx": 1063,
+    "dpi": 600,
+    "textBounds": "pass"
+  },
+  {
+    "file": "12-after-hours-oval.png",
+    "widthMm": 85,
+    "heightMm": 40,
+    "widthPx": 2008,
+    "heightPx": 945,
+    "dpi": 600,
+    "textBounds": "pass"
+  }
+]

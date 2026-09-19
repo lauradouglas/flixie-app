@@ -158,47 +158,50 @@ class NotificationRequestCard extends StatelessWidget {
     }
   }
 
-  Color get _accentColor {
-    if (_isEveryoneLogged) return WatchPlanColorRole.complete.color;
+  Color _accentColor(BuildContext context) {
+    if (_isEveryoneLogged) {
+      return context.colors.adapt(WatchPlanColorRole.complete.color);
+    }
     switch (notification.watchPlanEvent) {
       case 'PLAN_CANCELLED':
-        return WatchPlanColorRole.failed.color;
+        return context.colors.adapt(WatchPlanColorRole.failed.color);
       case 'PLAN_SCHEDULED':
       case 'PLAN_RESCHEDULED':
       case 'SCHEDULE_KEPT':
         return notification.watchPlanEvent == 'SCHEDULE_KEPT'
-            ? WatchPlanColorRole.complete.color
-            : WatchPlanColorRole.waiting.color;
+            ? context.colors.adapt(WatchPlanColorRole.complete.color)
+            : context.colors.adapt(WatchPlanColorRole.waiting.color);
       case 'PLAN_INVITED':
       case 'SCHEDULE_PROPOSED':
       case 'TITLE_PROPOSED':
       case 'TITLE_SELECTED':
-        return WatchPlanColorRole.action.color;
+        return context.colors.adapt(WatchPlanColorRole.action.color);
     }
     switch (notification.type) {
       case FlixieNotification.groupInvite:
       case FlixieNotification.groupRequest:
-        return FlixieColors.tertiary;
+        return context.colors.tertiary;
       case FlixieNotification.movieWatchRequest:
       case FlixieNotification.showWatchRequest:
         return FlixieColors.primary;
       case FlixieNotification.friendRequest:
       default:
-        return FlixieColors.secondary;
+        return context.colors.secondary;
     }
   }
 
-  Color get _accentTextColor => _accentColor == FlixieColors.primary
-      ? FlixieColors.primaryText
-      : _accentColor;
+  Color _accentTextColor(BuildContext context) =>
+      _accentColor(context) == FlixieColors.primary
+          ? context.colors.primaryText
+          : _accentColor(context);
 
   Widget _buildSubtitleWidget(BuildContext context) {
     if (_isEveryoneLogged) {
       final title = notification.watchMediaTitle ?? 'this watch';
       return RichText(
         text: TextSpan(
-          style: const TextStyle(
-            color: FlixieColors.light,
+          style: TextStyle(
+            color: context.colors.light,
             fontSize: 13,
             height: 1.25,
           ),
@@ -214,8 +217,8 @@ class NotificationRequestCard extends StatelessWidget {
     if (notification.watchPlanEvent == 'SCHEDULE_KEPT') {
       return Text(
         notification.message,
-        style: const TextStyle(
-          color: FlixieColors.light,
+        style: TextStyle(
+          color: context.colors.light,
           fontSize: 13,
           height: 1.25,
         ),
@@ -238,8 +241,8 @@ class NotificationRequestCard extends StatelessWidget {
           groupName.isNotEmpty) {
         return RichText(
           text: TextSpan(
-            style: const TextStyle(
-              color: FlixieColors.light,
+            style: TextStyle(
+              color: context.colors.light,
               fontSize: 13,
               height: 1.25,
             ),
@@ -263,8 +266,8 @@ class NotificationRequestCard extends StatelessWidget {
         children: [
           RichText(
             text: TextSpan(
-              style: const TextStyle(
-                color: FlixieColors.light,
+              style: TextStyle(
+                color: context.colors.light,
                 fontSize: 13,
                 height: 1.25,
               ),
@@ -292,10 +295,10 @@ class NotificationRequestCard extends StatelessWidget {
             const SizedBox(height: 7),
             Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.event_available_outlined,
                   size: 14,
-                  color: FlixieColors.secondary,
+                  color: context.colors.secondary,
                 ),
                 const SizedBox(width: 6),
                 Expanded(
@@ -303,8 +306,8 @@ class NotificationRequestCard extends StatelessWidget {
                     scheduleLabel,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: FlixieColors.light,
+                    style: TextStyle(
+                      color: context.colors.light,
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                     ),
@@ -328,8 +331,8 @@ class NotificationRequestCard extends StatelessWidget {
         children: [
           RichText(
             text: TextSpan(
-              style: const TextStyle(
-                color: FlixieColors.light,
+              style: TextStyle(
+                color: context.colors.light,
                 fontSize: 13,
                 height: 1.25,
               ),
@@ -359,8 +362,8 @@ class NotificationRequestCard extends StatelessWidget {
                   pendingScheduleLabel,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: FlixieColors.light,
+                  style: TextStyle(
+                    color: context.colors.light,
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -382,8 +385,8 @@ class NotificationRequestCard extends StatelessWidget {
       final title = notification.watchMediaTitle;
       return RichText(
         text: TextSpan(
-          style: const TextStyle(
-            color: FlixieColors.light,
+          style: TextStyle(
+            color: context.colors.light,
             fontSize: 13,
             height: 1.25,
           ),
@@ -410,8 +413,8 @@ class NotificationRequestCard extends StatelessWidget {
         children: [
           RichText(
             text: TextSpan(
-              style: const TextStyle(
-                color: FlixieColors.light,
+              style: TextStyle(
+                color: context.colors.light,
                 fontSize: 13,
                 height: 1.25,
               ),
@@ -430,10 +433,10 @@ class NotificationRequestCard extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: FlixieColors.secondary.withValues(alpha: .10),
+                color: context.colors.secondary.withValues(alpha: .10),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: FlixieColors.secondary.withValues(alpha: .38),
+                  color: context.colors.secondary.withValues(alpha: .38),
                 ),
               ),
               child: Column(
@@ -441,10 +444,10 @@ class NotificationRequestCard extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.event_available_outlined,
                         size: 16,
-                        color: FlixieColors.secondary,
+                        color: context.colors.secondary,
                       ),
                       const SizedBox(width: 7),
                       Expanded(
@@ -452,8 +455,8 @@ class NotificationRequestCard extends StatelessWidget {
                           _formatScheduleDate(scheduledFor),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: FlixieColors.textPrimary,
+                          style: TextStyle(
+                            color: context.colors.textPrimary,
                             fontSize: 14,
                             fontWeight: FontWeight.w900,
                           ),
@@ -465,10 +468,10 @@ class NotificationRequestCard extends StatelessWidget {
                     const SizedBox(height: 7),
                     Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.location_on_outlined,
                           size: 16,
-                          color: FlixieColors.secondary,
+                          color: context.colors.secondary,
                         ),
                         const SizedBox(width: 7),
                         Expanded(
@@ -476,8 +479,8 @@ class NotificationRequestCard extends StatelessWidget {
                             location,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: FlixieColors.light,
+                            style: TextStyle(
+                              color: context.colors.light,
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
                             ),
@@ -498,10 +501,10 @@ class NotificationRequestCard extends StatelessWidget {
         notification.type == FlixieNotification.showWatchRequest) {
       final title = notification.watchMediaTitle;
       if (notification.hasMultipleWatchPlanOptions) {
-        return const Text(
+        return Text(
           'wants to plan a watch with you',
           style: TextStyle(
-            color: FlixieColors.light,
+            color: context.colors.light,
             fontSize: 13,
             height: 1.25,
           ),
@@ -509,8 +512,8 @@ class NotificationRequestCard extends StatelessWidget {
       }
       return RichText(
         text: TextSpan(
-          style: const TextStyle(
-            color: FlixieColors.light,
+          style: TextStyle(
+            color: context.colors.light,
             fontSize: 13,
             height: 1.25,
           ),
@@ -530,8 +533,8 @@ class NotificationRequestCard extends StatelessWidget {
       final groupName = notification.groupWatchGroupName;
       return RichText(
         text: TextSpan(
-          style: const TextStyle(
-            color: FlixieColors.light,
+          style: TextStyle(
+            color: context.colors.light,
             fontSize: 13,
             height: 1.25,
           ),
@@ -559,8 +562,8 @@ class NotificationRequestCard extends StatelessWidget {
         groupName == null || groupName.isEmpty
             ? notification.groupInviteMessage
             : 'invited you to join $groupName',
-        style: const TextStyle(
-          color: FlixieColors.light,
+        style: TextStyle(
+          color: context.colors.light,
           fontSize: 13,
           height: 1.25,
         ),
@@ -568,10 +571,10 @@ class NotificationRequestCard extends StatelessWidget {
     }
 
     if (notification.type == FlixieNotification.friendRequest) {
-      return const Text(
+      return Text(
         'sent you a friend request',
         style: TextStyle(
-          color: FlixieColors.light,
+          color: context.colors.light,
           fontSize: 13,
           height: 1.25,
         ),
@@ -582,8 +585,8 @@ class NotificationRequestCard extends StatelessWidget {
       notification.message.isNotEmpty
           ? notification.message
           : 'sent you a friend request',
-      style: const TextStyle(
-        color: FlixieColors.light,
+      style: TextStyle(
+        color: context.colors.light,
         fontSize: 13,
         height: 1.25,
       ),
@@ -605,7 +608,8 @@ class NotificationRequestCard extends StatelessWidget {
         child: Text(
           title,
           style: TextStyle(
-            color: movieId != null ? FlixieColors.primary : FlixieColors.light,
+            color:
+                movieId != null ? FlixieColors.primary : context.colors.light,
             fontSize: 13,
             fontWeight: FontWeight.w800,
           ),
@@ -706,7 +710,7 @@ class NotificationRequestCard extends StatelessWidget {
                 .toUpperCase()
             : notification.senderInitials ?? '';
     final avatarBg = avatarColorFromIconColor(notification.senderIconColor);
-    final accent = _accentColor;
+    final accent = _accentColor(context);
     final msg = notification.watchRequestMessage;
     final hasMessage = msg.isNotEmpty && notification.action == null;
     final isUnread = !notification.isRead;
@@ -742,8 +746,8 @@ class NotificationRequestCard extends StatelessWidget {
       clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
         color: isUnread
-            ? FlixieColors.tabBarBackgroundFocused
-            : FlixieColors.tabBarBackgroundFocused.withValues(alpha: 0.72),
+            ? context.colors.tabBarBackgroundFocused
+            : context.colors.tabBarBackgroundFocused.withValues(alpha: 0.72),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isUnread
@@ -822,8 +826,8 @@ class NotificationRequestCard extends StatelessWidget {
                                           headline,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            color: FlixieColors.white,
+                                          style: TextStyle(
+                                            color: context.colors.white,
                                             fontWeight: FontWeight.bold,
                                             fontSize: 14,
                                           ),
@@ -833,8 +837,8 @@ class NotificationRequestCard extends StatelessWidget {
                                     if (date.isNotEmpty)
                                       Text(
                                         date,
-                                        style: const TextStyle(
-                                          color: FlixieColors.medium,
+                                        style: TextStyle(
+                                          color: context.colors.medium,
                                           fontSize: 11,
                                           fontWeight: FontWeight.w600,
                                         ),
@@ -848,7 +852,7 @@ class NotificationRequestCard extends StatelessWidget {
                                       child: Text(
                                         _requestKind,
                                         style: TextStyle(
-                                          color: _accentTextColor,
+                                          color: _accentTextColor(context),
                                           fontSize: 11,
                                           fontWeight: FontWeight.w800,
                                         ),
@@ -857,10 +861,10 @@ class NotificationRequestCard extends StatelessWidget {
                                     if (isUnread)
                                       Semantics(
                                         label: 'New notification',
-                                        child: const Text(
+                                        child: Text(
                                           'NEW',
                                           style: TextStyle(
-                                            color: FlixieColors.tertiary,
+                                            color: context.colors.tertiary,
                                             fontSize: 10,
                                             fontWeight: FontWeight.w800,
                                             letterSpacing: 0.6,
@@ -888,10 +892,11 @@ class NotificationRequestCard extends StatelessWidget {
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: FlixieColors.surface.withValues(alpha: 0.65),
+                            color:
+                                context.colors.surface.withValues(alpha: 0.65),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: FlixieColors.tabBarBorder,
+                              color: context.colors.tabBarBorder,
                             ),
                           ),
                           child: Column(
@@ -942,8 +947,8 @@ class NotificationRequestCard extends StatelessWidget {
                                   msg,
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: FlixieColors.light,
+                                  style: TextStyle(
+                                    color: context.colors.light,
                                     fontSize: 12,
                                     fontStyle: FontStyle.italic,
                                   ),
@@ -958,10 +963,10 @@ class NotificationRequestCard extends StatelessWidget {
                 ),
                 PopupMenuButton<String>(
                   tooltip: 'Notification actions',
-                  color: FlixieColors.tabBarBackgroundFocused,
-                  icon: const Icon(
+                  color: context.colors.tabBarBackgroundFocused,
+                  icon: Icon(
                     Icons.more_horiz_rounded,
-                    color: FlixieColors.medium,
+                    color: context.colors.medium,
                   ),
                   onSelected: (value) {
                     if (value == 'dismiss') onClose();
@@ -1007,7 +1012,7 @@ class NotificationRequestCard extends StatelessWidget {
                   },
                   style: FilledButton.styleFrom(
                     backgroundColor: FlixieColors.primary,
-                    foregroundColor: Colors.black,
+                    foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     minimumSize: const Size(0, 44),
                     shape: RoundedRectangleBorder(
@@ -1035,7 +1040,7 @@ class NotificationRequestCard extends StatelessWidget {
                       onPressed: onAcceptSchedule,
                       style: FilledButton.styleFrom(
                         backgroundColor: FlixieColors.primary,
-                        foregroundColor: Colors.black,
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         minimumSize: const Size(0, 44),
                         shape: RoundedRectangleBorder(
@@ -1054,9 +1059,9 @@ class NotificationRequestCard extends StatelessWidget {
                     child: OutlinedButton.icon(
                       onPressed: onDeclineSchedule,
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: FlixieColors.light,
+                        foregroundColor: context.colors.light,
                         side: BorderSide(
-                          color: FlixieColors.medium.withValues(alpha: 0.5),
+                          color: context.colors.medium.withValues(alpha: 0.5),
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         minimumSize: const Size(0, 44),
@@ -1081,7 +1086,7 @@ class NotificationRequestCard extends StatelessWidget {
                   icon: const Icon(Icons.edit_calendar_outlined, size: 16),
                   label: const Text('Suggest another time'),
                   style: TextButton.styleFrom(
-                    foregroundColor: FlixieColors.medium,
+                    foregroundColor: context.colors.medium,
                     minimumSize: const Size(0, 44),
                   ),
                 ),
@@ -1095,8 +1100,10 @@ class NotificationRequestCard extends StatelessWidget {
                   style: FilledButton.styleFrom(
                     backgroundColor: _isAgreedSchedule
                         ? FlixieColors.primary
-                        : FlixieColors.secondary,
-                    foregroundColor: Colors.black,
+                        : context.colors.secondary,
+                    foregroundColor: _isAgreedSchedule
+                        ? Colors.white
+                        : context.colors.background,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 14,
                       vertical: 8,
@@ -1123,7 +1130,7 @@ class NotificationRequestCard extends StatelessWidget {
                   ),
                   style: FilledButton.styleFrom(
                     backgroundColor: FlixieColors.primary,
-                    foregroundColor: Colors.black,
+                    foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 14,
                       vertical: 8,
@@ -1148,7 +1155,7 @@ class NotificationRequestCard extends StatelessWidget {
                     child: FilledButton.icon(
                       onPressed: onAccept,
                       style: FilledButton.styleFrom(
-                        backgroundColor: FlixieColors.success,
+                        backgroundColor: context.colors.success,
                         foregroundColor: Colors.black,
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         minimumSize: const Size(0, 44),
@@ -1168,8 +1175,8 @@ class NotificationRequestCard extends StatelessWidget {
                     child: OutlinedButton.icon(
                       onPressed: onDecline,
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: FlixieColors.danger,
-                        side: const BorderSide(color: FlixieColors.danger),
+                        foregroundColor: context.colors.danger,
+                        side: BorderSide(color: context.colors.danger),
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         minimumSize: const Size(0, 44),
                         shape: RoundedRectangleBorder(
@@ -1204,13 +1211,13 @@ class _PendingWatchDetail extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 15, color: FlixieColors.secondary),
+        Icon(icon, size: 15, color: context.colors.secondary),
         const SizedBox(width: 7),
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(
-              color: FlixieColors.light,
+            style: TextStyle(
+              color: context.colors.light,
               fontSize: 12,
               fontWeight: FontWeight.w600,
               height: 1.3,
@@ -1343,8 +1350,8 @@ class _ScheduleNote extends StatelessWidget {
               text,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: FlixieColors.light,
+              style: TextStyle(
+                color: context.colors.light,
                 fontSize: 12,
                 fontStyle: FontStyle.italic,
                 height: 1.25,

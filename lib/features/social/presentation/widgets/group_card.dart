@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -42,7 +43,7 @@ class GroupCard extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.only(bottom: 8),
         child: Material(
-          color: FlixieColors.tabBarBackgroundFocused,
+          color: context.colors.tabBarBackgroundFocused,
           borderRadius: BorderRadius.circular(14),
           child: InkWell(
             borderRadius: BorderRadius.circular(14),
@@ -57,8 +58,8 @@ class GroupCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                       Text(group.name,
-                          style: const TextStyle(
-                              color: FlixieColors.textPrimary,
+                          style: TextStyle(
+                              color: context.colors.textPrimary,
                               fontWeight: FontWeight.w700,
                               fontSize: 16)),
                       const SizedBox(height: 3),
@@ -68,12 +69,12 @@ class GroupCard extends StatelessWidget {
                               '$count member${count == 1 ? '' : 's'}',
                             if (description.isNotEmpty) description,
                           ].join(' · '),
-                          style: const TextStyle(
-                              color: FlixieColors.light, fontSize: 13)),
+                          style: TextStyle(
+                              color: context.colors.light, fontSize: 13)),
                     ])),
                 const SizedBox(width: 8),
-                const Icon(Icons.chevron_right_rounded,
-                    color: FlixieColors.primaryText),
+                Icon(Icons.chevron_right_rounded,
+                    color: context.colors.primaryText),
               ]),
             ),
           ),
@@ -88,9 +89,9 @@ class GroupCard extends StatelessWidget {
         // top content; it was sitting too close to the card edge on phones.
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 18),
         decoration: BoxDecoration(
-          color: FlixieColors.tabBarBackgroundFocused,
+          color: context.colors.tabBarBackgroundFocused,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: FlixieColors.tabBarBorder),
+          border: Border.all(color: context.colors.tabBarBorder),
         ),
         child: Column(
           children: [
@@ -110,15 +111,15 @@ class GroupCard extends StatelessWidget {
                               group.name,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: FlixieColors.textPrimary,
+                              style: TextStyle(
+                                color: context.colors.textPrimary,
                                 fontWeight: FontWeight.w800,
                                 fontSize: 16,
                               ),
                             ),
                           ),
-                          const Icon(Icons.more_horiz_rounded,
-                              color: FlixieColors.medium, size: 20),
+                          Icon(Icons.more_horiz_rounded,
+                              color: context.colors.medium, size: 20),
                         ],
                       ),
                       if (count != null)
@@ -143,16 +144,16 @@ class GroupCard extends StatelessWidget {
                     child: _GroupInfoChip(
                       label: statusLabel!,
                       color: statusLabel == 'Invite pending'
-                          ? FlixieColors.warning
+                          ? context.colors.warning
                           : statusLabel == 'Community'
-                              ? FlixieColors.medium
-                              : FlixieColors.success,
+                              ? context.colors.medium
+                              : context.colors.success,
                     ),
                   ),
               ],
             ),
             const SizedBox(height: 10),
-            const Divider(height: 1, color: FlixieColors.tabBarBorder),
+            Divider(height: 1, color: context.colors.tabBarBorder),
             const SizedBox(height: 10),
             Row(
               children: [
@@ -163,8 +164,8 @@ class GroupCard extends StatelessWidget {
                         : statusLabel ?? 'Open group',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: FlixieColors.medium,
+                    style: TextStyle(
+                      color: context.colors.medium,
                       fontSize: 12,
                     ),
                   ),
@@ -234,7 +235,7 @@ class _MemberAvatars extends StatelessWidget {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: FlixieColors.tabBarBackgroundFocused,
+                  color: context.colors.tabBarBackgroundFocused,
                   border: Border.all(color: FlixieColors.primary, width: 2),
                 ),
                 child: Padding(
@@ -242,8 +243,8 @@ class _MemberAvatars extends StatelessWidget {
                     child: FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text('+$remaining',
-                            style: const TextStyle(
-                                color: FlixieColors.primaryText,
+                            style: TextStyle(
+                                color: context.colors.primaryText,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w800)))),
               ),
@@ -270,21 +271,6 @@ class _GroupInfoChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.28)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
+    return FlixiePill.label(label: Text(label));
   }
 }

@@ -31,8 +31,8 @@ class GenreBar extends StatelessWidget {
             width: 20,
             child: Text(
               '$rank',
-              style: const TextStyle(
-                  color: FlixieColors.medium,
+              style: TextStyle(
+                  color: context.colors.medium,
                   fontSize: 12,
                   fontWeight: FontWeight.bold),
             ),
@@ -46,11 +46,11 @@ class GenreBar extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(name,
-                        style:
-                            const TextStyle(color: Colors.white, fontSize: 13)),
+                        style: TextStyle(
+                            color: context.colors.white, fontSize: 13)),
                     Text('$count',
-                        style: const TextStyle(
-                            color: FlixieColors.medium, fontSize: 12)),
+                        style: TextStyle(
+                            color: context.colors.medium, fontSize: 12)),
                   ],
                 ),
                 const SizedBox(height: 4),
@@ -59,7 +59,7 @@ class GenreBar extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: fraction,
                     minHeight: 6,
-                    backgroundColor: FlixieColors.tabBarBackgroundFocused,
+                    backgroundColor: context.colors.tabBarBackgroundFocused,
                     valueColor: AlwaysStoppedAnimation(accent),
                   ),
                 ),

@@ -1,4 +1,6 @@
+import 'package:flixie_app/core/safety/safety_service.dart';
 import 'dart:async';
+import 'package:firebase_core/firebase_core.dart';
 import 'dart:convert';
 import 'package:flixie_app/core/auth/startup_trace.dart';
 
@@ -56,12 +58,18 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     AuthPrefetchCoordinator? prefetchCoordinator,
     BackendProfileCreator? profileCreator,
     BackendProfileLoader? profileLoader,
+    Future<bool> Function()? termsStatusLoader,
     bool prefetchAfterAuth = true,
     AvatarSelector? avatarSelector,
   })  : _prefetchCoordinator = prefetchCoordinator ??
             AuthPrefetchCoordinator(movieService: movieService),
         _profileCreator = profileCreator ?? UserService.createUser {
     _profileLoader = profileLoader ?? UserService.getUserByExternalId;
+    _termsStatusLoader = termsStatusLoader ??
+        () async {
+          final response = await ApiClient.get('/users/me/terms');
+          return response is Map && response['accepted'] == true;
+        };
     _prefetchAfterAuth = prefetchAfterAuth;
     _avatarSelector = avatarSelector ?? AvatarService.selectAvatar;
     WidgetsBinding.instance.addObserver(this);
@@ -337,6 +345,8 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     }
     if (sameUser && !retry && _status == AuthStatus.authenticated) return;
     if (!sameUser || user == null) {
+      SafetyService.reset();
+      _termsVerified = false;
       _sessionGeneration++;
       _prefetchGeneration++;
       _resumeRefreshFuture = null;
@@ -375,6 +385,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (!_disposed) _authStatusNotifier.notify();
     });
+    SchedulerBinding.instance.ensureVisualUpdate();
     final generation = _sessionGeneration;
     final future = _handleAuthStateChanged(user, generation);
     _authStateChangeFuture = future;
@@ -460,6 +471,15 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
         if (!current()) return;
         if (profile == null) throw StateError('Profile unavailable');
         _dbUser = profile;
+        // Resolve account consent before the router sees an authenticated
+        // session. An unknown value must not briefly open the agreement page.
+        try {
+          await verifyTerms().timeout(_initialProfileTimeout);
+        } catch (_) {
+          // Keep deletion and the existing retry UI available on lookup failure.
+          // A failed check must never grant access.
+        }
+        if (!current()) return;
         _status = AuthStatus.authenticated;
         _recoveryError = null;
         _recoveryAttempts = 0;
@@ -542,7 +562,11 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
         SchedulerBinding.instance.addPostFrameCallback((_) {
           if (!_disposed) notifyListeners();
         });
+        SchedulerBinding.instance.ensureVisualUpdate();
       });
+      // Post-frame callbacks alone do not request a frame. An idle screen
+      // must redirect on logout without waiting for a gesture or refresh.
+      SchedulerBinding.instance.ensureVisualUpdate();
     } else {
       notifyListeners();
     }
@@ -929,17 +953,24 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
   bool _looksLikeEmail(String value) =>
       value.contains('@') && value.substring(value.indexOf('@')).contains('.');
 
-  Future<String> _resolveSignInEmail(String identifier) async {
+  Future<String> _resolveSignInEmail(String identifier, String password) async {
     if (_looksLikeEmail(identifier)) {
       return identifier;
     }
 
     try {
-      return (await UserService.getUserByUsername(identifier)).email;
+      final result = await ApiClient.post('/auth/username-session',
+          body: {
+            'username': identifier,
+            'password': password,
+            'apiKey': Firebase.app().options.apiKey,
+          },
+          logRequestBody: false);
+      return result['email'] as String;
     } on ApiException catch (error) {
       logger.w('Failed to resolve username during sign-in: $error');
-      _errorMessage = error.statusCode == 404
-          ? 'Username not found.'
+      _errorMessage = error.statusCode == 401
+          ? 'Incorrect username or password.'
           : 'Unable to verify username right now. Please try again.';
       rethrow;
     } catch (error) {
@@ -950,6 +981,24 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   /// Signs in with email or username and password. Returns `true` on success.
+  late final Future<bool> Function() _termsStatusLoader;
+  bool _termsVerified = false;
+  bool get termsVerified => _termsVerified;
+
+  Future<bool> verifyTerms({bool accept = false}) async {
+    final generation = _sessionGeneration;
+    final response = accept
+        ? await ApiClient.post('/users/me/terms', body: {
+            'termsAccepted': true,
+            'version': '2026-09-16',
+          })
+        : {'accepted': await _termsStatusLoader()};
+    if (generation != _sessionGeneration || _disposed) return false;
+    _termsVerified = response is Map && response['accepted'] == true;
+    if (_termsVerified) _authStatusNotifier.notify();
+    return _termsVerified;
+  }
+
   Future<bool> signIn(String emailOrUsername, String password) async {
     _setLoading(true);
     _setError(null);
@@ -961,7 +1010,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
         return false;
       }
 
-      final email = await _resolveSignInEmail(identifier);
+      final email = await _resolveSignInEmail(identifier, password);
       await StartupTrace.run(
           'sign-in',
           () => _authService
@@ -1002,6 +1051,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
   /// Creates Firebase identity once, then creates (or retries) the backend
   /// profile using the authenticated Firebase token.
   Future<bool> signUp({
+    required bool termsAccepted,
     required String email,
     required String password,
     required String firstName,
@@ -1013,6 +1063,10 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     String? referralCode,
   }) async {
     if (_isLoading) return false;
+    if (!termsAccepted) {
+      _setError('Please agree to the Terms of Use to continue.');
+      return false;
+    }
     _setLoading(true);
     _setError(null);
     _isSigningUp = true;
@@ -1025,6 +1079,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
         'username': username.trim(),
         'email': normalizedEmail,
         'bio': '',
+        'termsAccepted': termsAccepted,
         'countryId': countryId,
         'languageId': languageId,
         if (referralCode?.trim().isNotEmpty == true)
@@ -1048,6 +1103,9 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
       _dbUser = await _createBackendProfileWithAuthRetry(
         _pendingSignupProfile ?? createUserBody,
       );
+      // Successful profile creation confirms the backend saved signup consent.
+      // Set this before publishing the authenticated state to the router.
+      _termsVerified = termsAccepted;
       _pendingSignupEmail = null;
       _pendingSignupProfile = null;
 
@@ -1101,6 +1159,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<bool> beginAvatarSignUp({
+    required bool termsAccepted,
     required String email,
     required String password,
     required String firstName,
@@ -1111,6 +1170,10 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     String? referralCode,
   }) async {
     if (_isLoading) return false;
+    if (!termsAccepted) {
+      _setError('Please agree to the Terms of Use to continue.');
+      return false;
+    }
     _setLoading(true);
     _setError(null);
     _isSigningUp = true;
@@ -1122,6 +1185,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
         'username': username.trim(),
         'email': normalizedEmail,
         'bio': '',
+        'termsAccepted': termsAccepted,
         'countryId': countryId,
         'languageId': languageId,
         if (referralCode?.trim().isNotEmpty == true)
@@ -1182,6 +1246,9 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
       );
       final avatar = await _avatarSelector(_pendingAvatarId!);
       _dbUser = _dbUser!.copyWith(avatar: avatar);
+      // The backend already persisted this agreement when creating the profile.
+      // Publish consent and authentication together to avoid the terms route.
+      _termsVerified = _pendingSignupProfile!['termsAccepted'] == true;
       _pendingSignupEmail = null;
       _pendingSignupProfile = null;
       _pendingAvatarId = null;

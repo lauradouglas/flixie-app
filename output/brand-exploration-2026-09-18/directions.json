@@ -1,0 +1,23 @@
+[
+  {
+    "slug": "common-frame",
+    "name": "Common Frame",
+    "idea": "Different tastes. One shared frame.",
+    "accent": "#7C4DFF",
+    "copy": "MEET IN THE MIDDLE"
+  },
+  {
+    "slug": "after-hours",
+    "name": "After Hours",
+    "idea": "A club for people who stay through the credits.",
+    "accent": "#B9A0FF",
+    "copy": "STAY FOR THE CREDITS"
+  },
+  {
+    "slug": "plot-twist",
+    "name": "Plot Twist",
+    "idea": "The crossing point of your next obsession.",
+    "accent": "#00D1C7",
+    "copy": "GOOD TASTE. GREAT COMPANY."
+  }
+]

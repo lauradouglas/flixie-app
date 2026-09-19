@@ -222,7 +222,14 @@ class AnalyticsController extends ChangeNotifier {
     final safe = parameters == null
         ? null
         : Map<String, Object>.fromEntries(parameters.entries.where(
-            (entry) => allowedKeys.contains(entry.key),
+            (entry) =>
+                allowedKeys.contains(entry.key) &&
+                !const {
+                  'watch_plan_id',
+                  'content_id',
+                  'parent_content_id',
+                  'person_id'
+                }.contains(entry.key),
           ));
     if (kDebugMode && verboseFlutterLogs) {
       debugPrint('[Analytics] $name ${safe ?? const {}}');

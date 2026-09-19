@@ -21,34 +21,34 @@ class WatchPlansIntroductionCard extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(colors: [
             FlixieColors.primary.withValues(alpha: .28),
-            FlixieColors.success.withValues(alpha: .16),
+            context.colors.success.withValues(alpha: .16),
           ]),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(color: FlixieColors.primary.withValues(alpha: .5)),
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            const Icon(Icons.movie_filter_rounded,
-                color: FlixieColors.success, size: 22),
+            Icon(Icons.movie_filter_rounded,
+                color: context.colors.success, size: 22),
             const SizedBox(width: 10),
-            const Expanded(
+            Expanded(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Make a Watch Plan',
+                  const Text('Make a Watch Plan',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                           color: Colors.white,
                           fontSize: 16,
                           fontWeight: FontWeight.w900)),
-                  SizedBox(height: 2),
+                  const SizedBox(height: 2),
                   Text('Pick a movie with friends.',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style:
-                          TextStyle(color: FlixieColors.medium, fontSize: 12)),
+                      style: TextStyle(
+                          color: context.colors.medium, fontSize: 12)),
                 ],
               ),
             ),
@@ -59,8 +59,8 @@ class WatchPlansIntroductionCard extends StatelessWidget {
                 onPressed: onDismiss,
                 tooltip: 'Dismiss',
                 padding: EdgeInsets.zero,
-                icon: const Icon(Icons.close_rounded,
-                    color: FlixieColors.medium, size: 18),
+                icon: Icon(Icons.close_rounded,
+                    color: context.colors.medium, size: 18),
               ),
             ),
           ]),

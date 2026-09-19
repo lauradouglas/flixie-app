@@ -23,12 +23,12 @@ class StatsCard extends StatelessWidget {
         height: 104,
         padding: const EdgeInsets.all(13),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
+          gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              FlixieColors.surfaceElevated,
-              FlixieColors.tabBarBackgroundFocused,
+              context.colors.surfaceElevated,
+              context.colors.tabBarBackgroundFocused,
             ],
           ),
           borderRadius: BorderRadius.circular(18),
@@ -60,8 +60,8 @@ class StatsCard extends StatelessWidget {
                     value,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: context.colors.white,
                       fontSize: 21,
                       fontWeight: FontWeight.w800,
                       letterSpacing: -.4,
@@ -72,8 +72,8 @@ class StatsCard extends StatelessWidget {
                     label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: FlixieColors.medium,
+                    style: TextStyle(
+                      color: context.colors.medium,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
@@ -83,8 +83,8 @@ class StatsCard extends StatelessWidget {
                       subtitle!,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: FlixieColors.light,
+                      style: TextStyle(
+                        color: context.colors.light,
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                       ),

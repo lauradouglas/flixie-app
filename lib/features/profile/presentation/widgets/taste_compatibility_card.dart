@@ -16,11 +16,11 @@ class TasteCompatibilityCard extends StatelessWidget {
   final int sharedFavs;
   final String friendName;
 
-  Color get _color {
-    if (score == null) return FlixieColors.medium;
-    if (score! >= 75) return FlixieColors.success;
-    if (score! >= 50) return FlixieColors.warning;
-    return FlixieColors.danger;
+  Color _color(BuildContext context) {
+    if (score == null) return context.colors.medium;
+    if (score! >= 75) return context.colors.success;
+    if (score! >= 50) return context.colors.warning;
+    return context.colors.danger;
   }
 
   IconData get _icon {
@@ -57,7 +57,7 @@ class TasteCompatibilityCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final color = _color;
+    final color = _color(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -91,7 +91,7 @@ class TasteCompatibilityCard extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: FlixieColors.tabBarBackgroundFocused,
+            color: context.colors.tabBarBackgroundFocused,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: color.withValues(alpha: 0.35),
@@ -151,8 +151,8 @@ class TasteCompatibilityCard extends StatelessWidget {
                     const SizedBox(height: 6),
                     Text(
                       _buildSubtitle(),
-                      style: const TextStyle(
-                        color: FlixieColors.medium,
+                      style: TextStyle(
+                        color: context.colors.medium,
                         fontSize: 12,
                       ),
                     ),

@@ -1,0 +1,61 @@
+{
+  "status": "proposal-not-applied",
+  "brand": {
+    "primary": "#7C4DFF",
+    "secondary": "#65D6C4",
+    "tertiary": "#F1A77A",
+    "primaryPressed": "#6534E8",
+    "primaryText": "#B9A0FF"
+  },
+  "surfaces": {
+    "background": "#120A24",
+    "surface": "#1A1033",
+    "surfaceElevated": "#27194A",
+    "bone": "#F3F0E9"
+  },
+  "foregrounds": {
+    "onPrimary": "#FFFFFF",
+    "onSecondary": "#120A24",
+    "onTertiary": "#120A24",
+    "primary": "#F5F7FA",
+    "secondary": "#B7C2D0",
+    "muted": "#A0ACC0",
+    "onLight": "#120A24",
+    "secondaryOnLight": "#51495F"
+  },
+  "typography": {
+    "primaryFamily": "Manrope",
+    "editorialFamily": "Newsreader",
+    "wordmark": "existing artwork, never typeset replacement",
+    "body": {
+      "family": "Manrope",
+      "weight": 400,
+      "size": 16,
+      "lineHeight": 24
+    },
+    "action": {
+      "family": "Manrope",
+      "weight": 700,
+      "size": 16,
+      "lineHeight": 22
+    },
+    "hero": {
+      "family": "Manrope",
+      "weight": 800,
+      "size": 30,
+      "lineHeight": 36
+    },
+    "editorial": {
+      "family": "Newsreader",
+      "weight": 500,
+      "sizeDesktop": [
+        48,
+        64
+      ],
+      "sizeMobile": [
+        32,
+        40
+      ]
+    }
+  }
+}

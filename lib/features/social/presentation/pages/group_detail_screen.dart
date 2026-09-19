@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
@@ -217,17 +218,17 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
           Scaffold(
             backgroundColor: Colors.transparent,
             appBar: AppBar(
-              backgroundColor: FlixieColors.background,
+              backgroundColor: context.colors.background,
               elevation: 0,
               leading: IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                    color: FlixieColors.light, size: 20),
+                icon: Icon(Icons.arrow_back_ios_new_rounded,
+                    color: context.colors.light, size: 20),
                 onPressed: _deletingGroup ? null : () => context.pop(),
               ),
               titleSpacing: 0,
               title: _loadingGroup
-                  ? const Text('Loading...',
-                      style: TextStyle(color: FlixieColors.medium))
+                  ? Text('Loading...',
+                      style: TextStyle(color: context.colors.medium))
                   : Row(
                       children: [
                         CircleAvatar(
@@ -261,16 +262,16 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                                 _group?.name ?? 'Group',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: FlixieColors.light,
+                                style: TextStyle(
+                                  color: context.colors.light,
                                   fontWeight: FontWeight.w800,
                                   fontSize: 18,
                                 ),
                               ),
                               Text(
                                 '$_memberCount member${_memberCount == 1 ? '' : 's'}',
-                                style: const TextStyle(
-                                  color: FlixieColors.medium,
+                                style: TextStyle(
+                                  color: context.colors.medium,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -282,7 +283,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                     ),
               actions: [
                 IconButton(
-                  icon: const Icon(Icons.more_vert, color: FlixieColors.light),
+                  icon: Icon(Icons.more_vert, color: context.colors.light),
                   onPressed:
                       _deletingGroup ? null : () => _showGroupOptions(context),
                 ),
@@ -308,7 +309,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                       indicatorSize: TabBarIndicatorSize.tab,
                       dividerColor: Colors.white.withValues(alpha: 0.08),
                       labelColor: FlixieColors.primary,
-                      unselectedLabelColor: FlixieColors.medium,
+                      unselectedLabelColor: context.colors.medium,
                       labelStyle: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
@@ -329,22 +330,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                                 const Text('Watch Plans'),
                                 if (_pendingRequestCount > 0) ...[
                                   const SizedBox(width: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: FlixieColors.warning,
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Text(
-                                      '$_pendingRequestCount',
-                                      style: const TextStyle(
-                                        color: Colors.black,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
+                                  FlixiePill.label(
+                                      label: Text('$_pendingRequestCount')),
                                 ],
                               ],
                             ),
@@ -406,28 +393,30 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                 color: Color(0x99000000),
               ),
             ),
-            const Positioned.fill(
+            Positioned.fill(
               child: Center(
                 child: Card(
                   child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 20),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        CircularProgressIndicator(color: FlixieColors.primary),
-                        SizedBox(height: 14),
+                        const CircularProgressIndicator(
+                            color: FlixieColors.primary),
+                        const SizedBox(height: 14),
                         Text(
                           'Deleting group…',
                           style: TextStyle(
-                            color: FlixieColors.light,
+                            color: context.colors.light,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Text(
                           'Removing lists, requests and messages',
                           style: TextStyle(
-                            color: FlixieColors.medium,
+                            color: context.colors.medium,
                             fontSize: 12,
                           ),
                         ),
@@ -460,31 +449,29 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: FlixieColors.medium.withValues(alpha: 0.4),
+                color: context.colors.medium.withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             const SizedBox(height: 8),
             ListTile(
-              leading:
-                  const Icon(Icons.people_outline, color: FlixieColors.light),
-              title: const Text('Members',
-                  style: TextStyle(color: FlixieColors.light)),
+              leading: Icon(Icons.people_outline, color: context.colors.light),
+              title: Text('Members',
+                  style: TextStyle(color: context.colors.light)),
               onTap: () => Navigator.pop(modalContext, 'members'),
             ),
             ListTile(
-              leading:
-                  const Icon(Icons.info_outline, color: FlixieColors.light),
-              title: const Text('Group Info',
-                  style: TextStyle(color: FlixieColors.light)),
+              leading: Icon(Icons.info_outline, color: context.colors.light),
+              title: Text('Group Info',
+                  style: TextStyle(color: context.colors.light)),
               onTap: () => Navigator.pop(modalContext),
             ),
             if (isOwner)
               ListTile(
-                leading: const Icon(Icons.delete_outline,
-                    color: FlixieColors.danger),
-                title: const Text('Delete Group',
-                    style: TextStyle(color: FlixieColors.danger)),
+                leading:
+                    Icon(Icons.delete_outline, color: context.colors.danger),
+                title: Text('Delete Group',
+                    style: TextStyle(color: context.colors.danger)),
                 onTap: () => Navigator.pop(modalContext, 'delete'),
               ),
           ],
@@ -505,12 +492,12 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
     final confirm = await showFlixiePromptSheet<bool>(
       context: context,
       builder: (dialogContext) => FlixiePromptSheetContent(
-        title: const Text('Delete Group',
-            style: TextStyle(color: FlixieColors.light)),
-        content: const Text(
+        title:
+            Text('Delete Group', style: TextStyle(color: context.colors.light)),
+        content: Text(
           'Permanently delete this group, its lists, requests, '
           'chat messages and shared chat images? This cannot be undone.',
-          style: TextStyle(color: FlixieColors.medium),
+          style: TextStyle(color: context.colors.medium),
         ),
         actions: [
           TextButton(
@@ -520,7 +507,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
           ElevatedButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             style: ElevatedButton.styleFrom(
-                backgroundColor: FlixieColors.danger,
+                backgroundColor: context.colors.danger,
                 foregroundColor: Colors.white),
             child: const Text('Delete'),
           ),

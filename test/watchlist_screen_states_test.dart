@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -135,6 +136,71 @@ void main() {
       ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
     await icons.load();
   });
+  testWidgets('genre filtering needs no request input or matching API',
+      (tester) async {
+    final auth = ScreenAuth();
+    addTearDown(auth.dispose);
+    await http.runWithClient(() async {
+      await tester.pumpWidget(ChangeNotifierProvider<AuthProvider>.value(
+          value: auth,
+          child: MaterialApp(
+              theme: AppTheme.darkTheme, home: const WatchlistScreen())));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Genre'));
+      await tester.tap(find.text('Genre'));
+      await tester.pumpAndSettle();
+      expect(find.text('What do you fancy?'), findsNothing);
+      await tester.tap(find.text('Rom com'));
+      await tester.pumpAndSettle();
+      expect(find.text('A title with an included offer'), findsNothing);
+      await tester.tap(find.text('Rom com'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('All genres'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+          find.text('A title with an included offer'), 150,
+          scrollable: find.byType(Scrollable).first);
+      expect(find.text('A title with an included offer'), findsOneWidget);
+    },
+        () => MockClient((request) async {
+              expect(request.url.path.endsWith('/watchlist-fit'), false);
+              return handle(request);
+            }));
+  });
+  testWidgets(
+      'tonight time limit filters the actual list and clearing restores it',
+      (tester) async {
+    final auth = ScreenAuth();
+    addTearDown(auth.dispose);
+    await http.runWithClient(() async {
+      await tester.pumpWidget(ChangeNotifierProvider<AuthProvider>.value(
+          value: auth,
+          child: MaterialApp(
+              theme: AppTheme.darkTheme, home: const WatchlistScreen())));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.text('Time'), 180,
+          scrollable: find.byType(Scrollable).first);
+      await tester.tap(find.ancestor(
+          of: find.text('Time'), matching: find.byType(FlixiePill)));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.text('90 min'), 180,
+          scrollable: find.byType(Scrollable).first);
+      await tester.tap(find.text('90 min'));
+      await tester.pumpAndSettle();
+      expect(find.text('Date added · 0'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('No watchlist matches'), 180,
+          scrollable: find.byType(Scrollable).first);
+      expect(find.text('No watchlist matches'), findsOneWidget);
+      await tester.tap(find.text('Clear filters').last);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+          find.text('A title with an included offer'), 180,
+          scrollable: find.byType(Scrollable).first);
+      expect(find.text('A title with an included offer'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }, () => MockClient((request) async => handle(request)));
+  });
+
   testWidgets('ID-only saved show loads its title, poster and season details',
       (tester) async {
     final auth = MissingShowAuth();
@@ -176,8 +242,7 @@ void main() {
             }));
   });
 
-  testWidgets(
-      'removing a saved service immediately updates the included shortcut',
+  testWidgets('search services stay local when saved subscriptions change',
       (tester) async {
     final auth = ScreenAuth();
     addTearDown(auth.dispose);
@@ -187,14 +252,16 @@ void main() {
           child: MaterialApp(
               theme: AppTheme.darkTheme, home: const WatchlistScreen())));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('On my services'));
+      await tester.tap(find.ancestor(
+          of: find.text('Services'), matching: find.byType(FlixiePill)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Use for this search'));
       await tester.pumpAndSettle();
       expect(find.text('A title with an included offer'), findsOneWidget);
       auth.services = {};
       auth.notifyOnly();
       await tester.pumpAndSettle();
-      expect(find.text('A title with an included offer'), findsNothing);
-      expect(find.text('Nothing you can watch right now'), findsOneWidget);
+      expect(find.text('A title with an included offer'), findsOneWidget);
     }, () => MockClient((request) async => handle(request)));
   });
   test('movie fallback preserves region, nested offers and rental semantics',
@@ -283,13 +350,27 @@ void main() {
                   .writeAsBytes(bytes!.buffer.asUint8List());
             });
           }
-          await tester.ensureVisible(find.text('On my services'));
-          await tester.tap(find.text('On my services'));
+          await tester.ensureVisible(find.text('Services'));
+          await tester.tap(find.ancestor(
+              of: find.text('Services'), matching: find.byType(FlixiePill)));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Use for this search'));
           await tester.pumpAndSettle();
           expect(find.text('A rental on the same service'), findsNothing);
           // Clear via the toolbar, then verify the friends shortcut includes TV.
+          await tester.ensureVisible(find.byTooltip('More watchlist filters'));
+          await tester.tap(find.byTooltip('More watchlist filters'));
+          await tester.pumpAndSettle();
           await tester.ensureVisible(find.text('Clear filters').first);
           await tester.tap(find.text('Clear filters').first);
+          Navigator.of(tester.element(find.text('More watchlist filters')))
+              .pop();
+          await tester.pumpAndSettle();
+          await Scrollable.ensureVisible(
+              tester.element(find.byTooltip('More watchlist filters')),
+              alignment: .5);
+          await tester.pumpAndSettle();
+          await tester.tap(find.byTooltip('More watchlist filters'));
           await tester.pumpAndSettle();
           await tester.scrollUntilVisible(find.text('Friends watched'), -150,
               scrollable: find.byType(Scrollable).first);
@@ -306,8 +387,13 @@ void main() {
                   .checked,
               isTrue);
           await tester.pumpAndSettle();
+          Navigator.of(tester.element(find.text('Friends watched'))).pop();
+          await tester.pumpAndSettle();
           await tester.scrollUntilVisible(find.text('Shows'), -150,
               scrollable: find.byType(Scrollable).first);
+          await Scrollable.ensureVisible(tester.element(find.text('Shows')),
+              alignment: .5);
+          await tester.pumpAndSettle();
           await tester.tap(find.text('Shows'));
           await tester.pumpAndSettle();
           await tester.scrollUntilVisible(

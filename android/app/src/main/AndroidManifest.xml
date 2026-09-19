@@ -24,7 +24,8 @@
     <application
         android:label="Flixie"
         android:name="${applicationName}"
-        android:icon="@mipmap/launcher_icon">
+        android:icon="@mipmap/launcher_icon"
+        android:roundIcon="@mipmap/launcher_icon_round">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -63,7 +64,7 @@
             android:value="flixie_notifications" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
-            android:resource="@mipmap/launcher_icon" />
+            android:resource="@drawable/ic_stat_flixie" />
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />

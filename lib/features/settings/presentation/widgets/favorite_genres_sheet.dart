@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -73,7 +74,7 @@ class _FavoriteGenresSheetState extends State<FavoriteGenresSheet> {
         FlixieToast(
           type: FlixieToastType.success,
           content: const Text('Favourite genres updated.'),
-          backgroundColor: FlixieColors.surfaceElevated,
+          backgroundColor: context.colors.surfaceElevated,
         ),
       );
     } catch (_) {
@@ -83,7 +84,7 @@ class _FavoriteGenresSheetState extends State<FavoriteGenresSheet> {
         FlixieToast(
           type: FlixieToastType.error,
           content: const Text('Failed to save genres. Please try again.'),
-          backgroundColor: FlixieColors.danger,
+          backgroundColor: context.colors.danger,
         ),
       );
     }
@@ -95,9 +96,9 @@ class _FavoriteGenresSheetState extends State<FavoriteGenresSheet> {
 
     return Container(
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
-      decoration: const BoxDecoration(
-        color: FlixieColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(
         top: false,
@@ -111,24 +112,24 @@ class _FavoriteGenresSheetState extends State<FavoriteGenresSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: FlixieColors.medium,
+                  color: context.colors.medium,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Favourite Genres',
               style: TextStyle(
-                color: Colors.white,
+                color: context.colors.white,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               'Select the genres you enjoy most.',
-              style: TextStyle(color: FlixieColors.medium, fontSize: 13),
+              style: TextStyle(color: context.colors.medium, fontSize: 13),
             ),
             const SizedBox(height: 20),
 
@@ -146,54 +147,16 @@ class _FavoriteGenresSheetState extends State<FavoriteGenresSheet> {
                     runSpacing: 8,
                     children: _allGenres.map((genre) {
                       final selected = _selectedIds.contains(genre.id);
-                      return GestureDetector(
-                        onTap: () => setState(() {
-                          if (selected) {
-                            _selectedIds.remove(genre.id);
-                          } else {
-                            _selectedIds.add(genre.id);
-                          }
-                        }),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 150),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: selected
-                                ? FlixieColors.primary.withValues(alpha: 0.2)
-                                : FlixieColors.tabBarBackground,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: selected
-                                  ? FlixieColors.primary
-                                  : FlixieColors.tabBarBorder,
-                              width: selected ? 1.5 : 1,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (selected) ...[
-                                const Icon(Icons.check_rounded,
-                                    size: 14, color: FlixieColors.primary),
-                                const SizedBox(width: 4),
-                              ],
-                              Text(
-                                genre.name,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: selected
-                                      ? FlixieColors.primary
-                                      : FlixieColors.light,
-                                  fontWeight: selected
-                                      ? FontWeight.w600
-                                      : FontWeight.normal,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
+                      return FlixiePill.filter(
+                          label: Text(genre.name),
+                          selected: selected,
+                          onSelected: (_) => setState(() {
+                                if (selected) {
+                                  _selectedIds.remove(genre.id);
+                                } else {
+                                  _selectedIds.add(genre.id);
+                                }
+                              }));
                     }).toList(),
                   ),
                 ),

@@ -35,23 +35,33 @@ class AboutCreditsScreen extends StatelessWidget {
         children: [
           Center(
             child: Image.asset(
-              'assets/icon/flixie_text_1024.png',
+              'assets/icon/flixie_f_transparent.png',
+              width: 96,
+              height: 96,
+              excludeFromSemantics: true,
+            ),
+          ),
+          Center(
+            child: Image.asset(
+              Theme.of(context).brightness == Brightness.light
+                  ? 'assets/icon/flixie_text_black.png'
+                  : 'assets/icon/flixie_text_1024.png',
               height: 82,
               fit: BoxFit.contain,
               semanticLabel: 'Flixie',
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Version 1.0.1',
             textAlign: TextAlign.center,
-            style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+            style: TextStyle(color: context.colors.medium, fontSize: 12),
           ),
           const SizedBox(height: 28),
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: FlixieColors.surfaceElevated.withValues(alpha: 0.72),
+              color: context.colors.surfaceElevated.withValues(alpha: 0.72),
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
                 color: FlixieColors.primary.withValues(alpha: 0.2),
@@ -60,10 +70,10 @@ class AboutCreditsScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Data provided by TMDB',
                   style: TextStyle(
-                    color: FlixieColors.light,
+                    color: context.colors.light,
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                   ),
@@ -78,10 +88,10 @@ class AboutCreditsScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 18),
-                const Text(
+                Text(
                   'Movie, television, cast, artwork, and related metadata are provided by TMDB.',
                   style: TextStyle(
-                    color: FlixieColors.light,
+                    color: context.colors.light,
                     height: 1.45,
                   ),
                 ),
@@ -90,13 +100,13 @@ class AboutCreditsScreen extends StatelessWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: FlixieColors.background.withValues(alpha: 0.58),
+                    color: context.colors.background.withValues(alpha: 0.58),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Text(
+                  child: Text(
                     'This product uses the TMDB API but is not endorsed or certified by TMDB.',
                     style: TextStyle(
-                      color: FlixieColors.white,
+                      color: context.colors.white,
                       height: 1.45,
                       fontWeight: FontWeight.w700,
                     ),
@@ -119,24 +129,24 @@ class AboutCreditsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          const Text(
+          Text(
             'Credits',
             style: TextStyle(
-              color: FlixieColors.light,
+              color: context.colors.light,
               fontSize: 18,
               fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: 10),
-          const Text(
+          Text(
             'Flixie uses Firebase services for authentication, messaging, and app functionality.',
-            style: TextStyle(color: FlixieColors.medium, height: 1.45),
+            style: TextStyle(color: context.colors.medium, height: 1.45),
           ),
           const SizedBox(height: 28),
-          const Text(
+          Text(
             '© 2026 Flixie',
             textAlign: TextAlign.center,
-            style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+            style: TextStyle(color: context.colors.medium, fontSize: 12),
           ),
         ],
       ),

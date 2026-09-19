@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/safety/safety_actions.dart';
 import 'package:flixie_app/features/social/data/request_service.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/models/group_watch_request.dart';
@@ -134,6 +135,7 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
   @override
   void initState() {
     super.initState();
+    SafetyService.changes.addListener(_onSafetyChanged);
     _activityReply = widget.initialActivityReply;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -142,8 +144,13 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
     });
   }
 
+  void _onSafetyChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    SafetyService.changes.removeListener(_onSafetyChanged);
     _messageController.dispose();
     _messageFocusNode.dispose();
     super.dispose();
@@ -161,6 +168,7 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
           otherUserId: widget.otherUserId,
         ),
       ]);
+      await SafetyService.blockedUsers(refresh: true);
       final otherUser = results[0] as User?;
       final conversation = results[1] as Conversation;
       final memberUsernames = await ChatService.fetchMemberUsernames(
@@ -229,9 +237,9 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF0F081E),
-        body: Center(
+      return Scaffold(
+        backgroundColor: context.colors.background,
+        body: const Center(
           child: CircularProgressIndicator(color: FlixieColors.primary),
         ),
       );
@@ -239,12 +247,12 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
 
     if (_error != null || _conversationId == null) {
       return Scaffold(
-        backgroundColor: const Color(0xFF0F081E),
-        appBar: AppBar(backgroundColor: const Color(0xFF0F081E)),
+        backgroundColor: context.colors.background,
+        appBar: AppBar(backgroundColor: context.colors.background),
         body: Center(
           child: Text(
             _error ?? 'Could not open chat',
-            style: const TextStyle(color: FlixieColors.medium),
+            style: TextStyle(color: context.colors.medium),
           ),
         ),
       );
@@ -258,9 +266,9 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
         : 'Chat';
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F081E),
+      backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0F081E),
+        backgroundColor: context.colors.background,
         titleSpacing: 0,
         title: Semantics(
           button: true,
@@ -312,10 +320,10 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
                 }
                 final messages = snapshot.data ?? [];
                 if (messages.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Text(
                       'No messages yet. Say hello!',
-                      style: TextStyle(color: FlixieColors.medium),
+                      style: TextStyle(color: context.colors.medium),
                       textAlign: TextAlign.center,
                     ),
                   );
@@ -356,6 +364,23 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
                             });
                           }
                           return WatchRequestChatCard(
+                            onLongPress: isMe
+                                ? null
+                                : () async {
+                                    await SafetyActions.contentMenu(
+                                      context,
+                                      targetType: msg.type == 'watch_request'
+                                          ? 'WATCH_REQUEST_MESSAGE'
+                                          : 'DIRECT_MESSAGE',
+                                      targetId: msg.id,
+                                      reportedUserId: msg.senderId,
+                                      username: msg.senderUsername ??
+                                          otherUser?.username ??
+                                          title,
+                                      contentPreview: msg.text,
+                                    );
+                                    if (mounted) setState(() {});
+                                  },
                             msg: msg,
                             senderAvatar: isMe
                                 ? context.read<AuthProvider>().dbUser?.avatar
@@ -391,6 +416,23 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
                           );
                         }
                         return ChatBubble(
+                          onLongPress: isMe
+                              ? null
+                              : () async {
+                                  await SafetyActions.contentMenu(
+                                    context,
+                                    targetType: msg.type == 'watch_request'
+                                        ? 'WATCH_REQUEST_MESSAGE'
+                                        : 'DIRECT_MESSAGE',
+                                    targetId: msg.id,
+                                    reportedUserId: msg.senderId,
+                                    username: msg.senderUsername ??
+                                        otherUser?.username ??
+                                        title,
+                                    contentPreview: msg.text,
+                                  );
+                                  if (mounted) setState(() {});
+                                },
                           currentUserId: currentUserId,
                           currentUsername:
                               context.read<AuthProvider>().dbUser?.username,
@@ -458,7 +500,7 @@ class _ActivityReplyComposerBanner extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(16, 6, 16, 0),
       padding: const EdgeInsets.fromLTRB(12, 9, 6, 9),
       decoration: BoxDecoration(
-        color: FlixieColors.surface,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: FlixieColors.primary.withValues(alpha: .55)),
       ),
@@ -481,8 +523,8 @@ class _ActivityReplyComposerBanner extends StatelessWidget {
                   'Replying to @${payload.username}’s ${payload.activityLabel}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: FlixieColors.primaryTint,
+                  style: TextStyle(
+                    color: context.colors.primaryTint,
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                   ),
@@ -492,8 +534,8 @@ class _ActivityReplyComposerBanner extends StatelessWidget {
                   payload.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: FlixieColors.textPrimary,
+                  style: TextStyle(
+                    color: context.colors.textPrimary,
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                   ),
@@ -504,7 +546,7 @@ class _ActivityReplyComposerBanner extends StatelessWidget {
           IconButton(
             tooltip: 'Cancel reply',
             onPressed: onCancel,
-            icon: const Icon(Icons.close, color: FlixieColors.medium, size: 19),
+            icon: Icon(Icons.close, color: context.colors.medium, size: 19),
           ),
         ],
       ),

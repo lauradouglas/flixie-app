@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
@@ -380,7 +381,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
       isScrollControlled: true,
       useRootNavigator: true,
       useSafeArea: true,
-      backgroundColor: FlixieColors.surface,
+      backgroundColor: context.colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -428,7 +429,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
             FlixieToast(
               type: FlixieToastType.success,
               content: const Text('Watch Plan sent'),
-              backgroundColor: FlixieColors.surfaceElevated,
+              backgroundColor: context.colors.surfaceElevated,
             ),
           );
         },
@@ -438,7 +439,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
             FlixieToast(
               type: FlixieToastType.error,
               content: const Text('Could not send the Watch Plan'),
-              backgroundColor: FlixieColors.danger,
+              backgroundColor: context.colors.danger,
             ),
           );
         },
@@ -529,7 +530,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             style: FilledButton.styleFrom(
-              backgroundColor: FlixieColors.danger,
+              backgroundColor: context.colors.danger,
               foregroundColor: Colors.white,
             ),
             child: Text(isCreator ? 'Close for everyone' : 'Leave and close'),
@@ -578,7 +579,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
           FlixieToast(
             type: FlixieToastType.error,
             content: const Text('Could not delete the Watch Plan'),
-            backgroundColor: FlixieColors.danger,
+            backgroundColor: context.colors.danger,
           ),
         );
       }
@@ -603,7 +604,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             style: FilledButton.styleFrom(
-              backgroundColor: FlixieColors.danger,
+              backgroundColor: context.colors.danger,
               foregroundColor: Colors.white,
             ),
             child: const Text('I can’t make it'),
@@ -675,7 +676,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
           FlixieToast(
             type: FlixieToastType.success,
             content: Text(_responseSuccessMessage(response)),
-            backgroundColor: FlixieColors.surfaceElevated,
+            backgroundColor: context.colors.surfaceElevated,
           ),
         );
         succeeded = true;
@@ -685,7 +686,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
           FlixieToast(
             type: FlixieToastType.error,
             content: Text(_responseFailureMessage(response)),
-            backgroundColor: FlixieColors.danger,
+            backgroundColor: context.colors.danger,
           ),
         );
       }
@@ -757,7 +758,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
             content: Text(request.scheduledFor == null
                 ? 'Suggested ${_formatFriendlyDateTime(selected.proposedFor)}'
                 : 'New time proposed - the current plan stays in place until they agree'),
-            backgroundColor: FlixieColors.surfaceElevated,
+            backgroundColor: context.colors.surfaceElevated,
           ),
         );
       } catch (e) {
@@ -766,7 +767,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
           FlixieToast(
             type: FlixieToastType.error,
             content: const Text('Failed to schedule watch. Please try again.'),
-            backgroundColor: FlixieColors.danger,
+            backgroundColor: context.colors.danger,
           ),
         );
       }
@@ -789,7 +790,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
           type: FlixieToastType.warning,
           content:
               const Text('That proposed time has passed. Suggest a new time.'),
-          backgroundColor: FlixieColors.danger,
+          backgroundColor: context.colors.danger,
         ),
       );
       return;
@@ -857,7 +858,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
                 : request.scheduledFor != null
                     ? 'New time declined - your original plan is unchanged'
                     : 'Time declined'),
-            backgroundColor: FlixieColors.surfaceElevated,
+            backgroundColor: context.colors.surfaceElevated,
           ),
         );
       } catch (e) {
@@ -867,7 +868,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
             type: FlixieToastType.error,
             content:
                 const Text('Failed to update proposed time. Please try again.'),
-            backgroundColor: FlixieColors.danger,
+            backgroundColor: context.colors.danger,
           ),
         );
       }
@@ -886,9 +887,9 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => Container(
         padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-        decoration: const BoxDecoration(
-          color: FlixieColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -899,16 +900,16 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: FlixieColors.medium,
+                  color: context.colors.medium,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'Time agreed',
               style: TextStyle(
-                color: FlixieColors.textPrimary,
+                color: context.colors.textPrimary,
                 fontSize: 24,
                 fontWeight: FontWeight.w800,
               ),
@@ -923,9 +924,9 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
                     width: 64,
                     height: 96,
                     child: posterPath == null || posterPath.isEmpty
-                        ? const ColoredBox(
-                            color: FlixieColors.surfaceElevated,
-                            child: Icon(
+                        ? ColoredBox(
+                            color: context.colors.surfaceElevated,
+                            child: const Icon(
                               Icons.movie_outlined,
                               color: FlixieColors.primary,
                               size: 28,
@@ -934,9 +935,9 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
                         : Image.network(
                             'https://image.tmdb.org/t/p/w185$posterPath',
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const ColoredBox(
-                              color: FlixieColors.surfaceElevated,
-                              child: Icon(
+                            errorBuilder: (_, __, ___) => ColoredBox(
+                              color: context.colors.surfaceElevated,
+                              child: const Icon(
                                 Icons.movie_outlined,
                                 color: FlixieColors.primary,
                                 size: 28,
@@ -954,8 +955,8 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
                         title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: FlixieColors.textPrimary,
+                        style: TextStyle(
+                          color: context.colors.textPrimary,
                           fontSize: 20,
                           height: 1.15,
                           fontWeight: FontWeight.w800,
@@ -973,8 +974,8 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
                           Expanded(
                             child: Text(
                               _formatFriendlyDateTime(scheduledFor),
-                              style: const TextStyle(
-                                color: FlixieColors.medium,
+                              style: TextStyle(
+                                color: context.colors.medium,
                                 fontSize: 16,
                                 height: 1.3,
                                 fontWeight: FontWeight.w600,
@@ -989,10 +990,10 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
               ],
             ),
             const SizedBox(height: 26),
-            const Text(
+            Text(
               'Keep the plan handy by adding it to your phone calendar.',
               style: TextStyle(
-                color: FlixieColors.medium,
+                color: context.colors.medium,
                 fontSize: 15,
                 height: 1.35,
               ),
@@ -1126,7 +1127,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
       FlixieToast(
         type: FlixieToastType.success,
         content: const Text('Watch entry saved to your plan'),
-        backgroundColor: FlixieColors.surfaceElevated,
+        backgroundColor: context.colors.surfaceElevated,
       ),
     );
     final user = context.read<AuthProvider>().dbUser;
@@ -1165,7 +1166,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            style: TextButton.styleFrom(foregroundColor: FlixieColors.danger),
+            style: TextButton.styleFrom(foregroundColor: context.colors.danger),
             child: const Text('Cancel plan'),
           ),
         ],
@@ -1214,7 +1215,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
             FlixieToast(
               type: FlixieToastType.error,
               content: const Text('Could not cancel the watch plan'),
-              backgroundColor: FlixieColors.danger,
+              backgroundColor: context.colors.danger,
             ),
           );
         }
@@ -1268,7 +1269,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
                       label: const Text('Make a Watch Plan'),
                       style: FilledButton.styleFrom(
                         backgroundColor: FlixieColors.primary,
-                        foregroundColor: Colors.black,
+                        foregroundColor: Colors.white,
                         minimumSize: const Size.fromHeight(44),
                       ),
                     ),
@@ -1292,26 +1293,24 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
           );
     final screen = FlixiePageScaffold(
       appBar: FlixieTitleAppBar(
-        backgroundColor: FlixieColors.background,
+        backgroundColor: context.colors.background,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(isFocused ? 'Watch Plan' : 'Watch Plans',
                 style: TextStyle(
-                    color: Colors.white,
+                    color: context.colors.white,
                     fontSize: isFocused ? 20 : 22,
                     fontWeight: FontWeight.bold)),
             if (isFocused && focusedCompanion != null)
               Text('With $focusedCompanion',
-                  style:
-                      const TextStyle(color: FlixieColors.medium, fontSize: 12))
+                  style: TextStyle(color: context.colors.medium, fontSize: 12))
             else if (!_loading && _error == null)
               Text(
                   _audience == _RequestAudience.friends
                       ? '${_all.length} plans'
                       : 'Across ${_groups.length} groups',
-                  style: const TextStyle(
-                      color: FlixieColors.medium, fontSize: 12)),
+                  style: TextStyle(color: context.colors.medium, fontSize: 12)),
           ],
         ),
         actions: canDeleteFocusedPlan
@@ -1330,14 +1329,15 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
                   onSelected: (value) {
                     if (value == 'delete') _confirmDelete(_filtered.first);
                   },
-                  itemBuilder: (_) => const [
+                  itemBuilder: (_) => [
                     PopupMenuItem(
                       value: 'delete',
                       child: Row(children: [
-                        Icon(Icons.delete_outline, color: FlixieColors.danger),
-                        SizedBox(width: 10),
+                        Icon(Icons.delete_outline,
+                            color: context.colors.danger),
+                        const SizedBox(width: 10),
                         Text('Delete watch plan',
-                            style: TextStyle(color: FlixieColors.danger)),
+                            style: TextStyle(color: context.colors.danger)),
                       ]),
                     ),
                   ],
@@ -1416,12 +1416,12 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
             child: TextField(
               controller: _searchController,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: context.colors.white),
               decoration: InputDecoration(
                 hintText: 'Search by movie or username...',
                 prefixIcon: const Icon(Icons.search_rounded),
                 filled: true,
-                fillColor: FlixieColors.tabBarBackgroundFocused,
+                fillColor: context.colors.tabBarBackgroundFocused,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
                   borderSide: BorderSide.none,
@@ -1440,35 +1440,16 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
               final selected = _statusFilter == filter;
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
-                child: ChoiceChip(
-                  label: Text(filter == WatchPlanFilter.active
-                      ? 'Active · ${_countFor(WatchPlanFilter.active)}'
-                      : 'Past · ${_countFor(WatchPlanFilter.completed)}'),
-                  selected: selected,
-                  onSelected: (_) {
-                    setState(() => _statusFilter =
-                        selected ? WatchPlanFilter.active : filter);
-                    _applyFilter();
-                  },
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  visualDensity: VisualDensity.compact,
-                  labelPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  padding: EdgeInsets.zero,
-                  selectedColor: FlixieColors.primary.withValues(alpha: .22),
-                  backgroundColor: FlixieColors.tabBarBackgroundFocused,
-                  side: BorderSide(
-                    color: FlixieColors.primary.withValues(
-                      alpha: selected ? 1 : 0.3,
-                    ),
-                  ),
-                  labelStyle: TextStyle(
-                    color: selected ? Colors.white : FlixieColors.medium,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
+                child: FlixiePill.choice(
+                    label: Text(filter == WatchPlanFilter.active
+                        ? 'Active · ${_countFor(WatchPlanFilter.active)}'
+                        : 'Past · ${_countFor(WatchPlanFilter.completed)}'),
+                    selected: selected,
+                    onSelected: (_) {
+                      setState(() => _statusFilter =
+                          selected ? WatchPlanFilter.active : filter);
+                      _applyFilter();
+                    }),
               );
             },
           ),
@@ -1631,7 +1612,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
         FlixieToast(
           type: FlixieToastType.warning,
           content: const Text('Accept this Watch Plan before choosing movies.'),
-          backgroundColor: FlixieColors.warning,
+          backgroundColor: context.colors.warning,
         ),
       );
       return false;
@@ -1656,7 +1637,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
             FlixieToast(
               type: FlixieToastType.success,
               content: const Text('Movie choices saved'),
-              backgroundColor: FlixieColors.surfaceElevated,
+              backgroundColor: context.colors.surfaceElevated,
             ),
           );
         }
@@ -1676,7 +1657,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
                         userId);
                   }
                 }),
-            backgroundColor: FlixieColors.danger,
+            backgroundColor: context.colors.danger,
           ),
         );
       }
@@ -1694,7 +1675,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
       isScrollControlled: true,
       useRootNavigator: true,
       useSafeArea: true,
-      backgroundColor: FlixieColors.surface,
+      backgroundColor: context.colors.surface,
       builder: (_) => MovieSearchSheet(
         title: 'Add another option',
         searchMovies: (query) async {
@@ -1745,14 +1726,14 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
         ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
           type: FlixieToastType.success,
           content: const Text('Movie option removed'),
-          backgroundColor: FlixieColors.surfaceElevated,
+          backgroundColor: context.colors.surfaceElevated,
         ));
       } catch (_) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
           type: FlixieToastType.error,
           content: const Text('Could not remove that movie option.'),
-          backgroundColor: FlixieColors.danger,
+          backgroundColor: context.colors.danger,
         ));
       }
     });
@@ -1783,7 +1764,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
             content: Text(state.request.selectedCandidateId != null
                 ? '${candidate.title ?? 'Movie'} finalised'
                 : 'Suggested ${candidate.title ?? 'movie'} — waiting for your friend'),
-            backgroundColor: FlixieColors.surfaceElevated,
+            backgroundColor: context.colors.surfaceElevated,
           ),
         );
       } catch (_) {
@@ -1793,7 +1774,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
             type: FlixieToastType.error,
             content:
                 const Text('Could not choose this movie. Please try again.'),
-            backgroundColor: FlixieColors.danger,
+            backgroundColor: context.colors.danger,
           ),
         );
       }
@@ -1822,7 +1803,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
             FlixieToast(
               type: FlixieToastType.error,
               content: const Text('Could not reopen movie choices.'),
-              backgroundColor: FlixieColors.danger,
+              backgroundColor: context.colors.danger,
             ),
           );
         }
@@ -1855,15 +1836,14 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.group_outlined,
-              size: 64, color: FlixieColors.medium),
+          Icon(Icons.group_outlined, size: 64, color: context.colors.medium),
           const SizedBox(height: 16),
           Text(
             _searchController.text.isNotEmpty ||
                     _statusFilter != WatchPlanFilter.active
                 ? 'No Watch Plans match'
                 : 'No Watch Plans yet',
-            style: const TextStyle(color: FlixieColors.medium, fontSize: 16),
+            style: TextStyle(color: context.colors.medium, fontSize: 16),
           ),
         ],
       ),
@@ -1875,9 +1855,9 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.error_outline, color: FlixieColors.danger, size: 48),
+          Icon(Icons.error_outline, color: context.colors.danger, size: 48),
           const SizedBox(height: 16),
-          Text(_error!, style: const TextStyle(color: FlixieColors.light)),
+          Text(_error!, style: TextStyle(color: context.colors.light)),
           const SizedBox(height: 16),
           ElevatedButton(onPressed: _load, child: const Text('Retry')),
         ],
@@ -1952,8 +1932,8 @@ class _RequestListSectionHeader extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(
-                  color: FlixieColors.light,
+                style: TextStyle(
+                  color: context.colors.light,
                   fontSize: 17,
                   fontWeight: FontWeight.w800,
                 ),
@@ -1961,20 +1941,7 @@ class _RequestListSectionHeader extends StatelessWidget {
             ],
           ),
         ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-          decoration: BoxDecoration(
-            color: FlixieColors.primary.withValues(alpha: 0.14),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(
-            '$count',
-            style: const TextStyle(
-              color: FlixieColors.primary,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
+        FlixiePill.label(label: Text('$count')),
       ],
     );
   }

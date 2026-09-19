@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -71,31 +72,23 @@ class _StatsScreenState extends State<StatsScreen> {
 
     return Align(
       alignment: Alignment.centerRight,
-      child: Container(
-        height: 40,
-        padding: const EdgeInsets.symmetric(horizontal: 13),
-        decoration: BoxDecoration(
-          color: FlixieColors.surfaceElevated,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: FlixieColors.primary.withValues(alpha: .3),
-          ),
-        ),
-        child: DropdownButton<int?>(
-          value: _selectedYear,
-          underline: const SizedBox(),
-          dropdownColor: FlixieColors.tabBarBackgroundFocused,
-          style: const TextStyle(color: Colors.white, fontSize: 14),
-          icon: const Icon(Icons.keyboard_arrow_down_rounded,
-              color: FlixieColors.light),
-          items: [
-            const DropdownMenuItem(value: null, child: Text('All Time')),
-            ...years.map(
-              (y) => DropdownMenuItem(value: y, child: Text('$y')),
-            ),
-          ],
-          onChanged: (value) => setState(() => _selectedYear = value),
-        ),
+      child: PopupMenuButton<int>(
+        tooltip: 'Choose year',
+        initialValue: _selectedYear ?? -1,
+        onSelected: (value) =>
+            setState(() => _selectedYear = value == -1 ? null : value),
+        itemBuilder: (_) => [
+          const PopupMenuItem(value: -1, child: Text('All Time')),
+          ...years
+              .map((year) => PopupMenuItem(value: year, child: Text('$year'))),
+        ],
+        child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: FlixiePill.label(
+                compact: false,
+                label:
+                    Text(_selectedYear == null ? 'All Time' : '$_selectedYear'),
+                avatar: const Icon(Icons.keyboard_arrow_down_rounded))),
       ),
     );
   }
@@ -108,10 +101,10 @@ class _StatsScreenState extends State<StatsScreen> {
     final mostActive = _mostActiveMonthIndex;
 
     if (_allEntries.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           'No watch history yet.',
-          style: TextStyle(color: FlixieColors.medium),
+          style: TextStyle(color: context.colors.medium),
         ),
       );
     }
@@ -165,7 +158,7 @@ class _StatsScreenState extends State<StatsScreen> {
         Container(
           padding: const EdgeInsets.fromLTRB(14, 18, 14, 12),
           decoration: BoxDecoration(
-            color: FlixieColors.surfaceElevated.withValues(alpha: .72),
+            color: context.colors.surfaceElevated.withValues(alpha: .72),
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
               color: FlixieColors.primary.withValues(alpha: .18),
@@ -296,12 +289,14 @@ class _StatsScreenState extends State<StatsScreen> {
         : currentYear;
 
     return FlixiePageScaffold(
-      appBar: const FlixieTitleAppBar(
-        backgroundColor: FlixieColors.background,
+      appBar: FlixieTitleAppBar(
+        backgroundColor: context.colors.background,
         title: Text(
           'Recap',
           style: TextStyle(
-              color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+              color: context.colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.bold),
         ),
       ),
       body: Column(
@@ -328,7 +323,7 @@ class _StatsScreenState extends State<StatsScreen> {
                   backgroundColor: WidgetStateProperty.resolveWith((states) {
                     return states.contains(WidgetState.selected)
                         ? FlixieColors.primary
-                        : FlixieColors.surfaceElevated;
+                        : context.colors.surfaceElevated;
                   }),
                   side: WidgetStatePropertyAll(
                     BorderSide(
@@ -342,15 +337,15 @@ class _StatsScreenState extends State<StatsScreen> {
                   ),
                   foregroundColor: WidgetStateProperty.resolveWith((states) {
                     if (states.contains(WidgetState.selected)) {
-                      return FlixieColors.white;
+                      return context.colors.white;
                     }
-                    return FlixieColors.light;
+                    return context.colors.light;
                   }),
                   iconColor: WidgetStateProperty.resolveWith((states) {
                     if (states.contains(WidgetState.selected)) {
-                      return FlixieColors.white;
+                      return context.colors.white;
                     }
-                    return FlixieColors.light;
+                    return context.colors.light;
                   }),
                   textStyle: WidgetStateProperty.resolveWith((states) {
                     return TextStyle(
@@ -375,11 +370,11 @@ class _StatsScreenState extends State<StatsScreen> {
               child: _selectedTab == _RecapTab.stats
                   ? _buildStatsDashboard()
                   : user == null
-                      ? const Center(
-                          key: ValueKey('recap-wrapped-empty'),
+                      ? Center(
+                          key: const ValueKey('recap-wrapped-empty'),
                           child: Text(
                             'Sign in to view your year in review.',
-                            style: TextStyle(color: FlixieColors.medium),
+                            style: TextStyle(color: context.colors.medium),
                           ),
                         )
                       : WrappedContent(

@@ -89,6 +89,60 @@ User profile(String id) => User(
     completedSetup: true,
     darkMode: true);
 void main() {
+  testWidgets('idle logout schedules navigation without a user gesture',
+      (tester) async {
+    final auth = Auth._();
+    final provider = AuthProvider(auth, MovieService(),
+        prefetchAfterAuth: false,
+        profileLoader: (_) async => profile('one'),
+        termsStatusLoader: () async => true);
+    addTearDown(() {
+      provider.dispose();
+      auth.changes.close();
+    });
+    auth.emit(Identity('one'));
+    await tester.pumpAndSettle();
+    expect(provider.status, AuthStatus.authenticated);
+    expect(tester.binding.hasScheduledFrame, isFalse);
+
+    final routedStatuses = <AuthStatus>[];
+    provider.authStatusListenable.addListener(() {
+      routedStatuses.add(provider.status);
+    });
+    await provider.signOut();
+    expect(provider.status, AuthStatus.unauthenticated);
+    expect(provider.dbUser, isNull);
+    expect(provider.termsVerified, isFalse);
+    expect(tester.binding.hasScheduledFrame, isTrue,
+        reason: 'logout must request its own frame on an idle screen');
+    await tester.pumpAndSettle();
+    expect(routedStatuses, contains(AuthStatus.unauthenticated));
+  });
+
+  for (final accepted in [true, false]) {
+    testWidgets('login resolves terms before routing: accepted=$accepted',
+        (tester) async {
+      final auth = Auth._();
+      final terms = Completer<bool>();
+      final provider = AuthProvider(auth, MovieService(),
+          prefetchAfterAuth: false,
+          profileLoader: (_) async => profile('one'),
+          termsStatusLoader: () => terms.future);
+      addTearDown(() {
+        provider.dispose();
+        auth.changes.close();
+      });
+      auth.emit(Identity('one'));
+      await tester.pump();
+      expect(provider.dbUser, isNotNull);
+      expect(provider.status, AuthStatus.unknown);
+      terms.complete(accepted);
+      await tester.pump();
+      expect(provider.status, AuthStatus.authenticated);
+      expect(provider.termsVerified, accepted);
+    });
+  }
+
   testWidgets('sign-in/restoration share profile work and reuse a valid token',
       (tester) async {
     final auth = Auth._();

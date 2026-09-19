@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
@@ -120,11 +121,11 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
     final confirm = await showFlixiePromptSheet<bool>(
       context: context,
       builder: (dialogContext) => FlixiePromptSheetContent(
-        title: const Text('Transfer Ownership',
-            style: TextStyle(color: FlixieColors.light)),
+        title: Text('Transfer Ownership',
+            style: TextStyle(color: context.colors.light)),
         content: Text(
           'Transfer ownership to ${member.displayName}? You will become an admin.',
-          style: const TextStyle(color: FlixieColors.medium),
+          style: TextStyle(color: context.colors.medium),
         ),
         actions: [
           TextButton(
@@ -135,7 +136,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
             onPressed: () => Navigator.pop(dialogContext, true),
             style: ElevatedButton.styleFrom(
                 backgroundColor: FlixieColors.primary,
-                foregroundColor: Colors.black),
+                foregroundColor: Colors.white),
             child: const Text('Transfer'),
           ),
         ],
@@ -143,12 +144,8 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
     );
     if (confirm != true || !mounted) return;
     try {
-      await Future.wait([
-        GroupService.updateRoleOfMemberInGroup(
-            widget.groupId, _currentUserId!, 'ADMIN'),
-        GroupService.updateRoleOfMemberInGroup(
-            widget.groupId, member.memberId, 'OWNER'),
-      ]);
+      await GroupService.updateRoleOfMemberInGroup(
+          widget.groupId, member.memberId, 'OWNER');
       await _load();
     } catch (e) {
       logger.e('Transfer ownership error: $e');
@@ -166,11 +163,11 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
     final confirm = await showFlixiePromptSheet<bool>(
       context: context,
       builder: (dialogContext) => FlixiePromptSheetContent(
-        title: const Text('Remove Member',
-            style: TextStyle(color: FlixieColors.light)),
+        title: Text('Remove Member',
+            style: TextStyle(color: context.colors.light)),
         content: Text(
           'Remove ${member.displayName} from the group?',
-          style: const TextStyle(color: FlixieColors.medium),
+          style: TextStyle(color: context.colors.medium),
         ),
         actions: [
           TextButton(
@@ -180,7 +177,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
           ElevatedButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             style: ElevatedButton.styleFrom(
-                backgroundColor: FlixieColors.danger,
+                backgroundColor: context.colors.danger,
                 foregroundColor: Colors.white),
             child: const Text('Remove'),
           ),
@@ -240,7 +237,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: FlixieColors.medium.withValues(alpha: 0.4),
+                color: context.colors.medium.withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -249,8 +246,8 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               child: Text(
                 member.displayName,
-                style: const TextStyle(
-                  color: FlixieColors.light,
+                style: TextStyle(
+                  color: context.colors.light,
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
                 ),
@@ -260,8 +257,8 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
               ListTile(
                 leading:
                     const Icon(Icons.arrow_upward, color: FlixieColors.primary),
-                title: const Text('Promote to Admin',
-                    style: TextStyle(color: FlixieColors.light)),
+                title: Text('Promote to Admin',
+                    style: TextStyle(color: context.colors.light)),
                 onTap: () {
                   Navigator.pop(sheetContext);
                   _changeRole(member, 'ADMIN');
@@ -269,10 +266,10 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
               ),
             if (canDemote)
               ListTile(
-                leading: const Icon(Icons.arrow_downward,
-                    color: FlixieColors.warning),
-                title: const Text('Demote to Member',
-                    style: TextStyle(color: FlixieColors.light)),
+                leading:
+                    Icon(Icons.arrow_downward, color: context.colors.warning),
+                title: Text('Demote to Member',
+                    style: TextStyle(color: context.colors.light)),
                 onTap: () {
                   Navigator.pop(sheetContext);
                   _changeRole(member, 'MEMBER');
@@ -281,9 +278,9 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
             if (canTransfer)
               ListTile(
                 leading:
-                    const Icon(Icons.swap_horiz, color: FlixieColors.secondary),
-                title: const Text('Transfer Ownership',
-                    style: TextStyle(color: FlixieColors.light)),
+                    Icon(Icons.swap_horiz, color: context.colors.secondary),
+                title: Text('Transfer Ownership',
+                    style: TextStyle(color: context.colors.light)),
                 onTap: () {
                   Navigator.pop(sheetContext);
                   _transferOwnership(member);
@@ -291,10 +288,10 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
               ),
             if (canRemove)
               ListTile(
-                leading: const Icon(Icons.person_remove_outlined,
-                    color: FlixieColors.danger),
-                title: const Text('Remove from Group',
-                    style: TextStyle(color: FlixieColors.danger)),
+                leading: Icon(Icons.person_remove_outlined,
+                    color: context.colors.danger),
+                title: Text('Remove from Group',
+                    style: TextStyle(color: context.colors.danger)),
                 onTap: () {
                   Navigator.pop(sheetContext);
                   _removeMember(member);
@@ -312,22 +309,22 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: FlixieColors.background,
+        backgroundColor: context.colors.background,
         elevation: 0,
-        iconTheme: const IconThemeData(color: FlixieColors.light),
+        iconTheme: IconThemeData(color: context.colors.light),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               widget.groupName,
-              style: const TextStyle(
-                  color: FlixieColors.light,
+              style: TextStyle(
+                  color: context.colors.light,
                   fontWeight: FontWeight.bold,
                   fontSize: 16),
             ),
-            const Text(
+            Text(
               'Members',
-              style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+              style: TextStyle(color: context.colors.medium, fontSize: 12),
             ),
           ],
         ),
@@ -351,21 +348,21 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                   child: TextField(
                     controller: _searchController,
-                    style: const TextStyle(color: FlixieColors.light),
+                    style: TextStyle(color: context.colors.light),
                     decoration: InputDecoration(
                       hintText: 'Search members…',
-                      hintStyle: const TextStyle(color: FlixieColors.medium),
+                      hintStyle: TextStyle(color: context.colors.medium),
                       prefixIcon:
-                          const Icon(Icons.search, color: FlixieColors.medium),
+                          Icon(Icons.search, color: context.colors.medium),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(Icons.clear,
-                                  color: FlixieColors.medium, size: 18),
+                              icon: Icon(Icons.clear,
+                                  color: context.colors.medium, size: 18),
                               onPressed: () => _searchController.clear(),
                             )
                           : null,
                       filled: true,
-                      fillColor: FlixieColors.tabBarBackgroundFocused,
+                      fillColor: context.colors.tabBarBackgroundFocused,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: BorderSide.none,
@@ -401,30 +398,31 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                     alignment: Alignment.centerLeft,
                     child: Text(
                       '${_filtered.length} member${_filtered.length == 1 ? '' : 's'}',
-                      style: const TextStyle(
-                          color: FlixieColors.medium, fontSize: 12),
+                      style:
+                          TextStyle(color: context.colors.medium, fontSize: 12),
                     ),
                   ),
                 ),
                 Expanded(
                   child: _members.isEmpty
-                      ? const Center(
+                      ? Center(
                           child: Text('No members found',
-                              style: TextStyle(color: FlixieColors.medium)),
+                              style: TextStyle(color: context.colors.medium)),
                         )
                       : _filtered.isEmpty
-                          ? const Center(
+                          ? Center(
                               child: Text('No members match your search',
-                                  style: TextStyle(color: FlixieColors.medium)),
+                                  style:
+                                      TextStyle(color: context.colors.medium)),
                             )
                           : RefreshIndicator(
                               onRefresh: _load,
                               color: FlixieColors.primary,
                               child: ListView.separated(
                                 itemCount: _filtered.length,
-                                separatorBuilder: (_, __) => const Divider(
+                                separatorBuilder: (_, __) => Divider(
                                   height: 1,
-                                  color: FlixieColors.tabBarBorder,
+                                  color: context.colors.tabBarBorder,
                                   indent: 72,
                                 ),
                                 itemBuilder: (_, i) {
@@ -468,30 +466,8 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected
-              ? FlixieColors.primary.withValues(alpha: 0.15)
-              : FlixieColors.tabBarBackgroundFocused,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? FlixieColors.primary : FlixieColors.tabBarBorder,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? FlixieColors.primary : FlixieColors.medium,
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-    );
+    return FlixiePill.choice(
+        label: Text(label), selected: selected, onSelected: (_) => onTap());
   }
 }
 
@@ -511,12 +487,6 @@ class _MemberTile extends StatelessWidget {
   final bool isMe;
   final bool showChevron;
   final VoidCallback? onTap;
-
-  Color _roleColor() {
-    if (member.isOwner) return FlixieColors.warning;
-    if (member.isAdmin) return FlixieColors.primary;
-    return FlixieColors.medium;
-  }
 
   String _roleLabel() {
     if (member.isOwner) return 'OWNER';
@@ -555,44 +525,28 @@ class _MemberTile extends StatelessWidget {
           Text(
             member.displayName,
             style: TextStyle(
-              color: isMe ? FlixieColors.primary : FlixieColors.light,
+              color: isMe ? FlixieColors.primary : context.colors.light,
               fontWeight: FontWeight.w500,
             ),
           ),
           if (isMe) ...[
             const SizedBox(width: 6),
-            const Text('(you)',
-                style: TextStyle(color: FlixieColors.medium, fontSize: 12)),
+            Text('(you)',
+                style: TextStyle(color: context.colors.medium, fontSize: 12)),
           ],
         ],
       ),
       subtitle: member.isPending
-          ? const Text('Invite pending',
-              style: TextStyle(color: FlixieColors.warning, fontSize: 12))
+          ? Text('Invite pending',
+              style: TextStyle(color: context.colors.warning, fontSize: 12))
           : null,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: _roleColor().withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              _roleLabel(),
-              style: TextStyle(
-                color: _roleColor(),
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
+          FlixiePill.label(label: Text(_roleLabel())),
           if (showChevron) ...[
             const SizedBox(width: 4),
-            const Icon(Icons.chevron_right,
-                color: FlixieColors.medium, size: 16),
+            Icon(Icons.chevron_right, color: context.colors.medium, size: 16),
           ],
         ],
       ),
@@ -714,7 +668,7 @@ class _InviteMembersSheetState extends State<_InviteMembersSheet> {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: FlixieColors.medium.withValues(alpha: 0.4),
+              color: context.colors.medium.withValues(alpha: 0.4),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -723,10 +677,10 @@ class _InviteMembersSheetState extends State<_InviteMembersSheet> {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
               children: [
-                const Text(
+                Text(
                   'Invite Friends',
                   style: TextStyle(
-                    color: FlixieColors.light,
+                    color: context.colors.light,
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
                   ),
@@ -737,7 +691,7 @@ class _InviteMembersSheetState extends State<_InviteMembersSheet> {
                     onPressed: _inviting ? null : _invite,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: FlixieColors.primary,
-                      foregroundColor: Colors.black,
+                      foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 8),
                       minimumSize: Size.zero,
@@ -747,7 +701,7 @@ class _InviteMembersSheetState extends State<_InviteMembersSheet> {
                             width: 16,
                             height: 16,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.black),
+                                strokeWidth: 2, color: Colors.white),
                           )
                         : Text('Invite (${_selected.length})'),
                   ),
@@ -759,14 +713,13 @@ class _InviteMembersSheetState extends State<_InviteMembersSheet> {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: TextField(
               controller: _search,
-              style: const TextStyle(color: FlixieColors.light),
+              style: TextStyle(color: context.colors.light),
               decoration: InputDecoration(
                 hintText: 'Search friends…',
-                hintStyle: const TextStyle(color: FlixieColors.medium),
-                prefixIcon:
-                    const Icon(Icons.search, color: FlixieColors.medium),
+                hintStyle: TextStyle(color: context.colors.medium),
+                prefixIcon: Icon(Icons.search, color: context.colors.medium),
                 filled: true,
-                fillColor: FlixieColors.tabBarBackground,
+                fillColor: context.colors.tabBarBackground,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide.none,
@@ -786,7 +739,7 @@ class _InviteMembersSheetState extends State<_InviteMembersSheet> {
                           _friends.isEmpty
                               ? 'All your friends are already in the group'
                               : 'No friends match your search',
-                          style: const TextStyle(color: FlixieColors.medium),
+                          style: TextStyle(color: context.colors.medium),
                           textAlign: TextAlign.center,
                         ),
                       )
@@ -809,10 +762,10 @@ class _InviteMembersSheetState extends State<_InviteMembersSheet> {
                             },
                             title: Text(
                               friend.username,
-                              style: const TextStyle(color: FlixieColors.light),
+                              style: TextStyle(color: context.colors.light),
                             ),
                             activeColor: FlixieColors.primary,
-                            checkColor: Colors.black,
+                            checkColor: Colors.white,
                             secondary: CircleAvatar(
                               backgroundColor:
                                   FlixieColors.primary.withValues(alpha: 0.2),

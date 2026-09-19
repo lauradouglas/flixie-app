@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -115,9 +116,9 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final mediaLabel = widget.showId != null ? 'show' : 'movie';
     return Container(
-      decoration: const BoxDecoration(
-        color: FlixieColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.only(bottom: bottomInset),
       child: Column(
@@ -129,7 +130,7 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: FlixieColors.medium,
+              color: context.colors.medium,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -139,22 +140,22 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'Write a Review',
                   style: TextStyle(
-                    color: FlixieColors.white,
+                    color: context.colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: FlixieColors.light),
+                  icon: Icon(Icons.close, color: context.colors.light),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
             ),
           ),
-          const Divider(color: FlixieColors.tabBarBorder, height: 1),
+          Divider(color: context.colors.tabBarBorder, height: 1),
           // Form
           Flexible(
             child: SingleChildScrollView(
@@ -165,10 +166,10 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Rating
-                    const Text(
+                    Text(
                       'Rating',
                       style: TextStyle(
-                        color: FlixieColors.light,
+                        color: context.colors.light,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -184,68 +185,46 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
                             minWidth: 48,
                             minHeight: 42,
                           ),
-                          child: ChoiceChip(
-                            label: Text('$value'),
-                            avatar: Icon(
-                              isSelected
-                                  ? Icons.star_rounded
-                                  : Icons.star_border_rounded,
-                              size: 17,
-                              color: isSelected
-                                  ? Colors.white
-                                  : FlixieColors.medium,
-                            ),
-                            selected: isSelected,
-                            showCheckmark: false,
-                            onSelected: (_) => setState(() => _rating = value),
-                            selectedColor: FlixieColors.primary,
-                            backgroundColor: FlixieColors.surfaceElevated,
-                            side: BorderSide(
-                              color: isSelected
-                                  ? FlixieColors.primary
-                                  : FlixieColors.tabBarBorder,
-                            ),
-                            labelStyle: TextStyle(
-                              color: isSelected
-                                  ? Colors.white
-                                  : FlixieColors.light,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(9),
-                            ),
-                            visualDensity: VisualDensity.compact,
-                          ),
+                          child: FlixiePill.choice(
+                              label: Text('$value'),
+                              avatar: Icon(
+                                  isSelected
+                                      ? Icons.star_rounded
+                                      : Icons.star_border_rounded,
+                                  size: 17),
+                              selected: isSelected,
+                              showCheckmark: false,
+                              onSelected: (_) =>
+                                  setState(() => _rating = value)),
                         );
                       }),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '$_rating / 10',
-                      style: const TextStyle(
-                        color: FlixieColors.medium,
+                      style: TextStyle(
+                        color: context.colors.medium,
                         fontSize: 13,
                       ),
                     ),
                     const SizedBox(height: 20),
                     // Title
-                    const Text(
+                    Text(
                       'Title',
                       style: TextStyle(
-                        color: FlixieColors.light,
+                        color: context.colors.light,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _titleController,
-                      style: const TextStyle(color: FlixieColors.white),
+                      style: TextStyle(color: context.colors.white),
                       decoration: InputDecoration(
                         hintText: 'Give your review a title',
-                        hintStyle: const TextStyle(color: FlixieColors.medium),
+                        hintStyle: TextStyle(color: context.colors.medium),
                         filled: true,
-                        fillColor: FlixieColors.surfaceElevated,
+                        fillColor: context.colors.surfaceElevated,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                           borderSide: BorderSide.none,
@@ -256,24 +235,24 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
                     ),
                     const SizedBox(height: 16),
                     // Body
-                    const Text(
+                    Text(
                       'Review',
                       style: TextStyle(
-                        color: FlixieColors.light,
+                        color: context.colors.light,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _bodyController,
-                      style: const TextStyle(color: FlixieColors.white),
+                      style: TextStyle(color: context.colors.white),
                       maxLines: 6,
                       decoration: InputDecoration(
                         hintText:
                             'Share your thoughts about the $mediaLabel...',
-                        hintStyle: const TextStyle(color: FlixieColors.medium),
+                        hintStyle: TextStyle(color: context.colors.medium),
                         filled: true,
-                        fillColor: FlixieColors.surfaceElevated,
+                        fillColor: context.colors.surfaceElevated,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                           borderSide: BorderSide.none,
@@ -358,15 +337,15 @@ class _ToggleTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
       decoration: BoxDecoration(
-        color: FlixieColors.surfaceElevated,
+        color: context.colors.surfaceElevated,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: FlixieColors.tabBarBorder),
+        border: Border.all(color: context.colors.tabBarBorder),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label,
-              style: const TextStyle(color: FlixieColors.light, fontSize: 14)),
+              style: TextStyle(color: context.colors.light, fontSize: 14)),
           Switch(
             value: value,
             onChanged: onChanged,

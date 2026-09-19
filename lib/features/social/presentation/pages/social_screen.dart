@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/features/social/data/chat_unread_controller.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
@@ -74,7 +75,7 @@ class _SocialScreenState extends State<SocialScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.tabBarBackgroundFocused,
+      backgroundColor: context.colors.tabBarBackgroundFocused,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -86,10 +87,10 @@ class _SocialScreenState extends State<SocialScreen> {
   Widget build(BuildContext context) {
     return FlixiePageScaffold(
       appBar: FlixieTitleAppBar(
-        title: const Text(
+        title: Text(
           'Social',
           style: TextStyle(
-            color: FlixieColors.light,
+            color: context.colors.light,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -99,7 +100,7 @@ class _SocialScreenState extends State<SocialScreen> {
             icon: const Icon(Icons.person_add_alt_1_rounded, size: 19),
             label: const Text('Invite'),
             style: TextButton.styleFrom(
-              foregroundColor: FlixieColors.primary,
+              foregroundColor: context.colors.primaryText,
               textStyle: const TextStyle(fontWeight: FontWeight.w800),
             ),
           ),
@@ -130,13 +131,18 @@ class _SocialScreenState extends State<SocialScreen> {
             onChanged: (i) => setState(() => _selectedTab = i),
           ),
           Expanded(
-            child: IndexedStack(
-              index: _selectedTab,
-              children: [
-                _FriendsSubView(key: ValueKey('friends-$_refreshRevision')),
-                ConversationsHub(key: ValueKey('chats-$_refreshRevision')),
-                _GroupsSubView(key: ValueKey('groups-$_refreshRevision')),
-              ],
+            child: ClipRect(
+              child: Material(
+                type: MaterialType.transparency,
+                child: IndexedStack(
+                  index: _selectedTab,
+                  children: [
+                    _FriendsSubView(key: ValueKey('friends-$_refreshRevision')),
+                    ConversationsHub(key: ValueKey('chats-$_refreshRevision')),
+                    _GroupsSubView(key: ValueKey('groups-$_refreshRevision')),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -227,7 +233,7 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.tabBarBackgroundFocused,
+      backgroundColor: context.colors.tabBarBackgroundFocused,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -312,8 +318,7 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
 
     if (_error != null) {
       return Center(
-        child:
-            Text(_error!, style: const TextStyle(color: FlixieColors.medium)),
+        child: Text(_error!, style: TextStyle(color: context.colors.medium)),
       );
     }
 
@@ -353,7 +358,7 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
                 icon: const Icon(Icons.add),
                 label: const Text('Add'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: FlixieColors.primary,
+                  foregroundColor: context.colors.primaryText,
                   side: const BorderSide(color: FlixieColors.primary),
                   minimumSize: const Size(96, 52),
                   shape: RoundedRectangleBorder(
@@ -369,9 +374,9 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
             ]),
             const SizedBox(height: 20),
             Row(children: [
-              const Text('Friends',
+              Text('Friends',
                   style: TextStyle(
-                      color: FlixieColors.white,
+                      color: context.colors.white,
                       fontSize: 19,
                       fontWeight: FontWeight.w800)),
               const Spacer(),
@@ -417,7 +422,7 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
               ),
               const SizedBox(height: 14),
             ],
-            const SocialSectionHeader(title: 'FRIEND ACTIVITY'),
+            const SocialSectionHeader(title: 'Friend activity'),
             const SizedBox(height: 10),
             ActivityFilterBar(
               selected: _activityFilter,
@@ -483,94 +488,69 @@ class _InviteFriendsBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => context.push('/invite-friend?from=social_banner'),
-      borderRadius: BorderRadius.circular(18),
-      child: Ink(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(16, 15, 12, 15),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              FlixieColors.primary.withValues(alpha: .25),
-              FlixieColors.secondary.withValues(alpha: .12),
-            ],
-          ),
+    return Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          onTap: () => context.push('/invite-friend?from=social_banner'),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: FlixieColors.primary.withValues(alpha: .45),
+          child: Ink(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(16, 15, 12, 15),
+            decoration: BoxDecoration(
+              color: context.colors.surface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: context.colors.tabBarBorder,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: FlixieColors.primary.withValues(alpha: .2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.group_add_rounded,
+                    color: FlixieColors.primary,
+                    size: 27,
+                  ),
+                ),
+                const SizedBox(width: 13),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Flixie is better together',
+                        style: TextStyle(
+                          color: context.colors.textPrimary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Invite friends to compare favourites and plan what to watch.',
+                        style: TextStyle(
+                          color: context.colors.medium,
+                          fontSize: 12.5,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const FlixiePill.label(
+                    label: Text('Invite'),
+                    avatar: Icon(Icons.arrow_forward_rounded)),
+              ],
+            ),
           ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: FlixieColors.primary.withValues(alpha: .2),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.group_add_rounded,
-                color: FlixieColors.primary,
-                size: 27,
-              ),
-            ),
-            const SizedBox(width: 13),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Flixie is better together',
-                    style: TextStyle(
-                      color: FlixieColors.light,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'Invite friends to compare favourites and plan what to watch.',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: FlixieColors.medium,
-                      fontSize: 12.5,
-                      height: 1.3,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-              decoration: BoxDecoration(
-                color: FlixieColors.primary,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Invite',
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  SizedBox(width: 3),
-                  Icon(Icons.arrow_forward_rounded,
-                      color: Colors.black, size: 16),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+        ));
   }
 }
 
@@ -589,7 +569,7 @@ class _RequestBell extends StatelessWidget {
             icon: const Icon(Icons.notifications_none_rounded),
             style: IconButton.styleFrom(
               minimumSize: const Size(52, 52),
-              side: const BorderSide(color: FlixieColors.tabBarBorder),
+              side: BorderSide(color: context.colors.tabBarBorder),
             ),
           ),
           if (count > 0)
@@ -603,8 +583,8 @@ class _RequestBell extends StatelessWidget {
                 decoration: const BoxDecoration(
                     color: FlixieColors.primary, shape: BoxShape.circle),
                 child: Text('$count',
-                    style: const TextStyle(
-                        color: Colors.black,
+                    style: TextStyle(
+                        color: context.colors.white,
                         fontSize: 11,
                         fontWeight: FontWeight.w800)),
               ),
@@ -659,8 +639,8 @@ class _FriendStoryStrip extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: FlixieColors.medium,
+                    style: TextStyle(
+                      color: context.colors.medium,
                       fontSize: 11,
                     ),
                   ),
@@ -692,27 +672,28 @@ class _SocialQuickStats extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        _stat(Icons.people_alt_outlined, '$friendCount', 'Friends',
+        _stat(context, Icons.people_alt_outlined, '$friendCount', 'Friends',
             FlixieColors.primary),
         const SizedBox(width: 8),
-        _stat(Icons.notifications_active_outlined, '$pendingCount', 'Pending',
-            FlixieColors.warning),
+        _stat(context, Icons.notifications_active_outlined, '$pendingCount',
+            'Pending', context.colors.warning),
         const SizedBox(width: 8),
-        _stat(Icons.groups_2_outlined, '$groupCount', 'Groups',
-            FlixieColors.secondary),
+        _stat(context, Icons.groups_2_outlined, '$groupCount', 'Groups',
+            context.colors.secondary),
         const SizedBox(width: 8),
-        _stat(Icons.bolt_rounded, '$activityCount', 'Updates',
-            FlixieColors.tertiary),
+        _stat(context, Icons.bolt_rounded, '$activityCount', 'Updates',
+            context.colors.tertiary),
       ],
     );
   }
 
-  Widget _stat(IconData icon, String value, String label, Color color) {
+  Widget _stat(BuildContext context, IconData icon, String value, String label,
+      Color color) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
         decoration: BoxDecoration(
-          color: FlixieColors.surfaceElevated,
+          color: context.colors.surfaceElevated,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
         ),
@@ -722,8 +703,8 @@ class _SocialQuickStats extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               value,
-              style: const TextStyle(
-                color: FlixieColors.light,
+              style: TextStyle(
+                color: context.colors.light,
                 fontSize: 17,
                 fontWeight: FontWeight.w800,
               ),
@@ -732,8 +713,8 @@ class _SocialQuickStats extends StatelessWidget {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: FlixieColors.medium,
+              style: TextStyle(
+                color: context.colors.medium,
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
               ),
@@ -754,23 +735,21 @@ class _FriendSearchField extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
-      style: const TextStyle(color: FlixieColors.light, fontSize: 14),
+      style: TextStyle(color: context.colors.light, fontSize: 14),
       textInputAction: TextInputAction.search,
       decoration: InputDecoration(
         hintText: 'Search friends',
-        hintStyle: const TextStyle(color: FlixieColors.medium),
-        prefixIcon:
-            const Icon(Icons.search_rounded, color: FlixieColors.medium),
+        hintStyle: TextStyle(color: context.colors.medium),
+        prefixIcon: Icon(Icons.search_rounded, color: context.colors.medium),
         suffixIcon: controller.text.isEmpty
             ? null
             : IconButton(
                 tooltip: 'Clear search',
-                icon:
-                    const Icon(Icons.close_rounded, color: FlixieColors.medium),
+                icon: Icon(Icons.close_rounded, color: context.colors.medium),
                 onPressed: controller.clear,
               ),
         filled: true,
-        fillColor: FlixieColors.surfaceElevated,
+        fillColor: context.colors.surfaceElevated,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         enabledBorder: OutlineInputBorder(
@@ -818,8 +797,8 @@ class _PendingSocialSummary extends StatelessWidget {
                 if (outgoingCount > 0)
                   '$outgoingCount sent invite${outgoingCount == 1 ? '' : 's'}',
               ].join(' · '),
-              style: const TextStyle(
-                color: FlixieColors.light,
+              style: TextStyle(
+                color: context.colors.light,
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
               ),
@@ -828,7 +807,7 @@ class _PendingSocialSummary extends StatelessWidget {
           TextButton(
             onPressed: onAddFriend,
             style: TextButton.styleFrom(
-              foregroundColor: FlixieColors.primary,
+              foregroundColor: context.colors.primaryText,
               minimumSize: Size.zero,
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             ),
@@ -868,26 +847,12 @@ class _EnhancedFriendsSection extends StatelessWidget {
         Row(
           children: [
             const Expanded(child: SocialSectionHeader(title: 'FRIENDS')),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: FlixieColors.primary.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                '$totalCount',
-                style: const TextStyle(
-                  color: FlixieColors.primary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
+            FlixiePill.label(label: Text('$totalCount')),
             const SizedBox(width: 8),
             TextButton.icon(
               onPressed: onAddFriend,
               style: TextButton.styleFrom(
-                foregroundColor: FlixieColors.primary,
+                foregroundColor: context.colors.primaryText,
                 minimumSize: Size.zero,
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               ),
@@ -941,7 +906,7 @@ class _NoFriendsCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: FlixieColors.surfaceElevated,
+        color: context.colors.surfaceElevated,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
@@ -957,7 +922,7 @@ class _NoFriendsCard extends StatelessWidget {
               isSearching
                   ? 'No friends match your search.'
                   : 'Add friends to compare watchlists and see activity.',
-              style: const TextStyle(color: FlixieColors.medium, fontSize: 13),
+              style: TextStyle(color: context.colors.medium, fontSize: 13),
             ),
           ),
           if (!isSearching)
@@ -1077,9 +1042,9 @@ class _EnhancedFriendCard extends StatelessWidget {
         width: 150,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: FlixieColors.surfaceElevated,
+          color: context.colors.surfaceElevated,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: FlixieColors.tabBarBorder),
+          border: Border.all(color: context.colors.tabBarBorder),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1097,7 +1062,7 @@ class _EnhancedFriendCard extends StatelessWidget {
                 PopupMenuButton<String>(
                   tooltip: 'Friend actions',
                   padding: EdgeInsets.zero,
-                  color: FlixieColors.surfaceElevated,
+                  color: context.colors.surfaceElevated,
                   onSelected: (value) {
                     if (value == 'profile') {
                       context.push('/friends/${friend.id}');
@@ -1105,30 +1070,30 @@ class _EnhancedFriendCard extends StatelessWidget {
                       onRequestWatch();
                     }
                   },
-                  itemBuilder: (_) => const [
+                  itemBuilder: (_) => [
                     PopupMenuItem(
                       value: 'profile',
                       child: Row(children: [
-                        Icon(Icons.person_outline,
+                        const Icon(Icons.person_outline,
                             color: FlixieColors.primary, size: 18),
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Text('View profile',
-                            style: TextStyle(color: Colors.white)),
+                            style: TextStyle(color: context.colors.white)),
                       ]),
                     ),
                     PopupMenuItem(
                       value: 'request',
                       child: Row(children: [
                         Icon(Icons.movie_filter_outlined,
-                            color: FlixieColors.secondary, size: 18),
-                        SizedBox(width: 8),
+                            color: context.colors.secondary, size: 18),
+                        const SizedBox(width: 8),
                         Text('Create Watch Plan',
-                            style: TextStyle(color: Colors.white)),
+                            style: TextStyle(color: context.colors.white)),
                       ]),
                     ),
                   ],
-                  child: const Icon(Icons.more_horiz_rounded,
-                      color: FlixieColors.medium, size: 20),
+                  child: Icon(Icons.more_horiz_rounded,
+                      color: context.colors.medium, size: 20),
                 ),
               ],
             ),
@@ -1137,8 +1102,8 @@ class _EnhancedFriendCard extends StatelessWidget {
               friend.shortName,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: FlixieColors.light,
+              style: TextStyle(
+                color: context.colors.light,
                 fontSize: 15,
                 fontWeight: FontWeight.w800,
               ),
@@ -1159,8 +1124,8 @@ class _EnhancedFriendCard extends StatelessWidget {
               insights.secondaryLabel,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: FlixieColors.medium,
+              style: TextStyle(
+                color: context.colors.medium,
                 fontSize: 11,
                 height: 1.25,
               ),
@@ -1189,17 +1154,17 @@ class _ActivityEmptyState extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: FlixieColors.surfaceElevated,
+        color: context.colors.surfaceElevated,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'No recent activity yet.',
             style: TextStyle(
-              color: FlixieColors.light,
+              color: context.colors.light,
               fontWeight: FontWeight.w800,
               fontSize: 15,
             ),
@@ -1209,7 +1174,7 @@ class _ActivityEmptyState extends StatelessWidget {
             hasFriends
                 ? 'Create a Watch Plan or add more titles to spark activity.'
                 : 'Add friends to start seeing ratings, watchlists and reviews here.',
-            style: const TextStyle(color: FlixieColors.medium, fontSize: 13),
+            style: TextStyle(color: context.colors.medium, fontSize: 13),
           ),
           const SizedBox(height: 12),
           Row(
@@ -1221,7 +1186,7 @@ class _ActivityEmptyState extends StatelessWidget {
                     : Icons.person_add_outlined),
                 label: Text(hasFriends ? 'Pick a movie' : 'Add friends'),
                 style: FilledButton.styleFrom(
-                  foregroundColor: FlixieColors.light,
+                  foregroundColor: context.colors.light,
                   backgroundColor: FlixieColors.primary.withValues(alpha: 0.2),
                 ),
               ),
@@ -1482,7 +1447,7 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.tabBarBackgroundFocused,
+      backgroundColor: context.colors.tabBarBackgroundFocused,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -1525,8 +1490,7 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
 
     if (_error != null) {
       return Center(
-        child:
-            Text(_error!, style: const TextStyle(color: FlixieColors.medium)),
+        child: Text(_error!, style: TextStyle(color: context.colors.medium)),
       );
     }
 
@@ -1571,7 +1535,7 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
                 icon: const Icon(Icons.add_rounded, size: 20),
                 label: const Text('Create'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: FlixieColors.primary,
+                  foregroundColor: context.colors.primaryText,
                   side: const BorderSide(color: FlixieColors.primary),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
@@ -1583,14 +1547,19 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
               const SizedBox(width: 8),
               Badge(
                 isLabelVisible: pendingGroups.isNotEmpty,
-                label: Text('${pendingGroups.length}'),
-                backgroundColor: FlixieColors.primary,
+                label: Text(pendingGroups.length > 99
+                    ? '99+'
+                    : '${pendingGroups.length}'),
+                backgroundColor: FlixieColors.primaryShade,
+                textColor: Colors.white,
+                textStyle:
+                    const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
                 child: IconButton.filledTonal(
                   onPressed: () => setState(() => _innerTab = 1),
                   icon: const Icon(Icons.notifications_none_rounded),
-                  color: FlixieColors.light,
+                  color: context.colors.light,
                   style: IconButton.styleFrom(
-                    backgroundColor: FlixieColors.surfaceElevated,
+                    backgroundColor: context.colors.surfaceElevated,
                     minimumSize: const Size(50, 50),
                   ),
                 ),
@@ -1628,8 +1597,8 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: FlixieColors.medium,
+                            style: TextStyle(
+                              color: context.colors.medium,
                               fontSize: 11,
                             ),
                           ),
@@ -1650,31 +1619,12 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
             ),
             const SizedBox(height: 20),
           ],
-          Row(
+          const Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: SocialSectionHeader(title: 'YOUR GROUPS'),
               ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                decoration: BoxDecoration(
-                  color: FlixieColors.primary.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: const Row(
-                  children: [
-                    Text('Most active',
-                        style: TextStyle(
-                            color: FlixieColors.primary,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12)),
-                    SizedBox(width: 5),
-                    Icon(Icons.keyboard_arrow_down_rounded,
-                        color: FlixieColors.primary, size: 18),
-                  ],
-                ),
-              ),
+              FlixiePill.label(label: Text('Most active')),
             ],
           ),
           const SizedBox(height: 8),
@@ -1762,14 +1712,14 @@ class _GroupInviteBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
       decoration: BoxDecoration(
-        color: FlixieColors.surface,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: FlixieColors.tabBarBorder),
+        border: Border.all(color: context.colors.tabBarBorder),
       ),
       child: Row(
         children: [
-          const Icon(Icons.mail_outline_rounded,
-              color: FlixieColors.warning, size: 22),
+          Icon(Icons.mail_outline_rounded,
+              color: context.colors.warning, size: 22),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -1778,8 +1728,8 @@ class _GroupInviteBanner extends StatelessWidget {
                   : 'You have $count group invitations',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: FlixieColors.light,
+              style: TextStyle(
+                color: context.colors.light,
                 fontSize: 13,
               ),
             ),
@@ -1788,7 +1738,7 @@ class _GroupInviteBanner extends StatelessWidget {
           OutlinedButton(
             onPressed: onView,
             style: OutlinedButton.styleFrom(
-              foregroundColor: FlixieColors.primary,
+              foregroundColor: context.colors.primaryText,
               side: BorderSide(
                   color: FlixieColors.primary.withValues(alpha: 0.65)),
               visualDensity: VisualDensity.compact,
@@ -1810,23 +1760,21 @@ class _GroupSearchField extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
-      style: const TextStyle(color: FlixieColors.light, fontSize: 14),
+      style: TextStyle(color: context.colors.light, fontSize: 14),
       textInputAction: TextInputAction.search,
       decoration: InputDecoration(
         hintText: 'Search groups',
-        hintStyle: const TextStyle(color: FlixieColors.medium),
-        prefixIcon:
-            const Icon(Icons.search_rounded, color: FlixieColors.medium),
+        hintStyle: TextStyle(color: context.colors.medium),
+        prefixIcon: Icon(Icons.search_rounded, color: context.colors.medium),
         suffixIcon: controller.text.isEmpty
             ? null
             : IconButton(
                 tooltip: 'Clear search',
-                icon:
-                    const Icon(Icons.close_rounded, color: FlixieColors.medium),
+                icon: Icon(Icons.close_rounded, color: context.colors.medium),
                 onPressed: controller.clear,
               ),
         filled: true,
-        fillColor: FlixieColors.surfaceElevated,
+        fillColor: context.colors.surfaceElevated,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         enabledBorder: OutlineInputBorder(
@@ -1857,7 +1805,7 @@ class _NoGroupsCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: FlixieColors.surfaceElevated,
+        color: context.colors.surfaceElevated,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
@@ -1873,7 +1821,7 @@ class _NoGroupsCard extends StatelessWidget {
               isSearching
                   ? 'No groups match your search.'
                   : 'Create a group to plan watches with friends.',
-              style: const TextStyle(color: FlixieColors.medium, fontSize: 13),
+              style: TextStyle(color: context.colors.medium, fontSize: 13),
             ),
           ),
           if (!isSearching)
@@ -1898,25 +1846,25 @@ class _NoGroupInvitesCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: FlixieColors.surfaceElevated,
+        color: context.colors.surfaceElevated,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'No pending invites',
             style: TextStyle(
-              color: FlixieColors.light,
+              color: context.colors.light,
               fontSize: 16,
               fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'Start a group and invite friends to plan what to watch next.',
-            style: TextStyle(color: FlixieColors.medium, fontSize: 13),
+            style: TextStyle(color: context.colors.medium, fontSize: 13),
           ),
           const SizedBox(height: 12),
           FilledButton.tonalIcon(
@@ -1924,7 +1872,7 @@ class _NoGroupInvitesCard extends StatelessWidget {
             icon: const Icon(Icons.add),
             label: const Text('Create group'),
             style: FilledButton.styleFrom(
-              foregroundColor: FlixieColors.light,
+              foregroundColor: context.colors.light,
               backgroundColor: FlixieColors.primary.withValues(alpha: 0.2),
             ),
           ),
@@ -1945,19 +1893,20 @@ class _PendingGroupInviteSummary extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: FlixieColors.warning.withValues(alpha: 0.12),
+        color: context.colors.warning.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: FlixieColors.warning.withValues(alpha: 0.22)),
+        border:
+            Border.all(color: context.colors.warning.withValues(alpha: 0.22)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.mail_outline_rounded, color: FlixieColors.warning),
+          Icon(Icons.mail_outline_rounded, color: context.colors.warning),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               '$count group invite${count == 1 ? '' : 's'} waiting',
-              style: const TextStyle(
-                color: FlixieColors.light,
+              style: TextStyle(
+                color: context.colors.light,
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
               ),
@@ -2113,7 +2062,7 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: FlixieColors.medium.withValues(alpha: 0.4),
+                  color: context.colors.medium.withValues(alpha: 0.4),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -2147,7 +2096,7 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
             Text(
               'Visibility',
               style: textTheme.bodyMedium
-                  ?.copyWith(color: FlixieColors.light, fontSize: 13),
+                  ?.copyWith(color: context.colors.light, fontSize: 13),
             ),
             const SizedBox(height: 8),
             Row(
@@ -2172,7 +2121,7 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
                 onPressed: _submit,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: FlixieColors.primary,
-                  foregroundColor: Colors.black,
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
@@ -2201,7 +2150,7 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
           width: 40,
           height: 4,
           decoration: BoxDecoration(
-            color: FlixieColors.medium.withValues(alpha: 0.4),
+            color: context.colors.medium.withValues(alpha: 0.4),
             borderRadius: BorderRadius.circular(2),
           ),
         ),
@@ -2223,16 +2172,16 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
                     ),
                     Text(
                       'to "${_nameController.text}"',
-                      style: const TextStyle(
-                          color: FlixieColors.medium, fontSize: 13),
+                      style:
+                          TextStyle(color: context.colors.medium, fontSize: 13),
                     ),
                   ],
                 ),
               ),
               TextButton(
                 onPressed: _inviting ? null : _createGroupWithMembers,
-                child: const Text('Skip',
-                    style: TextStyle(color: FlixieColors.medium)),
+                child: Text('Skip',
+                    style: TextStyle(color: context.colors.medium)),
               ),
             ],
           ),
@@ -2243,13 +2192,13 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
           child: TextField(
             controller: _searchController,
             onChanged: (_) => setState(() {}),
-            style: const TextStyle(color: FlixieColors.light),
+            style: TextStyle(color: context.colors.light),
             decoration: InputDecoration(
               hintText: 'Search friends…',
-              hintStyle: const TextStyle(color: FlixieColors.medium),
-              prefixIcon: const Icon(Icons.search, color: FlixieColors.medium),
+              hintStyle: TextStyle(color: context.colors.medium),
+              prefixIcon: Icon(Icons.search, color: context.colors.medium),
               filled: true,
-              fillColor: FlixieColors.tabBarBackground,
+              fillColor: context.colors.tabBarBackground,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide.none,
@@ -2269,7 +2218,7 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
                         _friends.isEmpty
                             ? 'No friends to invite yet'
                             : 'No matches',
-                        style: const TextStyle(color: FlixieColors.medium),
+                        style: TextStyle(color: context.colors.medium),
                       ),
                     )
                   : ListView.builder(
@@ -2288,10 +2237,9 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
                             }
                           }),
                           title: Text(friend.username,
-                              style:
-                                  const TextStyle(color: FlixieColors.light)),
+                              style: TextStyle(color: context.colors.light)),
                           activeColor: FlixieColors.primary,
-                          checkColor: Colors.black,
+                          checkColor: Colors.white,
                           secondary: CircleAvatar(
                             backgroundColor:
                                 FlixieColors.primary.withValues(alpha: 0.2),
@@ -2316,7 +2264,7 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
               onPressed: _inviting ? null : _createGroupWithMembers,
               style: ElevatedButton.styleFrom(
                 backgroundColor: FlixieColors.primary,
-                foregroundColor: Colors.black,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
@@ -2326,7 +2274,7 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.black),
+                          strokeWidth: 2, color: Colors.white),
                     )
                   : Text(
                       _selectedFriendIds.isEmpty
@@ -2354,20 +2302,20 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
       maxLength: maxLength,
       maxLines: maxLines,
       validator: validator,
-      style: const TextStyle(color: FlixieColors.light),
+      style: TextStyle(color: context.colors.light),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: FlixieColors.medium, fontSize: 13),
-        counterStyle: const TextStyle(color: FlixieColors.medium),
+        labelStyle: TextStyle(color: context.colors.medium, fontSize: 13),
+        counterStyle: TextStyle(color: context.colors.medium),
         filled: true,
-        fillColor: FlixieColors.tabBarBackground,
+        fillColor: context.colors.tabBarBackground,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: FlixieColors.tabBarBorder),
+          borderSide: BorderSide(color: context.colors.tabBarBorder),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: FlixieColors.tabBarBorder),
+          borderSide: BorderSide(color: context.colors.tabBarBorder),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
@@ -2385,6 +2333,6 @@ Future<void> showProfileCreateGroupSheet(BuildContext context,
       useRootNavigator: true,
       useSafeArea: true,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.tabBarBackgroundFocused,
+      backgroundColor: context.colors.tabBarBackgroundFocused,
       builder: (_) => _CreateGroupSheet(onCreated: onCreated),
     );

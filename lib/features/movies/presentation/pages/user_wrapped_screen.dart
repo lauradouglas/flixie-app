@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -54,7 +55,7 @@ class _UserWrappedScreenState extends State<UserWrappedScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: FlixieColors.navy,
+      backgroundColor: context.colors.navy,
       body: FutureBuilder<(User, MovieWrapped)>(
         future: _future,
         builder: (context, snapshot) {
@@ -129,12 +130,12 @@ class _WrappedPage extends StatelessWidget {
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
                 sliver: SliverList.list(children: [
-                  _identity(),
+                  _identity(context),
                   const SizedBox(height: 12),
                   _PosterFan(films: featured),
                   Transform.translate(
                     offset: const Offset(0, -8),
-                    child: _headline(),
+                    child: _headline(context),
                   ),
                   const SizedBox(height: 14),
                   _highlights(),
@@ -197,7 +198,7 @@ class _WrappedPage extends StatelessWidget {
         ]),
       );
 
-  Widget _identity() =>
+  Widget _identity(BuildContext context) =>
       Row(mainAxisAlignment: MainAxisAlignment.center, children: [
         ProfileAvatarView(
           avatar: user.avatar,
@@ -210,12 +211,12 @@ class _WrappedPage extends StatelessWidget {
         Flexible(
           child: Text('@${user.username}',
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  color: FlixieColors.primaryTint, fontSize: 16)),
+              style:
+                  TextStyle(color: context.colors.primaryTint, fontSize: 16)),
         ),
       ]);
 
-  Widget _headline() => Column(children: [
+  Widget _headline(BuildContext context) => Column(children: [
         Text('${wrapped.rewatchCount}',
             style: const TextStyle(
                 fontSize: 74, height: .9, fontWeight: FontWeight.w900)),
@@ -223,7 +224,7 @@ class _WrappedPage extends StatelessWidget {
         const SizedBox(height: 3),
         Text(
           '${wrapped.totalMoviesWatched} movies · ${wrapped.totalHoursWatched.toStringAsFixed(1)}h',
-          style: const TextStyle(color: FlixieColors.light, fontSize: 17),
+          style: TextStyle(color: context.colors.light, fontSize: 17),
         ),
       ]);
 
@@ -246,15 +247,15 @@ class _WrappedPage extends StatelessWidget {
 class _WrappedBackground extends StatelessWidget {
   const _WrappedBackground();
   @override
-  Widget build(BuildContext context) => const DecoratedBox(
+  Widget build(BuildContext context) => DecoratedBox(
         decoration: BoxDecoration(
           gradient: RadialGradient(
-            center: Alignment(0, -.7),
+            center: const Alignment(0, -.7),
             radius: 1.05,
             colors: [
-              Color(0xFF3B1465),
-              FlixieColors.background,
-              FlixieColors.navy
+              const Color(0xFF3B1465),
+              context.colors.background,
+              context.colors.navy
             ],
           ),
         ),
@@ -337,8 +338,8 @@ class _FilmGrid extends StatelessWidget {
                                   fontWeight: FontWeight.w700))),
                       if (film.rating != null)
                         Text('★ ${film.rating}/10',
-                            style: const TextStyle(
-                                color: FlixieColors.warning,
+                            style: TextStyle(
+                                color: context.colors.warning,
                                 fontWeight: FontWeight.w700)),
                     ])),
               ]),
@@ -358,8 +359,8 @@ class _Standout extends StatelessWidget {
         child: Container(
           height: 116,
           decoration: BoxDecoration(
-              color: FlixieColors.surface.withValues(alpha: .82),
-              border: Border.all(color: FlixieColors.tabBarBorder),
+              color: context.colors.surface.withValues(alpha: .82),
+              border: Border.all(color: context.colors.tabBarBorder),
               borderRadius: BorderRadius.circular(16)),
           child: Row(children: [
             ClipRRect(
@@ -381,13 +382,12 @@ class _Standout extends StatelessWidget {
                                   fontSize: 19, fontWeight: FontWeight.w800)),
                           const SizedBox(height: 7),
                           Text('Highest rated  ★ ${movie.rating}/10',
-                              style:
-                                  const TextStyle(color: FlixieColors.warning)),
+                              style: TextStyle(color: context.colors.warning)),
                         ]))),
-            const Padding(
-                padding: EdgeInsets.only(right: 14),
+            Padding(
+                padding: const EdgeInsets.only(right: 14),
                 child: Icon(Icons.diamond_outlined,
-                    color: FlixieColors.warning, size: 34)),
+                    color: context.colors.warning, size: 34)),
           ]),
         ),
       );
@@ -398,25 +398,10 @@ class _TastePills extends StatelessWidget {
   final List<WrappedNamedCount> genres;
   @override
   Widget build(BuildContext context) {
-    const colors = [
-      FlixieColors.warning,
-      FlixieColors.secondary,
-      FlixieColors.primary
-    ];
-    return Row(children: [
-      for (var i = 0; i < genres.length; i++)
-        Expanded(
-            child: Padding(
-                padding: EdgeInsets.only(right: i == genres.length - 1 ? 0 : 8),
-                child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                        border: Border.all(color: colors[i]),
-                        borderRadius: BorderRadius.circular(22)),
-                    child: Text('${genres[i].name}  ${genres[i].count}',
-                        textAlign: TextAlign.center,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: colors[i])))))
+    return Wrap(spacing: 8, runSpacing: 8, children: [
+      for (final genre in genres)
+        FlixiePill.label(
+            colorKey: genre.name, label: Text('${genre.name}  ${genre.count}'))
     ]);
   }
 }
@@ -432,11 +417,11 @@ class _Highlight extends StatelessWidget {
         height: 68,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-            color: FlixieColors.surface.withValues(alpha: .7),
-            border: Border.all(color: FlixieColors.tabBarBorder),
+            color: context.colors.surface.withValues(alpha: .7),
+            border: Border.all(color: context.colors.tabBarBorder),
             borderRadius: BorderRadius.circular(15)),
         child: Row(children: [
-          Icon(icon, color: FlixieColors.warning),
+          Icon(icon, color: context.colors.warning),
           const SizedBox(width: 10),
           Expanded(
               child: Column(
@@ -444,8 +429,8 @@ class _Highlight extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                 Text(label,
-                    style: const TextStyle(
-                        color: FlixieColors.medium, fontSize: 11)),
+                    style:
+                        TextStyle(color: context.colors.medium, fontSize: 11)),
                 Text(value,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -488,12 +473,12 @@ class _Poster extends StatelessWidget {
       width: width,
       height: height,
       decoration: BoxDecoration(
-          color: FlixieColors.surfaceElevated,
+          color: context.colors.surfaceElevated,
           borderRadius: BorderRadius.circular(13),
           border: Border.all(color: Colors.white12)),
       clipBehavior: Clip.antiAlias,
       child: url == null
-          ? const Icon(Icons.movie_outlined, color: FlixieColors.medium)
+          ? Icon(Icons.movie_outlined, color: context.colors.medium)
           : CachedNetworkImage(
               imageUrl: url,
               fit: BoxFit.cover,

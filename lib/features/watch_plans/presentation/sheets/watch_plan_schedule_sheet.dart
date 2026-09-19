@@ -49,7 +49,7 @@ class _WatchPlanScheduleSheetState extends State<WatchPlanScheduleSheet> {
     return SizedBox(
       height: height * .88,
       child: Material(
-        color: FlixieColors.background,
+        color: context.colors.background,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         clipBehavior: Clip.antiAlias,
         child: MediaQuery(
@@ -66,25 +66,25 @@ class _WatchPlanScheduleSheetState extends State<WatchPlanScheduleSheet> {
                       width: 54,
                       height: 6,
                       decoration: BoxDecoration(
-                          color: FlixieColors.medium,
+                          color: context.colors.medium,
                           borderRadius: BorderRadius.circular(10)))),
               const SizedBox(height: 24),
               Row(children: [
-                const Expanded(
+                Expanded(
                     child: Text('Date & time',
                         style: TextStyle(
-                            color: FlixieColors.textPrimary,
+                            color: context.colors.textPrimary,
                             fontSize: 26,
                             fontWeight: FontWeight.w800))),
                 IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded,
-                        color: FlixieColors.light, size: 28)),
+                    icon: Icon(Icons.close_rounded,
+                        color: context.colors.light, size: 28)),
               ]),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                   'Set when this plan should happen. You can change it again later.',
-                  style: TextStyle(color: FlixieColors.light, fontSize: 13)),
+                  style: TextStyle(color: context.colors.light, fontSize: 13)),
               const SizedBox(height: 24),
               _ScheduleModeSelector(
                   mode: _mode,
@@ -95,9 +95,9 @@ class _WatchPlanScheduleSheetState extends State<WatchPlanScheduleSheet> {
                         }
                       })),
               const SizedBox(height: 24),
-              const Text('Quick pick',
+              Text('Quick pick',
                   style: TextStyle(
-                      color: FlixieColors.textPrimary,
+                      color: context.colors.textPrimary,
                       fontSize: 17,
                       fontWeight: FontWeight.w800)),
               const SizedBox(height: 12),
@@ -137,16 +137,16 @@ class _WatchPlanScheduleSheetState extends State<WatchPlanScheduleSheet> {
                       onChanged: (value) =>
                           setState(() => _leaveTimeUndecided = value)),
                   const SizedBox(width: 10),
-                  const Text('Leave the time undecided',
+                  Text('Leave the time undecided',
                       style:
-                          TextStyle(color: FlixieColors.light, fontSize: 13)),
+                          TextStyle(color: context.colors.light, fontSize: 13)),
                 ]),
               ],
               if (widget.showLocation) ...[
                 const SizedBox(height: 10),
                 TextField(
                   controller: _locationController,
-                  style: const TextStyle(color: FlixieColors.light),
+                  style: TextStyle(color: context.colors.light),
                   decoration: const InputDecoration(
                     prefixIcon: Icon(Icons.location_on_outlined),
                     labelText: 'Location (optional)',
@@ -159,12 +159,12 @@ class _WatchPlanScheduleSheetState extends State<WatchPlanScheduleSheet> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                      color: FlixieColors.surfaceElevated,
+                      color: context.colors.surfaceElevated,
                       borderRadius: BorderRadius.circular(18)),
-                  child: const Text(
+                  child: Text(
                       'Everyone in this plan will be notified that the schedule changed.',
-                      style:
-                          TextStyle(color: FlixieColors.light, fontSize: 11))),
+                      style: TextStyle(
+                          color: context.colors.light, fontSize: 11))),
               const SizedBox(height: 20),
               SizedBox(
                   width: double.infinity,
@@ -187,7 +187,7 @@ class _WatchPlanScheduleSheetState extends State<WatchPlanScheduleSheet> {
         FlixieToast(
           type: FlixieToastType.warning,
           content: const Text('Choose a date and time in the future.'),
-          backgroundColor: FlixieColors.danger,
+          backgroundColor: context.colors.danger,
         ),
       );
       return;
@@ -277,16 +277,17 @@ class _ScheduleModeSelector extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          border: Border.all(color: FlixieColors.tabBarBorder),
+          border: Border.all(color: context.colors.tabBarBorder),
           borderRadius: BorderRadius.circular(18),
         ),
         child: Row(children: [
-          _modeButton('Date only', _ScheduleEntryMode.dateOnly),
-          _modeButton('Date & time', _ScheduleEntryMode.dateAndTime),
+          _modeButton(context, 'Date only', _ScheduleEntryMode.dateOnly),
+          _modeButton(context, 'Date & time', _ScheduleEntryMode.dateAndTime),
         ]),
       );
 
-  Widget _modeButton(String label, _ScheduleEntryMode value) {
+  Widget _modeButton(
+      BuildContext context, String label, _ScheduleEntryMode value) {
     final selected = mode == value;
     return Expanded(
       child: Semantics(
@@ -305,7 +306,7 @@ class _ScheduleModeSelector extends StatelessWidget {
             child: Text(label,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: selected ? FlixieColors.white : FlixieColors.light,
+                  color: selected ? context.colors.white : context.colors.light,
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
                 )),
@@ -328,8 +329,8 @@ class _QuickScheduleButton extends StatelessWidget {
         style: OutlinedButton.styleFrom(
           minimumSize: const Size.fromHeight(58),
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-          foregroundColor: FlixieColors.light,
-          side: const BorderSide(color: FlixieColors.tabBarBorder),
+          foregroundColor: context.colors.light,
+          side: BorderSide(color: context.colors.tabBarBorder),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
@@ -363,7 +364,7 @@ class _ScheduleDetailCard extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              border: Border.all(color: FlixieColors.tabBarBorder),
+              border: Border.all(color: context.colors.tabBarBorder),
               borderRadius: BorderRadius.circular(18),
             ),
             child: Row(children: [
@@ -371,7 +372,7 @@ class _ScheduleDetailCard extends StatelessWidget {
                 width: 54,
                 height: 54,
                 decoration: BoxDecoration(
-                  color: FlixieColors.surfaceElevated,
+                  color: context.colors.surfaceElevated,
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(icon, color: FlixieColors.primary, size: 24),
@@ -382,15 +383,15 @@ class _ScheduleDetailCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                     Text(label,
-                        style: const TextStyle(
-                            color: FlixieColors.medium,
+                        style: TextStyle(
+                            color: context.colors.medium,
                             fontSize: 10,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 1.4)),
                     const SizedBox(height: 5),
                     Text(value,
-                        style: const TextStyle(
-                            color: FlixieColors.textPrimary,
+                        style: TextStyle(
+                            color: context.colors.textPrimary,
                             fontSize: 15,
                             fontWeight: FontWeight.w600)),
                   ])),
@@ -429,7 +430,7 @@ class _ScheduleTimePickerSheetState extends State<_ScheduleTimePickerSheet> {
     );
     return SafeArea(
       child: Material(
-        color: FlixieColors.background,
+        color: context.colors.background,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         clipBehavior: Clip.antiAlias,
         child: Padding(
@@ -441,17 +442,17 @@ class _ScheduleTimePickerSheetState extends State<_ScheduleTimePickerSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: FlixieColors.medium,
+                  color: context.colors.medium,
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
               const SizedBox(height: 18),
-              const Align(
+              Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
                   'Choose a time',
                   style: TextStyle(
-                    color: FlixieColors.textPrimary,
+                    color: context.colors.textPrimary,
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
                   ),
@@ -519,7 +520,7 @@ class _ScheduleDatePickerSheetState extends State<_ScheduleDatePickerSheet> {
       child: SizedBox(
         height: MediaQuery.sizeOf(context).height * .74,
         child: Material(
-          color: FlixieColors.background,
+          color: context.colors.background,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           clipBehavior: Clip.antiAlias,
           child: Padding(
@@ -530,17 +531,17 @@ class _ScheduleDatePickerSheetState extends State<_ScheduleDatePickerSheet> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: FlixieColors.medium,
+                    color: context.colors.medium,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
                 const SizedBox(height: 18),
-                const Align(
+                Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
                     'Choose a date',
                     style: TextStyle(
-                      color: FlixieColors.textPrimary,
+                      color: context.colors.textPrimary,
                       fontSize: 20,
                       fontWeight: FontWeight.w900,
                     ),

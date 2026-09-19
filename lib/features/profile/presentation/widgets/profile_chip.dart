@@ -17,7 +17,7 @@ class FriendProfileChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: FlixieColors.tabBarBackgroundFocused,
+        color: context.colors.tabBarBackgroundFocused,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -28,13 +28,12 @@ class FriendProfileChip extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(label,
-                  style: const TextStyle(
-                      color: Colors.white,
+                  style: TextStyle(
+                      color: context.colors.white,
                       fontWeight: FontWeight.bold,
                       fontSize: 14)),
               Text(sublabel,
-                  style: const TextStyle(
-                      color: FlixieColors.medium, fontSize: 11)),
+                  style: TextStyle(color: context.colors.medium, fontSize: 11)),
             ],
           ),
         ],

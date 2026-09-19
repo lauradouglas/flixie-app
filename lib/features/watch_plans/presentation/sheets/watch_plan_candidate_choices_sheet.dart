@@ -31,9 +31,9 @@ class _WatchPlanCandidateChoicesSheetState
   Widget build(BuildContext context) {
     return SafeArea(
       child: Container(
-        decoration: const BoxDecoration(
-          color: FlixieColors.background,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: context.colors.background,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
         child: Column(
@@ -45,24 +45,24 @@ class _WatchPlanCandidateChoicesSheetState
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: FlixieColors.medium,
+                  color: context.colors.medium,
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
             ),
             const SizedBox(height: 18),
-            const Text(
+            Text(
               'Which would you be happy to watch?',
               style: TextStyle(
-                color: FlixieColors.textPrimary,
+                color: context.colors.textPrimary,
                 fontSize: 19,
                 fontWeight: FontWeight.w900,
               ),
             ),
             const SizedBox(height: 5),
-            const Text(
+            Text(
               'Select every option that works for you. Choose at least one to continue.',
-              style: TextStyle(color: FlixieColors.medium, fontSize: 13),
+              style: TextStyle(color: context.colors.medium, fontSize: 13),
             ),
             const SizedBox(height: 12),
             ...widget.request.candidates.map((candidate) {
@@ -83,13 +83,13 @@ class _WatchPlanCandidateChoicesSheetState
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? FlixieColors.success.withValues(alpha: 0.12)
-                            : FlixieColors.surface,
+                            ? context.colors.success.withValues(alpha: 0.12)
+                            : context.colors.surface,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
                           color: isSelected
-                              ? FlixieColors.success
-                              : FlixieColors.tabBarBorder,
+                              ? context.colors.success
+                              : context.colors.tabBarBorder,
                           width: isSelected ? 2 : 1,
                         ),
                       ),
@@ -118,8 +118,8 @@ class _WatchPlanCandidateChoicesSheetState
                               children: [
                                 Text(
                                   candidate.title ?? 'Untitled',
-                                  style: const TextStyle(
-                                    color: FlixieColors.light,
+                                  style: TextStyle(
+                                    color: context.colors.light,
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
@@ -136,8 +136,8 @@ class _WatchPlanCandidateChoicesSheetState
                                         child: Text(
                                           'Suggested by ${candidate.addedByUsername}',
                                           overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            color: FlixieColors.medium,
+                                          style: TextStyle(
+                                            color: context.colors.medium,
                                             fontSize: 12,
                                           ),
                                         ),
@@ -155,8 +155,8 @@ class _WatchPlanCandidateChoicesSheetState
                                   : Icons.add_circle_outline_rounded,
                               key: ValueKey(isSelected),
                               color: isSelected
-                                  ? FlixieColors.success
-                                  : FlixieColors.medium,
+                                  ? context.colors.success
+                                  : context.colors.medium,
                               size: 28,
                             ),
                           ),
@@ -168,12 +168,12 @@ class _WatchPlanCandidateChoicesSheetState
               );
             }),
             if (_selected.isEmpty)
-              const Padding(
-                padding: EdgeInsets.only(bottom: 8),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
                 child: Text(
                   'Select at least one movie to save your choices.',
                   style: TextStyle(
-                    color: FlixieColors.danger,
+                    color: context.colors.danger,
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -202,8 +202,8 @@ class _PosterPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         color: const Color(0xFF1E2D40),
-        child: const Center(
-          child: Icon(Icons.movie_outlined, color: FlixieColors.medium),
+        child: Center(
+          child: Icon(Icons.movie_outlined, color: context.colors.medium),
         ),
       );
 }

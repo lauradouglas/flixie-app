@@ -69,7 +69,35 @@ class FlixieNotification {
       type == showWatchRequest;
 
   /// Whether this notification is still pending a response.
-  bool get isPending => action == actionReceived;
+  bool get isPending {
+    if (closed == true) return false;
+    if (type == friendRequest || type == groupInvite) {
+      final request = link?['request'];
+      if (request is Map) {
+        final status = request['status']?.toString().toUpperCase();
+        if (status != null && status != 'PENDING') return false;
+        final requester = request['requester'];
+        final requesterId = request['requesterId'] ??
+            (requester is Map ? requester['id'] : null);
+        if (requesterId == userId) return false;
+      }
+    }
+    return recipientAction == actionReceived;
+  }
+
+  /// Older recipient notifications were stored as SENT by the API.
+  String? get recipientAction {
+    if ((type != friendRequest && type != groupInvite) ||
+        action != actionSent) {
+      return action;
+    }
+    final request = link?['request'];
+    if (request is! Map) return action;
+    final recipient = request['recipient'];
+    final recipientId =
+        request['recipientId'] ?? (recipient is Map ? recipient['id'] : null);
+    return recipientId == userId ? actionReceived : action;
+  }
 
   bool get isRead => read ?? false;
 

@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/models/movie_friend_activity.dart';
@@ -8,13 +9,14 @@ class MediaFriendActivityRow extends StatelessWidget {
       {super.key, required this.activity, required this.onTap});
   final MovieFriendActivity activity;
   final VoidCallback? onTap;
-  BoxDecoration _friendPanelDecoration() => BoxDecoration(
-        color: FlixieColors.surface.withValues(alpha: 0.58),
+  BoxDecoration _friendPanelDecoration(BuildContext context) => BoxDecoration(
+        color: context.colors.surface.withValues(alpha: 0.58),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       );
 
-  Widget _compactFriendAvatar(MovieFriendActivity activity,
+  Widget _compactFriendAvatar(
+      BuildContext context, MovieFriendActivity activity,
       {double size = 30}) {
     final hex =
         activity.iconColor?['hexCode']?.toString().replaceFirst('#', '');
@@ -24,8 +26,8 @@ class MediaFriendActivityRow extends StatelessWidget {
     final color = value == null ? FlixieColors.primary : Color(value);
     return Container(
       padding: const EdgeInsets.all(1.5),
-      decoration: const BoxDecoration(
-        color: FlixieColors.surface,
+      decoration: BoxDecoration(
+        color: context.colors.surface,
         shape: BoxShape.circle,
       ),
       child: ProfileAvatarView(
@@ -51,7 +53,7 @@ class MediaFriendActivityRow extends StatelessWidget {
                   ? 'Watched twice'
                   : 'Watched',
           Icons.check_rounded,
-          FlixieColors.success,
+          context.colors.success,
         ),
       if (activity.onWatchlist)
         _compactFriendChip(
@@ -63,7 +65,7 @@ class MediaFriendActivityRow extends StatelessWidget {
         _compactFriendChip(
           'Favourite',
           Icons.favorite_rounded,
-          FlixieColors.danger,
+          context.colors.danger,
         ),
       if (activity.reviewed)
         _compactFriendChip(
@@ -79,11 +81,11 @@ class MediaFriendActivityRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
-          decoration: _friendPanelDecoration(),
+          decoration: _friendPanelDecoration(context),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              _compactFriendAvatar(activity, size: 38),
+              _compactFriendAvatar(context, activity, size: 38),
               const SizedBox(width: 8),
               Expanded(
                 child: Column(
@@ -91,8 +93,8 @@ class MediaFriendActivityRow extends StatelessWidget {
                   children: [
                     Text(
                       activity.username,
-                      style: const TextStyle(
-                        color: FlixieColors.white,
+                      style: TextStyle(
+                        color: context.colors.white,
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                       ),
@@ -119,8 +121,8 @@ class MediaFriendActivityRow extends StatelessWidget {
                         ? Icons.thumb_up_alt_rounded
                         : Icons.thumb_down_alt_rounded,
                     color: activity.recommended!
-                        ? FlixieColors.success
-                        : FlixieColors.danger,
+                        ? context.colors.success
+                        : context.colors.danger,
                     size: 17,
                   ),
                 ),
@@ -130,13 +132,13 @@ class MediaFriendActivityRow extends StatelessWidget {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.star_rounded,
-                        color: FlixieColors.warning, size: 16),
+                    Icon(Icons.star_rounded,
+                        color: context.colors.warning, size: 16),
                     const SizedBox(width: 2),
                     Text(
                       '${activity.rating}/10',
-                      style: const TextStyle(
-                        color: FlixieColors.light,
+                      style: TextStyle(
+                        color: context.colors.light,
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                       ),
@@ -156,22 +158,8 @@ class MediaFriendActivityRow extends StatelessWidget {
     );
   }
 
-  Widget _compactFriendChip(String label, IconData icon, Color color) =>
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: color.withValues(alpha: 0.65)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 10),
-            const SizedBox(width: 3),
-            Text(label,
-                style: TextStyle(
-                    color: color, fontSize: 9, fontWeight: FontWeight.w600)),
-          ],
-        ),
-      );
+  Widget _compactFriendChip(String label, IconData icon, Color color) {
+    return FlixiePill.label(
+        label: Text(label), avatar: Icon(icon, color: color));
+  }
 }

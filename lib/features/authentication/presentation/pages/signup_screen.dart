@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/legal/terms_agreement_field.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'dart:async';
 
@@ -39,6 +40,7 @@ class _SignupScreenState extends State<SignupScreen> {
   static const _usernameDebounceDuration = Duration(milliseconds: 350);
 
   final _formKey = GlobalKey<FormState>();
+  bool _termsAccepted = false;
 
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
@@ -97,9 +99,11 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> _pickCountry() async {
     final country = await showModalBottomSheet<Country>(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _CountryPickerSheet(
+      builder: (_) => SignupCountryPickerSheet(
         countries: _countries,
         selected: _selectedCountry,
       ),
@@ -252,7 +256,7 @@ class _SignupScreenState extends State<SignupScreen> {
           type: FlixieToastType.error,
           content: Text(
               _usernameCheckError ?? 'Please choose an available username.'),
-          backgroundColor: FlixieColors.danger,
+          backgroundColor: context.colors.danger,
         ),
       );
       return;
@@ -268,7 +272,7 @@ class _SignupScreenState extends State<SignupScreen> {
             content: Text(
               _referralError ?? 'Enter a valid referral code.',
             ),
-            backgroundColor: FlixieColors.danger,
+            backgroundColor: context.colors.danger,
           ),
         );
         return;
@@ -287,7 +291,7 @@ class _SignupScreenState extends State<SignupScreen> {
           type: FlixieToastType.warning,
           content:
               const Text('Please select your country to show watch providers.'),
-          backgroundColor: FlixieColors.danger,
+          backgroundColor: context.colors.danger,
         ),
       );
       return;
@@ -298,6 +302,7 @@ class _SignupScreenState extends State<SignupScreen> {
       unawaited(analytics.signupStarted());
     }
     final success = await auth.beginAvatarSignUp(
+      termsAccepted: _termsAccepted,
       email: _emailController.text.trim(),
       password: _passwordController.text,
       firstName: _firstNameController.text.trim(),
@@ -325,7 +330,7 @@ class _SignupScreenState extends State<SignupScreen> {
       FlixieToast(
         type: FlixieToastType.error,
         content: Text(auth.errorMessage ?? 'Sign up failed.'),
-        backgroundColor: FlixieColors.danger,
+        backgroundColor: context.colors.danger,
       ),
     );
   }
@@ -377,7 +382,7 @@ class _SignupScreenState extends State<SignupScreen> {
     ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
       type: FlixieToastType.error,
       content: Text(auth.errorMessage ?? 'Unable to assign avatar.'),
-      backgroundColor: FlixieColors.danger,
+      backgroundColor: context.colors.danger,
     ));
   }
 
@@ -393,10 +398,10 @@ class _SignupScreenState extends State<SignupScreen> {
       );
     }
     if (_usernameAvailable == true) {
-      return const Icon(Icons.check_circle, color: FlixieColors.success);
+      return Icon(Icons.check_circle, color: context.colors.success);
     }
     if (_usernameAvailable == false) {
-      return const Icon(Icons.cancel, color: FlixieColors.danger);
+      return Icon(Icons.cancel, color: context.colors.danger);
     }
     return null;
   }
@@ -407,8 +412,8 @@ class _SignupScreenState extends State<SignupScreen> {
     return Icon(
       isValidEmailFormat(value) ? Icons.check_circle : Icons.error_outline,
       color: isValidEmailFormat(value)
-          ? FlixieColors.success
-          : FlixieColors.danger,
+          ? context.colors.success
+          : context.colors.danger,
     );
   }
 
@@ -422,16 +427,23 @@ class _SignupScreenState extends State<SignupScreen> {
       title: Text.rich(
         TextSpan(
           style: textTheme.displaySmall?.copyWith(
-            color: FlixieColors.textPrimary,
+            color: context.colors.textPrimary,
             fontWeight: FontWeight.w800,
           ),
           children: [
             const TextSpan(text: 'Join '),
-            flixieWordmarkSpan(
-              fontSize: textTheme.displaySmall?.fontSize ?? 36,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.4,
-            ),
+            if (Theme.of(context).brightness == Brightness.light)
+              WidgetSpan(
+                  alignment: PlaceholderAlignment.middle,
+                  child: FlixieWordmark(
+                      fontSize: textTheme.displaySmall?.fontSize ?? 36))
+            else
+              flixieWordmarkSpan(
+                foregroundColor: context.colors.textPrimary,
+                fontSize: textTheme.displaySmall?.fontSize ?? 36,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.4,
+              ),
           ],
         ),
         textAlign: TextAlign.center,
@@ -519,8 +531,8 @@ class _SignupScreenState extends State<SignupScreen> {
                         alignment: Alignment.centerLeft,
                         child: Text(
                           _usernameCheckError!,
-                          style: const TextStyle(
-                            color: FlixieColors.danger,
+                          style: TextStyle(
+                            color: context.colors.danger,
                             fontSize: 12,
                           ),
                         ),
@@ -572,14 +584,14 @@ class _SignupScreenState extends State<SignupScreen> {
                               ),
                             )
                           : _referralCodeValid == true
-                              ? const Icon(
+                              ? Icon(
                                   Icons.check_circle,
-                                  color: FlixieColors.success,
+                                  color: context.colors.success,
                                 )
                               : _referralCodeValid == false
-                                  ? const Icon(
+                                  ? Icon(
                                       Icons.cancel,
-                                      color: FlixieColors.danger,
+                                      color: context.colors.danger,
                                     )
                                   : null,
                       validator: (value) {
@@ -601,10 +613,10 @@ class _SignupScreenState extends State<SignupScreen> {
                                   'your Movie Match.',
                       style: TextStyle(
                         color: _referrerUsername != null
-                            ? FlixieColors.success
+                            ? context.colors.success
                             : _referralError != null
-                                ? FlixieColors.danger
-                                : FlixieColors.medium,
+                                ? context.colors.danger
+                                : context.colors.medium,
                         fontSize: 12,
                         height: 1.35,
                         fontWeight: _referrerUsername != null
@@ -641,6 +653,9 @@ class _SignupScreenState extends State<SignupScreen> {
                       },
                     ),
                     const SizedBox(height: 22),
+                    TermsAgreementField(
+                        onChanged: (value) => _termsAccepted = value),
+                    const SizedBox(height: 16),
                     PrimaryButton(
                       label: 'Continue',
                       isLoading: isLoading,
@@ -653,12 +668,12 @@ class _SignupScreenState extends State<SignupScreen> {
                         Text(
                           'Already have an account?',
                           style: textTheme.bodyMedium
-                              ?.copyWith(color: FlixieColors.light),
+                              ?.copyWith(color: context.colors.light),
                         ),
                         TextButton(
                           onPressed: () => context.pop(),
                           style: TextButton.styleFrom(
-                            foregroundColor: FlixieColors.primaryTint,
+                            foregroundColor: context.colors.primaryTint,
                             padding: const EdgeInsets.symmetric(horizontal: 8),
                           ),
                           child: const Text(
@@ -704,19 +719,19 @@ class _CountryPickerField extends StatelessWidget {
         curve: Curves.easeOut,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),
-          color: FlixieColors.tabBarBackgroundFocused.withValues(alpha: 0.9),
+          color: context.colors.tabBarBackgroundFocused.withValues(alpha: 0.9),
           border: Border.all(
-            color: FlixieColors.tabBarBorder.withValues(alpha: 0.9),
+            color: context.colors.tabBarBorder.withValues(alpha: 0.9),
           ),
         ),
         height: 64,
         padding: const EdgeInsets.symmetric(horizontal: 18),
         child: Row(
           children: [
-            const Icon(
+            Icon(
               Icons.location_on_outlined,
               size: 22,
-              color: FlixieColors.medium,
+              color: context.colors.medium,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -726,15 +741,15 @@ class _CountryPickerField extends StatelessWidget {
                     hasValue ? 'Country: ${selected!.name}' : 'Country',
                     style: TextStyle(
                       color: hasValue
-                          ? FlixieColors.textPrimary
-                          : FlixieColors.light.withValues(alpha: 0.86),
+                          ? context.colors.textPrimary
+                          : context.colors.light.withValues(alpha: 0.86),
                       fontSize: 16,
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.expand_more_rounded, color: FlixieColors.medium),
+            Icon(Icons.expand_more_rounded, color: context.colors.medium),
           ],
         ),
       ),
@@ -746,17 +761,18 @@ class _CountryPickerField extends StatelessWidget {
 // Country picker bottom sheet
 // ---------------------------------------------------------------------------
 
-class _CountryPickerSheet extends StatefulWidget {
-  const _CountryPickerSheet({required this.countries, this.selected});
+class SignupCountryPickerSheet extends StatefulWidget {
+  const SignupCountryPickerSheet(
+      {super.key, required this.countries, this.selected});
 
   final List<Country> countries;
   final Country? selected;
 
   @override
-  State<_CountryPickerSheet> createState() => _CountryPickerSheetState();
+  State<SignupCountryPickerSheet> createState() => _CountryPickerSheetState();
 }
 
-class _CountryPickerSheetState extends State<_CountryPickerSheet> {
+class _CountryPickerSheetState extends State<SignupCountryPickerSheet> {
   final _searchController = TextEditingController();
   late List<Country> _filtered;
   bool _loadingCountries = false;
@@ -806,10 +822,10 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
       clipBehavior: Clip.antiAlias,
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
       decoration: BoxDecoration(
-        color: FlixieColors.surface,
+        color: context.colors.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         border: Border.all(
-          color: FlixieColors.tabBarBorder.withValues(alpha: 0.85),
+          color: context.colors.tabBarBorder.withValues(alpha: 0.85),
         ),
       ),
       child: SafeArea(
@@ -822,16 +838,16 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: FlixieColors.medium,
+                  color: context.colors.medium,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Select Country',
               style: TextStyle(
-                color: FlixieColors.textPrimary,
+                color: context.colors.textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
@@ -841,24 +857,23 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
               controller: _searchController,
               onChanged: _onSearch,
               autofocus: true,
-              style: const TextStyle(color: FlixieColors.textPrimary),
+              style: TextStyle(color: context.colors.textPrimary),
               decoration: InputDecoration(
                 hintText: 'Search countries...',
-                hintStyle: const TextStyle(color: FlixieColors.medium),
-                prefixIcon:
-                    const Icon(Icons.search, color: FlixieColors.medium),
+                hintStyle: TextStyle(color: context.colors.medium),
+                prefixIcon: Icon(Icons.search, color: context.colors.medium),
                 filled: true,
-                fillColor: FlixieColors.surfaceElevated,
+                fillColor: context.colors.surfaceElevated,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: FlixieColors.tabBarBorder.withValues(alpha: 0.85),
+                    color: context.colors.tabBarBorder.withValues(alpha: 0.85),
                   ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(
-                    color: FlixieColors.tabBarBorder.withValues(alpha: 0.85),
+                    color: context.colors.tabBarBorder.withValues(alpha: 0.85),
                   ),
                 ),
                 focusedBorder: OutlineInputBorder(
@@ -879,24 +894,27 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
                       itemBuilder: (context, index) {
                         final country = _filtered[index];
                         final isSelected = country.id == widget.selected?.id;
-                        return ListTile(
-                          tileColor: Colors.transparent,
-                          title: Text(
-                            country.name,
-                            style: TextStyle(
-                              color: isSelected
-                                  ? FlixieColors.primary
-                                  : FlixieColors.textPrimary,
-                              fontWeight: isSelected
-                                  ? FontWeight.w700
-                                  : FontWeight.normal,
+                        return Material(
+                          type: MaterialType.transparency,
+                          child: ListTile(
+                            tileColor: Colors.transparent,
+                            title: Text(
+                              country.name,
+                              style: TextStyle(
+                                color: isSelected
+                                    ? FlixieColors.primary
+                                    : context.colors.textPrimary,
+                                fontWeight: isSelected
+                                    ? FontWeight.w700
+                                    : FontWeight.normal,
+                              ),
                             ),
+                            trailing: isSelected
+                                ? const Icon(Icons.check_rounded,
+                                    color: FlixieColors.primary)
+                                : null,
+                            onTap: () => Navigator.of(context).pop(country),
                           ),
-                          trailing: isSelected
-                              ? const Icon(Icons.check_rounded,
-                                  color: FlixieColors.primary)
-                              : null,
-                          onTap: () => Navigator.of(context).pop(country),
                         );
                       },
                     ),

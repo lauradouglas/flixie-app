@@ -32,7 +32,7 @@ void main() {
           isMe: isMe,
           sentAt: DateTime(2026, 9, 13, 21, 58));
   Widget app(Widget child, double scale) => MaterialApp(
-      theme: ThemeData(fontFamily: 'Manrope'),
+      theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Manrope'),
       home: Scaffold(
           backgroundColor: const Color(0xFF120A24),
           body: MediaQuery(
@@ -90,14 +90,29 @@ void main() {
     expect(find.text('Open movie'), findsNothing);
   });
 
-  testWidgets('poster and title open the movie and ownership survives a rename', (tester) async {
-    const owned = ActivityReplyPayload(userId: 'me', username: 'OldUsername',
-      activityLabel: 'rating', title: 'The Odyssey', link: 'flixie://movies/1', posterUrl: '');
+  testWidgets('poster and title open the movie and ownership survives a rename',
+      (tester) async {
+    const owned = ActivityReplyPayload(
+        userId: 'me',
+        username: 'OldUsername',
+        activityLabel: 'rating',
+        title: 'The Odyssey',
+        link: 'flixie://movies/1',
+        posterUrl: '');
     final router = GoRouter(routes: [
-      GoRoute(path: '/', builder: (_, state) => Scaffold(body: ChatBubble(
-        message: owned.withMessage('noice'), senderUsername: 'Dougasaur',
-        currentUserId: 'me', currentUsername: 'LauraD', isMe: false, sentAt: DateTime(2026)))),
-      GoRoute(path: '/movies/:id', builder: (_, state) => const Scaffold(body: Text('Movie opened'))),
+      GoRoute(
+          path: '/',
+          builder: (_, state) => Scaffold(
+              body: ChatBubble(
+                  message: owned.withMessage('noice'),
+                  senderUsername: 'Dougasaur',
+                  currentUserId: 'me',
+                  currentUsername: 'LauraD',
+                  isMe: false,
+                  sentAt: DateTime(2026)))),
+      GoRoute(
+          path: '/movies/:id',
+          builder: (_, state) => const Scaffold(body: Text('Movie opened'))),
     ]);
     addTearDown(router.dispose);
     await tester.pumpWidget(MaterialApp.router(routerConfig: router));

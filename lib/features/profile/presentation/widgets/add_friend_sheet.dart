@@ -159,7 +159,7 @@ class _AddFriendSheetState extends State<AddFriendSheet> {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: FlixieColors.medium.withValues(alpha: 0.4),
+              color: context.colors.medium.withValues(alpha: 0.4),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -177,7 +177,8 @@ class _AddFriendSheetState extends State<AddFriendSheet> {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text(
               'Search by username',
-              style: textTheme.bodySmall?.copyWith(color: FlixieColors.medium),
+              style:
+                  textTheme.bodySmall?.copyWith(color: context.colors.medium),
             ),
           ),
           const SizedBox(height: 16),
@@ -188,14 +189,14 @@ class _AddFriendSheetState extends State<AddFriendSheet> {
                 Expanded(
                   child: TextField(
                     controller: _searchController,
-                    style: const TextStyle(color: FlixieColors.light),
+                    style: TextStyle(color: context.colors.light),
                     decoration: InputDecoration(
                       hintText: 'Username…',
-                      hintStyle: const TextStyle(color: FlixieColors.medium),
+                      hintStyle: TextStyle(color: context.colors.medium),
                       prefixIcon:
-                          const Icon(Icons.search, color: FlixieColors.medium),
+                          Icon(Icons.search, color: context.colors.medium),
                       filled: true,
-                      fillColor: FlixieColors.tabBarBackground,
+                      fillColor: context.colors.tabBarBackground,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: BorderSide.none,
@@ -212,7 +213,7 @@ class _AddFriendSheetState extends State<AddFriendSheet> {
                   onPressed: _searching ? null : _search,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: FlixieColors.primary,
-                    foregroundColor: Colors.black,
+                    foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 14),
                     shape: RoundedRectangleBorder(
@@ -223,7 +224,7 @@ class _AddFriendSheetState extends State<AddFriendSheet> {
                           width: 18,
                           height: 18,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.black),
+                              strokeWidth: 2, color: Colors.white),
                         )
                       : const Text('Search'),
                 ),
@@ -237,7 +238,7 @@ class _AddFriendSheetState extends State<AddFriendSheet> {
                     child: Text(
                       _searchError!,
                       style: textTheme.bodyMedium
-                          ?.copyWith(color: FlixieColors.medium),
+                          ?.copyWith(color: context.colors.medium),
                     ),
                   )
                 : ListView.builder(
@@ -261,20 +262,20 @@ class _AddFriendSheetState extends State<AddFriendSheet> {
                           profileBadges: user.profileBadges,
                         ),
                         title: Text(user.username,
-                            style: const TextStyle(color: FlixieColors.light)),
-                        subtitle: const Text(
+                            style: TextStyle(color: context.colors.light)),
+                        subtitle: Text(
                           'Flixie member',
                           style: TextStyle(
-                              color: FlixieColors.medium, fontSize: 12),
+                              color: context.colors.medium, fontSize: 12),
                         ),
                         trailing: sent
-                            ? const Icon(Icons.check_circle,
-                                color: FlixieColors.success)
+                            ? Icon(Icons.check_circle,
+                                color: context.colors.success)
                             : ElevatedButton(
                                 onPressed: () => _sendRequest(user),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: FlixieColors.primary,
-                                  foregroundColor: Colors.black,
+                                  foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 12, vertical: 8),
                                   textStyle: const TextStyle(fontSize: 12),

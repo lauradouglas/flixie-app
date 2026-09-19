@@ -24,9 +24,9 @@ class GroupInvitationCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: FlixieColors.tabBarBackgroundFocused,
+        color: context.colors.tabBarBackgroundFocused,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: FlixieColors.tabBarBorder),
+        border: Border.all(color: context.colors.tabBarBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -41,8 +41,8 @@ class GroupInvitationCard extends StatelessWidget {
                   children: [
                     Text(
                       group.name,
-                      style: const TextStyle(
-                        color: FlixieColors.light,
+                      style: TextStyle(
+                        color: context.colors.light,
                         fontWeight: FontWeight.w700,
                         fontSize: 15,
                       ),
@@ -51,8 +51,8 @@ class GroupInvitationCard extends StatelessWidget {
                     Text.rich(
                       TextSpan(
                         text: 'Invited by ',
-                        style: const TextStyle(
-                            color: FlixieColors.medium, fontSize: 12),
+                        style: TextStyle(
+                            color: context.colors.medium, fontSize: 12),
                         children: [
                           TextSpan(
                             text: invitedByUsername != null
@@ -78,7 +78,7 @@ class GroupInvitationCard extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: onAccept,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: FlixieColors.success,
+                    backgroundColor: context.colors.success,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     shape: RoundedRectangleBorder(
@@ -94,10 +94,10 @@ class GroupInvitationCard extends StatelessWidget {
                 child: OutlinedButton(
                   onPressed: onDecline,
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: FlixieColors.danger,
+                    foregroundColor: context.colors.danger,
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     side: BorderSide(
-                        color: FlixieColors.danger.withValues(alpha: 0.45)),
+                        color: context.colors.danger.withValues(alpha: 0.45)),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8)),
                   ),

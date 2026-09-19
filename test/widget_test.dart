@@ -62,11 +62,11 @@ void main() {
 
   group('FlixieColors', () {
     test('primary color has correct value', () {
-      expect(FlixieColors.primary, const Color(0xFF9B6BFF));
+      expect(FlixieColors.primary, const Color(0xFF7C4DFF));
     });
 
     test('secondary color has correct value', () {
-      expect(FlixieColors.secondary, const Color(0xFF00D1C7));
+      expect(FlixieColors.secondary, const Color(0xFF65D6C4));
     });
 
     test('background color has correct value', () {

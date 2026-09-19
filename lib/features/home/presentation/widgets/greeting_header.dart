@@ -54,7 +54,7 @@ class GreetingHeader extends StatelessWidget {
               ProfileAvatarView(
                 avatar: avatar,
                 fallbackText: initial,
-                fallbackColor: FlixieColors.surfaceElevated,
+                fallbackColor: context.colors.surfaceElevated,
                 size: 30,
                 profileBadges: profileBadges,
               ),
@@ -64,8 +64,8 @@ class GreetingHeader extends StatelessWidget {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: context.colors.white,
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                     height: 1.1,
@@ -130,7 +130,7 @@ class _ActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: Material(
-        color: FlixieColors.surfaceElevated.withValues(alpha: 0.68),
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
@@ -144,43 +144,22 @@ class _ActionButton extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     SizedBox(
-                      width: 48,
                       height: 27,
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        alignment: Alignment.center,
-                        children: [
-                          Icon(icon, color: FlixieColors.primary, size: 18),
-                          if (badgeCount > 0)
-                            Positioned(
-                              top: 0,
-                              right: -4,
-                              child: Container(
-                                constraints: const BoxConstraints(
-                                  minWidth: 16,
-                                  minHeight: 16,
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 4, vertical: 2),
-                                alignment: Alignment.center,
-                                decoration: const BoxDecoration(
-                                  color: FlixieColors.tertiary,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Text(
-                                  badgeCount > 99 ? '99+' : '$badgeCount',
-                                  semanticsLabel:
-                                      '$badgeCount plans need your attention',
-                                  style: const TextStyle(
-                                    color: Colors.black,
-                                    fontSize: 10,
-                                    height: 1,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
+                      child: Center(
+                        child: Badge(
+                          isLabelVisible: badgeCount > 0,
+                          label: Text(
+                            badgeCount > 99 ? '99+' : '$badgeCount',
+                            semanticsLabel:
+                                '$badgeCount plans need your attention',
+                          ),
+                          backgroundColor: FlixieColors.primaryShade,
+                          textColor: Colors.white,
+                          textStyle: const TextStyle(
+                              fontSize: 11, fontWeight: FontWeight.w700),
+                          child:
+                              Icon(icon, color: FlixieColors.primary, size: 18),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 3),
@@ -191,8 +170,8 @@ class _ActionButton extends StatelessWidget {
                         child: Text(
                           label,
                           maxLines: 1,
-                          style: const TextStyle(
-                            color: FlixieColors.light,
+                          style: TextStyle(
+                            color: context.colors.light,
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
                             height: 1,

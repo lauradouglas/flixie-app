@@ -63,12 +63,12 @@ class AvatarPicker extends StatelessWidget {
               duration: const Duration(milliseconds: 180),
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: FlixieColors.surfaceElevated,
+                color: context.colors.surfaceElevated,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: selected
                       ? FlixieColors.primary
-                      : FlixieColors.tabBarBorder,
+                      : context.colors.tabBarBorder,
                   width: selected ? 3 : 1,
                 ),
               ),

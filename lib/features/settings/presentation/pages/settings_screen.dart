@@ -1,8 +1,12 @@
+import '../widgets/appearance_setting.dart';
+import 'package:flixie_app/features/settings/presentation/widgets/delete_account_button.dart';
+import 'package:flixie_app/core/legal/terms_of_use_screen.dart';
 import 'package:flixie_app/features/settings/data/episode_spoiler_preference.dart';
 import 'package:flixie_app/features/library_import/data/library_import_controller.dart';
 import 'package:flixie_app/features/library_import/presentation/library_import_screen.dart';
 import 'package:flixie_app/core/navigation/tab_refresh_controller.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
+import 'package:flixie_app/features/settings/presentation/widgets/logout_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -35,7 +39,7 @@ Future<void> showSettingsEditDetailsSheet(BuildContext context) async {
     useRootNavigator: true,
     useSafeArea: true,
     isScrollControlled: true,
-    backgroundColor: FlixieColors.surface,
+    backgroundColor: context.colors.surface,
     shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
     clipBehavior: Clip.antiAlias,
@@ -54,11 +58,11 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FlixiePageScaffold(
-      appBar: const FlixieTitleAppBar(
+      appBar: FlixieTitleAppBar(
         title: Text(
           'Settings',
           style: TextStyle(
-            color: Colors.white,
+            color: context.colors.white,
             fontSize: 22,
             fontWeight: FontWeight.bold,
           ),
@@ -67,7 +71,7 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
-          _sectionLabel('Account'),
+          _sectionLabel(context, 'Account'),
           _SettingsGroup(
             children: [
               SettingsTile(
@@ -103,9 +107,10 @@ class SettingsScreen extends StatelessWidget {
                 label: 'Change Avatar',
                 onTap: () => showModalBottomSheet<void>(
                   context: context,
+                  useRootNavigator: true,
                   isScrollControlled: true,
                   useSafeArea: true,
-                  backgroundColor: FlixieColors.background,
+                  backgroundColor: context.colors.background,
                   builder: (_) => const FractionallySizedBox(
                     heightFactor: .9,
                     child: ChangeAvatarSheet(),
@@ -133,7 +138,7 @@ class SettingsScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
-          _sectionLabel('Social'),
+          _sectionLabel(context, 'Social'),
           _SettingsGroup(
             children: [
               SettingsTile(
@@ -145,14 +150,14 @@ class SettingsScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
-          _sectionLabel('Preferences'),
+          _sectionLabel(context, 'Preferences'),
           _SettingsGroup(
             children: [
               const _EpisodeSpoilerSetting(),
               Consumer<AnalyticsController>(
                 builder: (context, analytics, _) => SettingsTile(
                   icon: Icons.analytics_outlined,
-                  label: 'Share anonymous analytics',
+                  label: 'Share usage analytics',
                   onTap: () => analytics.isEnabled
                       ? analytics.decline()
                       : analytics.allow(),
@@ -169,12 +174,7 @@ class SettingsScreen extends StatelessWidget {
               //   label: 'Notifications',
               //   onTap: () {},
               // ),
-              // TODO: implement Appearance settings
-              // SettingsTile(
-              //   icon: Icons.dark_mode_outlined,
-              //   label: 'Appearance',
-              //   onTap: () {},
-              // ),
+              const AppearanceSetting(),
               SettingsTile(
                 icon: Icons.live_tv_outlined,
                 label: 'Watch Providers',
@@ -189,7 +189,7 @@ class SettingsScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
-          _sectionLabel('Support'),
+          _sectionLabel(context, 'Support'),
           _SettingsGroup(
             children: [
               SettingsTile(
@@ -205,7 +205,7 @@ class SettingsScreen extends StatelessWidget {
               SettingsTile(
                 icon: Icons.feedback_outlined,
                 label: 'Send Feedback',
-                onTap: () => _sendFeedback(),
+                onTap: () => _sendFeedback(context),
               ),
               SettingsTile(
                 icon: Icons.star_outline_rounded,
@@ -219,6 +219,11 @@ class SettingsScreen extends StatelessWidget {
                 isLast: true,
               ),
               SettingsTile(
+                icon: Icons.description_outlined,
+                label: 'Terms of Use',
+                onTap: () => TermsOfUseScreen.open(context),
+              ),
+              SettingsTile(
                 icon: Icons.privacy_tip_outlined,
                 label: 'Privacy Policy',
                 onTap: () => _openPrivacyPolicy(context),
@@ -229,20 +234,20 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 32),
           const _LogOutButton(),
           const SizedBox(height: 16),
-          const _DeleteAccountButton(),
+          const DeleteAccountButton(),
           const SizedBox(height: 16),
         ],
       ),
     );
   }
 
-  Widget _sectionLabel(String text) {
+  Widget _sectionLabel(BuildContext context, String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10, left: 4),
       child: Text(
         text,
-        style: const TextStyle(
-          color: FlixieColors.medium,
+        style: TextStyle(
+          color: context.colors.medium,
           fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
@@ -269,6 +274,8 @@ class SettingsScreen extends StatelessWidget {
   void _showChangePasswordSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => const ChangePasswordSheet(),
@@ -278,9 +285,10 @@ class SettingsScreen extends StatelessWidget {
   void _showBlockedUsers(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: FlixieColors.background,
+      backgroundColor: context.colors.background,
       builder: (_) => const FractionallySizedBox(
         heightFactor: .75,
         child: _BlockedUsersSheet(),
@@ -293,6 +301,8 @@ class SettingsScreen extends StatelessWidget {
     if (dbUser == null) return;
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => FavoriteGenresSheet(
@@ -315,12 +325,29 @@ class SettingsScreen extends StatelessWidget {
     }
   }
 
-  Future<void> _sendFeedback() async {
+  Future<void> _sendFeedback(BuildContext context) async {
     final uri =
         Uri.parse('mailto:flixieadmin@gmail.com?subject=Flixie%20Feedback');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
+    try {
+      if (await launchUrl(uri)) return;
+    } catch (_) {
+      // A mail account or email application may not be configured.
     }
+    if (!context.mounted) return;
+    await showFlixiePromptSheet<void>(
+      context: context,
+      builder: (context) => FlixiePromptSheetContent(
+        title: const Text('Contact Flixie'),
+        content: const SelectableText(
+          'Could not open an email app. You can copy this address and contact us from your preferred email service:\n\nflixieadmin@gmail.com',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'))
+        ],
+      ),
+    );
   }
 
   void _showWatchProvidersSheet(BuildContext context) {
@@ -329,6 +356,8 @@ class SettingsScreen extends StatelessWidget {
 
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => WatchProvidersSheet(userId: dbUser.id),
@@ -345,11 +374,33 @@ class _BlockedUsersSheet extends StatefulWidget {
 
 class _BlockedUsersSheetState extends State<_BlockedUsersSheet> {
   late Future<List<BlockedUser>> _users = SafetyService.blockedUsers();
+  final Set<String> _unblocking = {};
+  String? _error;
 
   Future<void> _unblock(BlockedUser user) async {
-    await SafetyService.unblock(user.id);
-    if (mounted) {
-      setState(() => _users = SafetyService.blockedUsers(refresh: true));
+    if (!_unblocking.add(user.id)) return;
+    setState(() {
+      _error = null;
+    });
+    try {
+      await SafetyService.unblock(user.id);
+      if (!mounted) return;
+      final users = SafetyService.blockedUsers(refresh: true);
+      setState(() {
+        _users = users;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _error = 'Could not unblock this user. Please try again.';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _unblocking.remove(user.id);
+        });
+      }
     }
   }
 
@@ -365,11 +416,11 @@ class _BlockedUsersSheetState extends State<_BlockedUsersSheet> {
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
         ),
-        const Padding(
-          padding: EdgeInsets.fromLTRB(20, 0, 20, 16),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
           child: Text(
             'Blocked users cannot contact or interact with you.',
-            style: TextStyle(color: FlixieColors.medium),
+            style: TextStyle(color: context.colors.medium),
           ),
         ),
         Expanded(
@@ -379,12 +430,23 @@ class _BlockedUsersSheetState extends State<_BlockedUsersSheet> {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
+              if (snapshot.hasError) {
+                return Center(
+                    child: TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _users = SafetyService.blockedUsers(refresh: true);
+                    });
+                  },
+                  child: const Text('Could not load blocked users. Retry'),
+                ));
+              }
               final users = snapshot.data ?? const [];
               if (users.isEmpty) {
-                return const Center(
+                return Center(
                   child: Text(
                     'You have not blocked anyone.',
-                    style: TextStyle(color: FlixieColors.medium),
+                    style: TextStyle(color: context.colors.medium),
                   ),
                 );
               }
@@ -402,8 +464,12 @@ class _BlockedUsersSheetState extends State<_BlockedUsersSheet> {
                         ? Text(user.firstName!)
                         : null,
                     trailing: TextButton(
-                      onPressed: () => _unblock(user),
-                      child: const Text('Unblock'),
+                      onPressed: _unblocking.contains(user.id)
+                          ? null
+                          : () => _unblock(user),
+                      child: Text(_unblocking.contains(user.id)
+                          ? 'Unblocking…'
+                          : 'Unblock'),
                     ),
                   );
                 },
@@ -411,6 +477,12 @@ class _BlockedUsersSheetState extends State<_BlockedUsersSheet> {
             },
           ),
         ),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child:
+                Text(_error!, style: TextStyle(color: context.colors.danger)),
+          ),
       ],
     );
   }
@@ -425,10 +497,10 @@ class _SettingsGroup extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: FlixieColors.surface,
+        color: context.colors.surface,
         borderRadius: BorderRadius.circular(kSettingsCornerRadius),
         border: Border.all(
-          color: FlixieColors.tabBarBorder,
+          color: context.colors.tabBarBorder,
         ),
       ),
       child: Column(children: children),
@@ -444,339 +516,32 @@ class _LogOutButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       clipBehavior: Clip.antiAlias,
-      color: FlixieColors.danger.withValues(alpha: 0.1),
+      color: context.colors.danger.withValues(alpha: 0.1),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(kSettingsCornerRadius),
         side: BorderSide(
-          color: FlixieColors.danger.withValues(alpha: 0.3),
+          color: context.colors.danger.withValues(alpha: 0.3),
         ),
       ),
       child: ListTile(
-        leading: const Icon(Icons.logout_rounded, color: FlixieColors.danger),
-        title: const Text(
+        leading: Icon(Icons.logout_rounded, color: context.colors.danger),
+        title: Text(
           'Log Out',
           style: TextStyle(
-            color: FlixieColors.danger,
+            color: context.colors.danger,
             fontWeight: FontWeight.w600,
             fontSize: 15,
           ),
         ),
         onTap: () async {
-          final confirmed = await showFlixiePromptSheet<bool>(
-            context: context,
-            builder: (ctx) => FlixiePromptSheetContent(
-              title: const Text(
-                'Log Out',
-                style: TextStyle(color: Colors.white),
-              ),
-              content: const Text(
-                'Are you sure you want to log out?',
-                style: TextStyle(color: FlixieColors.light),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(color: FlixieColors.medium),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text(
-                    'Log Out',
-                    style: TextStyle(color: FlixieColors.danger),
-                  ),
-                ),
-              ],
-            ),
-          );
-          if (confirmed == true && context.mounted) {
-            await context.read<AuthProvider>().signOut();
-          }
-        },
-      ),
-    );
-  }
-}
-
-class _DeleteAccountButton extends StatelessWidget {
-  const _DeleteAccountButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      clipBehavior: Clip.antiAlias,
-      color: FlixieColors.danger.withValues(alpha: 0.06),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(kSettingsCornerRadius),
-        side: BorderSide(color: FlixieColors.danger.withValues(alpha: 0.2)),
-      ),
-      child: ListTile(
-        leading: const Icon(
-          Icons.delete_forever_outlined,
-          color: FlixieColors.danger,
-        ),
-        title: const Text(
-          'Delete account',
-          style: TextStyle(
-            color: FlixieColors.danger,
-            fontWeight: FontWeight.w700,
-            fontSize: 15,
-          ),
-        ),
-        subtitle: const Text(
-          'Permanently deletes your account and Flixie data.',
-          style: TextStyle(color: FlixieColors.medium, fontSize: 12),
-        ),
-        onTap: () async {
-          final password = await showFlixiePromptSheet<String>(
+          final auth = context.read<AuthProvider>();
+          await showFlixiePromptSheet<void>(
             context: context,
             isDismissible: false,
-            builder: (_) => const _DeleteAccountDialog(),
+            builder: (_) => LogoutSheet(onSignOut: auth.signOut),
           );
-          if (password == null || !context.mounted) return;
-
-          final messenger = ScaffoldMessenger.of(context);
-          final authProvider = context.read<AuthProvider>();
-          final rootNavigator = Navigator.of(context, rootNavigator: true);
-
-          showGeneralDialog<void>(
-            context: context,
-            barrierDismissible: false,
-            barrierColor: FlixieColors.background,
-            transitionDuration: const Duration(milliseconds: 220),
-            pageBuilder: (_, __, ___) => const _AccountDeletionProgressScreen(),
-            transitionBuilder: (_, animation, __, child) => FadeTransition(
-              opacity: animation,
-              child: child,
-            ),
-          );
-
-          final error = await authProvider.deleteAccount(password);
-
-          if (rootNavigator.mounted && rootNavigator.canPop()) {
-            rootNavigator.pop();
-          }
-          if (error != null && messenger.mounted) {
-            messenger.showFlixieToast(
-              FlixieToast(
-                type: FlixieToastType.error,
-                content: Text(error),
-                backgroundColor: FlixieColors.danger,
-              ),
-            );
-          }
         },
       ),
-    );
-  }
-}
-
-class _AccountDeletionProgressScreen extends StatelessWidget {
-  const _AccountDeletionProgressScreen();
-
-  @override
-  Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      child: Scaffold(
-        backgroundColor: FlixieColors.background,
-        body: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 104,
-                    height: 104,
-                    decoration: BoxDecoration(
-                      color: FlixieColors.danger.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: FlixieColors.danger.withValues(alpha: 0.28),
-                      ),
-                    ),
-                    child: const Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        SizedBox(
-                          width: 82,
-                          height: 82,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 3,
-                            color: FlixieColors.danger,
-                            backgroundColor: FlixieColors.tabBarBorder,
-                          ),
-                        ),
-                        Icon(
-                          Icons.shield_outlined,
-                          size: 38,
-                          color: FlixieColors.dangerTint,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  const Text(
-                    'Deleting your account…',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 26,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'We’re securely deleting your Flixie data and login. '
-                    'Please keep the app open.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: FlixieColors.light,
-                      fontSize: 15,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: FlixieColors.surface,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: FlixieColors.tabBarBorder),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.lock_outline_rounded,
-                          size: 18,
-                          color: FlixieColors.success,
-                        ),
-                        SizedBox(width: 9),
-                        Flexible(
-                          child: Text(
-                            'This may take a few moments',
-                            style: TextStyle(
-                              color: FlixieColors.medium,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DeleteAccountDialog extends StatefulWidget {
-  const _DeleteAccountDialog();
-
-  @override
-  State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
-}
-
-class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
-  final _passwordController = TextEditingController();
-  final _confirmationController = TextEditingController();
-  bool _hidePassword = true;
-
-  bool get _canDelete =>
-      _passwordController.text.isNotEmpty &&
-      _confirmationController.text.trim() == 'DELETE';
-
-  @override
-  void dispose() {
-    _passwordController.dispose();
-    _confirmationController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FlixiePromptSheetContent(
-      title: const Text(
-        'Delete your account?',
-        style: TextStyle(color: Colors.white),
-      ),
-      content: AutofillGroup(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'This cannot be undone. Your profile, reviews, ratings, '
-                'watch history, lists, friendships, messages and Firebase '
-                'login will be permanently deleted.',
-                style: TextStyle(color: FlixieColors.light, height: 1.4),
-              ),
-              const SizedBox(height: 18),
-              TextField(
-                controller: _passwordController,
-                obscureText: _hidePassword,
-                autofillHints: const [AutofillHints.password],
-                onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  labelText: 'Current password',
-                  prefixIcon: const Icon(Icons.lock_outline_rounded),
-                  suffixIcon: IconButton(
-                    tooltip: _hidePassword ? 'Show password' : 'Hide password',
-                    onPressed: () =>
-                        setState(() => _hidePassword = !_hidePassword),
-                    icon: Icon(
-                      _hidePassword
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: _confirmationController,
-                autocorrect: false,
-                enableSuggestions: false,
-                textCapitalization: TextCapitalization.characters,
-                onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  labelText: 'Type DELETE to confirm',
-                  prefixIcon: Icon(Icons.warning_amber_rounded),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: _canDelete
-              ? () => Navigator.pop(context, _passwordController.text)
-              : null,
-          style: FilledButton.styleFrom(
-            backgroundColor: FlixieColors.danger,
-            foregroundColor: Colors.white,
-          ),
-          child: const Text('Delete account'),
-        ),
-      ],
     );
   }
 }
@@ -852,7 +617,7 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
     final country = await showModalBottomSheet<Country>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.surface,
+      backgroundColor: context.colors.surface,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       clipBehavior: Clip.antiAlias,
@@ -945,7 +710,7 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
       messenger.showFlixieToast(FlixieToast(
         type: FlixieToastType.success,
         content: const Text('Profile updated'),
-        backgroundColor: FlixieColors.surfaceElevated,
+        backgroundColor: context.colors.surfaceElevated,
       ));
     } on ApiException catch (error) {
       if (!mounted) return;
@@ -955,7 +720,7 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
         content: Text(error.code == 'USERNAME_NOT_AVAILABLE'
             ? error.message
             : 'Failed to update profile. Please try again.'),
-        backgroundColor: FlixieColors.danger,
+        backgroundColor: context.colors.danger,
       ));
     } catch (_) {
       if (!mounted) return;
@@ -963,7 +728,7 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
       messenger.showFlixieToast(FlixieToast(
           type: FlixieToastType.error,
           content: const Text('Failed to update profile. Please try again.'),
-          backgroundColor: FlixieColors.danger));
+          backgroundColor: context.colors.danger));
     }
   }
 
@@ -976,9 +741,9 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
 
     return Container(
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
-      decoration: const BoxDecoration(
-        color: FlixieColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(
         top: false,
@@ -991,16 +756,16 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: FlixieColors.medium,
+                  color: context.colors.medium,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Edit details',
               style: TextStyle(
-                  color: Colors.white,
+                  color: context.colors.white,
                   fontSize: 18,
                   fontWeight: FontWeight.bold),
             ),
@@ -1008,7 +773,7 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
             // Username
             TextField(
               controller: _usernameCtrl,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: context.colors.white),
               textInputAction: TextInputAction.next,
               autocorrect: false,
               onChanged: (v) {
@@ -1017,29 +782,29 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
               },
               decoration: InputDecoration(
                 labelText: 'Username',
-                labelStyle: const TextStyle(color: FlixieColors.medium),
+                labelStyle: TextStyle(color: context.colors.medium),
                 filled: true,
-                fillColor: FlixieColors.tabBarBackgroundFocused,
+                fillColor: context.colors.tabBarBackgroundFocused,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide.none,
                 ),
                 errorText: _usernameError,
                 suffixIcon: _checkingUsername
-                    ? const Padding(
-                        padding: EdgeInsets.all(12),
+                    ? Padding(
+                        padding: const EdgeInsets.all(12),
                         child: SizedBox(
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: FlixieColors.medium),
+                              strokeWidth: 2, color: context.colors.medium),
                         ),
                       )
                     : (_usernameError == null &&
                             _usernameCtrl.text.trim() != widget.user.username &&
                             _usernameCtrl.text.trim().length >= 3)
-                        ? const Icon(Icons.check_circle_outline,
-                            color: FlixieColors.success)
+                        ? Icon(Icons.check_circle_outline,
+                            color: context.colors.success)
                         : null,
               ),
             ),
@@ -1047,21 +812,21 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
             // Bio
             TextField(
               controller: _bioCtrl,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: context.colors.white),
               maxLines: 3,
               maxLength: 200,
               textInputAction: TextInputAction.done,
               onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
                 labelText: 'Bio',
-                labelStyle: const TextStyle(color: FlixieColors.medium),
+                labelStyle: TextStyle(color: context.colors.medium),
                 filled: true,
-                fillColor: FlixieColors.tabBarBackgroundFocused,
+                fillColor: context.colors.tabBarBackgroundFocused,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide.none,
                 ),
-                counterStyle: const TextStyle(color: FlixieColors.medium),
+                counterStyle: TextStyle(color: context.colors.medium),
               ),
             ),
             const SizedBox(height: 14),
@@ -1069,13 +834,13 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
               color: Colors.transparent,
               child: ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                tileColor: FlixieColors.tabBarBackgroundFocused,
+                tileColor: context.colors.tabBarBackgroundFocused,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10)),
-                leading: const Icon(Icons.location_on_outlined,
-                    color: FlixieColors.light),
-                title: const Text('Country',
-                    style: TextStyle(color: Colors.white)),
+                leading: Icon(Icons.location_on_outlined,
+                    color: context.colors.light),
+                title: Text('Country',
+                    style: TextStyle(color: context.colors.white)),
                 subtitle: Text(
                   _loadingCountries
                       ? 'Loading countries…'
@@ -1084,7 +849,7 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
                           : _selectedCountry?.name ??
                               widget.user.country?['name']?.toString() ??
                               'Select your country',
-                  style: const TextStyle(color: FlixieColors.light),
+                  style: TextStyle(color: context.colors.light),
                 ),
                 trailing: _loadingCountries
                     ? const SizedBox(
@@ -1093,7 +858,7 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
                         child: CircularProgressIndicator(strokeWidth: 2))
                     : Icon(
                         _countryLoadFailed ? Icons.refresh : Icons.expand_more,
-                        color: FlixieColors.light),
+                        color: context.colors.light),
                 onTap: _loadingCountries || _saving
                     ? null
                     : _countryLoadFailed
@@ -1101,10 +866,10 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
                         : _pickCountry,
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.only(top: 8, left: 12, right: 12),
+            Padding(
+              padding: const EdgeInsets.only(top: 8, left: 12, right: 12),
               child: Text('Used to find where you can watch movies and shows.',
-                  style: TextStyle(color: FlixieColors.light, fontSize: 12)),
+                  style: TextStyle(color: context.colors.light, fontSize: 12)),
             ),
             const SizedBox(height: 20),
             SizedBox(
@@ -1183,9 +948,9 @@ class _SettingsCountryPickerSheetState
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
     return Container(
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
-      decoration: const BoxDecoration(
-        color: FlixieColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(
         top: false,
@@ -1198,16 +963,16 @@ class _SettingsCountryPickerSheetState
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: FlixieColors.medium,
+                  color: context.colors.medium,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Select Country',
               style: TextStyle(
-                color: Colors.white,
+                color: context.colors.white,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
@@ -1217,14 +982,13 @@ class _SettingsCountryPickerSheetState
               controller: _searchController,
               onChanged: _onSearch,
               autofocus: true,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: context.colors.white),
               decoration: InputDecoration(
                 hintText: 'Search countries...',
-                hintStyle: const TextStyle(color: FlixieColors.medium),
-                prefixIcon:
-                    const Icon(Icons.search, color: FlixieColors.medium),
+                hintStyle: TextStyle(color: context.colors.medium),
+                prefixIcon: Icon(Icons.search, color: context.colors.medium),
                 filled: true,
-                fillColor: FlixieColors.tabBarBackgroundFocused,
+                fillColor: context.colors.tabBarBackgroundFocused,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
@@ -1246,15 +1010,15 @@ class _SettingsCountryPickerSheetState
                         country.name,
                         style: TextStyle(
                           color: isSelected
-                              ? FlixieColors.primaryTint
-                              : FlixieColors.textPrimary,
+                              ? context.colors.primaryTint
+                              : context.colors.textPrimary,
                           fontWeight:
                               isSelected ? FontWeight.w700 : FontWeight.normal,
                         ),
                       ),
                       trailing: isSelected
-                          ? const Icon(Icons.check_rounded,
-                              color: FlixieColors.primaryTint)
+                          ? Icon(Icons.check_rounded,
+                              color: context.colors.primaryTint)
                           : null,
                       onTap: () => Navigator.of(context).pop(country),
                     ),

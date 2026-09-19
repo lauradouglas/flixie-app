@@ -53,9 +53,18 @@ void main() {
           FlixieToast(type: type, content: const Text('Your update')));
       await tester.pumpAndSettle();
       final toast = tester.widget<SnackBar>(find.byType(SnackBar));
-      expect(toast.backgroundColor, const Color(0xFF261B40));
+      expect(toast.backgroundColor, Colors.transparent);
       expect(toast.behavior, SnackBarBehavior.floating);
-      expect((toast.shape! as RoundedRectangleBorder).side.color, type.colour);
+      final surface = tester
+          .widgetList<Container>(find.descendant(
+              of: find.byType(SnackBar), matching: find.byType(Container)))
+          .firstWhere((widget) =>
+              widget.decoration is BoxDecoration &&
+              (widget.decoration! as BoxDecoration).color ==
+                  const Color(0xFF261B40));
+      expect(
+          ((surface.decoration! as BoxDecoration).border! as Border).top.color,
+          type.colour.withValues(alpha: .65));
       expect(find.byIcon(type.icon), findsOneWidget);
     }
   });

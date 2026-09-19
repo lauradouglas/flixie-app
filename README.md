@@ -32,6 +32,20 @@ flutter pub get
 flutter run
 ```
 
+Debug runs default to `http://localhost:3000`. Profile and release builds default
+to the production Azure API. To run a debug build against production:
+
+```bash
+flutter run --dart-define=USE_PROD_API=true
+```
+
+The VS Code launch menu also includes **Mobile - Production API**. An explicit
+`--dart-define=API_BASE_URL=...` takes precedence over these defaults. For example,
+Android Emulator can reach the computer's backend with
+`--dart-define=API_BASE_URL=http://10.0.2.2:3000`; physical devices need the
+computer's LAN address. Keep API overrides out of `.firebase.json` when using
+automatic selection. Stop and rerun the app after changing compile-time flags.
+
 ### Building
 
 ```bash
@@ -39,8 +53,13 @@ flutter run
 flutter build apk --release
 
 # iOS (requires macOS + Xcode)
-flutter build ios --release
+sh scripts/prepare-ios-release.sh
+# Then open ios/Runner.xcworkspace and choose Product > Archive.
 ```
+
+Run the iOS preparation command again after simulator testing with a local
+backend. It restores the production HTTPS API and Firebase configuration used
+by Xcode archives; `.firebase.json` must be available locally.
 
 ## GitHub Actions
 

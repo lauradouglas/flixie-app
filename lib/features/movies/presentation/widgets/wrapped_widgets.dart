@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -40,12 +41,12 @@ class WrappedHeadlineCard extends StatelessWidget {
       height: 104,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            FlixieColors.surfaceElevated,
-            FlixieColors.tabBarBackgroundFocused,
+            context.colors.surfaceElevated,
+            context.colors.tabBarBackgroundFocused,
           ],
         ),
         borderRadius: BorderRadius.circular(16),
@@ -83,8 +84,8 @@ class WrappedHeadlineCard extends StatelessWidget {
                 title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: FlixieColors.medium,
+                style: TextStyle(
+                  color: context.colors.medium,
                   fontSize: 10.5,
                   fontWeight: FontWeight.w600,
                 ),
@@ -123,7 +124,7 @@ class WrappedMonthGrid extends StatelessWidget {
         final count = countByMonth[month] ?? 0;
         final intensity = maxCount > 0 ? count / maxCount : 0.0;
         final bg = Color.lerp(
-          FlixieColors.tabBarBackgroundFocused,
+          context.colors.tabBarBackgroundFocused,
           FlixieColors.primary,
           intensity * 0.85,
         )!;
@@ -145,7 +146,7 @@ class WrappedMonthGrid extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
-                  color: intensity > 0.4 ? Colors.white : FlixieColors.light,
+                  color: intensity > 0.4 ? Colors.white : context.colors.light,
                 ),
               ),
               const SizedBox(height: 2),
@@ -154,7 +155,7 @@ class WrappedMonthGrid extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: intensity > 0.4 ? Colors.white : FlixieColors.medium,
+                  color: intensity > 0.4 ? Colors.white : context.colors.medium,
                 ),
               ),
             ],
@@ -177,13 +178,8 @@ class WrappedGenreChips extends StatelessWidget {
       spacing: 8,
       runSpacing: 8,
       children: genres.map((g) {
-        return Chip(
-          label: Text('${g.name}  ${g.count}'),
-          labelStyle: const TextStyle(color: FlixieColors.white, fontSize: 13),
-          backgroundColor: FlixieColors.primary.withValues(alpha: 0.25),
-          side: const BorderSide(color: FlixieColors.primary),
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-        );
+        return FlixiePill.label(
+            colorKey: g.name, label: Text('${g.name}  ${g.count}'));
       }).toList(),
     );
   }
@@ -209,11 +205,11 @@ class WrappedDirectorList extends StatelessWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            tileColor: FlixieColors.surfaceElevated.withValues(alpha: .55),
+            tileColor: context.colors.surfaceElevated.withValues(alpha: .55),
             title: Text(
               d.name,
               style: TextStyle(
-                color: tappable ? FlixieColors.primary : FlixieColors.white,
+                color: tappable ? FlixieColors.primary : context.colors.white,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -221,11 +217,11 @@ class WrappedDirectorList extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text('${d.count} film${d.count == 1 ? '' : 's'}',
-                    style: const TextStyle(color: FlixieColors.medium)),
+                    style: TextStyle(color: context.colors.medium)),
                 if (tappable) ...[
                   const SizedBox(width: 4),
-                  const Icon(Icons.chevron_right,
-                      color: FlixieColors.medium, size: 18),
+                  Icon(Icons.chevron_right,
+                      color: context.colors.medium, size: 18),
                 ],
               ],
             ),
@@ -279,44 +275,26 @@ class WrappedSummaryCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: FlixieColors.primary.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                          color: FlixieColors.primary.withValues(alpha: 0.6)),
-                    ),
-                    child: Text(
-                      '${card.year} Wrapped',
-                      style: const TextStyle(
-                        color: FlixieColors.primary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
+                  FlixiePill.label(label: Text('${card.year} Wrapped')),
                   const SizedBox(height: 14),
                   RichText(
                     text: TextSpan(
                       children: [
                         TextSpan(
                           text: '${card.totalWatchCount}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 52,
                             fontWeight: FontWeight.w900,
-                            color: Colors.white,
+                            color: context.colors.white,
                             height: 1,
                           ),
                         ),
-                        const TextSpan(
+                        TextSpan(
                           text: ' watches',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w400,
-                            color: FlixieColors.light,
+                            color: context.colors.light,
                           ),
                         ),
                       ],
@@ -386,20 +364,19 @@ class _SummaryStatColumn extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(icon, size: 12, color: FlixieColors.medium),
+            Icon(icon, size: 12, color: context.colors.medium),
             const SizedBox(width: 4),
             Text(label,
-                style:
-                    const TextStyle(fontSize: 11, color: FlixieColors.medium)),
+                style: TextStyle(fontSize: 11, color: context.colors.medium)),
           ],
         ),
         const SizedBox(height: 3),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: Colors.white,
+            color: context.colors.white,
           ),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
@@ -425,7 +402,7 @@ class _SummaryMovieRow extends StatelessWidget {
             height: 52,
             child: posterUrl == null
                 ? Container(
-                    color: FlixieColors.tabBarBackgroundFocused,
+                    color: context.colors.tabBarBackgroundFocused,
                     child: const Icon(Icons.movie_outlined, size: 16),
                   )
                 : CachedNetworkImage(imageUrl: posterUrl!, fit: BoxFit.cover),
@@ -436,15 +413,15 @@ class _SummaryMovieRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Most Rewatched',
-                  style: TextStyle(fontSize: 11, color: FlixieColors.medium)),
+              Text('Most Rewatched',
+                  style: TextStyle(fontSize: 11, color: context.colors.medium)),
               const SizedBox(height: 2),
               Text(
                 movie.title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: Colors.white,
+                  color: context.colors.white,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -452,21 +429,7 @@ class _SummaryMovieRow extends StatelessWidget {
             ],
           ),
         ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: FlixieColors.primary.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(
-            '${movie.watchCount}x',
-            style: const TextStyle(
-              color: FlixieColors.primary,
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-            ),
-          ),
-        ),
+        FlixiePill.label(label: Text('${movie.watchCount}x')),
       ],
     );
   }
@@ -494,8 +457,8 @@ class WrappedRatedMovieRow extends StatelessWidget {
           const SizedBox(width: 3),
           Text(
             '${movie.rating}/10',
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: context.colors.white,
               fontWeight: FontWeight.w600,
               fontSize: 13,
             ),
@@ -551,7 +514,7 @@ class _MovieRowBase extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: FlixieColors.tabBarBackgroundFocused,
+          color: context.colors.tabBarBackgroundFocused,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: FlixieColors.primary.withValues(alpha: .16),
@@ -567,8 +530,8 @@ class _MovieRowBase extends StatelessWidget {
                 child: posterUrl == null
                     ? Container(
                         color: const Color(0xFF1E1E2E),
-                        child: const Icon(Icons.movie_outlined,
-                            size: 20, color: FlixieColors.medium),
+                        child: Icon(Icons.movie_outlined,
+                            size: 20, color: context.colors.medium),
                       )
                     : CachedNetworkImage(
                         imageUrl: posterUrl!,
@@ -582,10 +545,10 @@ class _MovieRowBase extends StatelessWidget {
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: Colors.white,
+                  color: context.colors.white,
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -594,8 +557,7 @@ class _MovieRowBase extends StatelessWidget {
             const SizedBox(width: 12),
             badge,
             const SizedBox(width: 4),
-            const Icon(Icons.chevron_right,
-                color: FlixieColors.medium, size: 18),
+            Icon(Icons.chevron_right, color: context.colors.medium, size: 18),
           ],
         ),
       ),

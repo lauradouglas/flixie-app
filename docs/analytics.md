@@ -12,9 +12,10 @@ so analytics can never interrupt the product. Debug builds print concise
 ## Privacy and parameters
 
 Never send names, usernames, email addresses, referral codes, user IDs, group
-names, message/review text, or participant IDs. `content_id` is the public media
-catalogue identifier, not a user identifier. Parameters are filtered by the
-allowlist in `AnalyticsController`; unknown sources become `unknown`.
+names, message/review text, participant IDs, Watch Plan IDs, or catalogue/person
+IDs. Catalogue IDs could reveal the specific titles a user viewed or watched.
+The central dispatcher strips them even when a caller supplies them. Other
+parameters are filtered by the allowlist; unknown sources become `unknown`.
 
 Canonical content types are `movie` and `show`. Detail-open sources are defined
 once by `DetailSource`: `search`, `trending`, `just_for_you`,
@@ -30,13 +31,13 @@ once by `DetailSource`: `search`, `trending`, `just_for_you`,
 | `signup_completed` | Account creation succeeds | none |
 | `taste_signal_added` | Onboarding taste choice is added | `signal_type` |
 | `taste_profile_completed` | Taste onboarding succeeds | `signal_count` |
-| `content_opened` | Movie/show detail data opens | `content_type`, `content_id`, optional `genre`, `source` |
-| `person_opened` | Person detail data opens | `person_id`, `source`, optional `parent_content_id`, optional `parent_content_type` |
-| `watchlist_added` | Watchlist add succeeds | `content_type`, `content_id`, `source` |
-| `watch_logged` | A new watch entry succeeds | `content_type`, `content_id`, `source`, optional watch-plan attribution |
-| `rating_added` | Rating save succeeds | `content_type`, `content_id`, `source`, optional recommendation attribution |
-| `review_created` | Review creation succeeds | `content_type`, `content_id`, `source` |
-| `recommendation_given` | A recommendation is successfully sent | `content_type`, `content_id`, `source` |
+| `content_opened` | Movie/show detail data opens | `content_type`, optional `genre`, `source` |
+| `person_opened` | Person detail data opens | `source`, optional `parent_content_type` |
+| `watchlist_added` | Watchlist add succeeds | `content_type`, `source` |
+| `watch_logged` | A new watch entry succeeds | `content_type`, `source`, optional watch-plan attribution |
+| `rating_added` | Rating save succeeds | `content_type`, `source`, optional recommendation attribution |
+| `review_created` | Review creation succeeds | `content_type`, `source` |
+| `recommendation_given` | A recommendation is successfully sent | `content_type`, `source` |
 | `recommendation_impression` | A recommendation card is actually presented | recommendation attribution fields below |
 | `recommendation_opened` | Presented recommendation opens | same recommendation parameters |
 | `recommendation_saved` | Presented recommendation is saved | same recommendation parameters |
@@ -67,7 +68,7 @@ The funnel is `recommendation_impression` → `recommendation_opened` →
 `recommendation_saved` → `recommendation_watched` → `rating_added`. Every
 recommendation event uses the same fields:
 
-- `content_id`, `content_type`
+- `content_type`
 - `recommendation_source` (`just_for_you`)
 - `position`
 - `recommendation_algorithm`
@@ -97,7 +98,7 @@ provenance with the saved item.
 
 The funnel is `watch_plan_created` → `watch_plan_accepted` →
 `watch_plan_scheduled` → `watch_plan_completed` → `watch_logged`.
-Watch-plan events include `watch_plan_id`, `content_id`, `content_type`,
+Watch-plan events include `content_type`,
 `plan_type`, `participant_count`, and `source` whenever the successful API
 response provides them. The opaque plan UUID is safe for funnel correlation;
 participant user IDs are never sent.
@@ -192,8 +193,7 @@ In Firebase Analytics, register useful event-scoped custom dimensions such as
 `content_type`, `source`, `recommendation_source`, `recommendation_algorithm`,
 `recommendation_version`, `recommendation_reason`, `invite_method`,
 `group_type`, `plan_type`, `share_type`, and `parent_content_type`. Register
-`position`, `participant_count`, `signal_count`, `person_id`, and
-`parent_content_id` as custom metrics only if reports need them. Do not register
+`position`, `participant_count`, and `signal_count` as custom metrics only if reports need them. Do not register
 free-text titles as custom dimensions.
 
 To validate Android DebugView:
@@ -210,3 +210,5 @@ For iOS, open `ios/Runner.xcworkspace` in Xcode and add
 then run the app. Replace it with `-FIRAnalyticsDebugDisabled` afterwards.
 Events may take a short time to appear in Firebase DebugView; the local
 `[Analytics]` debug lines confirm the app-side contract immediately.
+
+Privacy hardening (17 September 2026): the event dispatcher strips `watch_plan_id`, `content_id`, `parent_content_id`, and `person_id` from every event. Callers may keep those values for local app logic; they are not sent to Firebase. Historical events are unaffected by this code change and must be considered when updating published privacy disclosures.

@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/legal/terms_acceptance_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:flixie_app/features/social/data/chat_unread_controller.dart';
 import 'dart:async';
@@ -211,6 +212,14 @@ GoRouter buildRouter(
       }
 
       if (status == AuthStatus.authenticated) {
+        if (!authProvider.termsVerified) {
+          return state.matchedLocation == '/terms-required'
+              ? null
+              : '/terms-required';
+        }
+        if (state.matchedLocation == '/terms-required') {
+          return hasCompletedSetup ? '/' : '/onboarding';
+        }
         // Referral codes apply only to new account creation. Never carry one
         // into an existing authenticated account or a later sign-up.
         unawaited(referralStore.clear().catchError((_) {}));
@@ -514,6 +523,12 @@ GoRouter buildRouter(
         ],
       ),
 
+      GoRoute(
+        path: '/terms-required',
+        pageBuilder: (context, state) =>
+            _calmPage(state, const TermsAcceptanceScreen()),
+      ),
+
       // Onboarding route is kept for explicit navigation only.
       GoRoute(
         path: '/onboarding',
@@ -592,20 +607,22 @@ class MainNavigationShell extends StatelessWidget {
     final selectedIndex = _indexFromLocation(location);
 
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            FlixieColors.surface,
-            FlixieColors.background,
-            FlixieColors.navy,
+            context.colors.surface,
+            context.colors.background,
+            context.colors.navy,
           ],
         ),
       ),
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        body: child,
+        // Android's navigation bar can occupy a side in landscape.
+        // Pages handle their own top inset; the shell owns side protection.
+        body: SafeArea(top: false, bottom: false, child: child),
         bottomNavigationBar: _FlixieNavBar(
           selectedIndex: selectedIndex,
           onDestinationSelected: (index) {
@@ -663,7 +680,7 @@ class _FlixieNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: FlixieColors.tabBarBackground.withValues(alpha: 0.98),
+        color: context.colors.tabBarBackground.withValues(alpha: 0.98),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.28),
@@ -758,7 +775,8 @@ class _NavItem extends StatelessWidget {
                   isLabelVisible: dest.label == 'Social' &&
                       (context.watch<ChatUnreadController?>()?.total ?? 0) > 0,
                   backgroundColor: const Color(0xFFFFAD66),
-                  smallSize: 8,
+                  smallSize: 9,
+                  offset: const Offset(3, -3),
                   child: Icon(
                     isSelected ? dest.activeIcon : dest.icon,
                     semanticLabel: dest.label == 'Social' &&
@@ -768,7 +786,7 @@ class _NavItem extends StatelessWidget {
                         ? 'Social, unread messages'
                         : null,
                     size: 22,
-                    color: isSelected ? Colors.white : FlixieColors.medium,
+                    color: isSelected ? Colors.white : context.colors.medium,
                   ),
                 ),
               ),
@@ -777,7 +795,7 @@ class _NavItem extends StatelessWidget {
                 duration: const Duration(milliseconds: 200),
                 style: TextStyle(
                   color:
-                      isSelected ? FlixieColors.primary : FlixieColors.medium,
+                      isSelected ? FlixieColors.primary : context.colors.medium,
                   fontSize: 10,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
                 ),

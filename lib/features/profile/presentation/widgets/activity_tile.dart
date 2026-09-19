@@ -20,11 +20,13 @@ class ActivityTile extends StatefulWidget {
       required this.item,
       this.compact = false,
       this.embedded = false,
+      this.dismissSheetOnNavigate = false,
       this.showMoviePreview = true,
       this.detailSource = DetailSource.unknown});
   final ActivityListItem item;
   final bool compact, showMoviePreview;
   final bool embedded;
+  final bool dismissSheetOnNavigate;
   final DetailSource detailSource;
 
   @override
@@ -178,6 +180,12 @@ class _ActivityTileState extends State<ActivityTile>
     );
   }
 
+  void _navigate(String route, {Object? extra}) {
+    final router = GoRouter.of(context);
+    if (widget.dismissSheetOnNavigate) Navigator.of(context).pop();
+    router.push(route, extra: extra);
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUserId = context.read<AuthProvider?>()?.dbUser?.id;
@@ -221,7 +229,7 @@ class _ActivityTileState extends State<ActivityTile>
                                     width: 36,
                                     height: 4,
                                     decoration: BoxDecoration(
-                                        color: FlixieColors.medium,
+                                        color: context.colors.medium,
                                         borderRadius:
                                             BorderRadius.circular(2)))),
                             Positioned(
@@ -237,6 +245,7 @@ class _ActivityTileState extends State<ActivityTile>
                               child: ActivityTile(
                                   item: item,
                                   embedded: true,
+                                  dismissSheetOnNavigate: true,
                                   detailSource: detailSource))),
                     ])))),
         child: Padding(
@@ -274,11 +283,10 @@ class _ActivityTileState extends State<ActivityTile>
                       if (item.mediaRating != null)
                         Text(
                             '★ ${item.mediaRating!.toStringAsFixed(item.mediaRating! % 1 == 0 ? 0 : 1)}/10',
-                            style:
-                                const TextStyle(color: FlixieColors.warning)),
+                            style: TextStyle(color: context.colors.warning)),
                       if (item.recommended == true)
-                        const Text('Recommends',
-                            style: TextStyle(color: FlixieColors.success)),
+                        Text('Recommends',
+                            style: TextStyle(color: context.colors.success)),
                       for (final reaction in _reactions.counts.entries
                           .where((entry) => entry.value > 0))
                         Text('${reaction.key} ${reaction.value}'),
@@ -295,13 +303,13 @@ class _ActivityTileState extends State<ActivityTile>
       busy: _saving,
       onReact: item.userId == currentUserId ? null : _react,
       onReactionSelected: item.userId == currentUserId ? null : _save,
-      onOpen: route == null ? null : () => context.push(route),
-      onProfile: () => context.push(item.userId == currentUserId
+      onOpen: route == null ? null : () => _navigate(route),
+      onProfile: () => _navigate(item.userId == currentUserId
           ? '/profile'
           : '/friends/${item.userId}'),
       onReply: item.userId.isEmpty || item.userId == currentUserId
           ? null
-          : () => context.push('/chat/${item.userId}',
+          : () => _navigate('/chat/${item.userId}',
               extra: payload.isUsable ? payload : null),
       onOpenList: item.listId == null || item.listOwnerId == null
           ? null

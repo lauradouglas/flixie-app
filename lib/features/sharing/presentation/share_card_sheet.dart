@@ -23,7 +23,7 @@ Future<void> showShareCardSheet(
     useSafeArea: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    barrierColor: FlixieColors.background.withValues(alpha: .72),
+    barrierColor: context.colors.background.withValues(alpha: .72),
     builder: (_) => ShareCardSheet(data: data),
   );
 }
@@ -165,15 +165,15 @@ class _ShareCardSheetState extends State<ShareCardSheet> {
     final screen = MediaQuery.sizeOf(context);
     final previewHeight = (screen.height * .53).clamp(340.0, 530.0);
     return ColoredBox(
-      color: FlixieColors.surface,
+      color: context.colors.surface,
       child: SafeArea(
         top: false,
         bottom: true,
         child: Container(
           constraints: BoxConstraints(maxHeight: screen.height * .85),
-          decoration: const BoxDecoration(
-            color: FlixieColors.surface,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          decoration: BoxDecoration(
+            color: context.colors.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -183,7 +183,7 @@ class _ShareCardSheetState extends State<ShareCardSheet> {
                 width: 42,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: FlixieColors.mediumShade,
+                  color: context.colors.mediumShade,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -195,17 +195,17 @@ class _ShareCardSheetState extends State<ShareCardSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Saved - share your take',
+                          Text('Saved - share your take',
                               style: TextStyle(
-                                color: FlixieColors.textPrimary,
+                                color: context.colors.textPrimary,
                                 fontSize: 20,
                                 fontWeight: FontWeight.w800,
                               )),
                           const SizedBox(height: 3),
                           Text('Made for Stories, Messages and more',
                               style: TextStyle(
-                                color:
-                                    FlixieColors.medium.withValues(alpha: .95),
+                                color: context.colors.medium
+                                    .withValues(alpha: .95),
                                 fontSize: 13,
                               )),
                         ],
@@ -254,7 +254,7 @@ class _ShareCardSheetState extends State<ShareCardSheet> {
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: FlixieColors.surfaceElevated,
+                      color: context.colors.surfaceElevated,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: FlixieColors.primary.withValues(alpha: .28),
@@ -267,16 +267,16 @@ class _ShareCardSheetState extends State<ShareCardSheet> {
                         dense: true,
                         contentPadding:
                             const EdgeInsets.symmetric(horizontal: 12),
-                        title: const Text(
+                        title: Text(
                           'Show watch note',
                           style: TextStyle(
-                            color: FlixieColors.textPrimary,
+                            color: context.colors.textPrimary,
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                         value: _showNote,
-                        activeThumbColor: FlixieColors.textPrimary,
+                        activeThumbColor: context.colors.textPrimary,
                         activeTrackColor: FlixieColors.primary,
                         onChanged: _activeAction == null
                             ? (value) => setState(() {
@@ -293,13 +293,13 @@ class _ShareCardSheetState extends State<ShareCardSheet> {
                   padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline_rounded,
-                          color: FlixieColors.danger, size: 18),
+                      Icon(Icons.error_outline_rounded,
+                          color: context.colors.danger, size: 18),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(_error!,
-                            style: const TextStyle(
-                                color: FlixieColors.danger, fontSize: 12)),
+                            style: TextStyle(
+                                color: context.colors.danger, fontSize: 12)),
                       ),
                     ],
                   ),
@@ -355,7 +355,7 @@ class _ShareCardSheetState extends State<ShareCardSheet> {
                     ),
                     label: const Text('Join me on Flixie'),
                     style: TextButton.styleFrom(
-                      foregroundColor: FlixieColors.secondary,
+                      foregroundColor: context.colors.secondary,
                       textStyle: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),

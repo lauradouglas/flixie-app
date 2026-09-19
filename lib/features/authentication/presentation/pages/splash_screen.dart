@@ -36,26 +36,19 @@ class _SplashScreenState extends State<SplashScreen>
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     return Scaffold(
-      backgroundColor: FlixieColors.background,
+      backgroundColor: context.colors.background,
       body: FadeTransition(
         opacity: _fadeIn,
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Image.asset(
-              'assets/splash/splash.jpg',
-              fit: BoxFit.cover,
-            ),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.22),
-                    Colors.black.withValues(alpha: 0.42),
-                  ],
-                ),
+            Center(
+              child: Image.asset(
+                'assets/icon/flixie_f_transparent.png',
+                width: 192,
+                height: 192,
+                fit: BoxFit.contain,
+                semanticLabel: 'Flixie',
               ),
             ),
             SafeArea(

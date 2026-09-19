@@ -56,11 +56,11 @@ class MovieCarouselTile extends StatelessWidget {
                     width: width,
                     height: posterHeight,
                     child: posterUrl == null
-                        ? _fallback()
+                        ? _fallback(context)
                         : CachedNetworkImage(
                             imageUrl: posterUrl,
                             fit: BoxFit.cover,
-                            errorWidget: (_, __, ___) => _fallback(),
+                            errorWidget: (_, __, ___) => _fallback(context),
                           ),
                   ),
                 ),
@@ -79,8 +79,8 @@ class MovieCarouselTile extends StatelessWidget {
               title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: FlixieColors.light,
+              style: TextStyle(
+                color: context.colors.light,
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
               ),
@@ -104,8 +104,8 @@ class MovieCarouselTile extends StatelessWidget {
                       subtitle!,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: FlixieColors.medium,
+                      style: TextStyle(
+                        color: context.colors.medium,
                         fontSize: 11,
                         height: 1.2,
                         fontWeight: FontWeight.w500,
@@ -121,12 +121,12 @@ class MovieCarouselTile extends StatelessWidget {
     );
   }
 
-  Widget _fallback() => Container(
-        color: FlixieColors.tabBarBackgroundFocused,
+  Widget _fallback(BuildContext context) => Container(
+        color: context.colors.tabBarBackgroundFocused,
         alignment: Alignment.center,
-        child: const Icon(
+        child: Icon(
           Icons.movie_outlined,
-          color: FlixieColors.medium,
+          color: context.colors.medium,
           size: 30,
         ),
       );

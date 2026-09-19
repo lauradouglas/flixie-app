@@ -21,11 +21,11 @@ Future<Object?> showActivityReactionBubble(
         Rect.fromLTWH(origin.dx, bubbleTop, box.size.width, 0),
         Offset.zero & overlay.size),
     menuPadding: const EdgeInsets.symmetric(vertical: 8),
-    color: FlixieColors.surface,
+    color: context.colors.surface,
     elevation: 8,
     shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(28),
-        side: const BorderSide(color: FlixieColors.tabBarBorder)),
+        side: BorderSide(color: context.colors.tabBarBorder)),
     constraints:
         BoxConstraints.tightFor(width: (overlay.size.width - 32).clamp(0, 344)),
     items: [
@@ -60,12 +60,12 @@ Future<Object?> showActivityReactionBubble(
       ),
       if (canReply) const PopupMenuDivider(),
       if (canReply)
-        const PopupMenuItem<Object>(
+        PopupMenuItem<Object>(
             value: 'reply',
             child: Row(children: [
-              Icon(Icons.reply_rounded, color: FlixieColors.primaryText),
-              SizedBox(width: 12),
-              Text('Reply in chat')
+              Icon(Icons.reply_rounded, color: context.colors.primaryText),
+              const SizedBox(width: 12),
+              const Text('Reply in chat')
             ])),
     ],
   );

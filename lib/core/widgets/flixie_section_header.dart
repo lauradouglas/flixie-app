@@ -8,7 +8,7 @@ class FlixieSectionHeader extends StatelessWidget {
     super.key,
     required this.title,
     this.padding = EdgeInsets.zero,
-    this.uppercase = true,
+    this.uppercase = false,
     this.titleStyle,
     this.badge,
     this.trailingLabel,
@@ -42,7 +42,7 @@ class FlixieSectionHeader extends StatelessWidget {
                   ? FlixieTypography.eyebrow.copyWith(fontSize: 16)
                   : textTheme.titleLarge)
               ?.copyWith(
-            color: FlixieColors.textPrimary,
+            color: Theme.of(context).colorScheme.onSurface,
           ),
     );
 
@@ -75,7 +75,9 @@ class FlixieSectionHeader extends StatelessWidget {
               child: Text(
                 '$badge',
                 style: FlixieTypography.compactLabel.copyWith(
-                  color: FlixieColors.primary,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? context.colors.primaryText
+                      : FlixieColors.primaryShade,
                 ),
               ),
             ),
@@ -87,7 +89,7 @@ class FlixieSectionHeader extends StatelessWidget {
               child: Text(
                 trailingText,
                 style: textTheme.bodySmall?.copyWith(
-                  color: trailingColor ?? FlixieColors.medium,
+                  color: trailingColor ?? context.colors.medium,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.5,
                 ),

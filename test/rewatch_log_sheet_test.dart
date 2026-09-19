@@ -4,6 +4,40 @@ import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_shee
 import 'package:flixie_app/models/movie_watch_entry.dart';
 
 void main() {
+  testWidgets('a rated watch can clear a recommendation to no opinion',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    bool? savedRecommendation = true;
+    double? savedRating;
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: RewatchLogSheet(
+      initial: const MovieWatchEntry(
+          id: 'watch',
+          userId: 'user',
+          movieId: 603,
+          rating: 5,
+          recommended: true,
+          removed: false),
+      onSubmit: (
+          {required watchedAt,
+          required rating,
+          required recommended,
+          required notes}) async {
+        savedRecommendation = recommended;
+        savedRating = rating;
+      },
+    ))));
+    await tester.ensureVisible(find.text('No opinion'));
+    await tester.tap(find.text('No opinion'));
+    await tester.pump();
+    await tester.ensureVisible(find.text('Save Changes'));
+    await tester.tap(find.text('Save Changes'));
+    await tester.pumpAndSettle();
+    expect(savedRating, 5);
+    expect(savedRecommendation, isNull);
+  });
   testWidgets('editing an imported undated watch does not default to today',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1400));

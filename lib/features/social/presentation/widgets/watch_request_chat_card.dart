@@ -158,10 +158,10 @@ class WatchRequestChatCard extends StatelessWidget {
                                             ? 'Once replies are in, agree when to watch.'
                                             : 'Choose a time that works for everyone.';
     final color = complete || scheduled
-        ? FlixieColors.success
+        ? context.colors.success
         : needsReply || proposal != null
-            ? FlixieColors.warning
-            : FlixieColors.light;
+            ? context.colors.warning
+            : context.colors.light;
     final action = complete
         ? 'View summary'
         : needsReply
@@ -178,8 +178,8 @@ class WatchRequestChatCard extends StatelessWidget {
                         ? onDecline
                         : onTap,
                 style: OutlinedButton.styleFrom(
-                    foregroundColor: FlixieColors.light,
-                    side: const BorderSide(color: FlixieColors.tabBarBorder),
+                    foregroundColor: context.colors.light,
+                    side: BorderSide(color: context.colors.tabBarBorder),
                     minimumSize: const Size(0, 44),
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 11),
@@ -202,12 +202,13 @@ class WatchRequestChatCard extends StatelessWidget {
     final details =
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(title,
-          style: const TextStyle(
-              color: FlixieColors.textPrimary,
+          style: TextStyle(
+              color: context.colors.textPrimary,
               fontWeight: FontWeight.w800,
               fontSize: 22)),
       const SizedBox(height: 9),
       _fact(
+          context,
           complete || scheduled
               ? Icons.check_circle
               : needsReply
@@ -216,25 +217,28 @@ class WatchRequestChatCard extends StatelessWidget {
           label,
           color),
       const SizedBox(height: 8),
-      Text(contextLine, style: _body),
+      Text(contextLine, style: _body.copyWith(color: context.colors.light)),
       const SizedBox(height: 8),
       if (complete) ...[
         const SizedBox(height: 10),
         Wrap(spacing: 16, runSpacing: 8, children: [
-          _count(Icons.people_alt, '$watched watched', FlixieColors.success),
-          _count(Icons.person_outline, '$missed couldn’t make it',
-              FlixieColors.warning),
+          _count(context, Icons.people_alt, '$watched watched',
+              context.colors.success),
+          _count(context, Icons.person_outline, '$missed couldn’t make it',
+              context.colors.warning),
         ]),
       ] else if (!cancelled && !expired) ...[
         if (date != null)
           Text(
               '${MaterialLocalizations.of(context).formatMediumDate(date)} · ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(date))}',
-              style: _body)
+              style: _body.copyWith(color: context.colors.light))
         else if (r != null)
-          const Text('Date not set yet', style: _body),
+          Text('Date not set yet',
+              style: _body.copyWith(color: context.colors.light)),
         if (r?.location?.trim().isNotEmpty == true) ...[
           const SizedBox(height: 7),
-          _fact(Icons.location_on_outlined, r!.location!, FlixieColors.light),
+          _fact(context, Icons.location_on_outlined, r!.location!,
+              context.colors.light),
         ],
         if (r != null) ...[
           const SizedBox(height: 9),
@@ -257,13 +261,13 @@ class WatchRequestChatCard extends StatelessWidget {
                                           .characters
                                           .firstOrNull ??
                                       '?',
-                                  fallbackColor: FlixieColors.primaryText,
+                                  fallbackColor: context.colors.primaryText,
                                   size: 32,
                                   profileBadges: attendees[i].profileBadges))
                       ])),
                 Text(
                     '${r.acceptedCount} going${waiting > 0 ? ' · $waiting awaiting reply' : ''}${decision == 'DECLINED' ? ' · You declined' : ''}',
-                    style: _body),
+                    style: _body.copyWith(color: context.colors.light)),
               ]),
         ],
       ],
@@ -279,7 +283,7 @@ class WatchRequestChatCard extends StatelessWidget {
               ProfileAvatarView(
                   avatar: r?.requesterAvatar ?? senderAvatar,
                   fallbackText: name.characters.firstOrNull ?? '?',
-                  fallbackColor: FlixieColors.primaryText,
+                  fallbackColor: context.colors.primaryText,
                   size: 32,
                   profileBadges: r?.requesterProfileBadges.isNotEmpty == true
                       ? r!.requesterProfileBadges
@@ -288,15 +292,15 @@ class WatchRequestChatCard extends StatelessWidget {
               Flexible(
                   child: Text(name,
                       textAlign: mine ? TextAlign.right : TextAlign.left,
-                      style: const TextStyle(
-                          color: FlixieColors.primaryTint,
+                      style: TextStyle(
+                          color: context.colors.primaryTint,
                           fontWeight: FontWeight.w700,
                           fontSize: 14))),
             ],
           ),
           const SizedBox(height: 8),
           Material(
-              color: FlixieColors.surface,
+              color: context.colors.surface,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16)),
               clipBehavior: Clip.antiAlias,
@@ -306,8 +310,8 @@ class WatchRequestChatCard extends StatelessWidget {
                 child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: deleted
-                        ? const Text('This Watch Plan was deleted.',
-                            style: _body)
+                        ? Text('This Watch Plan was deleted.',
+                            style: _body.copyWith(color: context.colors.light))
                         : Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -325,7 +329,8 @@ class WatchRequestChatCard extends StatelessWidget {
                                                 title: c.title,
                                                 width: stack ? 80 : 96),
                                         ])
-                                      : _poster(poster, stack ? 80 : 96);
+                                      : _poster(
+                                          context, poster, stack ? 80 : 96);
                                   return stack
                                       ? Column(
                                           crossAxisAlignment:
@@ -351,7 +356,9 @@ class WatchRequestChatCard extends StatelessWidget {
                                 ],
                                 if (message != null) ...[
                                   const SizedBox(height: 12),
-                                  Text('“$message”', style: _body)
+                                  Text('“$message”',
+                                      style: _body.copyWith(
+                                          color: context.colors.light))
                                 ],
                                 const SizedBox(height: 14),
                                 if (isResponding)
@@ -398,7 +405,7 @@ class WatchRequestChatCard extends StatelessWidget {
                                                 isResponding ? null : onDecline,
                                             style: TextButton.styleFrom(
                                                 foregroundColor:
-                                                    FlixieColors.medium),
+                                                    context.colors.medium),
                                             child:
                                                 const Text('Can’t make it'))),
                                 ] else if (needsReply && onDecline != null)
@@ -431,28 +438,37 @@ class WatchRequestChatCard extends StatelessWidget {
               child: Text(
                   MaterialLocalizations.of(context).formatTimeOfDay(
                       TimeOfDay.fromDateTime(msg.createdAt.toLocal())),
-                  style: const TextStyle(
-                      color: FlixieColors.medium, fontSize: 12))),
+                  style:
+                      TextStyle(color: context.colors.medium, fontSize: 12))),
         ]));
   }
 
-  Widget _fact(IconData icon, String text, Color color) =>
+  Widget _fact(BuildContext context, IconData icon, String text, Color color) =>
       Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Icon(icon, size: 19, color: color),
         const SizedBox(width: 7),
-        Expanded(child: Text(text, style: _body.copyWith(color: color))),
+        Expanded(
+            child: Text(text,
+                style: _body
+                    .copyWith(color: context.colors.light)
+                    .copyWith(color: color))),
       ]);
-  Widget _count(IconData icon, String text, Color color) =>
+  Widget _count(
+          BuildContext context, IconData icon, String text, Color color) =>
       Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(icon, size: 18, color: color),
         const SizedBox(width: 6),
-        Flexible(child: Text(text, style: _body.copyWith(color: color))),
+        Flexible(
+            child: Text(text,
+                style: _body
+                    .copyWith(color: context.colors.light)
+                    .copyWith(color: color))),
       ]);
-  Widget _poster(String? path, double width) {
+  Widget _poster(BuildContext context, String? path, double width) {
     final fallback = Container(
-        color: FlixieColors.tabBarBackground,
-        child: const Center(
-            child: Icon(Icons.movie_outlined, color: FlixieColors.light)));
+        color: context.colors.tabBarBackground,
+        child: Center(
+            child: Icon(Icons.movie_outlined, color: context.colors.light)));
     return ClipRRect(
         borderRadius: BorderRadius.circular(8),
         child: SizedBox(

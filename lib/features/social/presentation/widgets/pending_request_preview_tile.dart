@@ -29,7 +29,7 @@ class PendingRequestPreviewTile extends StatelessWidget {
       clipBehavior: Clip.hardEdge,
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       decoration: BoxDecoration(
-        color: FlixieColors.tabBarBackgroundFocused,
+        color: context.colors.tabBarBackgroundFocused,
         borderRadius: BorderRadius.circular(12),
         border: const Border(
           left: BorderSide(color: FlixieColors.primary, width: 3),
@@ -67,8 +67,8 @@ class PendingRequestPreviewTile extends StatelessWidget {
                         children: [
                           Text(
                             request.requesterUsername ?? 'Unknown',
-                            style: const TextStyle(
-                              color: FlixieColors.light,
+                            style: TextStyle(
+                              color: context.colors.light,
                               fontWeight: FontWeight.w600,
                               fontSize: 13,
                             ),
@@ -76,8 +76,8 @@ class PendingRequestPreviewTile extends StatelessWidget {
                           if (request.movieTitle != null)
                             Text(
                               request.movieTitle!,
-                              style: const TextStyle(
-                                  color: FlixieColors.medium, fontSize: 12),
+                              style: TextStyle(
+                                  color: context.colors.medium, fontSize: 12),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -103,8 +103,8 @@ class PendingRequestPreviewTile extends StatelessWidget {
                                   Expanded(
                                     child: Text(
                                       request.message!,
-                                      style: const TextStyle(
-                                        color: FlixieColors.light,
+                                      style: TextStyle(
+                                        color: context.colors.light,
                                         fontSize: 11,
                                         fontStyle: FontStyle.italic,
                                       ),
@@ -122,8 +122,8 @@ class PendingRequestPreviewTile extends StatelessWidget {
                     if (canRespond) ...[
                       IconButton(
                         onPressed: () => onRespond('DECLINED'),
-                        icon: const Icon(Icons.close,
-                            color: FlixieColors.danger, size: 20),
+                        icon: Icon(Icons.close,
+                            color: context.colors.danger, size: 20),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                       ),
@@ -158,26 +158,26 @@ class PendingRequestPreviewTile extends StatelessWidget {
                           imageUrl: posterUrl,
                           fit: BoxFit.cover,
                           errorWidget: (_, __, ___) => Container(
-                            color: FlixieColors.tabBarBorder,
-                            child: const Icon(Icons.movie_outlined,
-                                color: FlixieColors.medium),
+                            color: context.colors.tabBarBorder,
+                            child: Icon(Icons.movie_outlined,
+                                color: context.colors.medium),
                           ),
                         )
                       : Container(
-                          color: FlixieColors.tabBarBorder,
-                          child: const Icon(Icons.movie_outlined,
-                              color: FlixieColors.medium),
+                          color: context.colors.tabBarBorder,
+                          child: Icon(Icons.movie_outlined,
+                              color: context.colors.medium),
                         ),
                   Container(
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.centerLeft,
                         end: Alignment.centerRight,
                         colors: [
-                          FlixieColors.tabBarBackgroundFocused,
+                          context.colors.tabBarBackgroundFocused,
                           Colors.transparent,
                         ],
-                        stops: [0.0, 0.25],
+                        stops: const [0.0, 0.25],
                       ),
                     ),
                   ),

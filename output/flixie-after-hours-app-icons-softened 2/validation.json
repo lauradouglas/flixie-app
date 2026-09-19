@@ -1,0 +1,24 @@
+{
+  "pngFilesChecked": 54,
+  "appleCatalogDimensions": "pass",
+  "appleNoAlpha": "pass",
+  "transparentMasters": "pass",
+  "googlePlaySizeChannelsFileLimit": "pass",
+  "android66dpSafeCircle": "pass",
+  "appleActool": {
+    "result": "pass",
+    "xcode": "27.0",
+    "targets": [
+      "iphone",
+      "ipad"
+    ],
+    "note": "Catalog compiled; simulator service warnings; no device test."
+  },
+  "androidAapt2": {
+    "compile": "pass",
+    "link": "pass",
+    "sdk": 36
+  },
+  "nativeAppResourcesChanged": false,
+  "designRevision": "Softened corners, 3 units on original 100-unit geometry"
+}

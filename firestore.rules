@@ -1,39 +1,41 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // -------------------------------------------------------------------------
-    // Conversations
-    // NOTE: memberIds stores Postgres UUIDs, not Firebase Auth UIDs.
-    // Membership is enforced by the backend (Admin SDK) at write time.
-    // Client reads are gated to any authenticated user - the backend ensures
-    // only members ever receive a conversationId.
-    // -------------------------------------------------------------------------
+    // Admin SDK maintains this mapping; clients cannot manufacture membership.
+    function userId() {
+      return get(/databases/$(database)/documents/userIdentities/$(request.auth.uid)).data.userId;
+    }
+    function activeIdentity() {
+      return request.auth != null &&
+        exists(/databases/$(database)/documents/userIdentities/$(request.auth.uid)) &&
+        !exists(/databases/$(database)/documents/accountDeletions/$(request.auth.uid));
+    }
+    function isMember(conversationId) {
+      return activeIdentity() && userId() in
+        get(/databases/$(database)/documents/conversations/$(conversationId)).data.memberIds;
+    }
     match /conversations/{conversationId} {
-      allow read: if request.auth != null;
-
-      // All writes are performed server-side via the Admin SDK.
+      // Queries must constrain memberIds to the authenticated database user ID.
+      allow read: if activeIdentity() && userId() in resource.data.memberIds;
       allow write: if false;
-
-      // -----------------------------------------------------------------------
-      // Messages subcollection
-      // -----------------------------------------------------------------------
       match /messages/{messageId} {
-        allow read: if request.auth != null;
-
-        // Messages are written by the backend only.
+        allow read: if isMember(conversationId);
         allow write: if false;
       }
-
-      // -----------------------------------------------------------------------
-      // Members subcollection (stores unreadCount per user)
-      // -----------------------------------------------------------------------
-      match /members/{userId} {
-        allow read: if request.auth != null;
-
-        // Writes are backend-only.
+      match /members/{memberId} {
+        allow read: if isMember(conversationId);
         allow write: if false;
+      }
+      match /watchRequests/{requestId} {
+        allow read: if isMember(conversationId);
+        allow write: if false;
+        match /responses/{responseId} {
+          allow read: if isMember(conversationId);
+          allow write: if false;
+        }
       }
     }
+    // Identity mappings, deletion jobs and other collections are server-only.
+    match /{document=**} { allow read, write: if false; }
   }
 }

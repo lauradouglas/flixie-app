@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/pick_for_us/pick_for_us_screen.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/core/auth/startup_trace.dart';
 import 'package:flixie_app/features/home/presentation/models/home_watch_plan_visibility.dart';
@@ -5,9 +6,9 @@ import 'package:flixie_app/core/api/api_client.dart';
 import 'package:flixie_app/features/social/data/watch_request_cache.dart';
 import 'package:flixie_app/features/home/presentation/models/home_group_watch_plan.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
-import 'dart:ui';
 
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -916,7 +917,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               duration: const Duration(seconds: 2),
               backgroundColor:
-                  inWatchlist ? FlixieColors.surface : FlixieColors.success,
+                  inWatchlist ? context.colors.surface : context.colors.success,
             ),
           );
       }
@@ -990,7 +991,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
             type: FlixieToastType.error,
             content: const Text('Could not create the Watch Plan'),
-            backgroundColor: FlixieColors.danger,
+            backgroundColor: context.colors.danger,
           ));
         },
       ),
@@ -1049,13 +1050,13 @@ class _HomeScreenState extends State<HomeScreen> {
         !_watchPlansIntroDismissed;
 
     return FlixiePageScaffold(
-      backgroundColor: FlixieColors.background,
+      backgroundColor: context.colors.background,
       appBar: AppBar(
-        backgroundColor: FlixieColors.background,
-        foregroundColor: FlixieColors.light,
+        backgroundColor: context.colors.background,
+        foregroundColor: context.colors.light,
         surfaceTintColor: Colors.transparent,
-        iconTheme: const IconThemeData(color: FlixieColors.light),
-        actionsIconTheme: const IconThemeData(color: FlixieColors.light),
+        iconTheme: IconThemeData(color: context.colors.light),
+        actionsIconTheme: IconThemeData(color: context.colors.light),
         title: const FlixieWordmark(),
         actions: [
           IconButton(
@@ -1063,11 +1064,13 @@ class _HomeScreenState extends State<HomeScreen> {
               isLabelVisible: unreadCount > 0,
               label:
                   unreadCount < 100 ? Text('$unreadCount') : const Text('99+'),
-              backgroundColor: FlixieColors.tertiary,
-              textColor: Colors.black,
-              child: const Icon(
+              backgroundColor: FlixieColors.primaryShade,
+              textColor: Colors.white,
+              textStyle:
+                  const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+              child: Icon(
                 Icons.notifications_outlined,
-                color: FlixieColors.light,
+                color: context.colors.light,
               ),
             ),
             onPressed: () async {
@@ -1087,7 +1090,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ? ErrorRetryWidget(message: _error!, onRetry: _loadAll)
               : RefreshIndicator(
                   color: FlixieColors.primary,
-                  backgroundColor: FlixieColors.background,
+                  backgroundColor: context.colors.background,
                   onRefresh: _refreshAll,
                   child: SingleChildScrollView(
                     controller: _homeScrollController,
@@ -1127,6 +1130,28 @@ class _HomeScreenState extends State<HomeScreen> {
                                 : null,
                           ),
                         ),
+                        if (user != null)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                            child: ListTile(
+                              tileColor: context.colors.surface,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16)),
+                              leading: Icon(Icons.auto_awesome_outlined,
+                                  color: context.colors.secondary),
+                              title: const Text('Pick for me'),
+                              subtitle: const Text(
+                                  'Your mood. Your taste. Solo or with friends.'),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () async {
+                                await Navigator.of(context, rootNavigator: true)
+                                    .push(MaterialPageRoute<void>(
+                                        builder: (_) =>
+                                            PickForUsScreen(userId: user.id)));
+                                if (mounted) await _refreshAll();
+                              },
+                            ),
+                          ),
                         _buildUpcomingWatchPlanSection(
                           context,
                           user,
@@ -1256,8 +1281,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  double _heroPosterHeight(MovieShort movie) =>
-      movie.name.length <= 20 ? 375.0 : 350.0;
+  double _heroPosterHeight(MovieShort movie) => 280.0;
 
   Widget _buildCarouselDots(List<MovieShort> movies) {
     final count = movies.length.clamp(0, _maxHeroCarouselItems);
@@ -1302,7 +1326,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
-      color: FlixieColors.surface,
+      color: context.colors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
         side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
@@ -1323,15 +1347,18 @@ class _HomeScreenState extends State<HomeScreen> {
                     Stack(
                       fit: StackFit.expand,
                       children: [
-                        ImageFiltered(
-                          imageFilter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                          child: CachedNetworkImage(
-                            imageUrl:
-                                'https://image.tmdb.org/t/p/w780${movie.poster}',
-                            fit: BoxFit.cover,
-                            color: Colors.black.withValues(alpha: 0.38),
-                            colorBlendMode: BlendMode.darken,
-                            errorWidget: (_, __, ___) => _heroFallback(),
+                        ClipRect(
+                          child: ImageFiltered(
+                            imageFilter:
+                                ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                            child: CachedNetworkImage(
+                              imageUrl:
+                                  'https://image.tmdb.org/t/p/w780${movie.poster}',
+                              fit: BoxFit.cover,
+                              color: Colors.black.withValues(alpha: .38),
+                              colorBlendMode: BlendMode.darken,
+                              errorWidget: (_, __, ___) => _heroFallback(),
+                            ),
                           ),
                         ),
                         Center(
@@ -1358,7 +1385,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1373,8 +1400,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 movie.name,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: context.colors.textPrimary,
                                   fontSize: 22,
                                   fontWeight: FontWeight.w900,
                                   height: 1.08,
@@ -1384,8 +1411,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 const SizedBox(height: 4),
                                 Text(
                                   _formatHeroDate(movie.releaseDate!),
-                                  style: const TextStyle(
-                                    color: FlixieColors.medium,
+                                  style: TextStyle(
+                                    color: context.colors.medium,
                                     fontSize: 12,
                                   ),
                                 ),
@@ -1401,7 +1428,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           icon: inWatchlist
                               ? Icons.bookmark_rounded
                               : Icons.bookmark_outline_rounded,
-                          foregroundColor: FlixieColors.warning,
+                          foregroundColor: context.colors.warning,
                           isBusy: isUpdating,
                           onPressed: () => _toggleHeroWatchlist(context, movie),
                         ),
@@ -1413,8 +1440,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         movie.overview!,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: FlixieColors.light,
+                        style: TextStyle(
+                          color: context.colors.light,
                           fontSize: 12,
                           height: 1.35,
                         ),
@@ -1424,30 +1451,30 @@ class _HomeScreenState extends State<HomeScreen> {
                     Row(
                       children: [
                         if ((movie.voteAverage ?? 0) > 0) ...[
-                          const Icon(
+                          Icon(
                             Icons.star_rounded,
-                            color: FlixieColors.warning,
+                            color: context.colors.warning,
                             size: 19,
                           ),
                           const SizedBox(width: 4),
                           Text(
                             movie.voteAverage!.toStringAsFixed(1),
-                            style: const TextStyle(
-                              color: FlixieColors.warning,
+                            style: TextStyle(
+                              color: context.colors.warning,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
                         ] else ...[
-                          const Icon(
+                          Icon(
                             Icons.star_outline_rounded,
-                            color: FlixieColors.medium,
+                            color: context.colors.medium,
                             size: 19,
                           ),
                           const SizedBox(width: 4),
-                          const Text(
+                          Text(
                             'Not rated yet',
                             style: TextStyle(
-                              color: FlixieColors.medium,
+                              color: context.colors.medium,
                               fontSize: 11.5,
                               fontWeight: FontWeight.w700,
                             ),
@@ -1469,7 +1496,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             label: const Text('Trailer'),
                             style: TextButton.styleFrom(
-                              foregroundColor: Colors.redAccent,
+                              foregroundColor: context.colors.danger,
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 9,
                                 vertical: 5,
@@ -1477,7 +1504,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               minimumSize: Size.zero,
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               side: BorderSide(
-                                color: Colors.redAccent.withValues(alpha: 0.35),
+                                color: context.colors.danger
+                                    .withValues(alpha: 0.55),
                               ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
@@ -1493,7 +1521,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         _HeroCompactIconButton(
                           tooltip: 'Details',
                           icon: Icons.info_outline_rounded,
-                          foregroundColor: FlixieColors.light,
+                          foregroundColor: context.colors.light,
                           onPressed: () => context.push(
                             movieDetailPath(
                               movie.id,
@@ -1512,9 +1540,9 @@ class _HomeScreenState extends State<HomeScreen> {
                               flex: 2,
                               child: Row(
                                 children: [
-                                  const Icon(
+                                  Icon(
                                     Icons.bookmark_rounded,
-                                    color: FlixieColors.warning,
+                                    color: context.colors.warning,
                                     size: 20,
                                   ),
                                   const SizedBox(width: 6),
@@ -1590,23 +1618,23 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       )
                     else
-                      const SizedBox(
+                      SizedBox(
                         height: 30,
                         child: Row(
                           children: [
                             Icon(
                               Icons.people_outline_rounded,
-                              color: FlixieColors.medium,
+                              color: context.colors.medium,
                               size: 19,
                             ),
-                            SizedBox(width: 7),
+                            const SizedBox(width: 7),
                             Expanded(
                               child: Text(
                                 'No friends have saved or favourited this yet',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  color: FlixieColors.medium,
+                                  color: context.colors.medium,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -1627,10 +1655,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _heroFallback() {
     return Container(
-      color: FlixieColors.tabBarBackgroundFocused,
-      child: const Icon(
+      color: context.colors.tabBarBackgroundFocused,
+      child: Icon(
         Icons.movie_outlined,
-        color: FlixieColors.medium,
+        color: context.colors.medium,
         size: 48,
       ),
     );
@@ -1695,20 +1723,20 @@ class _HomeScreenState extends State<HomeScreen> {
                                       imageUrl: posterUrl,
                                       fit: BoxFit.cover,
                                       errorWidget: (_, __, ___) => Container(
-                                        color: FlixieColors
-                                            .tabBarBackgroundFocused,
-                                        child: const Icon(
+                                        color: context
+                                            .colors.tabBarBackgroundFocused,
+                                        child: Icon(
                                           Icons.movie_outlined,
-                                          color: FlixieColors.medium,
+                                          color: context.colors.medium,
                                         ),
                                       ),
                                     )
                                   : Container(
-                                      color:
-                                          FlixieColors.tabBarBackgroundFocused,
-                                      child: const Icon(
+                                      color: context
+                                          .colors.tabBarBackgroundFocused,
+                                      child: Icon(
                                         Icons.movie_outlined,
-                                        color: FlixieColors.medium,
+                                        color: context.colors.medium,
                                       ),
                                     ),
                             ),
@@ -1738,7 +1766,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 child: Icon(
                                   Icons.bookmark,
                                   color: isUpdating
-                                      ? FlixieColors.medium
+                                      ? context.colors.medium
                                       : FlixieColors.primary,
                                   size: 18,
                                 ),
@@ -1750,12 +1778,12 @@ class _HomeScreenState extends State<HomeScreen> {
                             right: 2,
                             child: PopupMenuButton<String>(
                               tooltip: 'Quick actions',
-                              icon: const Icon(
+                              icon: Icon(
                                 Icons.more_vert_rounded,
-                                color: FlixieColors.light,
+                                color: context.colors.light,
                                 size: 20,
                               ),
-                              color: FlixieColors.tabBarBackgroundFocused,
+                              color: context.colors.tabBarBackgroundFocused,
                               onSelected: (value) {
                                 _handleQuickActionSelection(
                                   context,
@@ -1788,8 +1816,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         item.movie?.title ?? '',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: FlixieColors.light,
+                        style: TextStyle(
+                          color: context.colors.light,
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1819,7 +1847,7 @@ class _HomeScreenState extends State<HomeScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 12, 4),
+          padding: const EdgeInsets.fromLTRB(16, 0, 12, 0),
           child: Row(
             children: [
               Container(
@@ -1831,11 +1859,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(width: 10),
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Just for you',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: context.colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.5,
@@ -1847,11 +1875,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 onPressed:
                     _isLoadingRecommendations ? null : _refreshRecommendations,
                 style: IconButton.styleFrom(
-                  foregroundColor: FlixieColors.primary,
+                  foregroundColor: context.colors.primaryText,
                   backgroundColor: FlixieColors.primary.withValues(alpha: 0.14),
-                  disabledForegroundColor: FlixieColors.medium,
+                  disabledForegroundColor: context.colors.medium,
                   disabledBackgroundColor:
-                      FlixieColors.surfaceElevated.withValues(alpha: 0.7),
+                      context.colors.surfaceElevated.withValues(alpha: 0.7),
                 ),
                 icon: _isLoadingRecommendations
                     ? const SizedBox(
@@ -1873,8 +1901,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ? 'Building your fresh picks…'
                   : 'Picked from your taste',
               key: ValueKey(_isLoadingRecommendations),
-              style: const TextStyle(
-                color: FlixieColors.medium,
+              style: TextStyle(
+                color: context.colors.medium,
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),
@@ -1997,7 +2025,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   decoration: BoxDecoration(
                     color: index == page
                         ? FlixieColors.primary
-                        : FlixieColors.mediumShade.withValues(alpha: 0.65),
+                        : context.colors.mediumShade.withValues(alpha: 0.65),
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -2011,15 +2039,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildRecommendationsLoadingState() {
-    return const Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        HomeSectionHeader(title: 'Just for you'),
+        const HomeSectionHeader(title: 'Just for you'),
         Padding(
-          padding: EdgeInsets.fromLTRB(16, 0, 16, 10),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
           child: Row(
             children: [
-              SizedBox(
+              const SizedBox(
                 width: 14,
                 height: 14,
                 child: CircularProgressIndicator(
@@ -2027,11 +2055,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: FlixieColors.primary,
                 ),
               ),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Text(
                 'Building your recommendations…',
                 style: TextStyle(
-                  color: FlixieColors.medium,
+                  color: context.colors.medium,
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                 ),
@@ -2039,7 +2067,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
-        SizedBox(
+        const SizedBox(
           height: PersonalizedRecommendationCard.height,
           child: Padding(
             padding: EdgeInsets.only(left: 16, right: 10),
@@ -2049,7 +2077,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
-        SizedBox(height: 20),
+        const SizedBox(height: 20),
       ],
     );
   }
@@ -2200,7 +2228,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             decoration: BoxDecoration(
                               color: index == page
                                   ? FlixieColors.primary
-                                  : FlixieColors.medium.withValues(alpha: 0.5),
+                                  : context.colors.medium
+                                      .withValues(alpha: 0.5),
                               borderRadius: BorderRadius.circular(4),
                             ),
                           ),
@@ -2254,7 +2283,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: TextButton.icon(
                 onPressed: () => setState(() => _showMoreFriendActivity = true),
                 style: TextButton.styleFrom(
-                  foregroundColor: FlixieColors.primary,
+                  foregroundColor: context.colors.primaryText,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 18,
                     vertical: 8,
@@ -2444,7 +2473,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: FlixieColors.tabBarBackgroundFocused,
+      backgroundColor: context.colors.tabBarBackgroundFocused,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -2453,9 +2482,9 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.check_circle_outline,
-                color: FlixieColors.success,
+                color: context.colors.success,
               ),
               title: const Text('Mark as watched'),
               onTap: () {
@@ -2470,9 +2499,9 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.bookmark_remove_outlined,
-                color: FlixieColors.warning,
+                color: context.colors.warning,
               ),
               title: const Text('Remove from watchlist'),
               onTap: () {
@@ -2783,8 +2812,8 @@ class _RecommendationGeneratingCardState
           end: Alignment.bottomRight,
           colors: [
             FlixieColors.primary.withValues(alpha: 0.18),
-            FlixieColors.surfaceElevated,
-            FlixieColors.tertiary.withValues(alpha: 0.10),
+            context.colors.surfaceElevated,
+            context.colors.tertiary.withValues(alpha: 0.10),
           ],
         ),
         border: Border.all(color: FlixieColors.primary.withValues(alpha: 0.28)),
@@ -2805,8 +2834,8 @@ class _RecommendationGeneratingCardState
                     offset: Offset(0, -movement * 8),
                     child: Transform.rotate(
                       angle: -0.14 + (movement * 0.05),
-                      child: const _GeneratingPoster(
-                        color: FlixieColors.tertiary,
+                      child: _GeneratingPoster(
+                        color: context.colors.tertiary,
                         icon: Icons.favorite_rounded,
                       ),
                     ),
@@ -2819,8 +2848,8 @@ class _RecommendationGeneratingCardState
                     offset: Offset(0, movement * 8),
                     child: Transform.rotate(
                       angle: 0.14 - (movement * 0.05),
-                      child: const _GeneratingPoster(
-                        color: FlixieColors.success,
+                      child: _GeneratingPoster(
+                        color: context.colors.success,
                         icon: Icons.thumb_up_alt_rounded,
                       ),
                     ),
@@ -2833,7 +2862,7 @@ class _RecommendationGeneratingCardState
                     width: 88,
                     height: 112,
                     decoration: BoxDecoration(
-                      color: FlixieColors.tabBarBackgroundFocused,
+                      color: context.colors.tabBarBackgroundFocused,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: FlixieColors.primary.withValues(alpha: 0.7),
@@ -2861,9 +2890,9 @@ class _RecommendationGeneratingCardState
                   left: 112,
                   child: Transform.translate(
                     offset: Offset(0, movement * 5),
-                    child: const Icon(
+                    child: Icon(
                       Icons.star_rounded,
-                      color: FlixieColors.tertiary,
+                      color: context.colors.tertiary,
                       size: 18,
                     ),
                   ),
@@ -2880,7 +2909,7 @@ class _RecommendationGeneratingCardState
                     ),
                   ),
                 ),
-                const Positioned(
+                Positioned(
                   left: 20,
                   right: 20,
                   bottom: 24,
@@ -2888,14 +2917,14 @@ class _RecommendationGeneratingCardState
                     Text('Mixing your movie magic…',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                            color: FlixieColors.white,
+                            color: context.colors.white,
                             fontSize: 16,
                             fontWeight: FontWeight.w900)),
-                    SizedBox(height: 6),
+                    const SizedBox(height: 6),
                     Text('Taste, favourites and a little sparkle',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                            color: FlixieColors.medium,
+                            color: context.colors.medium,
                             fontSize: 12,
                             fontWeight: FontWeight.w600)),
                   ]),
@@ -2967,12 +2996,12 @@ class _ContinueWatchingCard extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 posterUrl == null
-                    ? _posterFallback()
+                    ? _posterFallback(context)
                     : CachedNetworkImage(
                         imageUrl: posterUrl,
                         fit: BoxFit.cover,
-                        placeholder: (_, __) => _posterFallback(),
-                        errorWidget: (_, __, ___) => _posterFallback(),
+                        placeholder: (_, __) => _posterFallback(context),
+                        errorWidget: (_, __, ___) => _posterFallback(context),
                       ),
                 const DecoratedBox(
                   decoration: BoxDecoration(
@@ -3059,11 +3088,11 @@ class _ContinueWatchingCard extends StatelessWidget {
     );
   }
 
-  Widget _posterFallback() {
+  Widget _posterFallback(BuildContext context) {
     return Container(
-      color: FlixieColors.tabBarBackgroundFocused,
+      color: context.colors.tabBarBackgroundFocused,
       alignment: Alignment.center,
-      child: const Icon(Icons.tv_rounded, color: FlixieColors.medium, size: 38),
+      child: Icon(Icons.tv_rounded, color: context.colors.medium, size: 38),
     );
   }
 }
@@ -3122,7 +3151,7 @@ class _FriendInteractionAvatarStack extends StatelessWidget {
                   fallbackText: visible[index].username.isEmpty
                       ? '?'
                       : visible[index].username[0].toUpperCase(),
-                  fallbackColor: FlixieColors.surfaceElevated,
+                  fallbackColor: context.colors.surfaceElevated,
                   size: 27,
                   profileBadges: visible[index].profileBadges,
                 ),
@@ -3136,14 +3165,14 @@ class _FriendInteractionAvatarStack extends StatelessWidget {
                 height: avatarSize,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: FlixieColors.surfaceElevated,
+                  color: context.colors.surfaceElevated,
                   shape: BoxShape.circle,
                   border: Border.all(color: FlixieColors.primary, width: 1.5),
                 ),
                 child: Text(
                   '+$overflow',
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: context.colors.white,
                     fontSize: 11,
                     fontWeight: FontWeight.w900,
                   ),
@@ -3176,7 +3205,7 @@ class _HeroCompactIconButton extends StatelessWidget {
     return Tooltip(
       message: tooltip,
       child: Material(
-        color: Colors.black.withValues(alpha: 0.44),
+        color: context.colors.surfaceElevated,
         borderRadius: BorderRadius.circular(10),
         child: InkWell(
           borderRadius: BorderRadius.circular(10),

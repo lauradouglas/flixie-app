@@ -32,13 +32,15 @@ class WatchPlanMovieOptions extends StatelessWidget {
                                           ? candidate.posterPath!
                                           : 'https://image.tmdb.org/t/p/w342${candidate.posterPath}',
                                       fit: BoxFit.cover,
-                                      placeholder: (_, __) => _fallback(),
-                                      errorWidget: (_, __, ___) => _fallback())
-                                  : _fallback())),
+                                      placeholder: (_, __) =>
+                                          _fallback(context),
+                                      errorWidget: (_, __, ___) =>
+                                          _fallback(context))
+                                  : _fallback(context))),
                       const SizedBox(height: 8),
                       Text(candidate.title ?? 'Movie option',
-                          style: const TextStyle(
-                              color: FlixieColors.textPrimary,
+                          style: TextStyle(
+                              color: context.colors.textPrimary,
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                               height: 1.35)),
@@ -46,9 +48,9 @@ class WatchPlanMovieOptions extends StatelessWidget {
         ]);
       });
 
-  Widget _fallback() => Container(
-      color: FlixieColors.tabBarBackgroundFocused,
-      child: const Center(
-          child:
-              Icon(Icons.movie_outlined, color: FlixieColors.light, size: 32)));
+  Widget _fallback(BuildContext context) => Container(
+      color: context.colors.tabBarBackgroundFocused,
+      child: Center(
+          child: Icon(Icons.movie_outlined,
+              color: context.colors.light, size: 32)));
 }

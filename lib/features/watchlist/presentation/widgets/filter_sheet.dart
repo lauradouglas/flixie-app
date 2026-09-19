@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -40,13 +41,16 @@ class _WatchlistFilterSheetState extends State<WatchlistFilterSheet> {
 
   static const _runtimeOptions = [
     (null, 'Any'),
-    (90, '< 1h 30m'),
-    (120, '< 2h'),
-    (150, '< 2h 30m'),
+    (30, 'Up to 30 min'),
+    (60, 'Up to 1h'),
+    (90, 'Up to 1h 30m'),
+    (120, 'Up to 2h'),
+    (150, 'Up to 2h 30m'),
   ];
 
   static const _sortOptions = [
     ('recent', 'Recently Added'),
+    ('runtimeAsc', 'Shortest first'),
     ('titleAsc', 'Title A\u2013Z'),
     ('titleDesc', 'Title Z\u2013A'),
     ('ratingDesc', 'Highest Rated'),
@@ -75,8 +79,8 @@ class _WatchlistFilterSheetState extends State<WatchlistFilterSheet> {
   Widget _sectionLabel(String text) => Padding(
         padding: const EdgeInsets.only(top: 20, bottom: 8),
         child: Text(text,
-            style: const TextStyle(
-                color: Colors.white,
+            style: TextStyle(
+                color: context.colors.white,
                 fontWeight: FontWeight.bold,
                 fontSize: 14)),
       );
@@ -86,28 +90,11 @@ class _WatchlistFilterSheetState extends State<WatchlistFilterSheet> {
     required bool selected,
     required VoidCallback onSelected,
   }) {
-    return ChoiceChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: (_) => onSelected(),
-      showCheckmark: true,
-      checkmarkColor: Colors.white,
-      selectedColor: FlixieColors.primary,
-      backgroundColor: Colors.transparent,
-      shape: const StadiumBorder(),
-      side: BorderSide(
-        color: selected
-            ? Colors.transparent
-            : Colors.white.withValues(alpha: 0.16),
-        width: 1,
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      labelStyle: TextStyle(
-        color: selected ? Colors.white : FlixieColors.medium,
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-      ),
-    );
+    return FlixiePill.choice(
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) => onSelected(),
+        showCheckmark: true);
   }
 
   @override
@@ -115,9 +102,9 @@ class _WatchlistFilterSheetState extends State<WatchlistFilterSheet> {
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
     final sheet = Container(
         padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottom),
-        decoration: const BoxDecoration(
-          color: FlixieColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: SafeArea(
           top: false,
@@ -132,7 +119,7 @@ class _WatchlistFilterSheetState extends State<WatchlistFilterSheet> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: FlixieColors.medium,
+                      color: context.colors.medium,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -141,9 +128,9 @@ class _WatchlistFilterSheetState extends State<WatchlistFilterSheet> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Sort & Filter',
+                    Text('Sort & Filter',
                         style: TextStyle(
-                            color: Colors.white,
+                            color: context.colors.white,
                             fontSize: 18,
                             fontWeight: FontWeight.bold)),
                     TextButton(

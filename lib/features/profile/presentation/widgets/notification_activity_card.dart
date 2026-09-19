@@ -19,15 +19,15 @@ class NotificationActivityCard extends StatelessWidget {
   final VoidCallback onClose;
   final VoidCallback? onOpen;
 
-  Color get _accentColor {
+  Color _accentColor(BuildContext context) {
     switch (notification.type) {
       case 'MOVIE_WATCH_REQUEST':
       case 'SHOW_WATCH_REQUEST':
         return FlixieColors.primary;
       case 'ALERT':
-        return FlixieColors.tertiary;
+        return context.colors.tertiary;
       default:
-        return FlixieColors.secondary;
+        return context.colors.secondary;
     }
   }
 
@@ -37,7 +37,7 @@ class NotificationActivityCard extends StatelessWidget {
     final initials = notification.senderInitials ?? '';
     final avatarBg = avatarColorFromIconColor(
       notification.senderIconColor,
-      fallback: _accentColor,
+      fallback: _accentColor(context),
     );
 
     final dateStr = notification.receivedAt.isNotEmpty
@@ -51,12 +51,12 @@ class NotificationActivityCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: isUnread
-              ? FlixieColors.tabBarBackgroundFocused
-              : FlixieColors.tabBarBackgroundFocused.withValues(alpha: 0.68),
+              ? context.colors.tabBarBackgroundFocused
+              : context.colors.tabBarBackgroundFocused.withValues(alpha: 0.68),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isUnread
-                ? _accentColor.withValues(alpha: 0.65)
+                ? _accentColor(context).withValues(alpha: 0.65)
                 : Colors.white.withValues(alpha: 0.06),
           ),
         ),
@@ -87,8 +87,8 @@ class NotificationActivityCard extends StatelessWidget {
                               if (name.isNotEmpty)
                                 TextSpan(
                                   text: '$name ',
-                                  style: const TextStyle(
-                                    color: FlixieColors.white,
+                                  style: TextStyle(
+                                    color: context.colors.white,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 14,
                                   ),
@@ -96,7 +96,7 @@ class NotificationActivityCard extends StatelessWidget {
                               TextSpan(
                                 text: notification.message,
                                 style: TextStyle(
-                                  color: FlixieColors.light,
+                                  color: context.colors.light,
                                   fontSize: 14,
                                   fontWeight: isUnread
                                       ? FontWeight.w600
@@ -109,11 +109,11 @@ class NotificationActivityCard extends StatelessWidget {
                       ),
                       PopupMenuButton<String>(
                         tooltip: 'Notification actions',
-                        color: FlixieColors.tabBarBackgroundFocused,
-                        icon: const Icon(
+                        color: context.colors.tabBarBackgroundFocused,
+                        icon: Icon(
                           Icons.more_horiz_rounded,
                           size: 20,
-                          color: FlixieColors.medium,
+                          color: context.colors.medium,
                         ),
                         onSelected: (value) {
                           if (value == 'dismiss') onClose();
@@ -130,10 +130,10 @@ class NotificationActivityCard extends StatelessWidget {
                           padding: const EdgeInsets.only(left: 6, top: 3),
                           child: Semantics(
                             label: 'New notification',
-                            child: const Text(
+                            child: Text(
                               'NEW',
                               style: TextStyle(
-                                color: FlixieColors.tertiary,
+                                color: context.colors.tertiary,
                                 fontSize: 10,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: 0.6,
@@ -147,8 +147,8 @@ class NotificationActivityCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       dateStr,
-                      style: const TextStyle(
-                        color: FlixieColors.medium,
+                      style: TextStyle(
+                        color: context.colors.medium,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -160,8 +160,8 @@ class NotificationActivityCard extends StatelessWidget {
                       notification.type == FlixieNotification.referralJoined
                           ? 'View profile'
                           : 'View list',
-                      style: const TextStyle(
-                        color: FlixieColors.primaryText,
+                      style: TextStyle(
+                        color: context.colors.primaryText,
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
                       ),

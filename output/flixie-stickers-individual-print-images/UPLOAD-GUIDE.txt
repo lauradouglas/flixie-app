@@ -1,0 +1,23 @@
+FLIXIE — INDIVIDUAL STICKER UPLOADS
+
+Upload one PNG for each sticker. These are flat artwork exports, not photos.
+All exports: sRGB PNG, 600 pixels per inch at the sizes below, with transparency outside the intended sticker silhouette. Fonts are rendered into pixels, so no font installation is needed by the print site.
+
+01 — 85 x 65 mm
+02 — 85 x 58 mm
+03 — 38 x 46 mm
+04 — 60 x 60 mm
+05 — 100 x 44 mm
+06 — 80 x 56 mm
+07 — 60 x 60 mm
+08 — 65 x 65 mm
+09 — 80 x 49 mm
+10 — 125 x 28 mm
+11 — 65 x 45 mm
+12 — 85 x 40 mm
+
+Choose custom shape/die-cut (or kiss-cut) for 03 and 09; circle/oval/rounded rectangle as appropriate for the others. Request a proof showing the cutting outline. For 03 the detached bar belongs to the same sticker; for 09 all lettering and the peach bar belong to one connected sticker. Bone is an intentional printed background, not transparent white.
+
+Use the listed dimensions and disable automatic background removal. Do not upload the contact sheet. No printer-specific bleed or spot cutting path is embedded: use the supplier's online cutline/bleed workflow and approve its proof. If the supplier requires a template, CMYK PDF, specific bleed or a cutline file, these PNGs will need adapting to that specification.
+
+The wordmark (11) is rendered from the existing original PNG at about 400 source pixels/inch at this size, upsampled in the 600ppi export; it is not newly vectorized. Other artwork is rendered from vectors and the actual Manrope/Newsreader fonts. The export follows the editable designs rather than imitating imperfect AI mockup lettering.

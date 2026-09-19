@@ -14,40 +14,26 @@ enum FavouriteLimitType { movie, show }
 
 bool isFavouriteLimitError(Object error) {
   final message = error.toString().toLowerCase();
-  return message.contains('favourite up to 25') ||
+  return message.contains('favourite up to 10') ||
+      message.contains('favourite up to 25') ||
       message.contains('maximum number of favorites') ||
       message.contains('max favorites reached');
 }
 
-void showFavouriteLimitPrompt(
+Future<void> showFavouriteLimitPrompt(
   BuildContext context, {
   required FavouriteLimitType type,
   Future<void> Function()? onSpaceMade,
-}) {
-  final messenger = ScaffoldMessenger.of(context);
-  final label = type == FavouriteLimitType.movie ? 'movies' : 'shows';
-  messenger.hideCurrentSnackBar();
-  messenger.showFlixieToast(
-    FlixieToast(
-      type: FlixieToastType.warning,
-      behavior: SnackBarBehavior.floating,
-      duration: const Duration(seconds: 6),
-      content: Text('You already have 25 favourite $label.'),
-      action: SnackBarAction(
-          label: 'Manage',
-          onPressed: () async {
-            if (!context.mounted) return;
-            final removed =
-                await showFavouriteManagerSheet(context, type: type);
-            if (removed && context.mounted) await onSpaceMade?.call();
-          }),
-    ),
-  );
+}) async {
+  final removed =
+      await showFavouriteManagerSheet(context, type: type, replacing: true);
+  if (removed && context.mounted) await onSpaceMade?.call();
 }
 
 Future<bool> showFavouriteManagerSheet(
   BuildContext context, {
   required FavouriteLimitType type,
+  bool replacing = false,
 }) async {
   final auth = context.read<AuthProvider>();
   final user = auth.dbUser;
@@ -67,9 +53,11 @@ Future<bool> showFavouriteManagerSheet(
   final removedIds = await showModalBottomSheet<Set<int>>(
     context: context,
     useRootNavigator: true,
+    useSafeArea: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => _FavouriteManagerSheet(type: type, items: items),
+    builder: (_) =>
+        _FavouriteManagerSheet(type: type, items: items, replacing: replacing),
   );
   if (removedIds == null || removedIds.isEmpty || !context.mounted) {
     return false;
@@ -105,7 +93,9 @@ Future<bool> showFavouriteManagerSheet(
 }
 
 class _FavouriteManagerSheet extends StatefulWidget {
-  const _FavouriteManagerSheet({required this.type, required this.items});
+  const _FavouriteManagerSheet(
+      {required this.type, required this.items, this.replacing = false});
+  final bool replacing;
 
   final FavouriteLimitType type;
   final List<_FavouriteManagerItem> items;
@@ -159,7 +149,7 @@ class _FavouriteManagerSheetState extends State<_FavouriteManagerSheet> {
       maxChildSize: .94,
       expand: false,
       builder: (context, scrollController) => Material(
-        color: FlixieColors.background,
+        color: context.colors.background,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
         clipBehavior: Clip.antiAlias,
         child: SafeArea(
@@ -171,7 +161,7 @@ class _FavouriteManagerSheetState extends State<_FavouriteManagerSheet> {
                 width: 42,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: FlixieColors.medium.withValues(alpha: .55),
+                  color: context.colors.medium.withValues(alpha: .55),
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -184,18 +174,22 @@ class _FavouriteManagerSheetState extends State<_FavouriteManagerSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Manage favourite $label',
-                            style: const TextStyle(
-                              color: FlixieColors.white,
+                            widget.replacing
+                                ? 'Which favourite should make room?'
+                                : 'Manage favourite $label',
+                            style: TextStyle(
+                              color: context.colors.white,
                               fontSize: 22,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            '${widget.items.length} of ${widget.type == FavouriteLimitType.movie ? maxFavouriteMovies : maxFavouriteShows} · Tap cards to remove',
-                            style: const TextStyle(
-                              color: FlixieColors.medium,
+                            widget.replacing
+                                ? 'Keep your top 10 $label. Choose ${widget.items.length > 10 ? widget.items.length - 9 : 1} to remove before adding this one.'
+                                : '${widget.items.length} of 10 · Tap cards to remove',
+                            style: TextStyle(
+                              color: context.colors.medium,
                               fontSize: 13,
                             ),
                           ),
@@ -229,9 +223,15 @@ class _FavouriteManagerSheetState extends State<_FavouriteManagerSheet> {
                       onTap: _saving
                           ? null
                           : () => setState(() {
-                                marked
-                                    ? _markedForRemoval.remove(item.id)
-                                    : _markedForRemoval.add(item.id);
+                                if (marked) {
+                                  _markedForRemoval.remove(item.id);
+                                } else {
+                                  if (widget.replacing &&
+                                      widget.items.length <= 10) {
+                                    _markedForRemoval.clear();
+                                  }
+                                  _markedForRemoval.add(item.id);
+                                }
                               }),
                     );
                   },
@@ -242,7 +242,7 @@ class _FavouriteManagerSheetState extends State<_FavouriteManagerSheet> {
                   padding: const EdgeInsets.fromLTRB(18, 0, 18, 8),
                   child: Text(
                     _error!,
-                    style: const TextStyle(color: FlixieColors.danger),
+                    style: TextStyle(color: context.colors.danger),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -252,7 +252,12 @@ class _FavouriteManagerSheetState extends State<_FavouriteManagerSheet> {
                   width: double.infinity,
                   height: 50,
                   child: FilledButton.icon(
-                    onPressed: _markedForRemoval.isEmpty || _saving
+                    onPressed: _markedForRemoval.isEmpty ||
+                            (widget.replacing &&
+                                widget.items.length -
+                                        _markedForRemoval.length >=
+                                    10) ||
+                            _saving
                         ? null
                         : _removeSelected,
                     icon: _saving
@@ -264,7 +269,9 @@ class _FavouriteManagerSheetState extends State<_FavouriteManagerSheet> {
                     label: Text(
                       _markedForRemoval.isEmpty
                           ? 'Select favourites to remove'
-                          : 'Remove ${_markedForRemoval.length} selected',
+                          : widget.replacing
+                              ? 'Remove selected and continue'
+                              : 'Remove ${_markedForRemoval.length} selected',
                     ),
                   ),
                 ),
@@ -296,11 +303,11 @@ class _FavouriteManagerCard extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         decoration: BoxDecoration(
-          color: FlixieColors.surfaceElevated,
+          color: context.colors.surfaceElevated,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: markedForRemoval
-                ? FlixieColors.danger
+                ? context.colors.danger
                 : FlixieColors.primary.withValues(alpha: .22),
             width: markedForRemoval ? 2 : 1,
           ),
@@ -314,10 +321,10 @@ class _FavouriteManagerCard extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   item.posterUrl == null
-                      ? const ColoredBox(
-                          color: FlixieColors.surface,
+                      ? ColoredBox(
+                          color: context.colors.surface,
                           child: Icon(Icons.movie_outlined,
-                              color: FlixieColors.medium),
+                              color: context.colors.medium),
                         )
                       : CachedNetworkImage(
                           imageUrl: item.posterUrl!,
@@ -325,7 +332,7 @@ class _FavouriteManagerCard extends StatelessWidget {
                         ),
                   if (markedForRemoval)
                     ColoredBox(
-                      color: FlixieColors.danger.withValues(alpha: .32),
+                      color: context.colors.danger.withValues(alpha: .32),
                     ),
                   Positioned(
                     right: 7,
@@ -336,8 +343,8 @@ class _FavouriteManagerCard extends StatelessWidget {
                       height: 28,
                       decoration: BoxDecoration(
                         color: markedForRemoval
-                            ? FlixieColors.danger
-                            : FlixieColors.background.withValues(alpha: .88),
+                            ? context.colors.danger
+                            : context.colors.background.withValues(alpha: .88),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
@@ -346,8 +353,8 @@ class _FavouriteManagerCard extends StatelessWidget {
                             : Icons.favorite_rounded,
                         size: 17,
                         color: markedForRemoval
-                            ? FlixieColors.white
-                            : FlixieColors.tertiary,
+                            ? context.colors.white
+                            : context.colors.tertiary,
                       ),
                     ),
                   ),
@@ -360,8 +367,8 @@ class _FavouriteManagerCard extends StatelessWidget {
                 item.title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: FlixieColors.white,
+                style: TextStyle(
+                  color: context.colors.white,
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                   height: 1.15,

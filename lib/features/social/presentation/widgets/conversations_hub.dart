@@ -1,3 +1,5 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
+import 'package:flixie_app/core/safety/safety_service.dart';
 import 'package:flixie_app/features/social/data/chat_unread_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -21,17 +23,40 @@ class ConversationsHub extends StatefulWidget {
 
 class _ConversationsHubState extends State<ConversationsHub> {
   final TextEditingController _search = TextEditingController();
+  bool _safetyReady = false;
+  bool _safetyFailed = false;
 
   @override
   void initState() {
     super.initState();
     _search.addListener(_onSearchChanged);
+    SafetyService.changes.addListener(_onSearchChanged);
+    _loadSafety();
+  }
+
+  Future<void> _loadSafety() async {
+    try {
+      await SafetyService.blockedUsers();
+      if (mounted) {
+        setState(() {
+          _safetyReady = true;
+          _safetyFailed = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _safetyFailed = true;
+        });
+      }
+    }
   }
 
   void _onSearchChanged() => setState(() {});
 
   @override
   void dispose() {
+    SafetyService.changes.removeListener(_onSearchChanged);
     _search
       ..removeListener(_onSearchChanged)
       ..dispose();
@@ -43,6 +68,17 @@ class _ConversationsHubState extends State<ConversationsHub> {
     final auth = context.watch<AuthProvider>();
     final userId = auth.dbUser?.id;
     if (userId == null) return const SizedBox.shrink();
+    if (!_safetyReady) {
+      if (_safetyFailed) {
+        return Center(
+            child: TextButton.icon(
+          onPressed: _loadSafety,
+          icon: const Icon(Icons.refresh),
+          label: const Text('Could not load chats. Retry'),
+        ));
+      }
+      return const _ConversationLoading();
+    }
     final friends = {
       for (final friendship
           in auth.cachedFriends?.friendships ?? const <Friendship>[])
@@ -71,6 +107,11 @@ class _ConversationsHubState extends State<ConversationsHub> {
         final query = _search.text.trim().toLowerCase();
         final conversations =
             (snapshot.data ?? const <Conversation>[]).where((conversation) {
+          if (conversation.type != 'group' &&
+              conversation.memberIds
+                  .any((id) => id != userId && SafetyService.isBlocked(id))) {
+            return false;
+          }
           if (query.isEmpty) return true;
           return conversationTitle(
                 conversation,
@@ -78,7 +119,11 @@ class _ConversationsHubState extends State<ConversationsHub> {
                 friends: friends,
                 groups: groups,
               ).toLowerCase().contains(query) ||
-              (conversation.lastMessage ?? '').toLowerCase().contains(query);
+              (!SafetyService.isBlocked(
+                      conversation.lastMessageSenderId ?? '') &&
+                  (conversation.lastMessage ?? '')
+                      .toLowerCase()
+                      .contains(query));
         }).toList(growable: false);
 
         return RefreshIndicator(
@@ -100,26 +145,24 @@ class _ConversationsHubState extends State<ConversationsHub> {
                           icon: const Icon(Icons.close_rounded),
                         ),
                   filled: true,
-                  fillColor: FlixieColors.surface,
+                  fillColor: context.colors.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(18),
-                    borderSide:
-                        const BorderSide(color: FlixieColors.tabBarBorder),
+                    borderSide: BorderSide(color: context.colors.tabBarBorder),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(18),
-                    borderSide:
-                        const BorderSide(color: FlixieColors.tabBarBorder),
+                    borderSide: BorderSide(color: context.colors.tabBarBorder),
                   ),
                 ),
               ),
               const SizedBox(height: 22),
               Row(
                 children: [
-                  const Text(
+                  Text(
                     'Messages',
                     style: TextStyle(
-                      color: FlixieColors.white,
+                      color: context.colors.white,
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
                     ),
@@ -243,9 +286,12 @@ class _ConversationRow extends StatelessWidget {
         : isGroup
             ? _groupSenderPrefix(context)
             : '';
-    final preview = conversation.lastMessage?.trim().isNotEmpty == true
-        ? '$senderPrefix${conversationMessagePreview(conversation.lastMessage)}'
-        : 'Start the conversation';
+    final preview = SafetyService.isBlocked(
+            conversation.lastMessageSenderId ?? '')
+        ? 'Message from a blocked user'
+        : conversation.lastMessage?.trim().isNotEmpty == true
+            ? '$senderPrefix${conversationMessagePreview(conversation.lastMessage)}'
+            : 'Start the conversation';
 
     return Consumer<ChatUnreadController?>(
       builder: (context, controller, _) {
@@ -255,9 +301,9 @@ class _ConversationRow extends StatelessWidget {
           child: Container(
             constraints: const BoxConstraints(minHeight: 88),
             padding: const EdgeInsets.symmetric(vertical: 14),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(
-                bottom: BorderSide(color: FlixieColors.tabBarBorder),
+                bottom: BorderSide(color: context.colors.tabBarBorder),
               ),
             ),
             child: Row(
@@ -285,7 +331,7 @@ class _ConversationRow extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                color: FlixieColors.white,
+                                color: context.colors.white,
                                 fontSize: 16,
                                 fontWeight: unread > 0
                                     ? FontWeight.w900
@@ -295,24 +341,7 @@ class _ConversationRow extends StatelessWidget {
                           ),
                           if (isGroup) ...[
                             const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: FlixieColors.primary),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: const Text(
-                                'GROUP',
-                                style: TextStyle(
-                                  color: FlixieColors.primary,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
+                            const FlixiePill.label(label: Text('Group')),
                           ],
                         ],
                       ),
@@ -323,8 +352,8 @@ class _ConversationRow extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: unread > 0
-                              ? FlixieColors.light
-                              : FlixieColors.medium,
+                              ? context.colors.light
+                              : context.colors.medium,
                           fontSize: 14,
                         ),
                       ),
@@ -337,8 +366,8 @@ class _ConversationRow extends StatelessWidget {
                   children: [
                     Text(
                       conversationTimeLabel(conversation.lastMessageAt),
-                      style: const TextStyle(
-                        color: FlixieColors.medium,
+                      style: TextStyle(
+                        color: context.colors.medium,
                         fontSize: 12,
                       ),
                     ),
@@ -357,8 +386,8 @@ class _ConversationRow extends StatelessWidget {
                         child: Text(
                           unread > 99 ? '99+' : '$unread',
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.black,
+                          style: TextStyle(
+                            color: context.colors.white,
                             fontSize: 11,
                             fontWeight: FontWeight.w900,
                           ),
@@ -400,7 +429,7 @@ class _GroupChatAvatar extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: FlixieColors.primary, width: 2),
       ),
-      child: const Icon(Icons.groups_2_outlined, color: FlixieColors.light),
+      child: Icon(Icons.groups_2_outlined, color: context.colors.light),
     );
   }
 }
@@ -433,7 +462,7 @@ class _ConversationLoading extends StatelessWidget {
       itemBuilder: (_, __) => Container(
         height: 78,
         decoration: BoxDecoration(
-          color: FlixieColors.surface,
+          color: context.colors.surface,
           borderRadius: BorderRadius.circular(18),
         ),
       ),
@@ -461,8 +490,8 @@ class _ConversationEmpty extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             title,
-            style: const TextStyle(
-              color: FlixieColors.white,
+            style: TextStyle(
+              color: context.colors.white,
               fontSize: 19,
               fontWeight: FontWeight.w800,
             ),
@@ -471,7 +500,7 @@ class _ConversationEmpty extends StatelessWidget {
           Text(
             body,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: FlixieColors.medium, height: 1.4),
+            style: TextStyle(color: context.colors.medium, height: 1.4),
           ),
         ],
       ),

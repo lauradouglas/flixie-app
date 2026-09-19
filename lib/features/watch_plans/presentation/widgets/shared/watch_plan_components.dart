@@ -22,12 +22,12 @@ class WatchPlanPoster extends StatelessWidget {
         height: width * 1.5,
         child: url == null
             ? ColoredBox(
-                color: FlixieColors.surfaceElevated,
+                color: context.colors.surfaceElevated,
                 child: Center(
                   child: Text(
                     title?.isNotEmpty == true ? title![0] : '?',
-                    style: const TextStyle(
-                        color: FlixieColors.primaryText,
+                    style: TextStyle(
+                        color: context.colors.primaryText,
                         fontSize: 24,
                         fontWeight: FontWeight.w900),
                   ),
@@ -36,9 +36,10 @@ class WatchPlanPoster extends StatelessWidget {
             : CachedNetworkImage(
                 imageUrl: url,
                 fit: BoxFit.cover,
-                errorWidget: (_, __, ___) => const ColoredBox(
-                  color: FlixieColors.surfaceElevated,
-                  child: Icon(Icons.movie_outlined, color: FlixieColors.medium),
+                errorWidget: (_, __, ___) => ColoredBox(
+                  color: context.colors.surfaceElevated,
+                  child:
+                      Icon(Icons.movie_outlined, color: context.colors.medium),
                 ),
               ),
       ),
@@ -60,9 +61,9 @@ class WatchPlanSurface extends StatelessWidget {
         width: double.infinity,
         padding: padding,
         decoration: BoxDecoration(
-          color: FlixieColors.surface,
+          color: context.colors.surface,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: border ?? FlixieColors.tabBarBorder),
+          border: Border.all(color: border ?? context.colors.tabBarBorder),
         ),
         child: child,
       );

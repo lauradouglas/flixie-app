@@ -1,3 +1,6 @@
+import 'package:flixie_app/core/safety/safety_service.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -38,6 +41,7 @@ GroupWatchRequest fixture({bool allMissed = false}) =>
     });
 
 void main() {
+  setUp(SafetyService.reset);
   setUpAll(() async {
     final font = FontLoader('Manrope')
       ..addFont(rootBundle.load('assets/fonts/Manrope-VariableFont_wght.ttf'));
@@ -53,12 +57,14 @@ void main() {
       bool allMissed = false,
       GroupWatchRequest? request,
       VoidCallback? onChat}) async {
+    await http.runWithClient(() => SafetyService.blockedUsers(),
+        () => MockClient((_) async => http.Response('[]', 200)));
     tester.view.physicalSize = Size(width, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(MaterialApp(
-      theme: ThemeData(fontFamily: 'Manrope'),
+      theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Manrope'),
       home: MediaQuery(
         data: MediaQueryData(textScaler: TextScaler.linear(scale)),
         child: Scaffold(
@@ -138,5 +144,35 @@ void main() {
     expect(find.text('A lovely evening with the group.'), findsOneWidget);
     expect(find.text('0 don’t recommend'), findsOneWidget);
     expect(find.text('1 person hasn’t recommended either way'), findsOneWidget);
+  });
+  testWidgets(
+      'other users reviews are reportable and disappear immediately after blocking',
+      (tester) async {
+    final request = GroupWatchRequest.fromJson({
+      'id': 'plan',
+      'groupId': 'group',
+      'status': 'COMPLETED',
+      'movieTitle': 'Moana',
+      'responses': [
+        {
+          'responderId': 'friend',
+          'username': 'Bundha',
+          'status': 'ACCEPTED',
+          'watchedAt': '2026-09-11T12:00:00Z',
+          'reviewText': 'An enjoyable film.',
+          'rating': 8
+        }
+      ],
+    });
+    await show(tester, request: request);
+    expect(find.text('An enjoyable film.'), findsOneWidget);
+    expect(find.text('Report'), findsOneWidget);
+    expect(find.text('Block user'), findsOneWidget);
+    await http.runWithClient(() => SafetyService.block('friend'),
+        () => MockClient((_) async => http.Response('{}', 200)));
+    await tester.pumpAndSettle();
+    expect(find.text('An enjoyable film.'), findsNothing);
+    expect(find.text('Bundha'), findsNothing);
+    expect(find.text('No ratings yet'), findsOneWidget);
   });
 }

@@ -114,7 +114,7 @@ class _WatchProvidersSheetState extends State<WatchProvidersSheet> {
         FlixieToast(
           type: FlixieToastType.success,
           content: const Text('Watch providers updated'),
-          backgroundColor: FlixieColors.surfaceElevated,
+          backgroundColor: context.colors.surfaceElevated,
         ),
       );
     } catch (_) {
@@ -126,7 +126,7 @@ class _WatchProvidersSheetState extends State<WatchProvidersSheet> {
         FlixieToast(
           type: FlixieToastType.error,
           content: const Text('Failed to update watch providers'),
-          backgroundColor: FlixieColors.danger,
+          backgroundColor: context.colors.danger,
         ),
       );
     }
@@ -139,9 +139,9 @@ class _WatchProvidersSheetState extends State<WatchProvidersSheet> {
     return Container(
       height: MediaQuery.sizeOf(context).height * 0.85,
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
-      decoration: const BoxDecoration(
-        color: FlixieColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(
         top: false,
@@ -151,18 +151,18 @@ class _WatchProvidersSheetState extends State<WatchProvidersSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: FlixieColors.medium,
+                color: context.colors.medium,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             const SizedBox(height: 16),
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
                     'Watch Providers',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: context.colors.white,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
@@ -170,18 +170,18 @@ class _WatchProvidersSheetState extends State<WatchProvidersSheet> {
                 ),
                 Text(
                   '${_selectedProviderIds.length} selected',
-                  style: const TextStyle(
-                    color: FlixieColors.medium,
+                  style: TextStyle(
+                    color: context.colors.medium,
                     fontSize: 13,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Choose the streaming services you use. Flixie can then show what you can watch now.',
               style: TextStyle(
-                color: FlixieColors.medium,
+                color: context.colors.medium,
                 fontSize: 13,
                 height: 1.4,
               ),
@@ -190,14 +190,13 @@ class _WatchProvidersSheetState extends State<WatchProvidersSheet> {
             TextField(
               controller: _searchController,
               onChanged: _onSearch,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: context.colors.white),
               decoration: InputDecoration(
                 hintText: 'Search providers...',
-                hintStyle: const TextStyle(color: FlixieColors.medium),
-                prefixIcon:
-                    const Icon(Icons.search, color: FlixieColors.medium),
+                hintStyle: TextStyle(color: context.colors.medium),
+                prefixIcon: Icon(Icons.search, color: context.colors.medium),
                 filled: true,
-                fillColor: FlixieColors.tabBarBackgroundFocused,
+                fillColor: context.colors.tabBarBackgroundFocused,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
@@ -213,11 +212,11 @@ class _WatchProvidersSheetState extends State<WatchProvidersSheet> {
                       ),
                     )
                   : _filteredProviders.isEmpty
-                      ? const Center(
+                      ? Center(
                           child: Text(
                             'No providers found',
                             style: TextStyle(
-                              color: FlixieColors.medium,
+                              color: context.colors.medium,
                               fontSize: 14,
                             ),
                           ),
@@ -243,11 +242,11 @@ class _WatchProvidersSheetState extends State<WatchProvidersSheet> {
                                   color: selected
                                       ? FlixieColors.primary
                                           .withValues(alpha: 0.18)
-                                      : FlixieColors.tabBarBackgroundFocused,
+                                      : context.colors.tabBarBackgroundFocused,
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
                                     color: selected
-                                        ? FlixieColors.primaryTint
+                                        ? context.colors.primaryTint
                                         : Colors.transparent,
                                   ),
                                 ),
@@ -264,13 +263,13 @@ class _WatchProvidersSheetState extends State<WatchProvidersSheet> {
                                           width: 42,
                                           height: 42,
                                           decoration: BoxDecoration(
-                                            color: FlixieColors.surface,
+                                            color: context.colors.surface,
                                             borderRadius:
                                                 BorderRadius.circular(8),
                                           ),
-                                          child: const Icon(
+                                          child: Icon(
                                             Icons.tv_outlined,
-                                            color: FlixieColors.medium,
+                                            color: context.colors.medium,
                                           ),
                                         ),
                                       ),
@@ -292,8 +291,8 @@ class _WatchProvidersSheetState extends State<WatchProvidersSheet> {
                                           _toggleProvider(provider.id),
                                       activeColor: FlixieColors.primary,
                                       checkColor: Colors.white,
-                                      side: const BorderSide(
-                                        color: FlixieColors.medium,
+                                      side: BorderSide(
+                                        color: context.colors.medium,
                                       ),
                                     ),
                                   ],

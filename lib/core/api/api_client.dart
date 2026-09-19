@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:http/http.dart' as http;
 import 'package:flixie_app/core/utils/app_logger.dart';
 
@@ -20,15 +21,17 @@ class ApiException implements Exception {
 }
 
 class ApiClient {
-  // static const String baseUrl = String.fromEnvironment(
-  //   'API_BASE_URL',
-  //   defaultValue: 'http://localhost:3000',
-  // );
-
+  // Debug runs use the local API; profile/release builds use production.
+  // Explicit API_BASE_URL always takes precedence over USE_PROD_API.
+  static const bool _useProdApi = bool.fromEnvironment(
+    'USE_PROD_API',
+    defaultValue: !kDebugMode,
+  );
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue:
-        'https://flixie-api-fmcehvaecwdheccm.northeurope-01.azurewebsites.net',
+    defaultValue: _useProdApi
+        ? 'https://flixie-api-fmcehvaecwdheccm.northeurope-01.azurewebsites.net'
+        : 'http://localhost:3000',
   );
 
   static const Duration _timeout = Duration(seconds: 15);
@@ -83,9 +86,7 @@ class ApiClient {
   static String? getToken() => _token;
 
   static Map<String, String> _headers({bool includeAuth = true}) {
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-    };
+    final headers = <String, String>{'Content-Type': 'application/json'};
     if (includeAuth && _token != null) {
       headers['Authorization'] = 'Bearer $_token';
     }
@@ -107,7 +108,8 @@ class ApiClient {
       try {
         final decoded = jsonDecode(response.body);
         if (decoded is Map<String, dynamic>) {
-          message = decoded['error'] as String? ??
+          message =
+              decoded['error'] as String? ??
               decoded['message'] as String? ??
               response.body;
           code = decoded['code'] as String?;
@@ -171,11 +173,14 @@ class ApiClient {
 
     // Do not return the removed Future from the error callback: doing so
     // creates a second, unhandled copy of an otherwise handled failure.
-    future.then<void>((_) {
-      clearInFlight();
-    }, onError: (Object _) {
-      clearInFlight();
-    });
+    future.then<void>(
+      (_) {
+        clearInFlight();
+      },
+      onError: (Object _) {
+        clearInFlight();
+      },
+    );
     return future;
   }
 
@@ -219,8 +224,9 @@ class ApiClient {
     final refresher = _authTokenRefresher;
     if (refresher == null) return;
     final session = _sessionGeneration;
-    final refreshFuture = _tokenRefreshInFlight ??=
-        Future<String>.sync(refresher).timeout(const Duration(seconds: 8));
+    final refreshFuture = _tokenRefreshInFlight ??= Future<String>.sync(
+      refresher,
+    ).timeout(const Duration(seconds: 8));
     try {
       final token = await refreshFuture;
       if (session == _sessionGeneration &&
@@ -249,8 +255,9 @@ class ApiClient {
 
     for (var attempt = 0; attempt <= _maxRetries; attempt++) {
       try {
-        final response =
-            await http.get(uri, headers: headers).timeout(_timeout);
+        final response = await http
+            .get(uri, headers: headers)
+            .timeout(_timeout);
         apiLogger.d('Response ${response.statusCode}');
         return _parseResponse(response);
       } on ApiException catch (e) {
@@ -271,8 +278,12 @@ class ApiClient {
     throw StateError('Unreachable retry loop exit for $uri');
   }
 
-  static Future<dynamic> post(String path,
-      {dynamic body, Duration? timeout, bool logRequestBody = true}) async {
+  static Future<dynamic> post(
+    String path, {
+    dynamic body,
+    Duration? timeout,
+    bool logRequestBody = true,
+  }) async {
     // Redact sensitive fields if present
     dynamic logBody = body;
     if (body is Map && body.containsKey('password')) {
@@ -287,7 +298,8 @@ class ApiClient {
     }
     apiLogger.d('POST $path');
     apiLogger.d(
-        'Headers: ${_headers().map((k, v) => MapEntry(k, k == "Authorization" ? "[REDACTED]" : v))}');
+      'Headers: ${_headers().map((k, v) => MapEntry(k, k == "Authorization" ? "[REDACTED]" : v))}',
+    );
     if (logRequestBody && logBody != null) apiLogger.d('Body: $logBody');
     return _withAuthRetry(
       authenticated: true,

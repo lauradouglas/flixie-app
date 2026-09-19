@@ -22,7 +22,7 @@ void main() {
       expect(FlixieTypography.sheetTitle.fontSize, 24);
       expect(FlixieTypography.sectionTitle.fontSize, 20);
       expect(FlixieTypography.cardTitle.fontSize, 17);
-      expect(FlixieTypography.body.fontSize, 15);
+      expect(FlixieTypography.body.fontSize, 16);
       expect(FlixieTypography.metadata.fontSize, 13);
       expect(FlixieTypography.eyebrow.fontSize, 12);
       expect(FlixieTypography.rating.fontSize, 20);
@@ -38,8 +38,8 @@ void main() {
       expect(textTheme.headlineLarge?.fontSize, 26);
       expect(textTheme.headlineSmall?.fontSize, 20);
       expect(textTheme.titleMedium?.fontSize, 17);
-      expect(textTheme.bodyMedium?.fontSize, 15);
-      expect(textTheme.labelLarge?.fontSize, 15);
+      expect(textTheme.bodyMedium?.fontSize, 16);
+      expect(textTheme.labelLarge?.fontSize, 16);
       expect(textTheme.bodySmall?.fontSize, 13);
     });
   });

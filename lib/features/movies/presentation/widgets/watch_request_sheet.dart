@@ -42,6 +42,7 @@ class MovieWatchRequestSheet extends StatefulWidget {
     this.initialGroupId,
     this.initialGroupMode = false,
     this.fromMovieMatch = false,
+    this.initialCinema = false,
   });
 
   final int? movieId;
@@ -55,6 +56,7 @@ class MovieWatchRequestSheet extends StatefulWidget {
   final String? initialGroupId;
   final bool initialGroupMode;
   final bool fromMovieMatch;
+  final bool initialCinema;
 
   @override
   State<MovieWatchRequestSheet> createState() => _MovieWatchRequestSheetState();
@@ -94,6 +96,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialCinema) _watchContext = _WatchContext.cinema;
     _movieChoices = widget.movieId == null
         ? []
         : [
@@ -301,7 +304,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
         FlixieToast(
           type: FlixieToastType.warning,
           content: const Text('Choose a date and time in the future.'),
-          backgroundColor: FlixieColors.danger,
+          backgroundColor: context.colors.danger,
         ),
       );
       return;
@@ -370,7 +373,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
     final movie = await showModalBottomSheet<MovieShort>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.surface,
+      backgroundColor: context.colors.surface,
       builder: (_) => MovieSearchSheet(
         title: 'Add a movie option',
         searchMovies: (query) async {
@@ -397,7 +400,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
     final movie = await showModalBottomSheet<MovieShort>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: FlixieColors.surface,
+      backgroundColor: context.colors.surface,
       builder: (_) => MovieSearchSheet(
         title: 'In cinemas near you',
         initialResultsLabel: 'Now playing in $region',
@@ -520,9 +523,9 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
     final hasGroups = _groups.isNotEmpty;
 
     return Container(
-      decoration: const BoxDecoration(
-        color: FlixieColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SizedBox(
         height: sheetHeight,
@@ -562,10 +565,10 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
                           const SizedBox(height: 2),
-                          const Text(
+                          Text(
                             'Start with the people, place or date',
                             style: TextStyle(
-                              color: FlixieColors.medium,
+                              color: context.colors.medium,
                               fontSize: 13,
                             ),
                           ),
@@ -575,8 +578,8 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                     IconButton(
                       tooltip: 'Close',
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close_rounded,
-                          color: FlixieColors.medium),
+                      icon: Icon(Icons.close_rounded,
+                          color: context.colors.medium),
                     ),
                   ],
                 ),
@@ -586,8 +589,8 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                 // Friend / Group toggle
                 Container(
                   decoration: BoxDecoration(
-                    color: FlixieColors.surfaceElevated,
-                    border: Border.all(color: FlixieColors.tabBarBorder),
+                    color: context.colors.surfaceElevated,
+                    border: Border.all(color: context.colors.tabBarBorder),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Row(
@@ -642,10 +645,10 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                   const SizedBox(height: 12),
                 ],
                 if (!_isGroupMode) ...[
-                  const Text(
+                  Text(
                     'SELECT A FRIEND',
                     style: TextStyle(
-                      color: FlixieColors.medium,
+                      color: context.colors.medium,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 1.1,
@@ -653,10 +656,10 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                   ),
                   const SizedBox(height: 10),
                   if (!hasFriends)
-                    const Text(
+                    Text(
                       'Add some friends to plan a watch together',
                       style:
-                          TextStyle(color: FlixieColors.medium, fontSize: 13),
+                          TextStyle(color: context.colors.medium, fontSize: 13),
                     )
                   else
                     ConstrainedBox(
@@ -681,10 +684,10 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                       ),
                     ),
                 ] else ...[
-                  const Text(
+                  Text(
                     'SELECT A GROUP',
                     style: TextStyle(
-                      color: FlixieColors.medium,
+                      color: context.colors.medium,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 1.1,
@@ -698,10 +701,10 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                           child: CircularProgressIndicator(strokeWidth: 2)),
                     )
                   else if (!hasGroups)
-                    const Text(
+                    Text(
                       "You're not in any groups yet",
                       style:
-                          TextStyle(color: FlixieColors.medium, fontSize: 13),
+                          TextStyle(color: context.colors.medium, fontSize: 13),
                     )
                   else
                     ConstrainedBox(
@@ -808,8 +811,8 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                       _watchContext == _WatchContext.cinema
                           ? 'Cinema plan - streaming providers won’t be checked.'
                           : 'You can decide where to watch together later.',
-                      style: const TextStyle(
-                          color: FlixieColors.secondary, fontSize: 13),
+                      style: TextStyle(
+                          color: context.colors.secondary, fontSize: 13),
                     ),
                   ),
                 const SizedBox(height: 14),
@@ -829,13 +832,13 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                   onTap: _pickSchedule,
                 ),
                 const SizedBox(height: 22),
-                const Row(
+                Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       'Message',
                       style: TextStyle(
-                        color: FlixieColors.light,
+                        color: context.colors.light,
                         fontSize: 17,
                         fontWeight: FontWeight.w800,
                       ),
@@ -843,7 +846,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                     Text(
                       'OPTIONAL',
                       style: TextStyle(
-                        color: FlixieColors.medium,
+                        color: context.colors.medium,
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 1,
@@ -856,22 +859,22 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                   controller: _messageController,
                   minLines: 1,
                   maxLines: 2,
-                  style: const TextStyle(color: FlixieColors.light),
+                  style: TextStyle(color: context.colors.light),
                   decoration: InputDecoration(
                     hintText: 'e.g. Want to watch this together?',
-                    hintStyle: const TextStyle(
-                        color: FlixieColors.medium, fontSize: 13),
+                    hintStyle:
+                        TextStyle(color: context.colors.medium, fontSize: 13),
                     filled: true,
-                    fillColor: FlixieColors.surfaceElevated,
+                    fillColor: context.colors.surfaceElevated,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide:
-                          const BorderSide(color: FlixieColors.tabBarBorder),
+                          BorderSide(color: context.colors.tabBarBorder),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide:
-                          const BorderSide(color: FlixieColors.tabBarBorder),
+                          BorderSide(color: context.colors.tabBarBorder),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
@@ -885,9 +888,9 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: FlixieColors.primary,
-                      foregroundColor: Colors.black,
-                      disabledBackgroundColor: FlixieColors.surfaceElevated,
-                      disabledForegroundColor: FlixieColors.medium,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: context.colors.surfaceElevated,
+                      disabledForegroundColor: context.colors.medium,
                       minimumSize: const Size.fromHeight(48),
                       side: const BorderSide(color: FlixieColors.primary),
                       textStyle: const TextStyle(
@@ -915,11 +918,12 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                const Center(
+                Center(
                   child: Text(
                     'The plan stays in Planning until a movie and time are agreed.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+                    style:
+                        TextStyle(color: context.colors.medium, fontSize: 12),
                   ),
                 ),
               ],
@@ -958,20 +962,20 @@ class _PlanStepHeading extends StatelessWidget {
           final titleWidget = Text(
             title,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: FlixieColors.light, fontWeight: FontWeight.w900),
+                color: context.colors.light, fontWeight: FontWeight.w900),
           );
           final numberWidget = CircleAvatar(
             radius: 18,
             backgroundColor: FlixieColors.primary,
             child: Text(number,
-                style: const TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.w800)),
+                style: TextStyle(
+                    color: context.colors.white, fontWeight: FontWeight.w800)),
           );
           final trailingWidget = trailing == null
               ? null
               : Text(trailing!,
-                  style: const TextStyle(
-                      color: FlixieColors.medium,
+                  style: TextStyle(
+                      color: context.colors.medium,
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
                       letterSpacing: .5));
@@ -1015,20 +1019,20 @@ class _SchedulePicker extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-              border: Border.all(color: FlixieColors.tabBarBorder),
+              border: Border.all(color: context.colors.tabBarBorder),
               borderRadius: BorderRadius.circular(14)),
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(label,
-                style: const TextStyle(
-                    color: FlixieColors.medium,
+                style: TextStyle(
+                    color: context.colors.medium,
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 1)),
             const SizedBox(height: 6),
             Text(value,
-                style: const TextStyle(
-                    color: FlixieColors.light,
+                style: TextStyle(
+                    color: context.colors.light,
                     fontSize: 15,
                     fontWeight: FontWeight.w600)),
           ]),
@@ -1049,7 +1053,7 @@ class _MovieOptionsEmptyCard extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            border: Border.all(color: FlixieColors.tabBarBorder),
+            border: Border.all(color: context.colors.tabBarBorder),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Row(children: [
@@ -1064,21 +1068,21 @@ class _MovieOptionsEmptyCard extends StatelessWidget {
                   color: FlixieColors.primary, size: 36),
             ),
             const SizedBox(width: 20),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Add films to vote on',
                       style: TextStyle(
-                          color: FlixieColors.light,
+                          color: context.colors.light,
                           fontSize: 19,
                           fontWeight: FontWeight.w700)),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Text('Everyone can add options.',
-                      style:
-                          TextStyle(color: FlixieColors.medium, fontSize: 13)),
-                  SizedBox(height: 14),
-                  Text('Browse cinema releases',
+                      style: TextStyle(
+                          color: context.colors.medium, fontSize: 13)),
+                  const SizedBox(height: 14),
+                  const Text('Browse cinema releases',
                       style: TextStyle(
                           color: FlixieColors.primary,
                           fontSize: 14,
@@ -1107,7 +1111,7 @@ class _SelectedPlanTitle extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-            border: Border.all(color: FlixieColors.tabBarBorder),
+            border: Border.all(color: context.colors.tabBarBorder),
             borderRadius: BorderRadius.circular(18)),
         child: SizedBox(
           height: 128,
@@ -1158,9 +1162,9 @@ class _SelectedPlanTitle extends StatelessWidget {
                                             borderRadius:
                                                 BorderRadius.circular(8),
                                             child: choice.poster == null
-                                                ? const ColoredBox(
-                                                    color: FlixieColors
-                                                        .surfaceElevated)
+                                                ? ColoredBox(
+                                                    color: context
+                                                        .colors.surfaceElevated)
                                                 : CachedNetworkImage(
                                                     imageUrl: choice.poster!
                                                             .startsWith('http')
@@ -1168,11 +1172,11 @@ class _SelectedPlanTitle extends StatelessWidget {
                                                         : 'https://image.tmdb.org/t/p/w185${choice.poster}',
                                                     fit: BoxFit.cover))),
                                     if (choice.id == selectedMovieId)
-                                      const Positioned(
+                                      Positioned(
                                           left: 4,
                                           bottom: 4,
                                           child: Icon(Icons.check_circle,
-                                              color: FlixieColors.success,
+                                              color: context.colors.success,
                                               size: 18)),
                                     Positioned(
                                       right: 2,
@@ -1203,8 +1207,8 @@ class _SelectedPlanTitle extends StatelessWidget {
                           Text(choice.name,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  color: FlixieColors.light,
+                              style: TextStyle(
+                                  color: context.colors.light,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700)),
                         ]));
@@ -1249,32 +1253,32 @@ class _WatchRequestProviders extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return const _ProviderPanel(
+      return _ProviderPanel(
         child: Row(
           children: [
-            SizedBox.square(
+            const SizedBox.square(
               dimension: 16,
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
-            SizedBox(width: 9),
+            const SizedBox(width: 9),
             Text(
               'Checking streaming availability…',
-              style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+              style: TextStyle(color: context.colors.medium, fontSize: 12),
             ),
           ],
         ),
       );
     }
     if (providers.isEmpty) {
-      return const _ProviderPanel(
+      return _ProviderPanel(
         child: Row(
           children: [
-            Icon(Icons.tv_off_outlined, size: 17, color: FlixieColors.medium),
-            SizedBox(width: 8),
+            Icon(Icons.tv_off_outlined, size: 17, color: context.colors.medium),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(
                 'Not currently available on a streaming subscription.',
-                style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+                style: TextStyle(color: context.colors.medium, fontSize: 12),
               ),
             ),
           ],
@@ -1297,8 +1301,8 @@ class _WatchRequestProviders extends StatelessWidget {
                 : 'WHERE TO WATCH · $movieTitle',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: FlixieColors.medium,
+            style: TextStyle(
+              color: context.colors.medium,
               fontSize: 10,
               fontWeight: FontWeight.w700,
               letterSpacing: 1,
@@ -1325,35 +1329,35 @@ class _WatchRequestProviders extends StatelessWidget {
           ),
           const SizedBox(height: 9),
           if (groupMode && !groupSelected)
-            const Text(
+            Text(
               'Select a group to compare everyone’s streaming services.',
-              style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+              style: TextStyle(color: context.colors.medium, fontSize: 12),
             )
           else if (groupMode && loadingGroup)
-            const Text(
+            Text(
               'Checking group members’ services…',
-              style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+              style: TextStyle(color: context.colors.medium, fontSize: 12),
             )
           else if (groupMode)
             Text(
               _groupSummary,
               style: TextStyle(
                 color: _hasGroupMatch
-                    ? FlixieColors.success
-                    : FlixieColors.warning,
+                    ? context.colors.success
+                    : context.colors.warning,
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
             )
           else if (!showFriendMatch)
-            const Text(
+            Text(
               'Select a friend to compare your streaming services.',
-              style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+              style: TextStyle(color: context.colors.medium, fontSize: 12),
             )
           else if (loadingFriend)
-            const Text(
+            Text(
               'Checking your friend’s services…',
-              style: TextStyle(color: FlixieColors.medium, fontSize: 12),
+              style: TextStyle(color: context.colors.medium, fontSize: 12),
             )
           else
             Text(
@@ -1362,8 +1366,8 @@ class _WatchRequestProviders extends StatelessWidget {
                   : 'No shared streaming service for you and ${friendName ?? 'your friend'}.',
               style: TextStyle(
                 color: shared.isNotEmpty
-                    ? FlixieColors.success
-                    : FlixieColors.warning,
+                    ? context.colors.success
+                    : context.colors.warning,
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
@@ -1413,9 +1417,9 @@ class _ProviderPanel extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: FlixieColors.surfaceElevated,
+          color: context.colors.surfaceElevated,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: FlixieColors.tabBarBorder),
+          border: Border.all(color: context.colors.tabBarBorder),
         ),
         child: child,
       );
@@ -1465,10 +1469,10 @@ class _ProviderMatchLogo extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
                 color: highlighted
-                    ? FlixieColors.success
+                    ? context.colors.success
                     : youHaveIt
                         ? FlixieColors.primary
-                        : FlixieColors.tabBarBorder,
+                        : context.colors.tabBarBorder,
                 width: highlighted ? 2 : 1,
               ),
             ),
@@ -1477,21 +1481,21 @@ class _ProviderMatchLogo extends StatelessWidget {
               child: CachedNetworkImage(
                 imageUrl: provider.logoUrl,
                 fit: BoxFit.cover,
-                errorWidget: (_, __, ___) => const Icon(
+                errorWidget: (_, __, ___) => Icon(
                   Icons.live_tv_outlined,
-                  color: FlixieColors.medium,
+                  color: context.colors.medium,
                 ),
               ),
             ),
           ),
           if (highlighted)
-            const Positioned(
+            Positioned(
               right: -4,
               top: -4,
               child: Icon(
                 Icons.check_circle_rounded,
                 size: 15,
-                color: FlixieColors.success,
+                color: context.colors.success,
               ),
             ),
         ],
@@ -1528,12 +1532,13 @@ class _ModeTab extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon,
-                size: 17, color: selected ? Colors.black : FlixieColors.medium),
+                size: 17,
+                color: selected ? Colors.white : context.colors.medium),
             const SizedBox(width: 7),
             Text(
               label,
               style: TextStyle(
-                color: selected ? Colors.black : FlixieColors.medium,
+                color: selected ? Colors.white : context.colors.medium,
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
               ),
@@ -1580,11 +1585,11 @@ class _RecipientOptionTile extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected
                 ? FlixieColors.primary.withValues(alpha: 0.16)
-                : FlixieColors.surfaceElevated,
+                : context.colors.surfaceElevated,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color:
-                  selected ? FlixieColors.primary : FlixieColors.tabBarBorder,
+                  selected ? FlixieColors.primary : context.colors.tabBarBorder,
             ),
           ),
           child: Row(
@@ -1619,8 +1624,8 @@ class _RecipientOptionTile extends StatelessWidget {
                       title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: FlixieColors.light,
+                      style: TextStyle(
+                        color: context.colors.light,
                         fontSize: 13.5,
                         fontWeight: FontWeight.w700,
                       ),
@@ -1630,8 +1635,8 @@ class _RecipientOptionTile extends StatelessWidget {
                         subtitle!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: FlixieColors.medium,
+                        style: TextStyle(
+                          color: context.colors.medium,
                           fontSize: 11,
                         ),
                       ),
@@ -1645,9 +1650,9 @@ class _RecipientOptionTile extends StatelessWidget {
                         key: ValueKey('selected'),
                         color: FlixieColors.primary,
                         size: 22)
-                    : const Icon(Icons.circle_outlined,
-                        key: ValueKey('unselected'),
-                        color: FlixieColors.medium,
+                    : Icon(Icons.circle_outlined,
+                        key: const ValueKey('unselected'),
+                        color: context.colors.medium,
                         size: 20),
               ),
             ],

@@ -5,6 +5,58 @@ import 'package:flixie_app/features/profile/presentation/widgets/notification_in
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 
 void main() {
+  test('legacy sent notification is actionable only for the pending recipient',
+      () {
+    FlixieNotification request(String viewer, String status) =>
+        FlixieNotification(
+          userId: viewer,
+          type: 'FRIEND_REQUEST',
+          action: 'SENT',
+          message: '',
+          link: {
+            'request': {
+              'requesterId': 'sender',
+              'recipientId': 'receiver',
+              'status': status,
+              'requester': {'id': 'sender', 'username': 'Dougasaur'},
+              'recipient': {'id': 'receiver', 'username': 'Recipient'}
+            }
+          },
+        );
+    final incoming = request('receiver', 'PENDING');
+    expect(
+        notificationHeadline(incoming), 'Dougasaur sent you a friend request');
+    expect(notificationNeedsResponse(incoming), isTrue);
+    expect(notificationNeedsResponse(request('sender', 'PENDING')), isFalse);
+    expect(notificationHeadline(request('sender', 'PENDING')),
+        'Friend request sent to Recipient');
+    for (final status in ['ACCEPTED', 'DECLINED', 'CANCELLED']) {
+      expect(notificationNeedsResponse(request('receiver', status)), isFalse);
+    }
+    expect(notificationNeedsResponse(incoming.copyWith(closed: true)), isFalse);
+  });
+  test('legacy group invitations need a response only from a pending recipient',
+      () {
+    FlixieNotification invite(String viewer, String status) =>
+        FlixieNotification(
+          userId: viewer,
+          type: 'GROUP_INVITE',
+          action: 'SENT',
+          message: '',
+          link: {
+            'request': {
+              'requesterId': 'sender',
+              'recipientId': 'receiver',
+              'status': status
+            }
+          },
+        );
+    expect(notificationNeedsResponse(invite('receiver', 'PENDING')), isTrue);
+    expect(notificationNeedsResponse(invite('sender', 'PENDING')), isFalse);
+    for (final status in ['ACCEPTED', 'DECLINED', 'CANCELLED']) {
+      expect(notificationNeedsResponse(invite('receiver', status)), isFalse);
+    }
+  });
   const incoming = FlixieNotification(
       id: 'n',
       userId: 'me',

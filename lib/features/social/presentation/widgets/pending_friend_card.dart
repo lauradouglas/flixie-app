@@ -39,9 +39,9 @@ class PendingFriendCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: FlixieColors.tabBarBackgroundFocused,
+          color: context.colors.tabBarBackgroundFocused,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: FlixieColors.tabBarBorder),
+          border: Border.all(color: context.colors.tabBarBorder),
         ),
         child: Row(
           children: [
@@ -59,8 +59,8 @@ class PendingFriendCard extends StatelessWidget {
             Expanded(
               child: Text(
                 user?.username ?? 'Unknown',
-                style: const TextStyle(
-                    color: FlixieColors.light, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                    color: context.colors.light, fontWeight: FontWeight.w500),
               ),
             ),
             SizedBox(
@@ -68,8 +68,8 @@ class PendingFriendCard extends StatelessWidget {
               child: OutlinedButton(
                 onPressed: onDecline,
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: FlixieColors.danger,
-                  side: const BorderSide(color: FlixieColors.danger),
+                  foregroundColor: context.colors.danger,
+                  side: BorderSide(color: context.colors.danger),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
                   minimumSize: Size.zero,
@@ -85,7 +85,7 @@ class PendingFriendCard extends StatelessWidget {
                 onPressed: onAccept,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: FlixieColors.primary,
-                  foregroundColor: Colors.black,
+                  foregroundColor: Colors.white,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
                   minimumSize: Size.zero,

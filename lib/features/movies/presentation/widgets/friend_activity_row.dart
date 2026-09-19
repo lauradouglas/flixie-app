@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -46,14 +47,14 @@ class FriendActivityRow extends StatelessWidget {
       badges.add(_ActivityBadge(
         icon: Icons.star_rounded,
         label: '${activity.rating}/10',
-        color: FlixieColors.tertiary,
+        color: context.colors.tertiary,
       ));
     }
     if (activity.recommended == true) {
-      badges.add(const _ActivityBadge(
+      badges.add(_ActivityBadge(
         icon: Icons.thumb_up_outlined,
         label: 'Recommended',
-        color: FlixieColors.success,
+        color: context.colors.success,
       ));
     } else if (activity.recommended == false) {
       badges.add(const _ActivityBadge(
@@ -72,8 +73,8 @@ class FriendActivityRow extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              FlixieColors.surfaceElevated.withValues(alpha: 0.62),
-              FlixieColors.surface.withValues(alpha: 0.92),
+              context.colors.surfaceElevated.withValues(alpha: 0.62),
+              context.colors.surface.withValues(alpha: 0.92),
             ],
           ),
           borderRadius: BorderRadius.circular(14),
@@ -111,8 +112,8 @@ class FriendActivityRow extends StatelessWidget {
                             displayName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: FlixieColors.light,
+                            style: TextStyle(
+                              color: context.colors.light,
                               fontWeight: FontWeight.w700,
                               fontSize: 14,
                             ),
@@ -152,28 +153,7 @@ class _ActivityBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.35)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
+    return FlixiePill.label(
+        label: Text(label), avatar: Icon(icon, color: color));
   }
 }

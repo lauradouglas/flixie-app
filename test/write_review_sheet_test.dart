@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/write_review_sheet.dart';
@@ -24,7 +25,7 @@ void main() {
 
     expect(find.text('9 / 10'), findsOneWidget);
     final selectedRatings = tester
-        .widgetList<ChoiceChip>(find.byType(ChoiceChip))
+        .widgetList<FlixiePill>(find.byType(FlixiePill))
         .where((chip) => chip.selected)
         .toList();
     expect(selectedRatings, hasLength(1));
