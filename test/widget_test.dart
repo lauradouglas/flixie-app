@@ -167,7 +167,9 @@ void main() {
       timeoutAuth.emitUser(_FakeUser());
       await pumpEventQueue();
 
-      expect(timeoutProvider.status, app_auth.AuthStatus.unauthenticated);
+      expect(timeoutProvider.status, app_auth.AuthStatus.unknown);
+      expect(timeoutProvider.recoveryError, isNotNull);
+      expect(timeoutProvider.firebaseUser, isNotNull);
     });
   });
 
@@ -309,13 +311,12 @@ void main() {
     });
 
     test('emptyMessage for active', () {
-      expect(
-          WatchRequestFilter.active.emptyMessage, 'No active watch requests');
+      expect(WatchRequestFilter.active.emptyMessage, 'No active Watch Plans');
     });
 
     test('emptyMessage for needsResponse', () {
       expect(WatchRequestFilter.needsResponse.emptyMessage,
-          'No requests need your response');
+          'No Watch Plans need your response');
     });
 
     test('emptyMessage for completed', () {
@@ -325,7 +326,7 @@ void main() {
 
     test('emptyMessage for byMe', () {
       expect(WatchRequestFilter.byMe.emptyMessage,
-          "You haven't created any requests yet");
+          "You haven't created any Watch Plans yet");
     });
   });
 

@@ -1,0 +1,74 @@
+name: Regression tests
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: regression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flutter-tests:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.0'
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze lib test patrol_test
+      - run: flutter test --coverage --reporter expanded
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: flutter-test-results
+          path: |
+            coverage/
+            test/failures/
+          if-no-files-found: ignore
+
+  patrol-ios:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.0'
+          cache: true
+      - run: flutter pub get
+      - run: dart pub global activate patrol_cli 4.8.0
+      - name: Create isolated simulator
+        run: |
+          python3 - <<'PY'
+          import json, subprocess, os
+          inventory = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', '-j']))
+          runtime = next(r['identifier'] for r in reversed(inventory['runtimes'])
+                         if r['isAvailable'] and r['identifier'].startswith('com.apple.CoreSimulator.SimRuntime.iOS-'))
+          device_type = next(d['identifier'] for d in inventory['devicetypes']
+                             if d['name'] == 'iPhone 16')
+          device = subprocess.check_output(['xcrun', 'simctl', 'create', 'Flixie Patrol', device_type, runtime], text=True).strip()
+          subprocess.run(['xcrun', 'simctl', 'boot', device], check=True)
+          subprocess.run(['xcrun', 'simctl', 'bootstatus', device, '-b'], check=True)
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write(f'PATROL_DEVICE={device}\n')
+          PY
+      - name: Run native regression suite
+        run: scripts/test-patrol.sh -d "$PATROL_DEVICE" --verbose
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: patrol-ios-results
+          path: |
+            build/ios_results_*.xcresult
+            build/ios_integ/Logs/Test/
+            build/ios_integ/**/*.xcresult
+            patrol_test/screenshots/
+          if-no-files-found: ignore

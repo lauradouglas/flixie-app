@@ -190,7 +190,7 @@ class UpdateMovieListRequest {
         if (coverImageUrl != null) 'coverImageUrl': coverImageUrl,
         if (whoCanAddMovies != null) 'whoCanAddItems': whoCanAddMovies,
         if (scope != null) 'scope': scope,
-        'groupId': groupId,
+        if (groupId != null || scope == ListScope.personal) 'groupId': groupId,
         if (collaboratorIds != null) 'collaboratorIds': collaboratorIds,
       };
 }

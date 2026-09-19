@@ -51,14 +51,14 @@ void main() {
       await tester.pumpWidget(ChangeNotifierProvider<AuthProvider>.value(
           value: auth, child: const MaterialApp(home: SearchScreen())));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), 'al');
-      await tester.pump(const Duration(milliseconds: 600));
+      await tester.enterText(find.byType(TextField), 'a');
+      await tester.pump(const Duration(milliseconds: 399));
       expect(calls, isEmpty);
       await tester.enterText(find.byType(TextField), 'alpha');
-      await tester.pump(const Duration(milliseconds: 499));
+      await tester.pump(const Duration(milliseconds: 399));
       expect(calls, isEmpty);
       await tester.enterText(find.byType(TextField), 'beta');
-      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 400));
       expect(calls.toSet(), {'beta/all'});
       await tester.enterText(find.byType(TextField), 'gamma');
       await tester.testTextInput.receiveAction(TextInputAction.search);

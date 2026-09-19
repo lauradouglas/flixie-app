@@ -31,7 +31,6 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
-pubspec.lock
 
 # Symbolication related
 app.*.symbols
@@ -88,3 +87,11 @@ android/build/
 # Local Google Play credential path
 /.play-store.env
 /test/failures
+
+# Patrol generated bundles and local test secrets
+**/test_bundle.dart
+.patrol.env
+
+# Keep the app lockfile reproducible; nested package lockfiles stay local.
+pubspec.lock
+!/pubspec.lock

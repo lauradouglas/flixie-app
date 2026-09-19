@@ -29,3 +29,20 @@ activity items. If a border is missing, check the data pipeline before changing
 the widget. Compact rows must reserve space for the complete border and keep
 avatar images and ring widths consistent, using `SpecialAvatarFrame` where
 needed without applying the frame twice.
+
+## Regression checks
+
+For behaviour changes, add or update a regression test covering the user action
+and its outcome. Run the affected widget tests while editing. Before declaring a
+change ready, run `scripts/test-regression.sh`; report existing failures rather
+than skipping them or weakening assertions.
+
+Device tests live in `patrol_test/`. Use `scripts/test-patrol.sh -d <test-device>`
+for changes to favourites/ranking, activity-sheet navigation, and profile gallery
+layout. Use a dedicated simulator/emulator: Patrol reinstalls the app. Extend this
+suite when adding another critical user journey. Fixtures must remain isolated
+from real accounts; do not introduce production credentials into tests.
+
+Do not regenerate visual goldens solely to make checks pass. Inspect differences
+and update baselines only for intended design changes. See `docs/testing.md` for
+coverage, setup, and the baseline review.

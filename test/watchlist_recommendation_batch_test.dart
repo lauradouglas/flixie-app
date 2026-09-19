@@ -190,6 +190,8 @@ void main() {
       auth.notifyOnly();
       await tester.pumpAndSettle();
       expect(batches, 5);
+      await tester.tap(find.byTooltip('More watchlist filters'));
+      await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Refresh watchlist'));
       await tester.pumpAndSettle();
       expect(batches, 6);

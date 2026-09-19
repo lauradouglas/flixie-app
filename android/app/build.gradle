@@ -60,7 +60,13 @@ android {
         }
     }
 
+    testOptions {
+        execution "ANDROIDX_TEST_ORCHESTRATOR"
+    }
+
     defaultConfig {
+        testInstrumentationRunner "pl.leancode.patrol.PatrolJUnitRunner"
+        testInstrumentationRunnerArguments clearPackageData: "true"
         applicationId "com.flixie.app"
         minSdkVersion flutter.minSdkVersion
         targetSdkVersion flutter.targetSdkVersion
@@ -80,6 +86,7 @@ flutter {
 }
 
 dependencies {
+    androidTestUtil "androidx.test:orchestrator:1.5.1"
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
     // kotlin-stdlib removed - provided automatically by built-in Kotlin
 }

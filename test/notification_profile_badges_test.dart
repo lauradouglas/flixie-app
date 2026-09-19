@@ -24,13 +24,13 @@ void main() {
     expect(n.senderAvatar?.key, 'cavalier');
     expect(n.senderProfileBadges, ['EARLY_ADOPTER']);
   });
-  final friends = FriendsData(friendships: [
+  const friends = FriendsData(friendships: [
     Friendship(id: 'empty', createdAt: '', updatedAt: ''),
     Friendship(
         id: 'known',
         createdAt: '',
         updatedAt: '',
-        friend: const FriendshipUser(
+        friend: FriendshipUser(
             id: 'ben', username: 'Ben', profileBadges: ['FOUNDER'])),
   ], pendingFriends: [], requestedFriends: []);
   const absent = FlixieNotification(

@@ -69,6 +69,7 @@ dev_dependencies:
   flutter_lints: ^4.0.0
   flutter_launcher_icons: ^0.13.1
   url_launcher_platform_interface: ^2.3.2
+  patrol: 4.10.0
 
 flutter:
   uses-material-design: true
@@ -86,3 +87,11 @@ flutter:
 # Native icons are maintained directly, including Apple appearances and Android
 # monochrome layers. See docs/app-logo-installation.md; do not run the legacy
 # flutter_launcher_icons generator over these resources.
+
+patrol:
+  app_name: Flixie
+  test_directory: patrol_test
+  android:
+    package_name: com.flixie.app
+  ios:
+    bundle_id: com.flixie.flixieApp

@@ -76,6 +76,16 @@ void main() {
       });
     });
 
+    test('moving a list to personal explicitly clears its group', () {
+      const request = UpdateMovieListRequest(scope: ListScope.personal);
+      expect(request.toJson(), {'scope': ListScope.personal, 'groupId': null});
+    });
+
+    test('group reassignment preserves the requested group', () {
+      const request = UpdateMovieListRequest(groupId: 'group-2');
+      expect(request.toJson(), {'groupId': 'group-2'});
+    });
+
     test('list movie falls back to nested movie id', () {
       final model = MovieListMovie.fromJson({
         'id': 'entry-1',
