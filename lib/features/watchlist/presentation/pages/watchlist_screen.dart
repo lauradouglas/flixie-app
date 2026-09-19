@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/watchlist/domain/release_status.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 import 'dart:math';
@@ -170,6 +171,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
   }
 
   // Active filters
+  ReleaseStatus? _releaseFilter;
   String? _filterGenre; // null = all genres
   double? _filterMinRating; // null = no min
   int? _filterYear; // null = all years
@@ -749,6 +751,10 @@ class _WatchlistScreenState extends State<WatchlistScreen>
       _filteredWatchlist = _allWatchlist.where((item) {
         final m = item.movie;
         if (m == null) return false;
+        if (_releaseFilter != null &&
+            releaseStatus(m.releaseDate) != _releaseFilter) {
+          return false;
+        }
         if (!_fitsExperience('movie:${item.movieId}') ||
             !_matchesTonightServices(
                 _movieWatchProviders[item.movieId] ?? [])) {
@@ -783,6 +789,10 @@ class _WatchlistScreenState extends State<WatchlistScreen>
       }).toList();
       _filteredShowWatchlist = _allShowWatchlist.where((item) {
         if (!item.title.toLowerCase().contains(query)) return false;
+        if (_releaseFilter != null &&
+            releaseStatus(item.firstAirDate) != _releaseFilter) {
+          return false;
+        }
         if (!_fitsExperience('show:${item.showId}') ||
             !_matchesTonightServices(_showWatchProviders[item.showId] ?? [])) {
           return false;
@@ -892,6 +902,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
   bool get _hasActiveFilters =>
       _usesExperience ||
       _tonightServices ||
+      _releaseFilter != null ||
       _filterGenre != null ||
       _filterMinRating != null ||
       _filterYear != null ||
@@ -1449,7 +1460,11 @@ class _WatchlistScreenState extends State<WatchlistScreen>
     );
   }
 
+  bool get _comingSoonOnly =>
+      _releaseFilter == ReleaseStatus.comingSoon || _selectedTab == 2;
+
   String _sortByLabel() {
+    if (_comingSoonOnly) return 'Soonest first';
     switch (_sortBy) {
       case 'runtimeAsc':
         return 'Shortest first';
@@ -1497,6 +1512,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
       _friendsOnly = false;
       _selectedTab = 0;
       _mediaFilter = 0;
+      _releaseFilter = null;
       _filterGenre = null;
       _filterMinRating = null;
       _filterYear = null;
@@ -1541,11 +1557,17 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                   label: Text(_sortByLabel())),
               PopupMenuButton<int>(
                   tooltip: 'Viewing status',
-                  onSelected: (value) => setState(() => _selectedTab = value),
+                  onSelected: (value) {
+                    setState(() {
+                      _selectedTab = value;
+                      if (value == 2) _releaseFilter = null;
+                    });
+                    _filterWatchlist();
+                  },
                   itemBuilder: (_) => const [
                         PopupMenuItem(
                             value: 0, child: Text('All viewing states')),
-                        PopupMenuItem(value: 2, child: Text('Upcoming')),
+                        PopupMenuItem(value: 2, child: Text('Coming soon')),
                         PopupMenuItem(value: 3, child: Text('Watched'))
                       ],
                   child: SizedBox(
@@ -1566,6 +1588,31 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                     onPressed: _clearFilters,
                     child: const Text('Clear filters')),
             ]),
+      );
+
+  Widget _buildReleaseFilters() => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: Wrap(spacing: 8, runSpacing: 4, children: [
+          for (final (status, label) in <(ReleaseStatus?, String)>[
+            (null, 'All releases'),
+            (ReleaseStatus.outNow, 'Out now'),
+            (ReleaseStatus.comingSoon, 'Coming soon'),
+          ])
+            FlixiePill.choice(
+              label: Text(label),
+              selected: (_selectedTab == 2
+                      ? ReleaseStatus.comingSoon
+                      : _releaseFilter) ==
+                  status,
+              onSelected: (_) {
+                setState(() {
+                  _releaseFilter = status;
+                  if (_selectedTab == 2) _selectedTab = 0;
+                });
+                _filterWatchlist();
+              },
+            ),
+        ]),
       );
 
   Widget _buildSearchBar() {
@@ -1648,10 +1695,8 @@ class _WatchlistScreenState extends State<WatchlistScreen>
           .toList();
     }
     if (_selectedTab == 2) {
-      final today = DateTime.now();
       final upcoming = _filteredWatchlist.where((item) {
-        final date = DateTime.tryParse(item.movie?.releaseDate ?? '');
-        return date != null && date.isAfter(today);
+        return releaseStatus(item.movie?.releaseDate) == ReleaseStatus.comingSoon;
       }).toList();
       upcoming.sort((a, b) {
         final dateA = DateTime.tryParse(a.movie?.releaseDate ?? '') ??
@@ -1693,10 +1738,8 @@ class _WatchlistScreenState extends State<WatchlistScreen>
       }).toList();
     }
     if (_selectedTab == 2) {
-      final today = DateTime.now();
       final upcoming = _filteredShowWatchlist.where((item) {
-        final date = DateTime.tryParse(item.firstAirDate ?? '');
-        return date != null && date.isAfter(today);
+        return releaseStatus(item.firstAirDate) == ReleaseStatus.comingSoon;
       }).toList();
       upcoming.sort((a, b) {
         final dateA = DateTime.tryParse(a.firstAirDate ?? '') ??
@@ -1719,10 +1762,21 @@ class _WatchlistScreenState extends State<WatchlistScreen>
       items.sort((a, b) => _experienceFits[_experienceKey(a)]!
           .compareTo(_experienceFits[_experienceKey(b)]!));
     }
+    if (_comingSoonOnly) {
+      DateTime releaseDate(Object item) => DateTime.parse(
+          (item is WatchlistMovie
+              ? item.movie!.releaseDate!
+              : (item as _WatchlistShowEntry).firstAirDate!)
+          .substring(0, 10));
+      items.sort((a, b) {
+        final byDate = releaseDate(a).compareTo(releaseDate(b));
+        return byDate != 0 ? byDate : _compareWatchlistItems(a, b);
+      });
+    }
     final enrichmentView = jsonEncode([
       _mediaFilter, _selectedTab, _friendsOnly, _tonightServices,
       _searchController.text, _sortBy, _filterGenre, _filterMinRating,
-      _filterYear, _filterMaxRuntime, _mood.id, _watchRequest,
+      _filterYear, _filterMaxRuntime, _releaseFilter?.name, _mood.id, _watchRequest,
     ]);
     if (_enrichmentView != enrichmentView) {
       _enrichmentView = enrichmentView;
@@ -1753,6 +1807,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
       _buildStatsRow(),
       _buildSearchBar(),
       _buildMediaFilter(),
+      if (hasItems) _buildReleaseFilters(),
       if (hasItems)
         TonightFiltersPanel(
           key: _tonightPanelKey,
@@ -1799,7 +1854,9 @@ class _WatchlistScreenState extends State<WatchlistScreen>
             _filterWatchlist();
           },
           onSort: _openFilterSheet,
-          sortLabel: _usesExperience ? 'Best fit' : _sortByLabel(),
+          sortLabel: _usesExperience && !_comingSoonOnly
+              ? 'Best fit'
+              : _sortByLabel(),
           onMore: () => showModalBottomSheet<void>(
               context: context,
               useRootNavigator: true,
@@ -2868,8 +2925,23 @@ class WatchlistMovieRow extends StatelessWidget {
                                 style: TextStyle(
                                     color: context.colors.light, fontSize: 13)),
                             const SizedBox(height: 7),
-                            FlixiePill.label(
-                                label: Text(isShow ? 'Show' : 'Movie')),
+                            Wrap(spacing: 6, runSpacing: 6, children: [
+                              FlixiePill.label(
+                                  label: Text(isShow ? 'Show' : 'Movie')),
+                              if (releaseStatus(movie.releaseDate) ==
+                                  ReleaseStatus.comingSoon)
+                                const FlixiePill.label(
+                                  avatar: Icon(Icons.event_outlined),
+                                  label: Text('Coming soon'),
+                                ),
+                            ]),
+                            if (releaseStatus(movie.releaseDate) ==
+                                ReleaseStatus.comingSoon) ...[
+                              const SizedBox(height: 4),
+                              Text('Releases ${_formatDate(movie.releaseDate)}',
+                                  style: TextStyle(
+                                      color: context.colors.light, fontSize: 13)),
+                            ],
                           ]),
                     ))),
             PopupMenuButton<String>(

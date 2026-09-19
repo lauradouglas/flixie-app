@@ -350,9 +350,12 @@ void main() {
                   .writeAsBytes(bytes!.buffer.asUint8List());
             });
           }
-          await tester.ensureVisible(find.text('Services'));
-          await tester.tap(find.ancestor(
-              of: find.text('Services'), matching: find.byType(FlixiePill)));
+          final servicesControl = find.ancestor(
+              of: find.text('Services'), matching: find.byType(FlixiePill));
+          await Scrollable.ensureVisible(
+              tester.element(servicesControl), alignment: .5);
+          await tester.pumpAndSettle();
+          await tester.tap(servicesControl);
           await tester.pumpAndSettle();
           await tester.tap(find.text('Use for this search'));
           await tester.pumpAndSettle();
