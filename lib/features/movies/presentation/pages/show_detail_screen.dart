@@ -1502,7 +1502,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                                     : 'Season ${season.seasonNumber}',
                                 style: TextStyle(
                                     color: active
-                                        ? Colors.white
+                                        ? context.colors.textPrimary
                                         : context.colors.light)),
                           ]))));
             }),

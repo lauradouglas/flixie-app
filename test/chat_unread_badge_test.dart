@@ -26,6 +26,8 @@ void main() {
               )),
         ))));
         expect(find.text('99+'), findsOneWidget);
+        expect(find.ancestor(of: find.text('99+'), matching: find.byType(Badge)),
+            findsOneWidget);
         expect(tester.takeException(), isNull);
       }
     }

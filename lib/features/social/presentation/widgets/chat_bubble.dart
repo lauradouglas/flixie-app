@@ -405,8 +405,8 @@ class ChatBubble extends StatelessWidget {
   }
 
   Widget _buildMovieShareCard(BuildContext context, MovieSharePayload payload) {
-    final foreground = isMe ? Colors.white : context.colors.textPrimary;
-    final secondary = isMe ? Colors.white : context.colors.primaryTint;
+    final foreground = context.colors.textPrimary;
+    final secondary = context.colors.primaryText;
     final poster = ClipRRect(
       borderRadius: BorderRadius.circular(10),
       child: SizedBox(
@@ -478,7 +478,7 @@ class ChatBubble extends StatelessWidget {
             const SizedBox(height: 14),
             Text(payload.prompt,
                 style: TextStyle(
-                    color: isMe ? Colors.white : context.colors.light,
+                    color: context.colors.light,
                     fontSize: 14.5,
                     height: 1.4)),
           ],

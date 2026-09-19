@@ -72,6 +72,10 @@ dev_dependencies:
   patrol: 4.10.0
 
 flutter:
+  # RunnerUITests imports Patrol through the checked-in CocoaPods integration.
+  # Keep clean CI runners from silently migrating plugins to SwiftPM.
+  config:
+    enable-swift-package-manager: false
   uses-material-design: true
 
   fonts:

@@ -76,13 +76,12 @@ class SocialSegmentedToggle extends StatelessWidget {
                               ),
                             ),
                             if (count > 0)
-                              Text(
-                                count > 99 ? '99+' : '$count',
-                                style: TextStyle(
-                                  color: context.colors.primaryTint,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 12,
-                                ),
+                              Badge(
+                                label: Text(count > 99 ? '99+' : '$count'),
+                                backgroundColor: FlixieColors.primaryShade,
+                                textColor: Colors.white,
+                                textStyle: const TextStyle(
+                                    fontSize: 11, fontWeight: FontWeight.w700),
                               ),
                           ],
                         ),

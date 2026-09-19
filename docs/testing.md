@@ -113,3 +113,19 @@ persisted outcomes and error recovery. Avoid fixed sleeps, real user data, and
 tests that only check that a screen exists. Keep fixture HTTP expectations strict.
 For each bug, first write the failing user journey, then fix it and rerun the
 smallest relevant suite. Add backend contract tests for database-only failures.
+
+## GitHub runner parity
+
+The project explicitly disables Flutter's automatic Swift Package Manager
+migration in `pubspec.yaml`. RunnerUITests currently imports Patrol through
+CocoaPods; clean runners must use the same integration as local builds. Migrate
+both the app and native test target together before enabling SwiftPM.
+
+Golden checks keep the committed reference images. The shared comparator allows
+only sparse RGB rounding: at most 0.05% of pixels may differ, each RGB channel by
+at most 2/255, with alpha and image dimensions unchanged. This covers the seven
+reviewed failures from GitHub run 35461189419 (16–107 pixels, maximum channel
+difference 2). A single larger colour difference, transparency change, resize,
+or broader drift still fails and writes the usual comparison artifacts. Tests
+exercise these rejection boundaries; do not increase tolerance to mask a new
+visual change.
