@@ -56,11 +56,17 @@ class _SearchScreenState extends State<SearchScreen> {
   List<String> _recentSearches = [];
   late final Future<void> _historyReady;
   static const _historyKey = 'device_recent_searches_v1';
+  static const _historyLimit = 5;
 
   Future<void> _loadHistory() async {
     final prefs = await SharedPreferences.getInstance();
+    final stored = prefs.getStringList(_historyKey) ?? [];
+    final recent = stored.take(_historyLimit).toList();
+    if (stored.length > _historyLimit) {
+      await prefs.setStringList(_historyKey, recent);
+    }
     if (mounted) {
-      setState(() => _recentSearches = prefs.getStringList(_historyKey) ?? []);
+      setState(() => _recentSearches = recent);
     }
   }
 
@@ -72,7 +78,7 @@ class _SearchScreenState extends State<SearchScreen> {
     final next = [
       value,
       ..._recentSearches.where((q) => q.toLowerCase() != value.toLowerCase())
-    ].take(8).toList();
+    ].take(_historyLimit).toList();
     setState(() => _recentSearches = next);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(_historyKey, next);

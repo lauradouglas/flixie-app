@@ -96,7 +96,7 @@ class AuthPrefetchCoordinator {
         notifications = visible;
         unreadNotificationCount = visible.where((item) => !item.isRead).length;
       }, onError: (_, __) {}),
-      fetchWatchProviders(userId, watchlistMovieIds, region: region).then(
+      fetchWatchProviders(userId, watchlistMovieIds.take(20), region: region).then(
           (value) {
         watchProvidersByMovieId = value.providersByMovieId;
         userWatchProviderIds = value.userProviderIds;
@@ -130,14 +130,19 @@ class AuthPrefetchCoordinator {
     String userId,
     Iterable<int> movieIds, {
     required String region,
+    bool Function()? isCurrent,
+    void Function(Map<int, List<WatchProvider>>, Set<int>)? onProgress,
   }) async {
-    final deadline = DateTime.now().add(const Duration(seconds: 10));
     final ids = movieIds.toSet().toList(growable: false);
     final userProviders = await UserService.getUserWatchProviders(userId);
     final providersByMovieId = <int, List<WatchProvider>>{};
 
+    final userProviderIds = userProviders.map((provider) => provider.id).toSet();
+    if (isCurrent == null || isCurrent()) {
+      onProgress?.call({}, userProviderIds);
+    }
     for (var start = 0; start < ids.length; start += 5) {
-      if (DateTime.now().isAfter(deadline)) break;
+      if (isCurrent != null && !isCurrent()) break;
       final end = (start + 5).clamp(0, ids.length);
       final results = await Future.wait(
         ids.sublist(start, end).map((movieId) async {
@@ -151,8 +156,12 @@ class AuthPrefetchCoordinator {
           }
         }),
       );
-      providersByMovieId
-          .addEntries(results.whereType<MapEntry<int, List<WatchProvider>>>());
+      final batch = Map<int, List<WatchProvider>>.fromEntries(
+          results.whereType<MapEntry<int, List<WatchProvider>>>());
+      providersByMovieId.addAll(batch);
+      if (isCurrent == null || isCurrent()) {
+        onProgress?.call(batch, userProviderIds);
+      }
     }
 
     return (

@@ -44,6 +44,8 @@ SDK location. iOS needs Xcode, an installed simulator runtime and CocoaPods.
 
 ## Initial device coverage
 
+- Large watchlist: 400 saved titles load providers/friends in 20-card pages,
+  with additional pages requested while scrolling rather than all at once.
 - Movie and show ranking: reorder, save API payload, confirmation toast, reopen
   with persisted order.
 - Movie and show favourites at ten: replacement prompt, disabled submit before
@@ -56,6 +58,9 @@ SDK location. iOS needs Xcode, an installed simulator runtime and CocoaPods.
   layout exceptions.
 
 The fixture app uses production components, themes, models and API serialization.
+Native tests that start requests from frame callbacks use `useApiFixture` from
+`test/support/api_fixture.dart`: those callbacks do not retain the zone used by
+`http.runWithClient`. The helper restores normal networking in teardown.
 It does not start the full production bootstrap, Firebase login or a live backend.
 These tests therefore do NOT prove that real login, push delivery, database
 constraints, external providers, or live ranking persistence are healthy. Add a
@@ -95,6 +100,11 @@ After cleanup, the full local gate passed: analysis clean and **630 Flutter test
 The native suite also passed on the dedicated iPhone 17 Pro / iOS 26.5 simulator:
 **9 Patrol tests passed, 0 failed, 0 skipped** (19 September 2026).
 No tests are excluded. The CI job fails on any failing assertion.
+
+The large-watchlist follow-up passed a 635-test full run, 24 focused watchlist
+checks, and the native 400-title paging test. The native fixture-client change
+also passed its cross-zone test and existing API recovery tests. Search and
+friends filters are checked against offscreen matches, not only the first page.
 
 ## Adding tests
 

@@ -729,20 +729,23 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     }
 
     final session = _sessionGeneration;
-    final future = _prefetchCoordinator
-        .fetchWatchProviders(
-          user.id,
-          missing,
-          region: providerRegion,
-        )
-        .timeout(const Duration(seconds: 20))
-        .then((value) {
-      if (_disposed ||
-          session != _sessionGeneration ||
-          _dbUser?.id != user.id ||
-          _cachedWatchProviderRegion != providerRegion) {
-        return;
-      }
+    bool current() => !_disposed &&
+        session == _sessionGeneration &&
+        _dbUser?.id == user.id &&
+        _cachedWatchProviderRegion == providerRegion;
+    final future = _prefetchCoordinator.fetchWatchProviders(
+      user.id,
+      missing,
+      region: providerRegion,
+      isCurrent: current,
+      onProgress: (providers, userProviderIds) {
+        if (!current()) return;
+        _cachedWatchProvidersByMovieId.addAll(providers);
+        _cachedUserWatchProviderIds = userProviderIds;
+        notifyListeners();
+      },
+    ).then((value) {
+      if (!current()) return;
       _cachedWatchProvidersByMovieId.addAll(value.providersByMovieId);
       _cachedUserWatchProviderIds = value.userProviderIds;
       notifyListeners();
@@ -1448,7 +1451,8 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
           .toSet();
       _cachedWatchProvidersByMovieId
           .removeWhere((movieId, _) => !activeIds.contains(movieId));
-      unawaited(ensureWatchProviderCache(movieIds: activeIds));
+      // The watchlist screen requests visible pages. Editing one entry must not
+      // restart provider lookups for every saved title in a large library.
     }
     notifyListeners();
   }

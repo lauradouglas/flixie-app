@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/api/retry_read.dart';
 import 'package:flixie_app/features/movies/data/media_review_service.dart';
 import 'package:flixie_app/models/friend_recommendation.dart';
 import 'package:flixie_app/models/friend_summary.dart';
@@ -247,15 +248,18 @@ class MovieService {
   /// No cache: every call reads current friendships and recommendations.
   Future<Map<int, FriendRecommendationResponse>> getFriendRecommendations(
       Iterable<int> movieIds,
-      {bool Function()? isCurrent}) async {
+      {bool Function()? isCurrent,
+      void Function(Map<int, FriendRecommendationResponse>)? onProgress}) async {
     final ids = movieIds.where((id) => id > 0).toSet().toList();
     final results = <int, FriendRecommendationResponse>{};
     for (var start = 0; start < ids.length; start += 25) {
       if (isCurrent != null && !isCurrent()) break;
       final chunk = ids.skip(start).take(25).toList();
       try {
-        final data = await ApiClient.post('/movies/friend-recommendations',
-            body: {'movieIds': chunk});
+        final data = await retryRead(
+            () => ApiClient.post('/movies/friend-recommendations',
+                body: {'movieIds': chunk}),
+            isCurrent: isCurrent);
         for (final item in data['items'] as List) {
           try {
             final id = int.parse(item['movieId'].toString());
@@ -273,6 +277,9 @@ class MovieService {
           rethrow;
         }
         apiLogger.w('Friend recommendation batch failed: $error');
+      }
+      if (isCurrent == null || isCurrent()) {
+        onProgress?.call(Map.unmodifiable(results));
       }
     }
     return results;

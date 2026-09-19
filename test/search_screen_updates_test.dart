@@ -13,6 +13,51 @@ import 'home_startup_recovery_test.dart' show Session;
 import 'auth_recovery_test.dart' show profile;
 
 void main() {
+  testWidgets('recent searches persist only five and promote repeated queries',
+      (tester) async {
+    const key = 'device_recent_searches_v1';
+    SharedPreferences.setMockInitialValues({
+      key: ['Dune', 'Up', 'Alien', 'Arrival', 'Interstellar', 'Jaws', 'Titanic']
+    });
+    final session = Session();
+    final auth = AuthProvider(session, MovieService(),
+        prefetchAfterAuth: false, profileLoader: (id) async => profile(id));
+    await http.runWithClient(() async {
+      await tester.pumpWidget(ChangeNotifierProvider.value(
+          value: auth, child: const MaterialApp(home: SearchScreen())));
+      await tester.pumpAndSettle();
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getStringList(key),
+          ['Dune', 'Up', 'Alien', 'Arrival', 'Interstellar']);
+      expect(find.text('Jaws'), findsNothing);
+
+      Future<void> submit(String query) async {
+        await tester.enterText(find.byType(TextField), query);
+        await tester.testTextInput.receiveAction(TextInputAction.search);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('Clear search'));
+        await tester.pumpAndSettle();
+      }
+
+      await submit('WALL-E');
+      expect(prefs.getStringList(key),
+          ['WALL-E', 'Dune', 'Up', 'Alien', 'Arrival']);
+      expect(find.text('Interstellar'), findsNothing);
+      await submit('  dune  ');
+      expect(prefs.getStringList(key),
+          ['dune', 'WALL-E', 'Up', 'Alien', 'Arrival']);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpWidget(ChangeNotifierProvider.value(
+          value: auth, child: const MaterialApp(home: SearchScreen())));
+      await tester.pumpAndSettle();
+      expect(find.text('dune'), findsOneWidget);
+      expect(prefs.getStringList(key), hasLength(5));
+      await tester.pumpWidget(const SizedBox());
+    }, () => MockClient((request) async => http.Response('[]', 200)));
+    auth.dispose();
+    await session.events.close();
+  });
+
   testWidgets(
       'short mixed search preserves order, pages and keeps device history',
       (tester) async {

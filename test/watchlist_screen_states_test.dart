@@ -302,10 +302,10 @@ void main() {
               calls++;
               final ids = jsonDecode(request.body)['showIds'] as List;
               expect(ids.length, lessThanOrEqualTo(25));
-              if (calls == 2) return response({'message': 'offline'}, 503);
+              if (ids.first == 26) return response({'message': 'offline'}, 503);
               return response({'items': ids.map((id) => item(id)).toList()});
             }));
-    expect(calls, 3);
+    expect(calls, 4);
   });
   for (final size in [
     const Size(320, 568),

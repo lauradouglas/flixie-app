@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/api/retry_read.dart';
 import 'package:flixie_app/features/movies/data/media_review_service.dart';
 import 'package:flixie_app/models/friend_recommendation.dart';
 import 'package:flixie_app/models/show.dart';
@@ -136,15 +137,18 @@ class ShowService {
 
   static Future<Map<int, FriendRecommendationResponse>>
       getFriendRecommendations(Iterable<int> showIds,
-          {bool Function()? isCurrent}) async {
+          {bool Function()? isCurrent,
+      void Function(Map<int, FriendRecommendationResponse>)? onProgress}) async {
     final ids = showIds.where((id) => id > 0).toSet().toList();
     final results = <int, FriendRecommendationResponse>{};
     for (var start = 0; start < ids.length; start += 25) {
       if (isCurrent != null && !isCurrent()) break;
       final chunk = ids.skip(start).take(25).toList();
       try {
-        final data = await ApiClient.post('/shows/friend-recommendations',
-            body: {'showIds': chunk});
+        final data = await retryRead(
+            () => ApiClient.post('/shows/friend-recommendations',
+                body: {'showIds': chunk}),
+            isCurrent: isCurrent);
         for (final item in data['items'] as List) {
           try {
             final id =
@@ -162,6 +166,9 @@ class ShowService {
             (error.statusCode == 401 || error.statusCode == 403)) {
           rethrow;
         }
+      }
+      if (isCurrent == null || isCurrent()) {
+        onProgress?.call(Map.unmodifiable(results));
       }
     }
     return results;

@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/foundation.dart' show kDebugMode, visibleForTesting;
 import 'package:http/http.dart' as http;
 import 'package:flixie_app/core/utils/app_logger.dart';
 
@@ -21,6 +21,16 @@ class ApiException implements Exception {
 }
 
 class ApiClient {
+  static http.Client? _testClient;
+
+  /// Native frame callbacks do not retain runWithClient's zone. Device tests
+  /// supply a client explicitly and restore null in tearDown. Caller owns it.
+  @visibleForTesting
+  static void useClientForTesting(http.Client? client) {
+    _testClient = client;
+    _inFlightGets.clear();
+  }
+
   // Debug runs use the local API; profile/release builds use production.
   // Explicit API_BASE_URL always takes precedence over USE_PROD_API.
   static const bool _useProdApi = bool.fromEnvironment(
@@ -255,8 +265,7 @@ class ApiClient {
 
     for (var attempt = 0; attempt <= _maxRetries; attempt++) {
       try {
-        final response = await http
-            .get(uri, headers: headers)
+        final response = await (_testClient?.get ?? http.get)(uri, headers: headers)
             .timeout(_timeout);
         apiLogger.d('Response ${response.statusCode}');
         return _parseResponse(response);
@@ -305,8 +314,7 @@ class ApiClient {
       authenticated: true,
       requestLabel: 'POST $path',
       request: () async {
-        final response = await http
-            .post(
+        final response = await (_testClient?.post ?? http.post)(
               _buildUri(path),
               headers: _headers(),
               body: body != null ? jsonEncode(body) : null,
@@ -322,8 +330,7 @@ class ApiClient {
       authenticated: true,
       requestLabel: 'PUT $path',
       request: () async {
-        final response = await http
-            .put(
+        final response = await (_testClient?.put ?? http.put)(
               _buildUri(path),
               headers: _headers(),
               body: body != null ? jsonEncode(body) : null,
@@ -339,8 +346,7 @@ class ApiClient {
       authenticated: true,
       requestLabel: 'PATCH $path',
       request: () async {
-        final response = await http
-            .patch(
+        final response = await (_testClient?.patch ?? http.patch)(
               _buildUri(path),
               headers: _headers(),
               body: body != null ? jsonEncode(body) : null,
@@ -361,8 +367,7 @@ class ApiClient {
         if (body != null) {
           request.body = jsonEncode(body);
         }
-        final response = await request
-            .send()
+        final response = await (_testClient?.send(request) ?? request.send())
             .then(http.Response.fromStream)
             .timeout(_timeout);
         return _parseResponse(response);

@@ -38,8 +38,8 @@ change ready, run `scripts/test-regression.sh`; report existing failures rather
 than skipping them or weakening assertions.
 
 Device tests live in `patrol_test/`. Use `scripts/test-patrol.sh -d <test-device>`
-for changes to favourites/ranking, activity-sheet navigation, and profile gallery
-layout. Use a dedicated simulator/emulator: Patrol reinstalls the app. Extend this
+for changes to favourites/ranking, activity-sheet navigation, profile gallery
+layout, and watchlist paging. Use a dedicated simulator/emulator: Patrol reinstalls the app. Extend this
 suite when adding another critical user journey. Fixtures must remain isolated
 from real accounts; do not introduce production credentials into tests.
 

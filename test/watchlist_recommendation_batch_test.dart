@@ -1,3 +1,6 @@
+import 'support/watchlist_auth.dart';
+export 'support/watchlist_auth.dart' show TestAuth;
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,9 +8,6 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
-import 'package:flixie_app/models/user.dart';
-import 'package:flixie_app/models/watchlist_movie.dart';
-import 'package:flixie_app/models/watch_provider.dart';
 import 'package:flixie_app/features/movies/data/movie_service.dart';
 import 'package:flixie_app/features/watchlist/presentation/pages/watchlist_screen.dart';
 
@@ -22,43 +22,6 @@ http.Response response(Object body, [int status = 200]) =>
     http.Response(jsonEncode(body), status,
         headers: {'content-type': 'application/json'});
 
-class TestAuth extends ChangeNotifier implements AuthProvider {
-  List<int> ids = [1];
-  @override
-  int activityVersion = 0;
-  @override
-  int friendDataVersion = 0;
-  @override
-  User get dbUser => User(
-      id: 'viewer',
-      username: 'Me',
-      email: '',
-      iconColorId: 0,
-      completedSetup: true,
-      darkMode: true,
-      movieWatchlist: ids
-          .map((id) => WatchlistMovie(
-              id: '$id',
-              userId: 'viewer',
-              movieId: id,
-              movie: WatchlistMovieDetails(id: id, title: 'Film $id')))
-          .toList());
-  @override
-  Map<int, List<WatchProvider>> get cachedWatchProvidersByMovieId =>
-      {for (final id in ids) id: []};
-  @override
-  Set<int> get cachedUserWatchProviderIds => {};
-  @override
-  Future<void> ensureWatchProviderCache({Iterable<int>? movieIds}) async {}
-  @override
-  Future<void> refreshUserData() async {
-    notifyListeners();
-  }
-
-  void notifyOnly() => notifyListeners();
-  @override
-  dynamic noSuchMethod(Invocation invocation) => null;
-}
 
 void main() {
   test('HTTP counts, batch bounds, deduplication and partial failures',
@@ -100,12 +63,14 @@ void main() {
     },
         () => MockClient((request) async {
               calls++;
-              if (calls == 2) return response({'message': 'Unavailable'}, 503);
+              if ((jsonDecode(request.body)['movieIds'] as List).first == 26) {
+                return response({'message': 'Unavailable'}, 503);
+              }
               final ids =
                   (jsonDecode(request.body)['movieIds'] as List).cast<int>();
               return response({'items': ids.map(item).toList()});
             }));
-    expect(calls, 3);
+    expect(calls, 4);
   });
 
   test(
@@ -156,6 +121,97 @@ void main() {
               return response({'message': 'Forbidden'}, 403);
             }));
     expect(calls, 1);
+  });
+
+  testWidgets('400 cards load one page, show friends early, then load on scroll',
+      (tester) async {
+    final auth = TestAuth()..ids = List.generate(400, (i) => i + 1);
+    addTearDown(auth.dispose);
+    final gate = Completer<void>();
+    auth.providerGate = gate.future;
+    final batches = <List<int>>[];
+    await http.runWithClient(() async {
+      await tester.pumpWidget(ChangeNotifierProvider<AuthProvider>.value(
+          value: auth, child: const MaterialApp(home: WatchlistScreen())));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(batches.length, 1);
+      expect(batches.single.length, 20);
+      expect(auth.providerRequests.single.length, 20);
+      final firstId = batches.first.first;
+      final cards = tester.widgetList<WatchlistMovieRow>(find.byType(WatchlistMovieRow));
+      final first = cards.firstWhere((row) => row.watchlistItem.movieId == firstId);
+      expect(first.recommendations.single.username, 'Friend');
+      expect(first.isLoadingFriends, isFalse);
+      gate.complete();
+      await tester.pumpAndSettle();
+      expect(batches.length, 1);
+      await tester.scrollUntilVisible(find.text('Film 21'), 500,
+          scrollable: find.descendant(of: find.byKey(const ValueKey('watchlist-cards')),
+              matching: find.byType(Scrollable)).first,
+          maxScrolls: 60);
+      await tester.pumpAndSettle();
+      expect(batches.length, greaterThan(1));
+      expect(batches.expand((batch) => batch).toSet().length, lessThanOrEqualTo(60));
+      expect(auth.providerRequests.every((batch) => batch.length <= 20), isTrue);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    }, () => MockClient((request) async {
+      if (request.url.path == '/movies/friend-recommendations') {
+        final ids = (jsonDecode(request.body)['movieIds'] as List).cast<int>();
+        batches.add(ids);
+        return response({'items': [for (final id in ids) {
+          ...item(id), 'friends': [{'userId': 'friend', 'username': 'Friend',
+            'watched': true, 'recommends': true}]
+        }]});
+      }
+      return response({'watchProviders': []});
+    }));
+  });
+
+  testWidgets('search reaches offscreen titles and friends filter checks the entire library',
+      (tester) async {
+    final auth = TestAuth()..ids = List.generate(400, (i) => i + 1);
+    addTearDown(auth.dispose);
+    final requested = <int>{};
+    await http.runWithClient(() async {
+      await tester.pumpWidget(ChangeNotifierProvider<AuthProvider>.value(
+          value: auth, child: const MaterialApp(home: WatchlistScreen())));
+      await tester.pumpAndSettle();
+      expect(requested.length, 20);
+      await tester.enterText(find.byType(TextField).first, 'Film 400');
+      await tester.pumpAndSettle();
+      expect(requested, contains(400));
+      expect(requested.length, 21);
+      expect(find.descendant(of: find.byType(WatchlistMovieRow),
+          matching: find.text('Film 400')), findsOneWidget);
+      await tester.enterText(find.byType(TextField).first, '');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('More watchlist filters'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Friends watched'));
+      await tester.pumpAndSettle();
+      expect(requested.length, 400);
+      Navigator.of(tester.element(find.text('Friends watched'))).pop();
+      await tester.pumpAndSettle();
+      expect(find.descendant(of: find.byType(WatchlistMovieRow),
+          matching: find.text('Film 400')), findsOneWidget);
+      expect(find.text('Film 1'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    }, () => MockClient((request) async {
+      if (request.url.path == '/movies/friend-recommendations') {
+        final ids = (jsonDecode(request.body)['movieIds'] as List).cast<int>();
+        requested.addAll(ids);
+        expect(ids.length, lessThanOrEqualTo(20));
+        return response({'items': [for (final id in ids) {
+          ...item(id), 'friends': id == 400
+              ? [{'userId': 'friend', 'username': 'Friend', 'watched': true,
+                  'recommends': true}] : []
+        }]});
+      }
+      return response({'watchProviders': []});
+    }));
   });
 
   testWidgets(
