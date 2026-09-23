@@ -411,12 +411,8 @@ class GroupActivityTabState extends State<GroupActivityTab>
                     reactions: _reactions[_key(item)] ??
                         const ActivityReactionSummary(),
                     busy: _saving.contains(_key(item)),
-                    onReact: item.userId == userId
-                        ? null
-                        : (anchor) => _chooseReaction(item, anchor),
-                    onReactionSelected: item.userId == userId
-                        ? null
-                        : (emoji) => _saveReaction(item, emoji),
+                    onReact: (anchor) => _chooseReaction(item, anchor),
+                    onReactionSelected: (emoji) => _saveReaction(item, emoji),
                     onOpen: item.movieId != null ||
                             item.showId != null ||
                             item.personId != null

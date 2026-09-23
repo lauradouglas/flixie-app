@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/collections/collection_screen.dart';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'dart:async';
@@ -331,10 +332,9 @@ class _SearchScreenState extends State<SearchScreen> {
       _SearchMode.movies,
       _SearchMode.shows,
       _SearchMode.people,
-      // TODO: Re-add Studios and Collections when their search experiences
-      // are ready for users.
+      // TODO: Re-add Studios when its search experience is ready.
       // _SearchMode.companies,
-      // _SearchMode.collections,
+      _SearchMode.collections,
     ];
 
     return SizedBox(
@@ -485,6 +485,11 @@ class _SearchScreenState extends State<SearchScreen> {
           return _EntityResultTile(
             result: item,
             onTap: () {
+              if (item.type == SearchEntityType.collection) {
+                Navigator.of(context).push(MaterialPageRoute<void>(
+                    builder: (_) => CollectionScreen(collectionId: item.id)));
+                return;
+              }
               _controller.text = item.name;
               setState(() {
                 _searchMode = _SearchMode.movies;

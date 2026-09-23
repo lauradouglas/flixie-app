@@ -669,3 +669,37 @@ class ErrorRetryWidget extends StatelessWidget {
     );
   }
 }
+
+/// Matches activity rows so loading does not replace the page with status copy.
+class ActivityRowsSkeleton extends StatelessWidget {
+  const ActivityRowsSkeleton({super.key, this.avatars = false});
+  final bool avatars;
+  @override
+  Widget build(BuildContext context) => Semantics(
+        label: 'Loading activity',
+        child: ExcludeSemantics(
+            child: Column(children: [
+          for (var i = 0; i < 3; i++)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(children: [
+                SkeletonBox(
+                    width: avatars ? 46 : 48,
+                    height: avatars ? 46 : 72,
+                    borderRadius: avatars ? 23 : 8),
+                const SizedBox(width: 12),
+                const Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      SkeletonBox(height: 14),
+                      SizedBox(height: 10),
+                      FractionallySizedBox(
+                          widthFactor: .6,
+                          child: SkeletonBox(height: 12)),
+                    ])),
+              ]),
+            ),
+        ])),
+      );
+}

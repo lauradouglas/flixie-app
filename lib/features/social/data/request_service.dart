@@ -275,13 +275,15 @@ class RequestService {
   static Future<List<WatchRequest>> getWatchRequests(
     String userId, {
     bool includeHomeState = false,
+    bool activeOnly = false,
   }) async {
     dynamic data;
     try {
       // Fetch both sides of every request in one call. In particular, a plan
       // the current person just sent is still PENDING, but must be visible in
       // their Planning section straight away.
-      data = await ApiClient.get('/requests/$userId/all');
+      data = await ApiClient.get(
+          '/requests/$userId/all${activeOnly ? '?activeOnly=true' : ''}');
     } on ApiException catch (e) {
       if (e.statusCode == 404) return [];
       rethrow;
@@ -291,6 +293,12 @@ class RequestService {
       final json = item as Map<String, dynamic>;
       final request = WatchRequest.fromJson(json);
       if (!request.isWatchRequest) continue;
+      if (activeOnly &&
+          (request.isTerminal ||
+              const ['CANCELLED', 'DECLINED']
+                  .contains(request.normalizedScheduleStatus) ||
+              const ['WATCHED', 'NOT_WATCHED']
+                  .contains(request.normalizedWatchedStatus))) continue;
       // New servers include the complete Home state in the list. Retain the
       // detail fallback during rollout, including when proposals are empty.
       if (includeHomeState &&

@@ -36,10 +36,14 @@ class FriendWatchPlanFlow extends StatefulWidget {
       required this.onSelectCandidate,
       required this.onChangeMovie,
       this.myAvatar,
+      this.headerTopInset = 0,
+      this.myProfileBadges = const [],
       this.busy = false});
   final WatchRequest request;
   final String myUserId;
+  final double headerTopInset;
   final ProfileAvatar? myAvatar;
+  final List<String> myProfileBadges;
   final bool compact, busy;
   final String scheduledLabel;
   final VoidCallback onOpen,
@@ -83,6 +87,29 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
       chosen?.posterPath ??
       r.movie?.posterPath ??
       r.candidates.firstOrNull?.posterPath;
+
+  Widget _movieLink(Widget child, String key) {
+    final candidate = chosen ??
+        (r.candidates.length == 1 ? r.candidates.first : null);
+    final movieId = candidate?.movieId ?? r.movieId ?? r.movie?.id;
+    final showId = candidate?.showId ?? r.showId;
+    final route = movieId != null
+        ? '/movies/$movieId'
+        : showId != null
+            ? '/shows/$showId'
+            : null;
+    if (route == null) return child;
+    return Semantics(
+      button: true,
+      label: 'View $title details',
+      child: InkWell(
+        key: ValueKey(key),
+        onTap: () => context.push(route),
+        borderRadius: BorderRadius.circular(10),
+        child: child,
+      ),
+    );
+  }
   bool get complete =>
       r.isCompleted ||
       [r.requesterId, r.recipientId]
@@ -129,39 +156,49 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
   Widget build(BuildContext context) {
     if (widget.compact) return _card();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _summary(),
-      const SizedBox(height: 20),
-      Divider(color: context.colors.tabBarBorder),
-      const SizedBox(height: 16),
-      if (complete)
-        _recap()
-      else if (r.isDeclined || r.isCancelled || r.isExpired) ...[
-        const SizedBox(height: 16),
-        Text('This plan is closed. You can make another whenever you’re ready.',
-            style: _body.copyWith(color: context.colors.light)),
-        _button('Plan another movie', Icons.add, widget.onNewPlan),
-        _button('Close', Icons.close, widget.onClosePlan, primary: false),
-      ] else if (r.isPending)
-        _invite()
-      else if (needsMovie)
-        _movies()
-      else if (r.latestPendingProposal != null)
-        _schedule()
-      else if (due)
-        _afterWatch()
-      else if (r.scheduledFor != null && r.normalizedScheduleStatus == 'AGREED')
-        _scheduled()
-      else
-        _schedule(),
-      if (!complete) _message(),
-      if (!complete &&
-          !r.isPending &&
-          !r.isDeclined &&
-          !r.isCancelled &&
-          !r.isExpired)
-        TextButton(
-            onPressed: widget.busy ? null : widget.onCancelPlan,
-            child: const Text('Cancel plan')),
+      if (r.hasSelectedTitle) _movieHeader(),
+      Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            if (!r.hasSelectedTitle) ...[
+              _summary(),
+              const SizedBox(height: 20),
+              Divider(color: context.colors.tabBarBorder),
+              const SizedBox(height: 16),
+            ],
+            if (complete)
+              _recap()
+            else if (r.isDeclined || r.isCancelled || r.isExpired) ...[
+              const SizedBox(height: 16),
+              Text(
+                  'This plan is closed. You can make another whenever you’re ready.',
+                  style: _body.copyWith(color: context.colors.light)),
+              _button('Plan another movie', Icons.add, widget.onNewPlan),
+              _button('Close', Icons.close, widget.onClosePlan, primary: false),
+            ] else if (r.isPending)
+              _invite()
+            else if (needsMovie)
+              _movies()
+            else if (r.latestPendingProposal != null)
+              _schedule()
+            else if (due)
+              _afterWatch()
+            else if (r.scheduledFor != null &&
+                r.normalizedScheduleStatus == 'AGREED')
+              _scheduled()
+            else
+              _schedule(),
+            if (!complete) _message(),
+            if (!complete &&
+                !r.isPending &&
+                !r.isDeclined &&
+                !r.isCancelled &&
+                !r.isExpired)
+              TextButton(
+                  onPressed: widget.busy ? null : widget.onCancelPlan,
+                  child: const Text('Cancel plan')),
+          ])),
     ]);
   }
 
@@ -611,6 +648,84 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
             style: _body.copyWith(color: context.colors.light)),
       ]);
 
+  String? get backdrop => chosen?.backdropPath ?? r.movie?.backdropPath;
+  Widget _movieHeader() =>
+      Stack(key: const ValueKey('watch-plan-backdrop-header'), children: [
+        if (backdrop?.isNotEmpty == true)
+          Positioned.fill(
+              child: Image.network(
+            backdrop!.startsWith('http')
+                ? backdrop!
+                : 'https://image.tmdb.org/t/p/w1280$backdrop',
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+          )),
+        Positioned.fill(
+            child: DecoratedBox(
+                decoration: BoxDecoration(
+          gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              stops: const [
+                0,
+                .25,
+                .75,
+                1
+              ],
+              colors: [
+                context.colors.background.withValues(alpha: .85),
+                context.colors.background.withValues(alpha: .35),
+                context.colors.background.withValues(alpha: .8),
+                context.colors.background
+              ]),
+        ))),
+        Padding(
+            padding:
+                EdgeInsets.fromLTRB(24, widget.headerTopInset + 40, 24, 28),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _movieLink(
+                    WatchPlanPoster(path: poster, title: title, width: 80),
+                    'watch-plan-movie-poster'),
+                const SizedBox(width: 16),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      if (!complete) ...[
+                        Text(stage.toUpperCase(),
+                            style: TextStyle(
+                                color: context.colors.primaryText,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 12)),
+                        const SizedBox(height: 8),
+                      ],
+                      _movieLink(Text(title,
+                          style: TextStyle(
+                              color: context.colors.textPrimary,
+                              fontSize: 26,
+                              fontWeight: FontWeight.w800)),
+                          'watch-plan-movie-title'),
+                      const SizedBox(height: 8),
+                      if (r.scheduledFor != null)
+                        Text('Planned ${widget.scheduledLabel}',
+                            style: TextStyle(
+                                color: context.colors.light, height: 1.4)),
+                      if (r.location?.isNotEmpty == true)
+                        Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(r.location!,
+                                style: TextStyle(color: context.colors.light))),
+                      const SizedBox(height: 14),
+                      Wrap(
+                          spacing: 8,
+                          children: [_avatar(true, 38), _avatar(false, 38)]),
+                    ])),
+              ],
+            )),
+      ]);
+
   Widget _recap() {
     final watched = r.watchConfirmations.where((c) => c.watched).toList();
     final hidden =
@@ -618,95 +733,190 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
     final ratings = hidden
         ? <int>[]
         : watched.map((c) => c.rating).whereType<int>().toList();
+    final mine = watched.where((c) => c.userId == widget.myUserId).firstOrNull;
     final recommendations = watched.where((c) => c.recommended == true).length;
+    Widget metric(IconData icon, Color color, String value, String detail) =>
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(width: 10),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(value,
+                    style: TextStyle(
+                        color: context.colors.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Text(detail,
+                    style: _body.copyWith(color: context.colors.light)),
+              ])),
+        ]);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const SizedBox(height: 22),
-      if (ratings.isNotEmpty)
-        Text(
-            '${(ratings.reduce((a, b) => a + b) / ratings.length).toStringAsFixed(1)} / 10',
-            style: TextStyle(
-                color: context.colors.warning,
-                fontSize: 32,
-                fontWeight: FontWeight.w800)),
-      Text(
-          hidden
-              ? 'Rate to see scores'
-              : ratings.length == 2
-                  ? 'Your average'
+      WatchPlanSurface(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(Icons.bar_chart_rounded, color: context.colors.primaryText),
+          const SizedBox(width: 12),
+          Expanded(
+              child: Text('Your recap',
+                  style: _title.copyWith(color: context.colors.textPrimary)))
+        ]),
+        const SizedBox(height: 20),
+        LayoutBuilder(builder: (context, constraints) {
+          final people = metric(
+              Icons.people_outline,
+              context.colors.primaryText,
+              '${watched.length} watched',
+              watched.length == 2 ? 'You and $friend' : 'Of 2 people');
+          final score = metric(
+              Icons.star_rounded,
+              context.colors.warning,
+              hidden
+                  ? 'Scores hidden'
                   : ratings.isEmpty
                       ? 'No ratings yet'
-                      : '1 rating',
-          style: _body.copyWith(color: context.colors.light)),
-      if (ratings.length == 2) ...[
-        const SizedBox(height: 12),
-        _badge(
-            (ratings[0] - ratings[1]).abs() <= 2
-                ? 'Similar takes'
-                : 'Different takes',
-            context.colors.success),
-      ],
-      const SizedBox(height: 20),
-      for (final mine in [true, false])
-        Builder(builder: (_) {
-          final entry = r.watchConfirmations
-              .where((c) => c.userId == (mine ? widget.myUserId : other?.id))
-              .firstOrNull;
-          return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _person(
-                    mine,
-                    entry == null
-                        ? 'To respond'
-                        : !entry.watched
-                            ? 'Didn’t make it'
-                            : hideMovieRatings(context, r.movieId,
-                                    isShow: r.showId != null,
-                                    ownerId: entry.userId)
-                                ? 'Rate to see score'
-                                : entry.rating == null
-                                    ? 'No rating'
-                                    : '${entry.rating} / 10',
-                    entry != null),
-                if (entry?.watched == true &&
-                    entry?.reviewText?.isNotEmpty == true)
-                  Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Text(entry!.reviewText!,
-                          style: _body.copyWith(color: context.colors.light))),
-              ]);
+                      : '${(ratings.reduce((a, b) => a + b) / ratings.length).toStringAsFixed(1)} avg · ${ratings.length} ${ratings.length == 1 ? 'rating' : 'ratings'}',
+              hidden
+                  ? 'Rate to see scores'
+                  : ratings.isEmpty
+                      ? 'No one has rated yet'
+                      : ratings.length == 1
+                          ? 'Only 1 of 2 rated'
+                          : 'Both rated');
+          if (constraints.maxWidth < 300 ||
+              MediaQuery.textScalerOf(context).scale(1) > 1.3) {
+            return Column(
+                children: [people, const SizedBox(height: 18), score]);
+          }
+          return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(child: people),
+            Container(
+                width: 1,
+                height: 44,
+                margin: const EdgeInsets.symmetric(horizontal: 12),
+                color: context.colors.tabBarBorder),
+            Expanded(child: score)
+          ]);
         }),
-      if (recommendations > 0)
-        Text(recommendations == 2 ? 'Both recommend it' : '1 recommends it',
-            style: _body.copyWith(color: context.colors.light)),
+        if (recommendations > 0)
+          Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Text(
+                  recommendations == 2
+                      ? 'Both recommend it'
+                      : '1 recommends it',
+                  style: _body.copyWith(color: context.colors.success))),
+      ])),
+      for (final isMine in [true, false]) ...[
+        const SizedBox(height: 8),
+        WatchPlanSurface(
+            padding: const EdgeInsets.all(12), child: _recapPerson(isMine)),
+      ],
+      if (mine != null) ...[
+        const SizedBox(height: 24),
+        WatchPlanSurface(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Your review',
+              style: _title.copyWith(color: context.colors.textPrimary)),
+          const SizedBox(height: 8),
+          Text(
+              mine.reviewText?.trim().isNotEmpty == true
+                  ? mine.reviewText!
+                  : 'Share your thoughts on $title.',
+              style: _body.copyWith(color: context.colors.light)),
+          _button(
+              mine.reviewText?.trim().isNotEmpty == true
+                  ? 'Edit your thoughts'
+                  : 'Add your thoughts',
+              Icons.edit_outlined,
+              widget.onConfirmWatched,
+              primary: false),
+        ])),
+      ],
+      const SizedBox(height: 12),
+      _button('Plan another movie', Icons.add, widget.onNewPlan),
       _message(),
-      _button('Plan another movie', Icons.add, widget.onNewPlan,
-          primary: false),
     ]);
   }
 
-  Widget _avatar(bool mine, double size) {
-    final isCreator = (mine ? widget.myUserId : other?.id) == r.requesterId;
-    return Container(
-      width: size,
-      height: size,
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: isCreator ? context.colors.warning : FlixieColors.primary,
-          width: 2,
-        ),
-      ),
-      child: ProfileAvatarView(
+  Widget _recapPerson(bool mine) {
+    final entry = r.watchConfirmations
+        .where((c) => c.userId == (mine ? widget.myUserId : other?.id))
+        .firstOrNull;
+    final hidden = hideMovieRatings(context, r.movieId,
+        isShow: r.showId != null, ownerId: entry?.userId);
+    final score = entry?.watched != true
+        ? null
+        : entry?.rating == null
+            ? 'No rating added'
+            : hidden
+                ? 'Rated'
+                : '${entry!.rating}/10';
+    return LayoutBuilder(builder: (context, constraints) {
+      final compact = constraints.maxWidth < 300 ||
+          MediaQuery.textScalerOf(context).scale(1) > 1.3;
+      final rating = score == null
+          ? const SizedBox.shrink()
+          : Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 6,
+              children: [
+                  if (entry?.rating != null)
+                    Icon(Icons.star_rounded,
+                        size: 22, color: context.colors.warning),
+                  Text(score,
+                      style: _body.copyWith(color: context.colors.textPrimary)),
+                ]);
+      return Row(children: [
+        _avatar(mine, 44),
+        const SizedBox(width: 12),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(mine ? 'You' : friend,
+              style: _title.copyWith(
+                  color: context.colors.textPrimary, fontSize: 16)),
+          const SizedBox(height: 4),
+          Text(
+              entry == null
+                  ? 'To respond'
+                  : entry.watched
+                      ? 'Watched'
+                      : 'Didn’t make it',
+              style: _body.copyWith(color: context.colors.light)),
+          if (compact) rating,
+          if (!mine &&
+              entry?.watched == true &&
+              entry?.reviewText?.isNotEmpty == true)
+            Text(entry!.reviewText!,
+                style: _body.copyWith(color: context.colors.light)),
+        ])),
+        if (!compact)
+          Flexible(
+              fit: FlexFit.tight,
+              child: Align(alignment: Alignment.centerRight, child: rating)),
+        if (entry?.watched == true)
+          Padding(
+              padding: const EdgeInsets.only(left: 12),
+              child: Icon(Icons.check_circle,
+                  color: context.colors.success, size: 26)),
+      ]);
+    });
+  }
+
+  Widget _avatar(bool mine, double size) => ProfileAvatarView(
         avatar: mine ? widget.myAvatar : other?.avatar,
+        profileBadges:
+            mine ? widget.myProfileBadges : other?.profileBadges ?? const [],
         fallbackText:
             mine ? 'Y' : (friend.isEmpty ? '?' : friend[0].toUpperCase()),
         fallbackColor: FlixieColors.primary,
-        size: size - 10,
-      ),
-    );
-  }
+        size: size,
+      );
 
   Widget _person(bool mine, String status, bool done) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),

@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/profile/presentation/pages/milestones_screen.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/favourite_ranking_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/features/social/presentation/pages/social_screen.dart'
@@ -595,6 +596,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ]),
                               ),
                           ]),
+                    )),
+                  if (userId != null)
+                    SliverToBoxAdapter(
+                        child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            icon: const Icon(Icons.workspace_premium_outlined),
+                            label: const Text('View all milestones'),
+                            onPressed: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        MilestonesScreen(userId: userId))),
+                          )),
                     )),
                   SliverPersistentHeader(
                       pinned: true,

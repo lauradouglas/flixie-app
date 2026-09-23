@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/watch_plans/presentation/widgets/shared/watch_plan_components.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
@@ -52,6 +53,11 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
   int _memberCount = 0;
   List<GroupMember> _groupMembers = [];
   List<GroupWatchRequest> _watchRequests = [];
+  String? _planBackdrop;
+  void _onPlanTabChanged() {
+    if (mounted) setState(() {});
+  }
+
   List<MovieList> _groupLists = [];
   String? _conversationId;
   // Set by _RequestsTab when it refreshes - overrides the initial computed count.
@@ -85,6 +91,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
       vsync: this,
       initialIndex: widget.initialTab ?? 1,
     );
+    _tabController.addListener(_onPlanTabChanged);
     _loadGroup();
   }
 
@@ -207,6 +214,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
 
   @override
   Widget build(BuildContext context) {
+    final planBackdrop = _tabController.index == 2 ? _planBackdrop : null;
     final groupName = _group?.name ?? '';
     final color =
         groupName.isNotEmpty ? _groupColor(groupName) : FlixieColors.primary;
@@ -215,10 +223,21 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
       canPop: !_deletingGroup,
       child: Stack(
         children: [
+          if (planBackdrop != null)
+            Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 560 + MediaQuery.paddingOf(context).top,
+                child: WatchPlanBackdrop(path: planBackdrop)),
           Scaffold(
             backgroundColor: Colors.transparent,
             appBar: AppBar(
-              backgroundColor: context.colors.background,
+              backgroundColor: planBackdrop == null
+                  ? context.colors.background
+                  : Colors.transparent,
+              surfaceTintColor: Colors.transparent,
+              scrolledUnderElevation: 0,
               elevation: 0,
               leading: IconButton(
                 icon: Icon(Icons.arrow_back_ios_new_rounded,
@@ -376,6 +395,11 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                             groupName: _group?.name,
                             initialRequestId: widget.initialRequestId,
                             embedded: true,
+                            onBackdropChanged: (path) {
+                              if (mounted && path != _planBackdrop) {
+                                setState(() => _planBackdrop = path);
+                              }
+                            },
                             onCountChanged: (count) {
                               if (mounted) {
                                 setState(() => _pendingCountOverride = count);

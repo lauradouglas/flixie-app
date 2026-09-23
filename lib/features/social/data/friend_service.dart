@@ -50,6 +50,7 @@ class FriendService {
     String userId, {
     int days = 30,
     int limit = 100,
+    FriendsData? cachedFriends,
   }) async {
     final data = await ApiClient.get(
       '/friends/$userId/activity-lists?days=$days&limit=$limit',
@@ -60,7 +61,7 @@ class FriendService {
 
     if (activities.any((activity) => activity.avatar == null)) {
       try {
-        final friends = await getFriends(userId);
+        final friends = cachedFriends ?? await getFriends(userId);
         final avatarsByUserId = <String, ProfileAvatar?>{
           for (final friendship in friends.friendships)
             if (friendship.friendUser != null)

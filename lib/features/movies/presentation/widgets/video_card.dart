@@ -12,6 +12,28 @@ class VideoCard extends StatelessWidget {
 
   final MovieVideo video;
 
+  static TextStyle _titleStyle(BuildContext context) =>
+      DefaultTextStyle.of(context).style.merge(TextStyle(
+        color: context.colors.light,
+        fontSize: 12.5,
+        fontWeight: FontWeight.w600,
+      ));
+
+  static double carouselHeight(BuildContext context, List<MovieVideo> videos) {
+    var titleHeight = 0.0;
+    for (final video in videos) {
+      final painter = TextPainter(
+        text: TextSpan(text: video.name, style: _titleStyle(context)),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+        locale: Localizations.maybeLocaleOf(context),
+      )..layout(maxWidth: 270);
+      if (painter.height > titleHeight) titleHeight = painter.height;
+      painter.dispose();
+    }
+    return 146 + 8 + titleHeight.ceilToDouble();
+  }
+
   Future<void> _launchVideo(BuildContext context) async {
     final url = video.youtubeUrl;
     final uri = Uri.parse(url);
@@ -52,6 +74,7 @@ class VideoCard extends StatelessWidget {
       child: SizedBox(
         width: 270,
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Stack(
@@ -90,13 +113,7 @@ class VideoCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               video.name,
-              style: TextStyle(
-                color: context.colors.light,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+              style: _titleStyle(context),
             ),
           ],
         ),

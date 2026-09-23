@@ -264,6 +264,7 @@ class GroupWatchPlanCandidate {
   final int? showId;
   final String? title;
   final String? posterPath;
+  final String? backdropPath;
   final String? addedByUsername;
   final ProfileAvatar? addedByAvatar;
   final List<String> selectedByUserIds;
@@ -275,6 +276,7 @@ class GroupWatchPlanCandidate {
     this.showId,
     this.title,
     this.posterPath,
+    this.backdropPath,
     this.addedByUsername,
     this.addedByAvatar,
     this.selectedByUserIds = const [],
@@ -293,6 +295,10 @@ class GroupWatchPlanCandidate {
       showId: _intValue(json['showId'] ?? show?['id']),
       title: (movie?['title'] ?? show?['title'])?.toString(),
       posterPath: (movie?['posterPath'] ?? show?['posterPath'])?.toString(),
+      backdropPath: (movie?['backdropUrl'] ??
+              movie?['backdropPath'] ??
+              show?['backdropPath'])
+          ?.toString(),
       addedByUsername:
           (addedBy?['username'] ?? addedBy?['firstName'])?.toString(),
       addedByAvatar: addedBy?['avatar'] is Map<String, dynamic>
@@ -381,6 +387,16 @@ class GroupWatchRequest {
   final String? createdAt;
   final String? updatedAt;
   final String? movieTitle;
+  final String? movieBackdropPath;
+  String? get selectedBackdropPath {
+    if (candidates.length > 1 && selectedCandidateId == null) return null;
+    final selected =
+        candidates.where((c) => c.id == selectedCandidateId).firstOrNull;
+    return selected?.backdropPath ??
+        movieBackdropPath ??
+        (candidates.length == 1 ? candidates.first.backdropPath : null);
+  }
+
   final String? moviePosterPath;
   final String? requesterUsername;
   final ProfileAvatar? requesterAvatar;
@@ -425,6 +441,7 @@ class GroupWatchRequest {
     this.updatedAt,
     this.movieTitle,
     this.moviePosterPath,
+    this.movieBackdropPath,
     this.requesterUsername,
     this.requesterAvatar,
     this.requesterProfileBadges = const [],
@@ -521,6 +538,8 @@ class GroupWatchRequest {
       movieTitle: hasUnresolvedMovieChoices
           ? null
           : movie?['title'] as String? ?? json['movieTitle'] as String?,
+      movieBackdropPath:
+          (movie?['backdropUrl'] ?? movie?['backdropPath'])?.toString(),
       moviePosterPath: hasUnresolvedMovieChoices
           ? null
           : movie?['posterPath'] as String? ??

@@ -189,6 +189,7 @@ class Movie {
       'overview': overview,
       'posterPath': posterPath,
       'backdropPath': backdropPath,
+      'collection': collection,
       'popularity': popularity,
       'voteAverage': voteAverage,
       'voteCount': voteCount,

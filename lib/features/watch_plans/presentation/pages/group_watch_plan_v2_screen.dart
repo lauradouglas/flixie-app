@@ -34,6 +34,7 @@ class GroupWatchPlanV2Screen extends StatefulWidget {
     this.initialRequestId,
     this.embedded = false,
     this.onCountChanged,
+    this.onBackdropChanged,
     this.onActiveCountChanged,
   });
 
@@ -42,6 +43,7 @@ class GroupWatchPlanV2Screen extends StatefulWidget {
   final String? initialRequestId;
   final bool embedded;
   final ValueChanged<int>? onCountChanged;
+  final ValueChanged<String?>? onBackdropChanged;
   final ValueChanged<int>? onActiveCountChanged;
 
   @override
@@ -54,6 +56,7 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
   final Map<String, List<GroupMember>> _membersByRequest = {};
   final Map<String, String> _groupNamesByRequest = {};
   String? _selectedId;
+  String? _publishedBackdrop;
   bool _past = false;
   bool _loading = true;
   bool _processing = false;
@@ -191,47 +194,82 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
   @override
   Widget build(BuildContext context) {
     final request = _selected;
+    final backdrop = request?.selectedBackdropPath;
+    if (_publishedBackdrop != backdrop) {
+      _publishedBackdrop = backdrop;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _publishedBackdrop == backdrop) {
+          widget.onBackdropChanged?.call(backdrop);
+        }
+      });
+    }
     return PopScope(
       canPop: request == null,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop && request != null) setState(() => _selectedId = null);
       },
       child: widget.embedded
-          ? _screenBody(request)
-          : Scaffold(
-              backgroundColor: context.colors.background,
-              appBar: AppBar(
-                backgroundColor: context.colors.background,
-                foregroundColor: context.colors.textPrimary,
-                leading: request == null
-                    ? null
-                    : IconButton(
-                        tooltip: 'Back to Watch Plans',
-                        onPressed: () => setState(() => _selectedId = null),
-                        icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                      ),
-                title: Text(request == null
-                    ? widget.groupId == null
-                        ? 'Group Watch Plans'
-                        : widget.groupName ?? 'Group Watch Plans'
-                    : request.movieTitle ?? 'Group Watch Plan'),
-                actions: [
-                  IconButton(
-                    tooltip: 'Refresh',
-                    onPressed: _processing ? null : _load,
-                    icon: const Icon(Icons.refresh_rounded),
-                  ),
-                ],
-              ),
-              floatingActionButton: request == null
-                  ? FloatingActionButton(
-                      tooltip: 'Make a Watch Plan',
-                      onPressed: _processing ? null : _create,
-                      child: const Icon(Icons.add_rounded),
-                    )
-                  : null,
-              body: _screenBody(request),
-            ),
+          ? (widget.onBackdropChanged == null && backdrop != null
+              ? Stack(children: [
+                  Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: 420,
+                      child: WatchPlanBackdrop(path: backdrop)),
+                  _screenBody(request),
+                ])
+              : _screenBody(request))
+          : Stack(children: [
+              Positioned.fill(
+                  child: ColoredBox(color: context.colors.background)),
+              if (backdrop != null)
+                Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: 520 + MediaQuery.paddingOf(context).top,
+                    child: WatchPlanBackdrop(path: backdrop)),
+              Scaffold(
+                backgroundColor: Colors.transparent,
+                appBar: AppBar(
+                  backgroundColor: backdrop == null
+                      ? context.colors.background
+                      : Colors.transparent,
+                  surfaceTintColor: Colors.transparent,
+                  elevation: 0,
+                  scrolledUnderElevation: 0,
+                  foregroundColor: context.colors.textPrimary,
+                  leading: request == null
+                      ? null
+                      : IconButton(
+                          tooltip: 'Back to Watch Plans',
+                          onPressed: () => setState(() => _selectedId = null),
+                          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                        ),
+                  title: Text(request == null
+                      ? widget.groupId == null
+                          ? 'Group Watch Plans'
+                          : widget.groupName ?? 'Group Watch Plans'
+                      : request.movieTitle ?? 'Group Watch Plan'),
+                  actions: [
+                    IconButton(
+                      tooltip: 'Refresh',
+                      onPressed: _processing ? null : _load,
+                      icon: const Icon(Icons.refresh_rounded),
+                    ),
+                  ],
+                ),
+                floatingActionButton: request == null
+                    ? FloatingActionButton(
+                        tooltip: 'Make a Watch Plan',
+                        onPressed: _processing ? null : _create,
+                        child: const Icon(Icons.add_rounded),
+                      )
+                    : null,
+                body: _screenBody(request),
+              )
+            ]),
     );
   }
 

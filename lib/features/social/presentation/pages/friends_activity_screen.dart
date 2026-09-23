@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -50,6 +51,7 @@ class _FriendsActivityScreenState extends State<FriendsActivityScreen> {
         userId,
         days: 14,
         limit: 100,
+        cachedFriends: auth.cachedFriends,
       );
       if (mounted) {
         setState(() => _items = items);
@@ -78,7 +80,10 @@ class _FriendsActivityScreenState extends State<FriendsActivityScreen> {
       body: RefreshIndicator(
         onRefresh: () => _load(),
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? ListView(padding: const EdgeInsets.all(16), children: const [
+                ActivityRowsSkeleton(),
+                ActivityRowsSkeleton()
+              ])
             : _error != null
                 ? ListView(
                     children: [

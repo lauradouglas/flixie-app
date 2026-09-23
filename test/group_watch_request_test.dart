@@ -2,6 +2,34 @@ import 'package:flixie_app/models/group_watch_request.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('backdrop uses selected movie and stays hidden while choosing', () {
+    final data = <String, dynamic>{
+      'id': 'plan',
+      'movie': {'id': 1, 'backdropUrl': '/old.jpg'},
+      'candidates': [
+        {
+          'id': 'a',
+          'movie': {'id': 1, 'backdropUrl': '/first.jpg'}
+        },
+        {
+          'id': 'b',
+          'movie': {'id': 2, 'backdropUrl': '/selected.jpg'}
+        },
+      ],
+    };
+    expect(GroupWatchRequest.fromJson(data).selectedBackdropPath, isNull);
+    expect(
+        GroupWatchRequest.fromJson({...data, 'selectedCandidateId': 'b'})
+            .selectedBackdropPath,
+        '/selected.jpg');
+    expect(
+        GroupWatchRequest.fromJson({
+          'id': 'single',
+          'movie': {'id': 1, 'backdropUrl': '/single.jpg'}
+        }).selectedBackdropPath,
+        '/single.jpg');
+  });
+
   test('conversation plans preserve both identifiers and their message link',
       () {
     final request = GroupWatchRequest.fromJson({

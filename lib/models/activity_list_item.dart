@@ -163,12 +163,13 @@ class ActivityListItem {
         type == ActivityListType.showReview;
     // API returns review fields flat at the top level, not nested under 'review'
     final src = review ?? (isReviewType ? json : null);
-    if (src != null && isReviewType) {
+    if (src != null) {
       try {
         reviewData = Review.fromJson(<String, dynamic>{
           'id': (src['id'] ?? '').toString(),
           'userId': (src['userId'] ?? userId).toString(),
           'movieId': src['movieId'] ?? json['movieId'],
+          'watchEntryId': src['watchEntryId'] ?? json['watchEntryId'],
           'showId': src['showId'] ?? json['showId'],
           'rating': src['rating'] ?? 0,
           'title': src['title'] ?? '',
@@ -218,10 +219,13 @@ class ActivityListItem {
           person?['profileImage'] as String? ??
           json['profileImgUrl'] as String? ??
           json['profilePath'] as String?,
-      mediaRating: (json['rating'] as num?)?.toDouble() ??
-          (review?['rating'] as num?)?.toDouble(),
-      recommended:
-          json['recommended'] as bool? ?? (review?['recommended'] as bool?),
+      mediaRating: json['watchEntryId'] != null
+          ? (json['rating'] as num?)?.toDouble()
+          : (json['rating'] as num?)?.toDouble() ??
+              (review?['rating'] as num?)?.toDouble(),
+      recommended: json['watchEntryId'] != null
+          ? json['recommended'] as bool?
+          : json['recommended'] as bool? ?? (review?['recommended'] as bool?),
       watchedAt: json['watchedAt'] as String?,
       watchCount: parsedWatchCount,
       isRewatch: isRewatch,

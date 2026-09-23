@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/collections/movie_collection_card.dart';
 import 'package:flixie_app/features/movies/data/movie_watch_plan_choice.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/movie_friends_summary_badges.dart';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
@@ -1086,6 +1087,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     MovieWatchPlanChoice? selectedPlan;
     var didSubmit = false;
     var writeReview = false;
+    String? reviewWatchEntryId = entry?.id;
     double? reviewRating;
     bool? reviewRecommended;
     String? shareNote;
@@ -1123,7 +1125,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                     recommended: recommended,
                     notes: notes);
               } else {
-                await WatchlistActionsController.instance.logMovieWatch(
+                final savedWatch =
+                    await WatchlistActionsController.instance.logMovieWatch(
                   userId,
                   LogMovieWatchRequest(
                     movieId: movieId,
@@ -1133,6 +1136,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                     notes: notes,
                   ),
                 );
+                reviewWatchEntryId = savedWatch.id;
               }
               // Also mark the movie as watched in the main watched list and
               // update local user state, then offer to remove from watchlist.
@@ -1204,24 +1208,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               );
               didSubmit = true;
             }
-            // Watch entries support ratings of their own. Make sure a rating
-            // recorded here is also saved as the user's overall movie rating,
-            // which powers the Rate action and the ratings list on their
-            // profile. The API normally performs this sync; this check also
-            // keeps older API deployments in step.
-            if (rating != null) {
-              final overallRating =
-                  await movieService.getUserMovieRating(movieId, userId);
-              if (overallRating.rating != rating.round() ||
-                  overallRating.recommended != recommended) {
-                await movieService.addMovieRating(
-                  movieId,
-                  userId,
-                  rating.round(),
-                  recommended,
-                );
-              }
-            }
             if (entry == null) {
               await analytics.watchLogged(
                 contentType: 'movie',
@@ -1287,6 +1273,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     if (didSubmit && writeReview && mounted) {
       await _showWriteReviewSheet(
         context,
+        watchEntryId: reviewWatchEntryId,
         initialRating: reviewRating,
         initialRecommended: reviewRecommended,
       );
@@ -3515,6 +3502,17 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   Widget _buildSelectedMovieTab(BuildContext context, Movie movie) {
     return switch (_movieDetailTab) {
       MovieDetailTab.overview => _tabContent([
+          if (movie.collection != null)
+            MovieCollectionCard(
+                collection: movie.collection!,
+                onReturn: () {
+                  if (!mounted) return;
+                  setState(() => _inWatchlist = context
+                          .read<AuthProvider>()
+                          .dbUser
+                          ?.isMovieInWatchlist(movie.id) ??
+                      false);
+                }),
           _buildTrailersSection(context, movie),
           _optionalSection(
               'credits', 'cast and crew', _buildTopCastSection(context)),
@@ -4278,7 +4276,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         ),
         const SizedBox(height: 8),
         SizedBox(
-          height: 190,
+          height: VideoCard.carouselHeight(context, videos),
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: videos.length,
@@ -4617,6 +4615,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   Future<void> _showWriteReviewSheet(
     BuildContext context, {
+    String? watchEntryId,
     double? initialRating,
     bool? initialRecommended,
   }) async {
@@ -4633,12 +4632,17 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => WriteReviewSheet(
         movieId: movieId,
+        watchEntryId: watchEntryId,
+        watchEntries: _movieWatchHistory,
         userId: user.id,
         initialRating: initialRating,
         initialRecommended: initialRecommended,
         onSubmitted: (review) {
           final auth = context.read<AuthProvider>();
-          setState(() => _reviews = [review, ..._reviews]);
+          setState(() => _reviews = [
+                review,
+                ..._reviews.where((item) => item.id != review.id)
+              ]);
           auth.invalidateCachedReviews();
           auth.markActivityChanged();
         },

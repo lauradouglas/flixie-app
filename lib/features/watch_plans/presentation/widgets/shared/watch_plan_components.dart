@@ -89,3 +89,37 @@ class WatchPlanPosterStack extends StatelessWidget {
     );
   }
 }
+
+/// Decorative artwork shared by embedded and standalone plan headers.
+class WatchPlanBackdrop extends StatelessWidget {
+  const WatchPlanBackdrop({super.key, required this.path});
+  final String path;
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+          child: ExcludeSemantics(
+              child: Stack(fit: StackFit.expand, children: [
+        CachedNetworkImage(
+            imageUrl: path.startsWith('http')
+                ? path
+                : 'https://image.tmdb.org/t/p/w1280$path',
+            fit: BoxFit.cover,
+            errorWidget: (_, __, ___) => const SizedBox.shrink()),
+        DecoratedBox(
+            decoration: BoxDecoration(
+                gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    stops: const [
+              0,
+              .28,
+              .7,
+              1
+            ],
+                    colors: [
+              context.colors.background.withValues(alpha: .85),
+              context.colors.background.withValues(alpha: .4),
+              context.colors.background.withValues(alpha: .8),
+              context.colors.background
+            ]))),
+      ])));
+}

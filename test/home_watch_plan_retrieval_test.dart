@@ -17,6 +17,25 @@ Map<String, dynamic> plan(String id) => {
     };
 
 void main() {
+  test('Home requests active plans without removing overdue action items',
+      () async {
+    final result = await http.runWithClient(
+      () => RequestService.getWatchRequests('laura',
+          includeHomeState: true, activeOnly: true),
+      () => MockClient((request) async {
+        expect(request.url.queryParameters['activeOnly'], 'true');
+        return http.Response(
+            jsonEncode([
+              {...plan('overdue'), 'scheduledFor': '2020-01-01T12:00:00Z'},
+              {...plan('finished'), 'watchedStatus': 'WATCHED'},
+              {...plan('cancelled'), 'scheduleStatus': 'CANCELLED'},
+            ]),
+            200);
+      }),
+    );
+    expect(result.map((p) => p.id), ['overdue']);
+  });
+
   test('complete Home lists need one HTTP request regardless of plan count',
       () async {
     final paths = <String>[];

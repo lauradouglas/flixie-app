@@ -44,31 +44,37 @@ class _ActivityFeedCardState extends State<ActivityFeedCard> {
     if (anchor != null) widget.onReact?.call(anchor);
   }
 
-  String get _label => switch (widget.item.type) {
-        ActivityListType.movieWatched || ActivityListType.showWatched => widget
-                .item.isRewatch
-            ? 'Watched again${(widget.item.watchCount ?? 0) > 1 ? ' · ${widget.item.watchCount} times' : ''}'
-            : 'Watched a ${widget.item.showId != null ? 'show' : 'film'}',
-        ActivityListType.movieRating ||
-        ActivityListType.showRating =>
-          'Rated a ${widget.item.showId != null ? 'show' : 'film'}',
-        ActivityListType.movieReview ||
-        ActivityListType.showReview =>
-          'Wrote a review',
-        ActivityListType.movieWatchlist ||
-        ActivityListType.showWatchlist =>
-          'Added to watchlist',
-        ActivityListType.favoriteMovie ||
-        ActivityListType.favoriteShow ||
-        ActivityListType.favoritePerson =>
-          'Added to favourites',
-        ActivityListType.watchRequest ||
-        ActivityListType.watchRequestSent =>
-          'Shared a film',
-        ActivityListType.watchRequestAccepted => 'Joined a watch plan',
-        ActivityListType.movieListAdded => 'Added to a list',
-        _ => 'Shared an update',
-      };
+  String get _label => widget.item.watchLogged
+      ? (widget.item.reviewData != null
+          ? 'Watched and reviewed'
+          : widget.item.mediaRating != null
+              ? 'Watched and rated'
+              : 'Watched')
+      : switch (widget.item.type) {
+          ActivityListType.movieWatched || ActivityListType.showWatched => widget
+                  .item.isRewatch
+              ? 'Watched again${(widget.item.watchCount ?? 0) > 1 ? ' · ${widget.item.watchCount} times' : ''}'
+              : 'Watched a ${widget.item.showId != null ? 'show' : 'film'}',
+          ActivityListType.movieRating ||
+          ActivityListType.showRating =>
+            'Rated a ${widget.item.showId != null ? 'show' : 'film'}',
+          ActivityListType.movieReview ||
+          ActivityListType.showReview =>
+            'Wrote a review',
+          ActivityListType.movieWatchlist ||
+          ActivityListType.showWatchlist =>
+            'Added to watchlist',
+          ActivityListType.favoriteMovie ||
+          ActivityListType.favoriteShow ||
+          ActivityListType.favoritePerson =>
+            'Added to favourites',
+          ActivityListType.watchRequest ||
+          ActivityListType.watchRequestSent =>
+            'Shared a film',
+          ActivityListType.watchRequestAccepted => 'Joined a watch plan',
+          ActivityListType.movieListAdded => 'Added to a list',
+          _ => 'Shared an update',
+        };
   String get _age {
     final date = DateTime.tryParse(widget.item.timestamp);
     if (date == null) return '';
@@ -258,15 +264,16 @@ class _ActivityFeedCardState extends State<ActivityFeedCard> {
                                 label: Text(
                                     '${reaction.emoji} ${widget.reactions.counts[reaction.emoji]}')),
                         if (widget.onReact != null)
-                          IconButton.outlined(
-                              key: _reactButtonKey,
-                              tooltip: 'Add reaction',
-                              onPressed: widget.busy ? null : _openReactions,
-                              icon: const Icon(Icons.add_reaction_outlined),
-                              style: IconButton.styleFrom(
-                                  foregroundColor: context.colors.light,
-                                  side: BorderSide(
-                                      color: context.colors.tabBarBorder))),
+                          Tooltip(
+                              message: 'Add reaction',
+                              child: TextButton.icon(
+                                  key: _reactButtonKey,
+                                  label: const Text('React'),
+                                  onPressed:
+                                      widget.busy ? null : _openReactions,
+                                  icon: const Icon(Icons.add_reaction_outlined),
+                                  style: TextButton.styleFrom(
+                                      foregroundColor: context.colors.light))),
                       ])),
                   if (widget.onReply != null) ...[
                     const SizedBox(width: 8),

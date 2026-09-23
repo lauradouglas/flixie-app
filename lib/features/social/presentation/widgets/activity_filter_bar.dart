@@ -18,12 +18,15 @@ enum ActivityFeedFilter {
         ActivityFeedFilter.all => true,
         ActivityFeedFilter.watched =>
           item.type == ActivityListType.movieWatched ||
-              item.type == ActivityListType.showWatched,
+              item.type == ActivityListType.showWatched ||
+              item.watchLogged,
         ActivityFeedFilter.rated => item.type == ActivityListType.movieRating ||
-            item.type == ActivityListType.showRating,
+            item.type == ActivityListType.showRating ||
+            item.mediaRating != null,
         ActivityFeedFilter.reviews =>
           item.type == ActivityListType.movieReview ||
-              item.type == ActivityListType.showReview,
+              item.type == ActivityListType.showReview ||
+              item.reviewData != null,
         ActivityFeedFilter.watchlists =>
           item.type == ActivityListType.movieWatchlist ||
               item.type == ActivityListType.showWatchlist,

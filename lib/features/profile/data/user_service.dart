@@ -471,6 +471,7 @@ class UserService {
         'review': {
           'id': review.movieId,
           'userId': review.userId,
+          if (review.watchEntryId != null) 'watchEntryId': review.watchEntryId,
           'mediaId': review.movieId,
           'title': review.title,
           'body': review.body,

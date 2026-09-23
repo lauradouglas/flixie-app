@@ -43,6 +43,7 @@ class WatchRequestUser {
   final String? lastName;
   final Map<String, dynamic>? iconColor;
   final ProfileAvatar? avatar;
+  final List<String> profileBadges;
 
   const WatchRequestUser({
     required this.id,
@@ -51,10 +52,15 @@ class WatchRequestUser {
     this.lastName,
     this.iconColor,
     this.avatar,
+    this.profileBadges = const [],
   });
 
   factory WatchRequestUser.fromJson(Map<String, dynamic> json) {
     return WatchRequestUser(
+      profileBadges: (json['profileBadges'] as List? ?? const [])
+          .map((v) => v is Map ? v['badge'] : v)
+          .whereType<String>()
+          .toList(),
       id: json['id']?.toString() ?? '',
       username: json['username']?.toString() ?? '',
       firstName: json['firstName'] as String?,
@@ -76,12 +82,14 @@ class WatchRequestMovieDetails {
   final int id;
   final String title;
   final String? posterPath;
+  final String? backdropPath;
   final int? runtimeMinutes;
 
   const WatchRequestMovieDetails({
     required this.id,
     required this.title,
     this.posterPath,
+    this.backdropPath,
     this.runtimeMinutes,
   });
 
@@ -90,6 +98,7 @@ class WatchRequestMovieDetails {
       id: _intValue(json['id']) ?? 0,
       title: json['title'] as String? ?? 'Unknown Movie',
       posterPath: json['posterPath'] as String?,
+      backdropPath: (json['backdropPath'] ?? json['backdropUrl']) as String?,
       runtimeMinutes: _intValue(json['runtime']),
     );
   }
@@ -254,6 +263,7 @@ class WatchPlanCandidate {
   final ProfileAvatar? addedByAvatar;
   final String? title;
   final String? posterPath;
+  final String? backdropPath;
   final String? releaseDate;
   final List<String> selectedByUserIds;
 
@@ -267,6 +277,7 @@ class WatchPlanCandidate {
     this.addedByAvatar,
     this.title,
     this.posterPath,
+    this.backdropPath,
     this.releaseDate,
     this.selectedByUserIds = const [],
   });
@@ -290,6 +301,10 @@ class WatchPlanCandidate {
           : null,
       title: (movie?['title'] ?? show?['title'])?.toString(),
       posterPath: (movie?['posterPath'] ?? show?['posterPath'])?.toString(),
+      backdropPath: (movie?['backdropPath'] ??
+              movie?['backdropUrl'] ??
+              show?['backdropPath'])
+          ?.toString(),
       releaseDate: (movie?['releaseDate'] ?? show?['firstAirDate'])?.toString(),
       selectedByUserIds: choices
           .whereType<Map<String, dynamic>>()
@@ -364,6 +379,13 @@ class WatchRequest {
   final DateTime? cancelledAt;
   final DateTime? expiresAt;
   final DateTime? lastActivityAt;
+
+  /// A single-title invitation already has a title; multi-title plans need a final selection.
+  bool get hasSelectedTitle =>
+      selectedCandidateId != null ||
+      (candidates.length <= 1 &&
+          (movieId != null || showId != null || candidates.isNotEmpty));
+
   final List<WatchRequestParticipant> participants;
   final bool? hasCurrentUserAccepted;
   final bool? hasCurrentUserCompleted;

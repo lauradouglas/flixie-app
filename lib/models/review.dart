@@ -3,6 +3,7 @@ import 'package:flixie_app/models/user.dart';
 class Review {
   final String id;
   final String userId;
+  final String? watchEntryId;
   final int? movieId;
   final int? showId;
   final int rating;
@@ -24,6 +25,7 @@ class Review {
   const Review({
     required this.id,
     required this.userId,
+    this.watchEntryId,
     this.movieId,
     this.showId,
     required this.rating,
@@ -47,6 +49,7 @@ class Review {
     return Review(
       id: _stringOrFallback(json['id']),
       userId: _stringOrFallback(json['userId']),
+      watchEntryId: _nullableString(json['watchEntryId']),
       movieId: _intValue(json['movieId']),
       showId: _intValue(json['showId']),
       rating: _intValue(json['rating']) ?? 0,
@@ -102,6 +105,7 @@ class Review {
     return {
       'id': id,
       'userId': userId,
+      if (watchEntryId != null) 'watchEntryId': watchEntryId,
       'movieId': movieId,
       'showId': showId,
       'rating': rating,

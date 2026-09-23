@@ -1,3 +1,4 @@
+import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'package:flixie_app/core/widgets/notification_opt_in.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
@@ -1030,6 +1031,9 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
     if (userId == null || userId.isEmpty) return;
     final hasCompletedSetup =
         context.read<AuthProvider>().dbUser?.completedSetup == true;
+    final existing = request.watchConfirmations
+        .where((c) => c.userId == userId && c.watched)
+        .firstOrNull;
     var saved = false;
     int? savedRating;
     bool? savedRecommended;
@@ -1041,6 +1045,18 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
       useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (_) => RewatchLogSheet(
+        isPlanReview: true,
+        initial: existing == null
+            ? null
+            : MovieWatchEntry(
+                id: existing.id,
+                userId: userId,
+                movieId: request.movieId ?? 0,
+                rating: existing.rating?.toDouble(),
+                recommended: existing.recommended,
+                notes: existing.reviewText,
+                removed: false,
+              ),
         showReviewOption: false,
         onSubmit: ({
           required watchedAt,
@@ -1293,9 +1309,17 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
               ),
             ],
           );
+    final backdropBehindHeader = isFocused &&
+        !_loading &&
+        _error == null &&
+        _filtered.isNotEmpty &&
+        _filtered.first.hasSelectedTitle;
     final screen = FlixiePageScaffold(
+      extendBodyBehindAppBar: backdropBehindHeader,
       appBar: FlixieTitleAppBar(
-        backgroundColor: context.colors.background,
+        backgroundColor: backdropBehindHeader
+            ? Colors.transparent
+            : context.colors.background,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1469,7 +1493,8 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
         onRefresh: _load,
         color: FlixieColors.primary,
         child: ListView.separated(
-          padding: EdgeInsets.fromLTRB(16, isFocused ? 8 : 16, 16, 24),
+          padding: EdgeInsets.fromLTRB(
+              isFocused ? 0 : 16, isFocused ? 0 : 16, isFocused ? 0 : 16, 24),
           itemCount: _filtered.length,
           separatorBuilder: (_, __) => const SizedBox(height: 10),
           itemBuilder: (_, index) =>
@@ -1532,8 +1557,12 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
     return FriendWatchPlanFlow(
       request: request,
       compact: !isFocused,
+      headerTopInset:
+          isFocused ? MediaQuery.paddingOf(context).top + kToolbarHeight : 0,
       myUserId: myUserId,
       myAvatar: context.read<AuthProvider>().dbUser?.avatar,
+      myProfileBadges:
+          context.read<AuthProvider>().dbUser?.profileBadges ?? const [],
       scheduledLabel: _formatFriendlyDateTime(request.scheduledFor),
       busy: _busyActions.containsKey(request.id),
       onAccept: () => _respond(request, 'ACCEPTED'),

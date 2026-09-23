@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/profile/presentation/pages/milestones_screen.dart';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/models/movie_rating.dart';
 import 'package:flixie_app/models/favorite_movie.dart';
@@ -1024,6 +1025,20 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
             ],
             const SizedBox(height: 20),
             _modernStats(watched, watchlist, favourites),
+            if (_isSelf || _friendshipStatus == _FriendshipStatus.friends) ...[
+              const SizedBox(height: 20),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.workspace_premium_outlined),
+                label: const Text('View earned milestones'),
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => MilestonesScreen(
+                          userId: widget.userId,
+                          displayName: _user?.username,
+                          earnedOnly: true,
+                        ))),
+              ),
+            ],
+
             const SizedBox(height: 12),
             _profileTabs(),
             const SizedBox(height: 18),

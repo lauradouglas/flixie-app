@@ -9,16 +9,19 @@ class FlixiePageScaffold extends StatelessWidget {
     required this.body,
     this.floatingActionButton,
     this.backgroundColor = Colors.transparent,
+    this.extendBodyBehindAppBar = false,
   });
 
   final PreferredSizeWidget? appBar;
   final Widget body;
   final Widget? floatingActionButton;
   final Color backgroundColor;
+  final bool extendBodyBehindAppBar;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: extendBodyBehindAppBar,
       backgroundColor: backgroundColor,
       appBar: appBar,
       body: body,

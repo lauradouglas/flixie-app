@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -60,6 +61,10 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       expect(find.text('Trending now'), findsOneWidget);
       expect(recommendationCalls, 1);
+      expect(find.byType(ActivityRowsSkeleton), findsNothing,
+          reason:
+              'Completed empty friend activity must not wait for recommendations');
+      expect(find.text('Friends watching'), findsNothing);
       recommendations.complete(response({'error': 'offline'}, 500));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));

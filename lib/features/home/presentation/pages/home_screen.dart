@@ -451,7 +451,9 @@ class _HomeScreenState extends State<HomeScreen> {
           !refreshRecommendations && cachedFriends != null
               ? Future.value(cachedFriends)
               : FriendService.getFriendsActivityLists(user.id,
-                  days: 30, limit: 200),
+                  days: 30,
+                  limit: 200,
+                  cachedFriends: context.read<AuthProvider>().cachedFriends),
           (value) => _friendsActivity = value),
       section(
           'recommendations',
@@ -533,9 +535,6 @@ class _HomeScreenState extends State<HomeScreen> {
               _countWatchRequestsNeedingResponse(plans, user.id);
         }
         applyPlans(results[1] as List<dynamic>);
-        if (!isGroup && mounted) {
-          context.read<AuthProvider>().updateCachedWatchRequests(plans);
-        }
         unawaited(_syncLocalWatchPlanReminders(plans, userId: user.id));
       } catch (error) {
         failed = true;
@@ -553,7 +552,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     await Future.wait([
       loadSource(
-          RequestService.getWatchRequests(user.id, includeHomeState: true),
+          RequestService.getWatchRequests(user.id,
+              includeHomeState: true, activeOnly: true),
           isGroup: false),
       loadSource(_loadGroupWatchPlansForHome(), isGroup: true),
     ]);
@@ -1164,8 +1164,10 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
               _buildBecauseYouRatedSection(context),
               _buildContinueWatchingSection(context),
-              if (_isLoadingRecommendations && _friendsActivity.isEmpty)
-                _buildPosterRailLoadingState('Friends watching')
+              if (_loadingHomeSections.contains('friends') &&
+                  _friendsActivity.isEmpty)
+                _buildActivityLoadingState(
+                    title: 'Friends are watching', avatars: true)
               else
                 FriendsWatchingSection(activity: _friendsActivity),
               _buildFriendActivitySection(context),
@@ -1893,9 +1895,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 220),
             child: Text(
-              _isLoadingRecommendations
-                  ? 'Building your fresh picks…'
-                  : 'Picked from your taste',
+              'Picked from your taste',
               key: ValueKey(_isLoadingRecommendations),
               style: TextStyle(
                 color: context.colors.medium,
@@ -1909,100 +1909,83 @@ class _HomeScreenState extends State<HomeScreen> {
           height: PersonalizedRecommendationCard.height,
           child: Padding(
             padding: const EdgeInsets.only(left: 16),
-            child: _isLoadingRecommendations
-                ? LayoutBuilder(
-                    builder: (context, constraints) => Align(
-                      alignment: Alignment.centerLeft,
-                      child: SizedBox(
-                        width: constraints.maxWidth *
-                            _forYouPageController.viewportFraction,
-                        height: PersonalizedRecommendationCard.height,
-                        child: const Padding(
-                          padding: EdgeInsets.only(right: 10),
-                          child: _RecommendationGeneratingCard(),
-                        ),
+            child: PageView.builder(
+              controller: _forYouPageController,
+              padEnds: false,
+              itemCount: movies.length,
+              onPageChanged: (index) {
+                _forYouPage.value = index;
+                _trackRecommendationImpression(index);
+              },
+              itemBuilder: (context, index) {
+                final movie = movies[index];
+                final isBookmarked = _watchlistMovieIds.contains(
+                  movie.id,
+                );
+                final isPreviouslyWatched = movie.previouslyWatched ||
+                    (context
+                            .read<AuthProvider>()
+                            .dbUser
+                            ?.isMovieWatched(movie.id) ??
+                        false);
+                final reasons = isPreviouslyWatched &&
+                        !movie.recommendationReasons.any(
+                          (reason) => reason.toLowerCase().contains('rewatch'),
+                        )
+                    ? [
+                        'You\'ve watched this before - it may be worth a rewatch',
+                        ...movie.recommendationReasons,
+                      ]
+                    : movie.recommendationReasons;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: PersonalizedRecommendationCard(
+                    movie: movie,
+                    reasons: reasons,
+                    isBookmarked: isBookmarked,
+                    isBookmarkUpdating:
+                        _watchlistUpdatesInFlight.contains(movie.id),
+                    isPreviouslyWatched: isPreviouslyWatched,
+                    onTap: () => _openRecommendation(movie, index),
+                    onBookmarkTap: () async {
+                      final analytics = context.read<AnalyticsController>();
+                      await _toggleWatchlistState(
+                        context,
+                        movieId: movie.id,
+                        movieTitle: movie.name,
+                        posterPath: movie.poster,
+                        currentlyInWatchlist: isBookmarked,
+                      );
+                      if (!isBookmarked &&
+                          _watchlistMovieIds.contains(movie.id) &&
+                          mounted) {
+                        await analytics.recommendationSaved(
+                          attribution:
+                              RecommendationAttribution.forPersonalisedMovie(
+                            movie,
+                            position: index,
+                          ),
+                        );
+                      }
+                    },
+                    onMarkWatched: () => _openQuickMarkWatchedSheet(
+                      context,
+                      movieId: movie.id,
+                      movieTitle: movie.name,
+                      posterPath: movie.poster,
+                      isInWatchlist: isBookmarked,
+                      isRewatch: isPreviouslyWatched,
+                      recommendation:
+                          RecommendationAttribution.forPersonalisedMovie(
+                        movie,
+                        position: index,
                       ),
                     ),
-                  )
-                : PageView.builder(
-                    controller: _forYouPageController,
-                    padEnds: false,
-                    itemCount: movies.length,
-                    onPageChanged: (index) {
-                      _forYouPage.value = index;
-                      _trackRecommendationImpression(index);
-                    },
-                    itemBuilder: (context, index) {
-                      final movie = movies[index];
-                      final isBookmarked = _watchlistMovieIds.contains(
-                        movie.id,
-                      );
-                      final isPreviouslyWatched = movie.previouslyWatched ||
-                          (context
-                                  .read<AuthProvider>()
-                                  .dbUser
-                                  ?.isMovieWatched(movie.id) ??
-                              false);
-                      final reasons = isPreviouslyWatched &&
-                              !movie.recommendationReasons.any(
-                                (reason) =>
-                                    reason.toLowerCase().contains('rewatch'),
-                              )
-                          ? [
-                              'You\'ve watched this before - it may be worth a rewatch',
-                              ...movie.recommendationReasons,
-                            ]
-                          : movie.recommendationReasons;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 10),
-                        child: PersonalizedRecommendationCard(
-                          movie: movie,
-                          reasons: reasons,
-                          isBookmarked: isBookmarked,
-                          isBookmarkUpdating:
-                              _watchlistUpdatesInFlight.contains(movie.id),
-                          isPreviouslyWatched: isPreviouslyWatched,
-                          onTap: () => _openRecommendation(movie, index),
-                          onBookmarkTap: () async {
-                            final analytics =
-                                context.read<AnalyticsController>();
-                            await _toggleWatchlistState(
-                              context,
-                              movieId: movie.id,
-                              movieTitle: movie.name,
-                              posterPath: movie.poster,
-                              currentlyInWatchlist: isBookmarked,
-                            );
-                            if (!isBookmarked &&
-                                _watchlistMovieIds.contains(movie.id) &&
-                                mounted) {
-                              await analytics.recommendationSaved(
-                                attribution: RecommendationAttribution
-                                    .forPersonalisedMovie(
-                                  movie,
-                                  position: index,
-                                ),
-                              );
-                            }
-                          },
-                          onMarkWatched: () => _openQuickMarkWatchedSheet(
-                            context,
-                            movieId: movie.id,
-                            movieTitle: movie.name,
-                            posterPath: movie.poster,
-                            isInWatchlist: isBookmarked,
-                            isRewatch: isPreviouslyWatched,
-                            recommendation:
-                                RecommendationAttribution.forPersonalisedMovie(
-                              movie,
-                              position: index,
-                            ),
-                          ),
-                          onNotInterested: () => _markMovieNotInterested(movie),
-                        ),
-                      );
-                    },
+                    onNotInterested: () => _markMovieNotInterested(movie),
                   ),
+                );
+              },
+            ),
           ),
         ),
         if (!_isLoadingRecommendations && movies.length > 1) ...[
@@ -2034,49 +2017,18 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildRecommendationsLoadingState() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const HomeSectionHeader(title: 'Just for you'),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-          child: Row(
-            children: [
-              const SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: FlixieColors.primary,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Building your recommendations…',
-                style: TextStyle(
-                  color: context.colors.medium,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(
-          height: PersonalizedRecommendationCard.height,
-          child: Padding(
-            padding: EdgeInsets.only(left: 16, right: 10),
-            child: SizedBox(
-              width: double.infinity,
-              child: _RecommendationGeneratingCard(),
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-      ],
-    );
-  }
+  Widget _buildRecommendationsLoadingState() => const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          HomeSectionHeader(title: 'Just for you'),
+          Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: SkeletonBox(
+                  height: PersonalizedRecommendationCard.height,
+                  borderRadius: 16)),
+          SizedBox(height: 20),
+        ],
+      );
 
   Widget _buildUpcomingWatchPlanSection(
     BuildContext context,
@@ -2299,54 +2251,39 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildPosterRailLoadingState(String title) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        HomeSectionHeader(title: title),
-        const SizedBox(height: 12),
-        const SizedBox(
-          height: 180,
-          child: Row(
-            children: [
-              SizedBox(width: 16),
-              SkeletonBox(width: 110, height: 148, borderRadius: 11),
-              SizedBox(width: 8),
-              SkeletonBox(width: 110, height: 148, borderRadius: 11),
-              SizedBox(width: 8),
-              SkeletonBox(width: 110, height: 148, borderRadius: 11),
-              SizedBox(width: 8),
-              Expanded(child: SkeletonBox(height: 148, borderRadius: 11)),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-      ],
-    );
-  }
+  Widget _buildPosterRailLoadingState(String title) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          HomeSectionHeader(title: title),
+          const SizedBox(height: 12),
+          SizedBox(
+              height: 164,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: 4,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (_, __) => const SkeletonBox(
+                    width: 110, height: 148, borderRadius: 11),
+              )),
+          const SizedBox(height: 14),
+        ],
+      );
 
-  Widget _buildActivityLoadingState() {
-    return const Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        HomeSectionHeader(title: 'Popular with friends'),
-        SizedBox(height: 12),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: Column(
-            children: [
-              SkeletonBox(height: 72, borderRadius: 14),
-              SizedBox(height: 10),
-              SkeletonBox(height: 72, borderRadius: 14),
-              SizedBox(height: 10),
-              SkeletonBox(height: 72, borderRadius: 14),
-            ],
-          ),
-        ),
-        SizedBox(height: 20),
-      ],
-    );
-  }
+  Widget _buildActivityLoadingState(
+          {String title = 'Popular with friends', bool avatars = false}) =>
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          HomeSectionHeader(title: title),
+          const SizedBox(height: 12),
+          Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: ActivityRowsSkeleton(avatars: avatars)),
+          const SizedBox(height: 20),
+        ],
+      );
 
   Future<void> _toggleWatchlistState(
     BuildContext context, {

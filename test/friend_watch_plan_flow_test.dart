@@ -1,20 +1,44 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/watch_plans/presentation/widgets/friend_plan/friend_watch_plan_flow.dart';
 import 'package:flixie_app/models/watch_request.dart';
 
-WatchRequest fixture([Map<String, dynamic> changes = const {}]) => WatchRequest.fromJson({
-  'id': 'plan', 'requesterId': 'laura', 'recipientId': 'me', 'status': 'ACCEPTED',
-  'type': 'MOVIE_WATCH_REQUEST', 'message': 'Fancy a movie night?',
-  'requester': {'id': 'laura', 'username': 'Laura'},
-  'recipient': {'id': 'me', 'username': 'You'},
-  'candidates': [
-    {'id': 'moana', 'movieId': 1, 'movie': {'id': 1, 'title': 'Moana'}, 'addedByUserId': 'laura', 'choices': [{'userId': 'me'}, {'userId': 'laura'}]},
-    {'id': 'pretty', 'movieId': 2, 'movie': {'id': 2, 'title': 'Pretty Woman'}, 'addedByUserId': 'me', 'choices': [{'userId': 'me'}]},
-  ], ...changes,
-});
+WatchRequest fixture([Map<String, dynamic> changes = const {}]) =>
+    WatchRequest.fromJson({
+      'id': 'plan',
+      'requesterId': 'laura',
+      'recipientId': 'me',
+      'status': 'ACCEPTED',
+      'type': 'MOVIE_WATCH_REQUEST',
+      'message': 'Fancy a movie night?',
+      'requester': {'id': 'laura', 'username': 'Laura'},
+      'recipient': {'id': 'me', 'username': 'You'},
+      'candidates': [
+        {
+          'id': 'moana',
+          'movieId': 1,
+          'movie': {'id': 1, 'title': 'Moana'},
+          'addedByUserId': 'laura',
+          'choices': [
+            {'userId': 'me'},
+            {'userId': 'laura'}
+          ]
+        },
+        {
+          'id': 'pretty',
+          'movieId': 2,
+          'movie': {'id': 2, 'title': 'Pretty Woman'},
+          'addedByUserId': 'me',
+          'choices': [
+            {'userId': 'me'}
+          ]
+        },
+      ],
+      ...changes,
+    });
 
 void main() {
   setUpAll(() async {
@@ -25,55 +49,154 @@ void main() {
       ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
     await icons.load();
   });
-  Future<void> show(WidgetTester tester, WatchRequest request, {
-    VoidCallback? accept, VoidCallback? logWatch, ValueChanged<String>? select,
-    Future<bool> Function()? save, double width = 390, double scale = 1,
+  Future<void> show(
+    WidgetTester tester,
+    WatchRequest request, {
+    VoidCallback? accept,
+    VoidCallback? logWatch,
+    ValueChanged<String>? select,
+    Future<bool> Function()? save,
+    double width = 390,
+    double scale = 1,
+    GoRouter? router,
   }) async {
     tester.view.physicalSize = Size(width, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(MaterialApp(theme: AppTheme.darkTheme,
-      home: MediaQuery(data: MediaQueryData(textScaler: TextScaler.linear(scale)),
-        child: Scaffold(body: SingleChildScrollView(padding: const EdgeInsets.all(16),
-          child: FriendWatchPlanFlow(request: request, myUserId: 'me', compact: false,
-            scheduledLabel: '18 Sep, 21:30', onOpen: () {}, onAccept: accept ?? () {},
-            onDecline: () {}, onSuggestSchedule: () {}, onRespondToProposal: (_, __) {},
-            onConfirmWatched: logWatch ?? () {}, onNotThisTime: () {}, onClosePlan: () {},
-            onNewPlan: () {}, onCancelPlan: () {}, candidateChoiceDraft: const {'moana'},
-            onToggleCandidateChoice: (_) {}, onSaveCandidateChoices: save ?? () async => true,
-            onAddCandidate: () {}, onRemoveCandidate: (_) {},
-            onSelectCandidate: select ?? (_) {}, onChangeMovie: () {},
+    final page = MediaQuery(
+        data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+        child: Scaffold(
+            body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: FriendWatchPlanFlow(
+            request: request,
+            myUserId: 'me',
+            compact: false,
+            scheduledLabel: '18 Sep, 21:30',
+            onOpen: () {},
+            onAccept: accept ?? () {},
+            onDecline: () {},
+            onSuggestSchedule: () {},
+            onRespondToProposal: (_, __) {},
+            onConfirmWatched: logWatch ?? () {},
+            onNotThisTime: () {},
+            onClosePlan: () {},
+            onNewPlan: () {},
+            onCancelPlan: () {},
+            candidateChoiceDraft: const {'moana'},
+            onToggleCandidateChoice: (_) {},
+            onSaveCandidateChoices: save ?? () async => true,
+            onAddCandidate: () {},
+            onRemoveCandidate: (_) {},
+            onSelectCandidate: select ?? (_) {},
+            onChangeMovie: () {},
           ),
         )),
-      ),
-    ));
+      );
+    await tester.pumpWidget(router == null
+        ? MaterialApp(theme: AppTheme.darkTheme, home: page)
+        : MaterialApp.router(
+            theme: AppTheme.darkTheme,
+            routerConfig: router,
+            builder: (context, child) => child!,
+          ));
+    if (router != null) {
+      router.push("/plan", extra: page);
+    }
     await tester.pumpAndSettle();
   }
 
-  testWidgets('confirmed future plan lets user log an early watch', (tester) async {
+  for (final target in ['poster', 'title']) {
+    testWidgets('tapping movie $target opens details and back returns to plan',
+        (tester) async {
+      final router = GoRouter(routes: [
+        GoRoute(path: '/', builder: (_, __) => const SizedBox()),
+        GoRoute(path: '/plan', builder: (_, state) => state.extra as Widget),
+        GoRoute(path: '/movies/:id', builder: (_, state) =>
+            Scaffold(body: Text('Movie details ${state.pathParameters['id']}'))),
+      ]);
+      addTearDown(router.dispose);
+      await show(tester, fixture({'selectedCandidateId': 'moana'}),
+          router: router);
+      await tester.tap(find.byKey(ValueKey('watch-plan-movie-$target')));
+      await tester.pumpAndSettle();
+      expect(find.text('Movie details 1'), findsOneWidget);
+      router.pop();
+      await tester.pumpAndSettle();
+      expect(find.byKey(ValueKey('watch-plan-movie-$target')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('backdrop header follows the movie selection across plan stages',
+      (tester) async {
+    await show(tester, fixture());
+    expect(
+        find.byKey(const ValueKey('watch-plan-backdrop-header')), findsNothing);
+    for (final status in ['PENDING', 'ACCEPTED', 'COMPLETED', 'CANCELLED']) {
+      await show(
+          tester, fixture({'status': status, 'selectedCandidateId': 'moana'}));
+      expect(find.byKey(const ValueKey('watch-plan-backdrop-header')),
+          findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }
+    await show(tester, fixture({'movieId': 1, 'candidates': []}));
+    expect(find.byKey(const ValueKey('watch-plan-backdrop-header')),
+        findsOneWidget);
+  });
+
+  testWidgets('confirmed future plan lets user log an early watch',
+      (tester) async {
     var logs = 0;
-    await show(tester, fixture({'selectedCandidateId': 'moana',
-      'scheduleStatus': 'AGREED', 'scheduledFor': '2099-09-18T21:30:00Z'}),
-      logWatch: () => logs++);
+    await show(
+        tester,
+        fixture({
+          'selectedCandidateId': 'moana',
+          'scheduleStatus': 'AGREED',
+          'scheduledFor': '2099-09-18T21:30:00Z'
+        }),
+        logWatch: () => logs++);
     await tester.ensureVisible(find.text('Log watch'));
     await tester.tap(find.text('Log watch'));
     expect(logs, 1);
   });
 
-  testWidgets('single title invitation offers an alternative time before joining', (tester) async {
-    await show(tester, fixture({'status': 'PENDING', 'proposedDate': '2027-01-01T19:00:00Z', 'candidates': [
-      {'id': 'moana', 'movieId': 1, 'movie': {'id': 1, 'title': 'Moana'}}
-    ]}));
+  testWidgets(
+      'single title invitation offers an alternative time before joining',
+      (tester) async {
+    await show(
+        tester,
+        fixture({
+          'status': 'PENDING',
+          'proposedDate': '2027-01-01T19:00:00Z',
+          'candidates': [
+            {
+              'id': 'moana',
+              'movieId': 1,
+              'movie': {'id': 1, 'title': 'Moana'}
+            }
+          ]
+        }));
     expect(find.text('Accept to confirm this film and time.'), findsOneWidget);
     expect(find.text('Suggest another time'), findsOneWidget);
     expect(find.text('I’m in'), findsOneWidget);
   });
 
-  testWidgets('one movie skips preference saving and offers scheduling', (tester) async {
-    await show(tester, fixture({'candidates': [
-      {'id': 'moana', 'movieId': 1, 'movie': {'id': 1, 'title': 'Moana'}, 'choices': []}
-    ]}));
+  testWidgets('one movie skips preference saving and offers scheduling',
+      (tester) async {
+    await show(
+        tester,
+        fixture({
+          'candidates': [
+            {
+              'id': 'moana',
+              'movieId': 1,
+              'movie': {'id': 1, 'title': 'Moana'},
+              'choices': []
+            }
+          ]
+        }));
     expect(find.text('Save my picks'), findsNothing);
     expect(find.text('What could you watch?'), findsNothing);
     expect(find.text('Suggest a time'), findsOneWidget);
@@ -82,14 +205,16 @@ void main() {
   testWidgets('joining an invite does not select a movie', (tester) async {
     var accepted = 0;
     var selected = 0;
-    await show(tester, fixture({'status': 'PENDING'}), accept: () => accepted++, select: (_) => selected++);
+    await show(tester, fixture({'status': 'PENDING'}),
+        accept: () => accepted++, select: (_) => selected++);
     expect(find.text('JOIN THE PLAN'), findsOneWidget);
     await tester.tap(find.text('I’m in'));
     expect(accepted, 1);
     expect(selected, 0);
   });
 
-  testWidgets('movie interests advance only after a successful save', (tester) async {
+  testWidgets('movie interests advance only after a successful save',
+      (tester) async {
     var succeeds = false;
     await show(tester, fixture(), save: () async => succeeds);
     await tester.ensureVisible(find.text('Save my picks'));
@@ -104,11 +229,19 @@ void main() {
   });
 
   testWidgets('only the creator sees final movie actions', (tester) async {
-    await show(tester, fixture({'proposedCandidateId': 'moana', 'movieProposedById': 'laura'}));
+    await show(
+        tester,
+        fixture(
+            {'proposedCandidateId': 'moana', 'movieProposedById': 'laura'}));
     expect(find.text('Choose'), findsNothing);
     String? selected;
-    await show(tester, fixture({'requesterId': 'me', 'recipientId': 'laura',
-      }), select: (id) => selected = id);
+    await show(
+        tester,
+        fixture({
+          'requesterId': 'me',
+          'recipientId': 'laura',
+        }),
+        select: (id) => selected = id);
     expect(find.text('Save my picks'), findsNothing);
     expect(find.text('Edit my picks'), findsNothing);
     expect(find.text('Choose'), findsNWidgets(2));
@@ -116,41 +249,106 @@ void main() {
     expect(selected, 'moana');
   });
 
-  testWidgets('pending time agreement takes precedence over an older schedule', (tester) async {
-    await show(tester, fixture({'selectedCandidateId': 'moana', 'scheduleStatus': 'AGREED',
-      'scheduledFor': '2099-09-18T21:30:00Z', 'scheduleProposals': [
-        {'id': 'time', 'proposerId': 'laura', 'status': 'PENDING', 'proposedFor': '2099-09-19T21:30:00Z'}
-      ]}));
+  testWidgets('pending time agreement takes precedence over an older schedule',
+      (tester) async {
+    await show(
+        tester,
+        fixture({
+          'selectedCandidateId': 'moana',
+          'scheduleStatus': 'AGREED',
+          'scheduledFor': '2099-09-18T21:30:00Z',
+          'scheduleProposals': [
+            {
+              'id': 'time',
+              'proposerId': 'laura',
+              'status': 'PENDING',
+              'proposedFor': '2099-09-19T21:30:00Z'
+            }
+          ]
+        }));
     expect(find.text('AGREE ON A TIME'), findsOneWidget);
     expect(find.text('Works for me'), findsWidgets);
     expect(find.text('Add to calendar'), findsNothing);
   });
 
-  testWidgets('one person missing the watch does not block the other from logging', (tester) async {
-    await show(tester, fixture({'selectedCandidateId': 'moana', 'scheduleStatus': 'AGREED',
-      'scheduledFor': '2020-09-18T21:30:00Z', 'watchConfirmations': [
-        {'userId': 'laura', 'watched': false}
-      ]}));
+  testWidgets(
+      'one person missing the watch does not block the other from logging',
+      (tester) async {
+    await show(
+        tester,
+        fixture({
+          'selectedCandidateId': 'moana',
+          'scheduleStatus': 'AGREED',
+          'scheduledFor': '2020-09-18T21:30:00Z',
+          'watchConfirmations': [
+            {'userId': 'laura', 'watched': false}
+          ]
+        }));
     expect(find.text('AFTER THE WATCH'), findsOneWidget);
     expect(find.text('Log your watch'), findsOneWidget);
     expect(find.text('Didn’t make it'), findsOneWidget);
   });
 
-  testWidgets('recap excludes missed attendance and does not infer recommendations from ratings', (tester) async {
-    await show(tester, fixture({'status': 'COMPLETED', 'selectedCandidateId': 'moana', 'watchConfirmations': [
-      {'userId': 'me', 'watched': true, 'rating': 9, 'recommended': false},
-      {'userId': 'laura', 'watched': false, 'rating': 10, 'recommended': true},
-    ]}));
-    expect(find.text('9.0 / 10'), findsOneWidget);
-    expect(find.text('1 rating'), findsOneWidget);
+  testWidgets(
+      'recap excludes missed attendance and does not infer recommendations from ratings',
+      (tester) async {
+    await show(
+        tester,
+        fixture({
+          'status': 'COMPLETED',
+          'selectedCandidateId': 'moana',
+          'watchConfirmations': [
+            {
+              'userId': 'me',
+              'watched': true,
+              'rating': 9,
+              'recommended': false
+            },
+            {
+              'userId': 'laura',
+              'watched': false,
+              'rating': 10,
+              'recommended': true
+            },
+          ]
+        }));
+    expect(find.text('9.0 avg · 1 rating'), findsOneWidget);
+    expect(find.text('Only 1 of 2 rated'), findsOneWidget);
     expect(find.text('Both recommend it'), findsNothing);
     expect(find.text('1 recommends it'), findsNothing);
   });
 
-  testWidgets('picking reflows on a small phone with large text and on tablet', (tester) async {
+  testWidgets(
+      'recap review action opens the plan editor and adapts to large text',
+      (tester) async {
+    var edits = 0;
+    final plan = fixture({
+      'status': 'COMPLETED',
+      'selectedCandidateId': 'moana',
+      'watchConfirmations': [
+        {'userId': 'me', 'watched': true, 'rating': 9},
+        {'userId': 'laura', 'watched': true},
+      ]
+    });
+    await show(tester, plan, logWatch: () => edits++);
+    expect(find.text('Your recap'), findsOneWidget);
+    expect(find.text('2 watched'), findsOneWidget);
+    expect(find.text('No rating added'), findsOneWidget);
+    await tester.ensureVisible(find.text('Add your thoughts'));
+    await tester.tap(find.text('Add your thoughts'));
+    expect(edits, 1);
+    for (final size in [(320.0, 2.0), (800.0, 1.0)]) {
+      await show(tester, plan, width: size.$1, scale: size.$2);
+      expect(tester.takeException(), isNull);
+    }
+  });
+
+  testWidgets('picking reflows on a small phone with large text and on tablet',
+      (tester) async {
     for (final size in [(320.0, 2.0), (800.0, 1.0)]) {
       await show(tester, fixture(), width: size.$1, scale: size.$2);
-      await tester.drag(find.byType(SingleChildScrollView), const Offset(0, -700));
+      await tester.drag(
+          find.byType(SingleChildScrollView), const Offset(0, -700));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     }

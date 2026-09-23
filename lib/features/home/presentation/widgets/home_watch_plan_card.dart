@@ -2,6 +2,7 @@ import 'package:flixie_app/features/watch_plans/presentation/widgets/shared/watc
 import 'package:flutter/material.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/app/theme/flixie_typography.dart';
 import 'package:flixie_app/features/home/presentation/models/home_watch_plan_state.dart';
 import 'package:flixie_app/features/watch_plans/presentation/utils/watch_plan_display_state.dart';
 
@@ -111,8 +112,7 @@ class HomeWatchPlanCard extends StatelessWidget {
                           : context.colors.white,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8)),
-                      textStyle: const TextStyle(
-                          fontSize: 12, fontWeight: FontWeight.w700),
+                      textStyle: FlixieTypography.button,
                       minimumSize: const Size(0, 44),
                       padding: const EdgeInsets.symmetric(horizontal: 14),
                     ),
