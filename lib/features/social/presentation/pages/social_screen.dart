@@ -584,7 +584,7 @@ class _RequestBell extends StatelessWidget {
                     color: FlixieColors.primary, shape: BoxShape.circle),
                 child: Text('$count',
                     style: TextStyle(
-                        color: context.colors.white,
+                        color: Theme.of(context).colorScheme.onPrimary,
                         fontSize: 11,
                         fontWeight: FontWeight.w800)),
               ),
@@ -1550,8 +1550,8 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
                 label: Text(pendingGroups.length > 99
                     ? '99+'
                     : '${pendingGroups.length}'),
-                backgroundColor: FlixieColors.primaryShade,
-                textColor: Colors.white,
+                backgroundColor: FlixieColors.notificationBadge,
+                textColor: FlixieColors.onNotificationBadge,
                 textStyle:
                     const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
                 child: IconButton.filledTonal(

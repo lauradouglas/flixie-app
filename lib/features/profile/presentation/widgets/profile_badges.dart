@@ -192,41 +192,22 @@ class ProfileBadgePills extends StatelessWidget {
     return Wrap(
       spacing: 6,
       runSpacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         for (final badge in visible)
-          if (badge.id == 'EARLY_ADOPTER' ||
-              badge.id == 'FOUNDING_FILM_FRIEND' ||
-              badge.id == 'PEACH_USER')
-            Tooltip(
-              message: badge.label,
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: badge.id == 'PEACH_USER'
-                    ? null
-                    : () => _showBadgeContext(context, badge),
-                child: Container(
-                  padding: EdgeInsets.all(compact ? 5 : 6),
-                  decoration: BoxDecoration(
-                    color: badge.color.withValues(alpha: .13),
-                    shape: BoxShape.circle,
-                    border:
-                        Border.all(color: badge.color.withValues(alpha: .45)),
-                  ),
-                  child: _badgeIcon(
-                    badge.icon,
-                    badge.color,
-                    compact ? 12 : 14,
-                    peach: badge.id == 'PEACH_USER',
-                  ),
-                ),
-              ),
-            )
-          else
-            FlixiePill.action(
-                label: Text(badge.label),
-                avatar: _badgeIcon(badge.icon, badge.color, compact ? 12 : 14,
-                    peach: badge.id == 'PEACH_USER'),
-                onPressed: () => _showBadgeContext(context, badge)),
+          FlixiePill.action(
+              label: badge.id == 'PEACH_USER'
+                  ? Semantics(
+                      label: badge.label,
+                      child: _badgeIcon(
+                          badge.icon, badge.color, compact ? 18 : 22,
+                          peach: true),
+                    )
+                  : Text(badge.label),
+              avatar: badge.id == 'PEACH_USER'
+                  ? null
+                  : _badgeIcon(badge.icon, badge.color, compact ? 18 : 22),
+              onPressed: () => _showBadgeContext(context, badge)),
       ],
     );
   }
@@ -243,6 +224,8 @@ class ProfileBadgePills extends StatelessWidget {
   ) {
     showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       backgroundColor: context.colors.surface,
       showDragHandle: true,
       builder: (context) => SafeArea(

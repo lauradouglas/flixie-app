@@ -969,7 +969,8 @@ class _PlanStepHeading extends StatelessWidget {
             backgroundColor: FlixieColors.primary,
             child: Text(number,
                 style: TextStyle(
-                    color: context.colors.white, fontWeight: FontWeight.w800)),
+                    color: Theme.of(context).colorScheme.onPrimary,
+                    fontWeight: FontWeight.w800)),
           );
           final trailingWidget = trailing == null
               ? null

@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/models/activity_reaction.dart';
 import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/models/group.dart';
@@ -488,7 +489,13 @@ class GroupService {
         if (watched && watchedAt != null) 'watchedAt': watchedAt,
       },
     );
-    return GroupWatchRequest.fromJson(data as Map<String, dynamic>);
+    final request = GroupWatchRequest.fromJson(data as Map<String, dynamic>);
+    if (watched &&
+        request.analyticsContentType == 'movie' &&
+        request.mediaId != null) {
+      MovieRatingPrivacy.instance.ratingSaved(userId, request.mediaId!, rating);
+    }
+    return request;
   }
 
   /// PATCH /conversations/:conversationId/watch-requests/:requestId/cancel

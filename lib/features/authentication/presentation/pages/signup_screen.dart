@@ -1,3 +1,5 @@
+import 'package:flixie_app/features/authentication/data/setup_service.dart';
+import 'package:flixie_app/features/settings/data/reference_data_service.dart';
 import 'package:flixie_app/core/legal/terms_agreement_field.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'dart:async';
@@ -11,7 +13,6 @@ import 'package:flixie_app/models/country.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/core/auth/referral_attribution_store.dart';
 import 'package:flixie_app/core/api/api_client.dart';
-import 'package:flixie_app/features/settings/data/reference_data_service.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
@@ -21,6 +22,13 @@ import 'package:flixie_app/features/profile/data/avatar_service.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/avatar_picker.dart';
 import 'package:flixie_app/models/profile_avatar.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
+
+String? validateSignupName(String? value, String label) {
+  final name = value?.trim() ?? '';
+  if (name.isEmpty) return 'Enter your $label';
+  if (name.length > 100) return 'Use 100 characters or fewer';
+  return null;
+}
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({
@@ -67,9 +75,6 @@ class _SignupScreenState extends State<SignupScreen> {
   String? _referrerUsername;
   String? _referralError;
 
-  List<Country> _countries = [];
-  Country? _selectedCountry;
-
   @override
   void initState() {
     super.initState();
@@ -82,34 +87,6 @@ class _SignupScreenState extends State<SignupScreen> {
         }
       });
     }
-    _loadCountries();
-  }
-
-  Future<void> _loadCountries() async {
-    try {
-      final countries = await ReferenceDataService.getCountries();
-      if (mounted) {
-        setState(() => _countries = countries);
-      }
-    } catch (_) {
-      // Country list is optional; silently ignore load failures
-    }
-  }
-
-  Future<void> _pickCountry() async {
-    final country = await showModalBottomSheet<Country>(
-      context: context,
-      useRootNavigator: true,
-      useSafeArea: true,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => SignupCountryPickerSheet(
-        countries: _countries,
-        selected: _selectedCountry,
-      ),
-    );
-    if (!mounted || country == null) return;
-    setState(() => _selectedCountry = country);
   }
 
   @override
@@ -285,18 +262,6 @@ class _SignupScreenState extends State<SignupScreen> {
     }
 
     if (!mounted) return;
-    if (_selectedCountry == null) {
-      ScaffoldMessenger.of(context).showFlixieToast(
-        FlixieToast(
-          type: FlixieToastType.warning,
-          content:
-              const Text('Please select your country to show watch providers.'),
-          backgroundColor: context.colors.danger,
-        ),
-      );
-      return;
-    }
-
     if (!_signupStartedLogged) {
       _signupStartedLogged = true;
       unawaited(analytics.signupStarted());
@@ -308,7 +273,6 @@ class _SignupScreenState extends State<SignupScreen> {
       firstName: _firstNameController.text.trim(),
       lastName: _lastNameController.text.trim(),
       username: _usernameController.text.trim(),
-      countryId: _selectedCountry?.id,
       referralCode: _referralCodeController.text,
     );
 
@@ -360,6 +324,11 @@ class _SignupScreenState extends State<SignupScreen> {
     if (avatarId == null) return;
     final auth = context.read<AuthProvider>();
     final analytics = context.read<AnalyticsController>();
+    if (_referrerUsername != null && auth.dbUser != null) {
+      try {
+        await SetupService.rememberInviter(auth.dbUser!.id, _referrerUsername!);
+      } catch (_) {}
+    }
     final success = await auth.completeAvatarSignUp(avatarId);
     if (success && !_signupCompletedLogged) {
       _signupCompletedLogged = true;
@@ -423,7 +392,7 @@ class _SignupScreenState extends State<SignupScreen> {
     final isLoading = context.select<AuthProvider, bool>((p) => p.isLoading);
 
     return AuthScaffold(
-      topLabel: 'Step 1 of 3',
+      topLabel: 'Create your account',
       title: Text.rich(
         TextSpan(
           style: textTheme.displaySmall?.copyWith(
@@ -481,29 +450,28 @@ class _SignupScreenState extends State<SignupScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const OnboardingProgressIndicator(
-                        currentStep: 0, totalSteps: 3),
-                    const SizedBox(height: 18),
                     AppTextField(
                       controller: _firstNameController,
-                      label: 'First Name',
+                      label: 'First name',
+                      validator: (value) =>
+                          validateSignupName(value, 'first name'),
                       prefixIcon: Icons.person_outline_rounded,
                       keyboardType: TextInputType.name,
                       textCapitalization: TextCapitalization.words,
                       textInputAction: TextInputAction.next,
                       autofillHints: const [AutofillHints.givenName],
-                      validator: _requiredNameValidator,
                     ),
                     const SizedBox(height: 14),
                     AppTextField(
                       controller: _lastNameController,
-                      label: 'Last Name',
+                      label: 'Last name',
+                      validator: (value) =>
+                          validateSignupName(value, 'last name'),
                       prefixIcon: Icons.person_outline_rounded,
                       keyboardType: TextInputType.name,
                       textCapitalization: TextCapitalization.words,
                       textInputAction: TextInputAction.next,
                       autofillHints: const [AutofillHints.familyName],
-                      validator: _requiredNameValidator,
                     ),
                     const SizedBox(height: 14),
                     AppTextField(
@@ -559,11 +527,6 @@ class _SignupScreenState extends State<SignupScreen> {
                         }
                         return null;
                       },
-                    ),
-                    const SizedBox(height: 14),
-                    _CountryPickerField(
-                      selected: _selectedCountry,
-                      onTap: _pickCountry,
                     ),
                     const SizedBox(height: 14),
                     AppTextField(
@@ -689,76 +652,10 @@ class _SignupScreenState extends State<SignupScreen> {
             ),
     );
   }
-
-  String? _requiredNameValidator(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Required';
-    }
-    return null;
-  }
 }
 
 // ---------------------------------------------------------------------------
 // Country picker field (tappable, mimics AppTextField style)
-// ---------------------------------------------------------------------------
-
-class _CountryPickerField extends StatelessWidget {
-  const _CountryPickerField({required this.selected, required this.onTap});
-
-  final Country? selected;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final hasValue = selected != null;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          color: context.colors.tabBarBackgroundFocused.withValues(alpha: 0.9),
-          border: Border.all(
-            color: context.colors.tabBarBorder.withValues(alpha: 0.9),
-          ),
-        ),
-        height: 64,
-        padding: const EdgeInsets.symmetric(horizontal: 18),
-        child: Row(
-          children: [
-            Icon(
-              Icons.location_on_outlined,
-              size: 22,
-              color: context.colors.medium,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Row(
-                children: [
-                  Text(
-                    hasValue ? 'Country: ${selected!.name}' : 'Country',
-                    style: TextStyle(
-                      color: hasValue
-                          ? context.colors.textPrimary
-                          : context.colors.light.withValues(alpha: 0.86),
-                      fontSize: 16,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(Icons.expand_more_rounded, color: context.colors.medium),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Country picker bottom sheet
 // ---------------------------------------------------------------------------
 
 class SignupCountryPickerSheet extends StatefulWidget {

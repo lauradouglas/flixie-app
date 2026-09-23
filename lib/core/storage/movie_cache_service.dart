@@ -121,14 +121,15 @@ class MovieCacheService {
 
   // ---- Trending Movies Caching ----
 
-  /// Get trending movies from cache if they exist and were cached today
+  /// Trending rankings are refreshed after 15 minutes.
   List<MovieShort>? getTrendingMovies(String timeWindow) {
     final cached = _trendingMoviesCache[timeWindow];
     if (cached == null) {
       return null;
     }
 
-    if (_isToday(cached.timestamp)) {
+    if (DateTime.now().difference(cached.timestamp) <
+        const Duration(minutes: 15)) {
       return cached.movies;
     }
 

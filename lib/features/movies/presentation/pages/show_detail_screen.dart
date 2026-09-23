@@ -2656,6 +2656,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       );
 
   Widget _buildShowFriendRow(TvShowFriend friend) => MediaFriendActivityRow(
+        isShow: true,
         activity: MovieFriendActivity(
             userId: friend.userId,
             username: friend.username,

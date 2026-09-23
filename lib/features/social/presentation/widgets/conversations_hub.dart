@@ -177,6 +177,7 @@ class _ConversationsHubState extends State<ConversationsHub> {
                   ),
                 ],
               ),
+              const MarkAllChatsReadButton(),
               const SizedBox(height: 10),
               if (conversations.isEmpty)
                 _ConversationEmpty(
@@ -503,6 +504,45 @@ class _ConversationEmpty extends StatelessWidget {
             style: TextStyle(color: context.colors.medium, height: 1.4),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Uses the shared controller so totals and individual rows stay in sync.
+class MarkAllChatsReadButton extends StatelessWidget {
+  const MarkAllChatsReadButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = context.watch<ChatUnreadController?>();
+    if (controller == null ||
+        (controller.total == 0 && !controller.markingAllRead)) {
+      return const SizedBox.shrink();
+    }
+    return Align(
+      alignment: Alignment.centerRight,
+      child: TextButton.icon(
+        style: TextButton.styleFrom(
+          padding: const EdgeInsetsDirectional.only(start: 8),
+        ),
+        onPressed: controller.markingAllRead
+            ? null
+            : () async {
+                final failures = await controller.markAllRead();
+                if (!context.mounted || failures == 0) return;
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text(
+                      'Some chats could not be marked as read. Please try again.'),
+                ));
+              },
+        icon: controller.markingAllRead
+            ? const SizedBox.square(
+                dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
+            : const Icon(Icons.done_all_rounded, size: 20),
+        label: Text(controller.markingAllRead
+            ? 'Marking as read…'
+            : 'Mark all as read'),
       ),
     );
   }

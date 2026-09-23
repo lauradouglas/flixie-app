@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -389,7 +390,8 @@ class InsightHighlightCard extends StatelessWidget {
                       Text('${movie.discussionCount} discussions',
                           style: TextStyle(
                               color: context.colors.light, fontSize: 11)),
-                      if (movie.averageRating > 0)
+                      if (movie.averageRating > 0 &&
+                          !hideMovieRatings(context, movie.movieId))
                         Text('${movie.averageRating.toStringAsFixed(1)}/10',
                             style: TextStyle(
                                 color: context.colors.warning,
@@ -562,7 +564,9 @@ class InsightSignalsPanel extends StatelessWidget {
         movie: topRated,
         value: topRated == null
             ? '-'
-            : '${topRated.averageRating.toStringAsFixed(1)}/10',
+            : hideMovieRatings(context, topRated.movieId)
+                ? 'Rate to see score'
+                : '${topRated.averageRating.toStringAsFixed(1)}/10',
         icon: Icons.auto_awesome_outlined,
         color: context.colors.warning,
       ),
@@ -765,10 +769,14 @@ class InsightMovieCard extends StatelessWidget {
         '${movie.watchCount} ${movie.watchCount == 1 ? 'watch' : 'watches'}',
       InsightMovieCardVariant.mostDiscussed =>
         '${movie.discussionCount} ${movie.discussionCount == 1 ? 'message' : 'messages'}',
-      InsightMovieCardVariant.highestRated =>
-        '${movie.averageRating.toStringAsFixed(1)} group rating • ${movie.ratingCount} ${movie.ratingCount == 1 ? 'rating' : 'ratings'}',
+      InsightMovieCardVariant.highestRated => hideMovieRatings(
+              context, movie.movieId)
+          ? 'Rate to see scores'
+          : '${movie.averageRating.toStringAsFixed(1)} group rating • ${movie.ratingCount} ${movie.ratingCount == 1 ? 'rating' : 'ratings'}',
       InsightMovieCardVariant.mostDivisive =>
-        '${movie.ratingSpread.toStringAsFixed(1)} rating spread',
+        hideMovieRatings(context, movie.movieId)
+            ? 'Rate to see scores'
+            : '${movie.ratingSpread.toStringAsFixed(1)} rating spread',
     };
 
     return InkWell(
@@ -1070,7 +1078,10 @@ class _InsightReviewCardState extends State<InsightReviewCard> {
                         size: 16, color: Color(0xFFFFC34D)),
                     const SizedBox(width: 3),
                     Text(
-                      '${review.rating.toStringAsFixed(1)}/10',
+                      hideMovieRatings(context, review.movieId,
+                              ownerId: review.userId)
+                          ? 'Rate to see score'
+                          : '${review.rating.toStringAsFixed(1)}/10',
                       style: TextStyle(
                         color: context.colors.light,
                         fontWeight: FontWeight.w700,

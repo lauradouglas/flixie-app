@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/notification_opt_in.dart';
 import 'package:flixie_app/core/utils/notification_profile_badges.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'dart:async';
@@ -449,6 +450,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 ? _buildError()
                 : Column(
                     children: [
+                      const NotificationOptIn(),
                       _buildFilterChips(),
                       Expanded(child: _buildContent()),
                     ],

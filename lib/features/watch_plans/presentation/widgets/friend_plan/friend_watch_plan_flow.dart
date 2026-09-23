@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
@@ -553,6 +554,12 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
         const SizedBox(height: 16),
         _person(true, 'Confirmed', true),
         _person(false, 'Confirmed', true),
+        if (!r.watchConfirmations.any((c) => c.userId == widget.myUserId)) ...[
+          _button('Log watch', Icons.check_rounded, widget.onConfirmWatched),
+          const SizedBox(height: 8),
+          Text('Watched early? You can log it now.',
+              style: _body.copyWith(color: context.colors.medium)),
+        ],
         _button('Add to calendar', Icons.calendar_month, () async {
           final saved = await WatchCalendarService.addScheduledWatch(
               title: title,
@@ -564,7 +571,7 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
                 type: FlixieToastType.error,
                 content: const Text('Could not open your calendar.')));
           }
-        }),
+        }, primary: false),
         _button('Reschedule', Icons.schedule, widget.onSuggestSchedule,
             primary: false),
       ]);
@@ -606,7 +613,11 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
 
   Widget _recap() {
     final watched = r.watchConfirmations.where((c) => c.watched).toList();
-    final ratings = watched.map((c) => c.rating).whereType<int>().toList();
+    final hidden =
+        hideMovieRatings(context, r.movieId, isShow: r.showId != null);
+    final ratings = hidden
+        ? <int>[]
+        : watched.map((c) => c.rating).whereType<int>().toList();
     final recommendations = watched.where((c) => c.recommended == true).length;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const SizedBox(height: 22),
@@ -618,11 +629,13 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
                 fontSize: 32,
                 fontWeight: FontWeight.w800)),
       Text(
-          ratings.length == 2
-              ? 'Your average'
-              : ratings.isEmpty
-                  ? 'No ratings yet'
-                  : '1 rating',
+          hidden
+              ? 'Rate to see scores'
+              : ratings.length == 2
+                  ? 'Your average'
+                  : ratings.isEmpty
+                      ? 'No ratings yet'
+                      : '1 rating',
           style: _body.copyWith(color: context.colors.light)),
       if (ratings.length == 2) ...[
         const SizedBox(height: 12),
@@ -647,9 +660,13 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
                         ? 'To respond'
                         : !entry.watched
                             ? 'Didn’t make it'
-                            : entry.rating == null
-                                ? 'No rating'
-                                : '${entry.rating} / 10',
+                            : hideMovieRatings(context, r.movieId,
+                                    isShow: r.showId != null,
+                                    ownerId: entry.userId)
+                                ? 'Rate to see score'
+                                : entry.rating == null
+                                    ? 'No rating'
+                                    : '${entry.rating} / 10',
                     entry != null),
                 if (entry?.watched == true &&
                     entry?.reviewText?.isNotEmpty == true)
@@ -728,7 +745,16 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
                   label: Text(label,
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontSize: 16)))
-              : OutlinedButton.icon(
+              : TextButton.icon(
+                  style: TextButton.styleFrom(
+                    foregroundColor: context.colors.primaryText,
+                    backgroundColor: context.colors.surfaceElevated,
+                    minimumSize: const Size(0, 48),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
                   onPressed: widget.busy ? null : action,
                   icon: Icon(icon),
                   label: Text(label,

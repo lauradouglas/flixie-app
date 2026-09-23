@@ -160,6 +160,7 @@ class AnalyticsController extends ChangeNotifier {
     'movie_detail',
     'show_detail',
     'signup',
+    'onboarding',
   };
   static const allowedContentTypes = {'movie', 'show'};
   static const allowedInviteMethods = {'referral_link', 'profile', 'unknown'};

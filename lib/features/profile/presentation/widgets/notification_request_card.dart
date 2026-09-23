@@ -1156,7 +1156,10 @@ class NotificationRequestCard extends StatelessWidget {
                       onPressed: onAccept,
                       style: FilledButton.styleFrom(
                         backgroundColor: context.colors.success,
-                        foregroundColor: Colors.black,
+                        foregroundColor:
+                            Theme.of(context).brightness == Brightness.light
+                                ? Colors.white
+                                : Colors.black,
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         minimumSize: const Size(0, 44),
                         shape: RoundedRectangleBorder(

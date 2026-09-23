@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
@@ -48,7 +49,8 @@ class MovieSearchResultTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final releaseDate = _releaseDateLabel;
-    final rating = movie.voteAverage;
+    final rating =
+        hideMovieRatings(context, movie.id) ? null : movie.voteAverage;
 
     return Card(
       child: InkWell(

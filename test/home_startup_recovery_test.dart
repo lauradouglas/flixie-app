@@ -27,7 +27,7 @@ class Session extends AuthService {
 
 void main() {
   testWidgets(
-      'Home gates on trending, secondary failure retains content and manual retry recovers',
+      'Home is usable before trending, secondary failure retains content and manual retry recovers',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
     MovieCacheService().clearCache();
@@ -49,10 +49,10 @@ void main() {
         ChangeNotifierProvider<WatchRequestCache>.value(value: cache)
       ], child: const MaterialApp(home: HomeScreen())));
       await tester.pump();
-      expect(find.text('Trending now'), findsNothing);
-      expect(recommendationCalls, 0,
-          reason:
-              'secondary HTTP is deferred until essential content is ready');
+      expect(find.byType(RefreshIndicator), findsOneWidget);
+      expect(find.text('Pick for me'), findsOneWidget);
+      expect(recommendationCalls, 1,
+          reason: 'secondary HTTP starts without waiting for trending');
       trending.complete(response([
         {'id': 123, 'title': 'Useful fixture', 'popularity': 10}
       ]));

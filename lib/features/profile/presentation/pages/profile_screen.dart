@@ -491,8 +491,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               label: auth.unreadNotificationCount < 100
                   ? Text('${auth.unreadNotificationCount}')
                   : const Text('99+'),
-              backgroundColor: FlixieColors.primaryShade,
-              textColor: Colors.white,
+              backgroundColor: FlixieColors.notificationBadge,
+              textColor: FlixieColors.onNotificationBadge,
               textStyle:
                   const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
               child: const Icon(Icons.notifications_outlined),
@@ -931,8 +931,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     radius: 14,
                     backgroundColor: context.colors.warning,
                     child: Text('$needsReply',
-                        style: const TextStyle(
-                            color: Colors.black, fontWeight: FontWeight.w700))),
+                        style: TextStyle(
+                            color:
+                                Theme.of(context).brightness == Brightness.light
+                                    ? Colors.white
+                                    : Colors.black,
+                            fontWeight: FontWeight.w700))),
                 trailing: const Icon(Icons.chevron_right_rounded),
               ),
             ),

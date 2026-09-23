@@ -153,8 +153,8 @@ class _ActionButton extends StatelessWidget {
                             semanticsLabel:
                                 '$badgeCount plans need your attention',
                           ),
-                          backgroundColor: FlixieColors.primaryShade,
-                          textColor: Colors.white,
+                          backgroundColor: FlixieColors.notificationBadge,
+                          textColor: FlixieColors.onNotificationBadge,
                           textStyle: const TextStyle(
                               fontSize: 11, fontWeight: FontWeight.w700),
                           child:

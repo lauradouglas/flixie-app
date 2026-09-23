@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 
@@ -33,7 +34,9 @@ class FeaturedCard extends StatelessWidget {
       posterPath: movie.poster,
       onTap: onTap,
       topLeft: showNewBadge ? const FlixiePill.label(label: Text('New')) : null,
-      topRight: movie.voteAverage != null && movie.voteAverage! > 0
+      topRight: !hideMovieRatings(context, movie.id) &&
+              movie.voteAverage != null &&
+              movie.voteAverage! > 0
           ? FlixiePill.label(
               label: Text(movie.voteAverage!.toStringAsFixed(1)),
               avatar: Icon(Icons.star_rounded, color: context.colors.tertiary))

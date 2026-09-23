@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/features/watchlist/domain/release_status.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/api/api_client.dart';
@@ -203,8 +204,8 @@ class _WatchlistScreenState extends State<WatchlistScreen>
   final Set<String> _scheduledEnrichment = {};
   final Set<String> _completedEnrichment = {};
   final Set<String> _inFlightEnrichment = {};
-  bool get _hasPendingEnrichment => _scheduledEnrichment.any(
-      (key) => !_completedEnrichment.contains(key));
+  bool get _hasPendingEnrichment =>
+      _scheduledEnrichment.any((key) => !_completedEnrichment.contains(key));
   bool _enrichmentRunning = false;
   int _enrichmentGeneration = 0;
   String? _enrichmentView;
@@ -221,8 +222,9 @@ class _WatchlistScreenState extends State<WatchlistScreen>
   }
 
   void _scheduleEnrichment(Iterable<Object> items) {
-    final fresh = items.where((item) =>
-        _scheduledEnrichment.add(_experienceKey(item))).toList();
+    final fresh = items
+        .where((item) => _scheduledEnrichment.add(_experienceKey(item)))
+        .toList();
     if (fresh.isEmpty) return;
     final generation = _enrichmentGeneration;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -257,14 +259,14 @@ class _WatchlistScreenState extends State<WatchlistScreen>
         ]);
         _inFlightEnrichment.removeAll(batch.map(_experienceKey));
         if (mounted && generation == _enrichmentGeneration) {
-          setState(() => _completedEnrichment.addAll(batch.map(_experienceKey)));
+          setState(
+              () => _completedEnrichment.addAll(batch.map(_experienceKey)));
         }
       }
     } finally {
       _enrichmentRunning = false;
     }
   }
-
 
   void _retryEnrichment(Object item) {
     final key = _experienceKey(item);
@@ -385,7 +387,8 @@ class _WatchlistScreenState extends State<WatchlistScreen>
     _resetEnrichment();
     final authProvider = context.read<AuthProvider>();
     _loadError = null;
-    final owner = '${authProvider.dbUser?.id}:${authProvider.dbUser?.watchProviderRegion}';
+    final owner =
+        '${authProvider.dbUser?.id}:${authProvider.dbUser?.watchProviderRegion}';
     if (_enrichmentOwner != owner) {
       _enrichmentOwner = owner;
       _movieWatchProviders.clear();
@@ -465,8 +468,8 @@ class _WatchlistScreenState extends State<WatchlistScreen>
     }
   }
 
-  Future<void> _loadFriendRecommendations(
-      List<WatchlistMovie> watchlist, {List<_WatchlistShowEntry>? shows}) async {
+  Future<void> _loadFriendRecommendations(List<WatchlistMovie> watchlist,
+      {List<_WatchlistShowEntry>? shows}) async {
     final request = ++_recommendationsRequest;
     final snapshot = _friendSnapshot(context.read<AuthProvider>());
     if (snapshot != _recommendationSnapshot) {
@@ -477,14 +480,14 @@ class _WatchlistScreenState extends State<WatchlistScreen>
     _recommendationSnapshot = snapshot;
     // Drop removed films immediately, including while another batch is in flight.
     final ids = watchlist.map((item) => item.movieId).toSet();
-    setState(() =>
-        _recommendationsByMovieId.removeWhere((id, _) =>
-            !_allWatchlist.any((item) => item.movieId == id)));
-    final showIds = (shows ?? _allShowWatchlist).map((item) => item.showId).toSet();
+    setState(() => _recommendationsByMovieId.removeWhere(
+        (id, _) => !_allWatchlist.any((item) => item.movieId == id)));
+    final showIds =
+        (shows ?? _allShowWatchlist).map((item) => item.showId).toSet();
     setState(() {
       _loadingFriends = true;
-      _friendsByShowId.removeWhere((id, _) =>
-          !_allShowWatchlist.any((item) => item.showId == id));
+      _friendsByShowId.removeWhere(
+          (id, _) => !_allShowWatchlist.any((item) => item.showId == id));
     });
     bool current() => mounted && request == _recommendationsRequest;
     Future<Map<int, FriendRecommendationResponse>> safe(
@@ -509,7 +512,8 @@ class _WatchlistScreenState extends State<WatchlistScreen>
     await Future.wait([
       safe(MovieService().getFriendRecommendations(ids,
           isCurrent: current,
-          onProgress: (results) => publish(results, _recommendationsByMovieId))),
+          onProgress: (results) =>
+              publish(results, _recommendationsByMovieId))),
       safe(ShowService.getFriendRecommendations(showIds,
           isCurrent: current,
           onProgress: (results) => publish(results, _friendsByShowId))),
@@ -548,10 +552,9 @@ class _WatchlistScreenState extends State<WatchlistScreen>
       final needsUserProviders =
           authProvider.cachedUserWatchProviderIds == null;
       setState(() {
-        _movieWatchProviders
-          .addEntries(movieIds
-              .where(cachedProviders.containsKey)
-              .map((id) => MapEntry(id, cachedProviders[id]!)));
+        _movieWatchProviders.addEntries(movieIds
+            .where(cachedProviders.containsKey)
+            .map((id) => MapEntry(id, cachedProviders[id]!)));
         _userWatchProviderIds =
             authProvider.cachedUserWatchProviderIds ?? const {};
         _loadingWatchProviderAvailability =
@@ -580,16 +583,15 @@ class _WatchlistScreenState extends State<WatchlistScreen>
             .where((provider) => _userWatchProviderIds.contains(provider.id))
             .map((provider) => provider.matchKey)
             .toSet();
-        _movieWatchProviders
-          .addEntries(movieIds
-              .where(providers.containsKey)
-              .map((id) => MapEntry(id, providers[id]!)));
+        _movieWatchProviders.addEntries(movieIds
+            .where(providers.containsKey)
+            .map((id) => MapEntry(id, providers[id]!)));
         _canWatchNowByMovieId
-          .addEntries(_movieWatchProviders.entries.map((entry) => MapEntry(
-                entry.key,
-                entry.value.any((provider) =>
-                    provider.isIncludedOffer && _isUserProvider(provider)),
-              )));
+            .addEntries(_movieWatchProviders.entries.map((entry) => MapEntry(
+                  entry.key,
+                  entry.value.any((provider) =>
+                      provider.isIncludedOffer && _isUserProvider(provider)),
+                )));
         _loadingWatchProviderAvailability = false;
       });
 
@@ -689,8 +691,8 @@ class _WatchlistScreenState extends State<WatchlistScreen>
         }));
         if (!mounted || request != _showProvidersRequest) return;
         entries.addAll(chunk.whereType<MapEntry<int, List<WatchProvider>>>());
-        setState(() => _showWatchProviders.addEntries(
-            chunk.whereType<MapEntry<int, List<WatchProvider>>>()));
+        setState(() => _showWatchProviders
+            .addEntries(chunk.whereType<MapEntry<int, List<WatchProvider>>>()));
         _filterWatchlist();
       }
       final savedProviders = await UserService.getUserWatchProviders(user.id)
@@ -1696,7 +1698,8 @@ class _WatchlistScreenState extends State<WatchlistScreen>
     }
     if (_selectedTab == 2) {
       final upcoming = _filteredWatchlist.where((item) {
-        return releaseStatus(item.movie?.releaseDate) == ReleaseStatus.comingSoon;
+        return releaseStatus(item.movie?.releaseDate) ==
+            ReleaseStatus.comingSoon;
       }).toList();
       upcoming.sort((a, b) {
         final dateA = DateTime.tryParse(a.movie?.releaseDate ?? '') ??
@@ -1763,27 +1766,38 @@ class _WatchlistScreenState extends State<WatchlistScreen>
           .compareTo(_experienceFits[_experienceKey(b)]!));
     }
     if (_comingSoonOnly) {
-      DateTime releaseDate(Object item) => DateTime.parse(
-          (item is WatchlistMovie
-              ? item.movie!.releaseDate!
-              : (item as _WatchlistShowEntry).firstAirDate!)
-          .substring(0, 10));
+      DateTime releaseDate(Object item) =>
+          DateTime.parse((item is WatchlistMovie
+                  ? item.movie!.releaseDate!
+                  : (item as _WatchlistShowEntry).firstAirDate!)
+              .substring(0, 10));
       items.sort((a, b) {
         final byDate = releaseDate(a).compareTo(releaseDate(b));
         return byDate != 0 ? byDate : _compareWatchlistItems(a, b);
       });
     }
     final enrichmentView = jsonEncode([
-      _mediaFilter, _selectedTab, _friendsOnly, _tonightServices,
-      _searchController.text, _sortBy, _filterGenre, _filterMinRating,
-      _filterYear, _filterMaxRuntime, _releaseFilter?.name, _mood.id, _watchRequest,
+      _mediaFilter,
+      _selectedTab,
+      _friendsOnly,
+      _tonightServices,
+      _searchController.text,
+      _sortBy,
+      _filterGenre,
+      _filterMinRating,
+      _filterYear,
+      _filterMaxRuntime,
+      _releaseFilter?.name,
+      _mood.id,
+      _watchRequest,
     ]);
     if (_enrichmentView != enrichmentView) {
       _enrichmentView = enrichmentView;
       // Cancel queued offscreen work from the previous search/filter.
       _pendingEnrichment.clear();
       _scheduledEnrichment.removeWhere((key) =>
-          !_completedEnrichment.contains(key) && !_inFlightEnrichment.contains(key));
+          !_completedEnrichment.contains(key) &&
+          !_inFlightEnrichment.contains(key));
     }
     if (_friendsOnly || _selectedTab == 1 || _tonightServices) {
       _scheduleEnrichment([..._allWatchlist, ..._allShowWatchlist]);
@@ -1854,9 +1868,8 @@ class _WatchlistScreenState extends State<WatchlistScreen>
             _filterWatchlist();
           },
           onSort: _openFilterSheet,
-          sortLabel: _usesExperience && !_comingSoonOnly
-              ? 'Best fit'
-              : _sortByLabel(),
+          sortLabel:
+              _usesExperience && !_comingSoonOnly ? 'Best fit' : _sortByLabel(),
           onMore: () => showModalBottomSheet<void>(
               context: context,
               useRootNavigator: true,
@@ -1893,15 +1906,20 @@ class _WatchlistScreenState extends State<WatchlistScreen>
         const Padding(
             padding: EdgeInsets.all(16), child: Text('Checking friends…')),
       if (_friendsOnly &&
-          !_loadingFriends && !_hasPendingEnrichment &&
+          !_loadingFriends &&
+          !_hasPendingEnrichment &&
           (_recommendationsByMovieId.length < _allWatchlist.length ||
               _friendsByShowId.length < _allShowWatchlist.length))
         TextButton(
-            onPressed: () { _resetEnrichment(); _filterWatchlist(); },
+            onPressed: () {
+              _resetEnrichment();
+              _filterWatchlist();
+            },
             child: const Text('Some friends couldn’t load · Retry')),
       if ((_selectedTab == 1 || _tonightServices) &&
           !_loadingWatchProviderAvailability &&
-          !_loadingShowWatchProviderAvailability && !_hasPendingEnrichment &&
+          !_loadingShowWatchProviderAvailability &&
+          !_hasPendingEnrichment &&
           (_movieWatchProviders.length < _allWatchlist.length ||
               _showWatchProviders.length < _allShowWatchlist.length))
         TextButton(
@@ -1988,8 +2006,8 @@ class _WatchlistScreenState extends State<WatchlistScreen>
 
         final itemIndex = index - header.length;
         final pageStart = (itemIndex ~/ 20) * 20;
-        _scheduleEnrichment(items.skip(pageStart).take(
-            itemIndex % 20 >= 15 ? 40 : 20));
+        _scheduleEnrichment(
+            items.skip(pageStart).take(itemIndex % 20 >= 15 ? 40 : 20));
         final item = items[itemIndex];
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -2214,8 +2232,8 @@ class _WatchlistScreenState extends State<WatchlistScreen>
   Widget _buildWatchlistRow(WatchlistMovie item, dynamic user) {
     final isWatched = user?.isMovieWatched(item.movieId) ?? false;
     final pending = !_completedEnrichment.contains('movie:${item.movieId}');
-    final isLoadingProviders = pending &&
-        !_movieWatchProviders.containsKey(item.movieId);
+    final isLoadingProviders =
+        pending && !_movieWatchProviders.containsKey(item.movieId);
     final providers =
         _movieWatchProviders[item.movieId] ?? const <WatchProvider>[];
     final canWatchNow = _isAvailableOnUserProviders(item.movieId);
@@ -2240,10 +2258,10 @@ class _WatchlistScreenState extends State<WatchlistScreen>
       region: context.read<AuthProvider>().dbUser?.watchProviderRegion ?? 'GB',
       onEditPreferences: _editPreferences,
       onRetryProviders: () => _retryEnrichment(item),
-      isLoadingFriends: pending &&
-          !_recommendationsByMovieId.containsKey(item.movieId),
-      friendsFailed: !pending &&
-          !_recommendationsByMovieId.containsKey(item.movieId),
+      isLoadingFriends:
+          pending && !_recommendationsByMovieId.containsKey(item.movieId),
+      friendsFailed:
+          !pending && !_recommendationsByMovieId.containsKey(item.movieId),
       onRetryFriends: () => _retryEnrichment(item),
       recommendations: _recommendationsByMovieId[item.movieId] ?? const [],
       onTap: () => context.push(movieDetailPath(
@@ -2301,17 +2319,18 @@ class _WatchlistScreenState extends State<WatchlistScreen>
               .toSet()
           : _userWatchProviderMatchKeys,
       region: context.read<AuthProvider>().dbUser?.watchProviderRegion ?? 'GB',
-      isLoadingProviders: !_completedEnrichment.contains('show:${item.showId}') &&
-          !_showWatchProviders.containsKey(item.showId),
+      isLoadingProviders:
+          !_completedEnrichment.contains('show:${item.showId}') &&
+              !_showWatchProviders.containsKey(item.showId),
       providersFailed: _completedEnrichment.contains('show:${item.showId}') &&
           !_showWatchProviders.containsKey(item.showId),
       onEditPreferences: _editPreferences,
       onRetryProviders: () => _retryEnrichment(item),
       recommendations: _friendsByShowId[item.showId] ?? const [],
-      isLoadingFriends:
-          !_completedEnrichment.contains('show:${item.showId}') && !_friendsByShowId.containsKey(item.showId),
-      friendsFailed:
-          _completedEnrichment.contains('show:${item.showId}') && !_friendsByShowId.containsKey(item.showId),
+      isLoadingFriends: !_completedEnrichment.contains('show:${item.showId}') &&
+          !_friendsByShowId.containsKey(item.showId),
+      friendsFailed: _completedEnrichment.contains('show:${item.showId}') &&
+          !_friendsByShowId.containsKey(item.showId),
       onRetryFriends: () => _retryEnrichment(item),
     );
   }
@@ -2668,7 +2687,7 @@ class _WatchlistMovieSearchResultTile extends StatelessWidget {
         ? null
         : 'https://image.tmdb.org/t/p/w185${movie.poster}';
     final year = _movieYear(movie.releaseDate);
-    final vote = movie.voteAverage;
+    final vote = hideMovieRatings(context, movie.id) ? null : movie.voteAverage;
 
     return Material(
       color: context.colors.surfaceElevated,
@@ -2940,7 +2959,8 @@ class WatchlistMovieRow extends StatelessWidget {
                               const SizedBox(height: 4),
                               Text('Releases ${_formatDate(movie.releaseDate)}',
                                   style: TextStyle(
-                                      color: context.colors.light, fontSize: 13)),
+                                      color: context.colors.light,
+                                      fontSize: 13)),
                             ],
                           ]),
                     ))),
@@ -2999,6 +3019,7 @@ class WatchlistMovieRow extends StatelessWidget {
           ]),
           const SizedBox(height: 8),
           _FriendsViewing(
+              movieId: movie.id,
               friends: recommendations,
               title: movie.title,
               isShow: isShow,
@@ -3059,10 +3080,12 @@ class _FriendsViewing extends StatelessWidget {
   const _FriendsViewing(
       {required this.friends,
       required this.title,
+      required this.movieId,
       this.isShow = false,
       this.loading = false,
       this.failed = false,
       this.onRetry});
+  final int movieId;
   final List<FriendRecommendationItem> friends;
   final String title;
   final bool isShow, loading, failed;
@@ -3113,9 +3136,12 @@ class _FriendsViewing extends StatelessWidget {
         : rated.fold<double>(0, (sum, f) => sum + f.rating!) / rated.length;
     final summary =
         '${watched.length} ${watched.length == 1 ? 'friend' : 'friends'} watched';
-    final ratingLabel = average == null
-        ? 'No friends’ ratings yet'
-        : 'Friends’ average ${average.toStringAsFixed(1)}/10 · ${rated.length} rated';
+    final scoresHidden = hideMovieRatings(context, movieId, isShow: isShow);
+    final ratingLabel = scoresHidden
+        ? 'Rate to see friends’ scores'
+        : average == null
+            ? 'No friends’ ratings yet'
+            : 'Friends’ average ${average.toStringAsFixed(1)}/10 · ${rated.length} rated';
     return InkWell(
       onTap: () => showModalBottomSheet<void>(
         context: context,
@@ -3187,9 +3213,12 @@ class _FriendsViewing extends StatelessWidget {
                                         fontSize: 13)),
                               ]);
                           final rating = Text(
-                              friend.rating == null
-                                  ? '—'
-                                  : '${friend.rating! == friend.rating!.roundToDouble() ? friend.rating!.toInt() : friend.rating}/10',
+                              hideMovieRatings(context, movieId,
+                                      isShow: isShow, ownerId: friend.userId)
+                                  ? 'Hidden'
+                                  : friend.rating == null
+                                      ? '—'
+                                      : '${friend.rating! == friend.rating!.roundToDouble() ? friend.rating!.toInt() : friend.rating}/10',
                               style: TextStyle(
                                   color: friend.rating == null
                                       ? context.colors.light

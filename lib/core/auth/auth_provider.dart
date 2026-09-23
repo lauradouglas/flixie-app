@@ -729,7 +729,8 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     }
 
     final session = _sessionGeneration;
-    bool current() => !_disposed &&
+    bool current() =>
+        !_disposed &&
         session == _sessionGeneration &&
         _dbUser?.id == user.id &&
         _cachedWatchProviderRegion == providerRegion;
@@ -927,13 +928,23 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     final qualifiedReferral = _pendingReferralQualification;
     try {
       final updated = await UserService.completeUserSetup(userId);
-      _dbUser = updated;
+      if (_disposed || _dbUser?.id != userId) return false;
+      // Setup returns profile fields without library relations. Keep the
+      // freshly loaded library instead of interpreting omitted lists as empty.
+      final current = _dbUser!;
+      _dbUser = updated.copyWith(
+        movieWatchlist: updated.movieWatchlist ?? current.movieWatchlist,
+        showWatchlist: updated.showWatchlist ?? current.showWatchlist,
+        watchedMovies: updated.watchedMovies ?? current.watchedMovies,
+        watchedShows: updated.watchedShows ?? current.watchedShows,
+        favoriteMovies: updated.favoriteMovies ?? current.favoriteMovies,
+        favoriteShows: updated.favoriteShows ?? current.favoriteShows,
+        favoritePeople: updated.favoritePeople ?? current.favoritePeople,
+        favoriteGenres: updated.favoriteGenres ?? current.favoriteGenres,
+      );
     } catch (e) {
-      // Optimistically mark complete locally so the user isn't stuck
-      if (_dbUser != null) {
-        _dbUser = _dbUser!.copyWith(completedSetup: true);
-      }
       logger.w('[AuthProvider] completeOnboarding error: $e');
+      rethrow;
     }
     _pendingReferralQualification = false;
     notifyListeners();

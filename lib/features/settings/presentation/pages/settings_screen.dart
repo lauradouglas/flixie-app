@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/settings/presentation/widgets/movie_rating_privacy_setting.dart';
 import '../widgets/appearance_setting.dart';
 import 'package:flixie_app/features/settings/presentation/widgets/delete_account_button.dart';
 import 'package:flixie_app/core/legal/terms_of_use_screen.dart';
@@ -153,6 +154,7 @@ class SettingsScreen extends StatelessWidget {
           _sectionLabel(context, 'Preferences'),
           _SettingsGroup(
             children: [
+              const MovieRatingPrivacySetting(),
               const _EpisodeSpoilerSetting(),
               Consumer<AnalyticsController>(
                 builder: (context, analytics, _) => SettingsTile(
@@ -495,13 +497,12 @@ class _SettingsGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: context.colors.surface,
+    return Material(
+      color: context.colors.surface,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(kSettingsCornerRadius),
-        border: Border.all(
-          color: context.colors.tabBarBorder,
-        ),
+        side: BorderSide(color: context.colors.tabBarBorder),
       ),
       child: Column(children: children),
     );

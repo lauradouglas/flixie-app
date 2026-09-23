@@ -278,8 +278,8 @@ class _WatchProvidersSheetState extends State<WatchProvidersSheet> {
                                     Expanded(
                                       child: Text(
                                         provider.providerName,
-                                        style: const TextStyle(
-                                          color: Colors.white,
+                                        style: TextStyle(
+                                          color: context.colors.textPrimary,
                                           fontSize: 15,
                                           fontWeight: FontWeight.w600,
                                         ),

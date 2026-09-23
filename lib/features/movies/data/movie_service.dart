@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/core/api/retry_read.dart';
 import 'package:flixie_app/features/movies/data/media_review_service.dart';
 import 'package:flixie_app/models/friend_recommendation.dart';
@@ -82,6 +83,7 @@ class MovieService {
       'rating': rating,
       'recommended': recommended,
     });
+    MovieRatingPrivacy.instance.ratingSaved(userId, movieId, rating);
     return data as Map<String, dynamic>;
   }
 
@@ -92,8 +94,9 @@ class MovieService {
           body: {'userId': userId});
       if (data != null && data is Map<String, dynamic>) {
         final r = data['rating'];
+        MovieRatingPrivacy.instance.ratingSaved(userId, movieId, r as num?);
         return (
-          rating: r == null ? null : (r as num).toInt(),
+          rating: r?.toInt(),
           recommended: data['recommended'] as bool?,
         );
       }
@@ -105,15 +108,13 @@ class MovieService {
 
   Future<void> addToWatchlist(String userId, int movieId) async {
     await ApiClient.post(
-      '/movies/watchlist',
-      body: {'userId': userId, 'movieId': movieId},
+      '/users/$userId/movie/watchlist/$movieId',
     );
   }
 
   Future<void> removeFromWatchlist(String userId, int movieId) async {
     await ApiClient.delete(
-      '/movies/watchlist',
-      body: {'userId': userId, 'movieId': movieId},
+      '/users/$userId/movie/watchlist/$movieId',
     );
   }
 
@@ -249,7 +250,8 @@ class MovieService {
   Future<Map<int, FriendRecommendationResponse>> getFriendRecommendations(
       Iterable<int> movieIds,
       {bool Function()? isCurrent,
-      void Function(Map<int, FriendRecommendationResponse>)? onProgress}) async {
+      void Function(Map<int, FriendRecommendationResponse>)?
+          onProgress}) async {
     final ids = movieIds.where((id) => id > 0).toSet().toList();
     final results = <int, FriendRecommendationResponse>{};
     for (var start = 0; start < ids.length; start += 25) {

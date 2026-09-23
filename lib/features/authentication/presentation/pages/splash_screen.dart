@@ -60,7 +60,8 @@ class _SplashScreenState extends State<SplashScreen>
                       ? Column(mainAxisSize: MainAxisSize.min, children: [
                           Text(auth.recoveryError!,
                               textAlign: TextAlign.center,
-                              style: const TextStyle(color: Colors.white)),
+                              style:
+                                  TextStyle(color: context.colors.textPrimary)),
                           TextButton(
                               onPressed: auth.retrySession,
                               child: const Text('Retry')),

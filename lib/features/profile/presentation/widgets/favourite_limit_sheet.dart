@@ -353,7 +353,7 @@ class _FavouriteManagerCard extends StatelessWidget {
                             : Icons.favorite_rounded,
                         size: 17,
                         color: markedForRemoval
-                            ? context.colors.white
+                            ? Theme.of(context).colorScheme.onError
                             : context.colors.tertiary,
                       ),
                     ),

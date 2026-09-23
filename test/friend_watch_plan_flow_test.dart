@@ -26,7 +26,7 @@ void main() {
     await icons.load();
   });
   Future<void> show(WidgetTester tester, WatchRequest request, {
-    VoidCallback? accept, ValueChanged<String>? select,
+    VoidCallback? accept, VoidCallback? logWatch, ValueChanged<String>? select,
     Future<bool> Function()? save, double width = 390, double scale = 1,
   }) async {
     tester.view.physicalSize = Size(width, 1000);
@@ -39,7 +39,7 @@ void main() {
           child: FriendWatchPlanFlow(request: request, myUserId: 'me', compact: false,
             scheduledLabel: '18 Sep, 21:30', onOpen: () {}, onAccept: accept ?? () {},
             onDecline: () {}, onSuggestSchedule: () {}, onRespondToProposal: (_, __) {},
-            onConfirmWatched: () {}, onNotThisTime: () {}, onClosePlan: () {},
+            onConfirmWatched: logWatch ?? () {}, onNotThisTime: () {}, onClosePlan: () {},
             onNewPlan: () {}, onCancelPlan: () {}, candidateChoiceDraft: const {'moana'},
             onToggleCandidateChoice: (_) {}, onSaveCandidateChoices: save ?? () async => true,
             onAddCandidate: () {}, onRemoveCandidate: (_) {},
@@ -50,6 +50,16 @@ void main() {
     ));
     await tester.pumpAndSettle();
   }
+
+  testWidgets('confirmed future plan lets user log an early watch', (tester) async {
+    var logs = 0;
+    await show(tester, fixture({'selectedCandidateId': 'moana',
+      'scheduleStatus': 'AGREED', 'scheduledFor': '2099-09-18T21:30:00Z'}),
+      logWatch: () => logs++);
+    await tester.ensureVisible(find.text('Log watch'));
+    await tester.tap(find.text('Log watch'));
+    expect(logs, 1);
+  });
 
   testWidgets('single title invitation offers an alternative time before joining', (tester) async {
     await show(tester, fixture({'status': 'PENDING', 'proposedDate': '2027-01-01T19:00:00Z', 'candidates': [

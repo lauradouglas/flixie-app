@@ -36,11 +36,11 @@ class WatchPlansIntroductionCard extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Make a Watch Plan',
+                  Text('Make a Watch Plan',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                          color: Colors.white,
+                          color: context.colors.textPrimary,
                           fontSize: 16,
                           fontWeight: FontWeight.w900)),
                   const SizedBox(height: 2),

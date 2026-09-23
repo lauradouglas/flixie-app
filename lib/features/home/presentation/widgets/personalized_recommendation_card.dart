@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
@@ -106,7 +107,8 @@ class PersonalizedRecommendationCard extends StatelessWidget {
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      if (movie.voteAverage != null &&
+                      if (!hideMovieRatings(context, movie.id) &&
+                          movie.voteAverage != null &&
                           movie.voteAverage! > 0) ...[
                         const SizedBox(height: 8),
                         Row(

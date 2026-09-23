@@ -8,6 +8,13 @@ import 'package:flixie_app/models/watch_provider.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 
 class ShowService {
+  static Future<List<TvShow>> getTopRatedShows() async {
+    final data = await ApiClient.get('/shows/top_rated');
+    return (data as List<dynamic>)
+        .map((item) => TvShow.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
   static Future<List<ContinueWatchingShow>> getContinueWatching(
     String userId, {
     int limit = 10,
@@ -138,7 +145,8 @@ class ShowService {
   static Future<Map<int, FriendRecommendationResponse>>
       getFriendRecommendations(Iterable<int> showIds,
           {bool Function()? isCurrent,
-      void Function(Map<int, FriendRecommendationResponse>)? onProgress}) async {
+          void Function(Map<int, FriendRecommendationResponse>)?
+              onProgress}) async {
     final ids = showIds.where((id) => id > 0).toSet().toList();
     final results = <int, FriendRecommendationResponse>{};
     for (var start = 0; start < ids.length; start += 25) {

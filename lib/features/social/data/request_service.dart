@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/models/group_watch_request.dart';
 import 'package:flixie_app/models/watch_request.dart';
 import 'package:flixie_app/core/api/api_client.dart';
@@ -137,7 +138,15 @@ class RequestService {
         if (watched && recommended != null) 'recommended': recommended,
       },
     );
-    return getWatchRequestState(watchRequestId: watchRequestId, userId: userId);
+    final state = await getWatchRequestState(
+        watchRequestId: watchRequestId, userId: userId);
+    if (watched &&
+        state.request.showId == null &&
+        state.request.movieId != null) {
+      MovieRatingPrivacy.instance
+          .ratingSaved(userId, state.request.movieId!, rating);
+    }
+    return state;
   }
 
   static Future<WatchRequestState> addWatchPlanCandidate({
@@ -246,7 +255,11 @@ class RequestService {
           'reviewText': reviewText.trim(),
       },
     );
-    return WatchRequest.fromJson(data as Map<String, dynamic>);
+    final request = WatchRequest.fromJson(data as Map<String, dynamic>);
+    if (request.showId == null && request.movieId != null) {
+      MovieRatingPrivacy.instance.ratingSaved(userId, request.movieId!, rating);
+    }
+    return request;
   }
 
   static Future<void> deleteWatchRequest({

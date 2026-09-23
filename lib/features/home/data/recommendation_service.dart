@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/authentication/data/setup_service.dart';
 import 'package:flixie_app/models/movie_short.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/api/api_client.dart';
@@ -78,6 +79,22 @@ class RecommendationService {
     final movies = (data as List<dynamic>)
         .map((e) => MovieShort.fromJson(e as Map<String, dynamic>))
         .toList();
+    // Reorder only server-eligible candidates: never restore a watched or
+    // dismissed title excluded by the recommendation service.
+    try {
+      final related =
+          (await SetupService.movieSeeds(userId)).map((m) => m.id).toSet();
+      if (related.isNotEmpty) {
+        final preferred = movies.where((m) => related.contains(m.id)).toList();
+        final remaining = movies.where((m) => !related.contains(m.id)).toList();
+        movies
+          ..clear()
+          ..addAll(preferred)
+          ..addAll(remaining);
+      }
+    } catch (_) {
+      /* Keep server recommendations if local taste is unavailable. */
+    }
     _userRecsCache[userId] =
         _CachedUserRecs(movies: movies, fetchedAt: DateTime.now());
     return movies;

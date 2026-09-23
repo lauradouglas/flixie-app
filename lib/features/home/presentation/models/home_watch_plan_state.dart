@@ -120,7 +120,25 @@ List<HomeWatchPlanState> homeWatchPlanStates(
       .map((plan) => _stateFor(plan, currentUserId, currentTime))
       .whereType<HomeWatchPlanState>()
       .toList();
+  bool scheduledToday(HomeWatchPlanState state) {
+    final scheduled = state.plan.scheduledFor;
+    return scheduled != null &&
+        _sameDay(scheduled.toLocal(), currentTime.toLocal()) &&
+        state.type != HomeWatchPlanStateType.waitingForLogs &&
+        state.type != HomeWatchPlanStateType.recap;
+  }
+
   states.sort((a, b) {
+    final aToday = scheduledToday(a);
+    final bToday = scheduledToday(b);
+    if (aToday != bToday) return aToday ? -1 : 1;
+    if (a.requiresAttention != b.requiresAttention) {
+      return a.requiresAttention ? -1 : 1;
+    }
+    if (aToday && bToday) {
+      final time = a.plan.scheduledFor!.compareTo(b.plan.scheduledFor!);
+      if (time != 0) return time;
+    }
     final priority = a.priority.compareTo(b.priority);
     if (priority != 0) return priority;
     return _activityDate(b.plan).compareTo(_activityDate(a.plan));

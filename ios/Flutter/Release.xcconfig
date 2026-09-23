@@ -4,3 +4,6 @@
 // Keep Xcode archives on production even after Flutter regenerates local settings.
 // Base64: API_BASE_URL=https://flixie-api-fmcehvaecwdheccm.northeurope-01.azurewebsites.net
 DART_DEFINES = $(inherited),QVBJX0JBU0VfVVJMPWh0dHBzOi8vZmxpeGllLWFwaS1mbWNlaHZhZWN3ZGhlY2NtLm5vcnRoZXVyb3BlLTAxLmF6dXJld2Vic2l0ZXMubmV0
+
+// Patrol rewrites Generated.xcconfig; App Store archives must launch the app.
+FLUTTER_TARGET = lib/main.dart

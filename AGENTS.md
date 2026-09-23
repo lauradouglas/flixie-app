@@ -33,9 +33,10 @@ needed without applying the frame twice.
 ## Regression checks
 
 For behaviour changes, add or update a regression test covering the user action
-and its outcome. Run the affected widget tests while editing. Before declaring a
-change ready, run `scripts/test-regression.sh`; report existing failures rather
-than skipping them or weakening assertions.
+and its outcome. Run only focused checks relevant to the change while editing.
+Run the full `scripts/test-regression.sh` suite only when explicitly requested
+or in GitHub workflows; do not run it automatically for each prompt. Report
+existing failures rather than skipping them or weakening assertions.
 
 Device tests live in `patrol_test/`. Use `scripts/test-patrol.sh -d <test-device>`
 for changes to favourites/ranking, activity-sheet navigation, profile gallery

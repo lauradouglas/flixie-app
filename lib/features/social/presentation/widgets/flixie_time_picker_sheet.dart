@@ -60,8 +60,8 @@ class _FlixieTimePickerSheetState extends State<FlixieTimePickerSheet> {
               SizedBox(
                 height: 170,
                 child: CupertinoTheme(
-                  data: const CupertinoThemeData(
-                    brightness: Brightness.dark,
+                  data: CupertinoThemeData(
+                    brightness: Theme.of(context).brightness,
                     primaryColor: FlixieColors.primary,
                   ),
                   child: CupertinoDatePicker(

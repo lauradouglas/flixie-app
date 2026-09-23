@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -6,8 +7,9 @@ import 'package:flixie_app/models/movie_friend_activity.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 
 class FriendActivityRow extends StatelessWidget {
-  const FriendActivityRow({super.key, required this.activity});
+  const FriendActivityRow({super.key, required this.activity, this.movieId});
 
+  final int? movieId;
   final MovieFriendActivity activity;
 
   @override
@@ -46,7 +48,9 @@ class FriendActivityRow extends StatelessWidget {
     if (activity.rating != null) {
       badges.add(_ActivityBadge(
         icon: Icons.star_rounded,
-        label: '${activity.rating}/10',
+        label: hideMovieRatings(context, movieId, ownerId: activity.userId)
+            ? 'Rated'
+            : '${activity.rating}/10',
         color: context.colors.tertiary,
       ));
     }

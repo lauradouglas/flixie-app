@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -251,8 +252,8 @@ class _SearchScreenState extends State<SearchScreen> {
             icon: Badge(
               isLabelVisible: unreadCount > 0,
               label: Text(unreadCount < 100 ? '$unreadCount' : '99+'),
-              backgroundColor: FlixieColors.primaryShade,
-              textColor: Colors.white,
+              backgroundColor: FlixieColors.notificationBadge,
+              textColor: FlixieColors.onNotificationBadge,
               textStyle:
                   const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
               child: Icon(Icons.notifications_outlined,
@@ -656,7 +657,7 @@ class _TrendingPosterCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final year = _extractYear(movie.releaseDate);
-    final vote = movie.voteAverage;
+    final vote = hideMovieRatings(context, movie.id) ? null : movie.voteAverage;
 
     return GestureDetector(
       onTap: onTap,
@@ -906,6 +907,7 @@ class _SearchMediaTile extends StatelessWidget {
     required this.year,
     required this.overview,
     required this.rating,
+    required this.mediaId,
     required this.isShow,
     required this.query,
     this.onTap,
@@ -917,6 +919,7 @@ class _SearchMediaTile extends StatelessWidget {
     VoidCallback? onTap,
   }) =>
       _SearchMediaTile._(
+        mediaId: movie.id,
         name: movie.name,
         posterPath: movie.poster,
         year: _extractYear(movie.releaseDate),
@@ -933,6 +936,7 @@ class _SearchMediaTile extends StatelessWidget {
     VoidCallback? onTap,
   }) =>
       _SearchMediaTile._(
+        mediaId: show.id,
         name: show.name,
         posterPath: show.posterPath,
         year: _extractYear(show.firstAirDate),
@@ -948,6 +952,7 @@ class _SearchMediaTile extends StatelessWidget {
   final String? year;
   final String? overview;
   final double? rating;
+  final int mediaId;
   final bool isShow;
   final String query;
   final VoidCallback? onTap;
@@ -1015,7 +1020,10 @@ class _SearchMediaTile extends StatelessWidget {
                           Text(year!,
                               style: TextStyle(
                                   color: context.colors.medium, fontSize: 13)),
-                        if (rating != null && rating! > 0)
+                        if (!hideMovieRatings(context, mediaId,
+                                isShow: isShow) &&
+                            rating != null &&
+                            rating! > 0)
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [

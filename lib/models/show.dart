@@ -154,7 +154,8 @@ class TvShow {
           _stringValue(json['firstAirDate'] ?? json['first_air_date']),
       lastAirDate: _stringValue(json['lastAirDate'] ?? json['last_air_date']),
       overview: _stringValue(json['overview']),
-      posterPath: _stringValue(json['posterPath'] ?? json['poster_path']),
+      posterPath: _stringValue(
+          json['posterPath'] ?? json['poster_path'] ?? json['poster']),
       backdropPath: _stringValue(json['backdropPath'] ?? json['backdrop_path']),
       popularity: _doubleValue(json['popularity']),
       voteAverage: _doubleValue(json['voteAverage'] ?? json['vote_average']),

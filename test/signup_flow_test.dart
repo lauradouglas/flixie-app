@@ -97,6 +97,70 @@ void main() {
         username: 'Movie_User.99',
       );
 
+  test(
+      'setup completion preserves movie and show watchlists omitted by the API',
+      () async {
+    final provider =
+        AuthProvider(authService, MovieService(), prefetchAfterAuth: false);
+    final library = model.User.fromJson({
+      ..._createdUser().toJson(),
+      'movieWatchlist': [
+        {
+          'id': 'entry-1',
+          'userId': 'profile-1',
+          'movieId': 550,
+          'movie': {'id': 550, 'title': 'Setup movie'}
+        }
+      ],
+      'showWatchlist': [
+        {'showId': 1399}
+      ],
+    });
+    provider.updateCachedUser(library);
+    await http.runWithClient(() async {
+      await provider.completeOnboarding();
+      expect(provider.dbUser!.completedSetup, isTrue);
+      expect(provider.dbUser!.movieWatchlist!.single.movieId, 550);
+      expect(provider.dbUser!.showWatchlist!.single['showId'], 1399);
+    },
+        () => MockClient((request) async => http.Response(
+            jsonEncode({
+              ..._createdUser().toJson()
+                ..remove('movieWatchlist')
+                ..remove('showWatchlist'),
+              'completedSetup': true,
+            }),
+            200)));
+    provider.dispose();
+  });
+
+  test(
+      'failed setup completion preserves the incomplete account and permits retry',
+      () async {
+    final provider =
+        AuthProvider(authService, MovieService(), prefetchAfterAuth: false);
+    provider.updateCachedUser(_createdUser());
+    var fail = true;
+    await http.runWithClient(() async {
+      await expectLater(provider.completeOnboarding(), throwsA(anything));
+      expect(provider.dbUser?.completedSetup, isFalse);
+      fail = false;
+      await provider.completeOnboarding();
+      expect(provider.dbUser?.completedSetup, isTrue);
+    },
+        () => MockClient((request) async => fail
+            ? http.Response('{"message":"offline"}', 503)
+            : http.Response(
+                jsonEncode({
+                  'id': 'profile-1',
+                  'username': 'Movie_User.99',
+                  'email': 'laura@example.com',
+                  'completedSetup': true
+                }),
+                200)));
+    provider.dispose();
+  });
+
   test('account terms are verified remotely and accepted explicitly', () async {
     final provider = AuthProvider(authService, MovieService(),
         prefetchAfterAuth: false, profileCreator: (_) async => _createdUser());

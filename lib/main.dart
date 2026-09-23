@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flixie_app/app/theme/appearance_controller.dart';
 import 'package:flixie_app/features/social/data/chat_unread_controller.dart';
@@ -143,6 +144,11 @@ void main() async {
             AuthService(),
             context.read<MovieService>(),
           ),
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, MovieRatingPrivacy>(
+          create: (_) => MovieRatingPrivacy.instance,
+          update: (_, auth, privacy) => (privacy ?? MovieRatingPrivacy.instance)
+            ..syncUser(auth.dbUser?.id),
         ),
         ChangeNotifierProxyProvider<AuthProvider, ChatUnreadController>(
           create: (_) => ChatUnreadController(),

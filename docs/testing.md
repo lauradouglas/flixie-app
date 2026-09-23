@@ -129,3 +129,39 @@ difference 2). A single larger colour difference, transparency change, resize,
 or broader drift still fails and writes the usual comparison artifacts. Tests
 exercise these rejection boundaries; do not increase tolerance to mask a new
 visual change.
+
+
+## Movie score privacy
+
+Settings → Preferences → **Rate movies first** is off by default and saved per
+account on the current device. It hides other users’ movie scores and public
+averages until a confirmed personal rating exists. TV and the viewer’s own scores
+remain visible. A failed eligibility load keeps unknown movie scores hidden and
+provides a retry. Review prose, chat messages, recommendations and rating counts
+are not censored.
+
+`test/movie_rating_privacy_test.dart` covers persistence, account-switch races,
+failed loads, immediate unlocks, chat movie/TV/ownership rules, and large text.
+`patrol_test/movie_rating_privacy_test.dart` exercises the setting and a successful
+rating save through the movie service on an isolated fixture account.
+
+
+## First-time setup
+
+Signup collects credentials, consent, required first and last names, and an avatar.
+Both the form and backend reject missing or blank names. Country now lives with streaming
+services in setup. Taste selection supports both media types and is optional;
+selected titles become profile favourites in selection order, without adding
+watches or ratings. Skipping adds no favourites. Account-scoped taste seeds
+are stored on this device and can reorder server-eligible Home movie picks.
+Explicit genre preferences and streaming services are saved to the account.
+
+Setup offers library import, viewing preferences, real recommendations with
+regional availability, watchlist actions, friend discovery and an optional tour.
+Completion failures remain retryable. Notification permission is requested only
+from an explicit contextual opt-in, not authentication.
+
+`setup_flow_test.dart` covers country/provider saves, retry, movie/TV identity,
+skipping, the search contract, watchlist addition and responsive layouts.
+`patrol_test/setup_test.dart` exercises movie/TV picks and adding a show on a
+fixture account. `notification_opt_in_test.dart` protects consent timing.

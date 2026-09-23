@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -1105,7 +1106,9 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
           Expanded(
             child: _statTile(
               'Top title',
-              topRated.isEmpty
+              (topRated.isEmpty ||
+                      hideMovieRatings(context, topRated.first.id,
+                          isShow: !topRated.first.isMovie))
                   ? '-'
                   : topRated.first.voteAverage.toStringAsFixed(1),
               Icons.star_border_rounded,
@@ -1633,7 +1636,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                             filter.label,
                             style: TextStyle(
                               color: selected
-                                  ? context.colors.white
+                                  ? Theme.of(context).colorScheme.onPrimary
                                   : context.colors.medium,
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
@@ -1867,7 +1870,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                 ],
               ),
             ),
-            if (item.voteAverage > 0) ...[
+            if (item.voteAverage > 0 &&
+                !hideMovieRatings(context, item.id, isShow: !item.isMovie)) ...[
               const SizedBox(width: 8),
               Icon(
                 Icons.star_rounded,

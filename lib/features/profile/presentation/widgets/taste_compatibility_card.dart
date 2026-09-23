@@ -79,7 +79,7 @@ class TasteCompatibilityCard extends StatelessWidget {
                 'TASTE COMPATIBILITY',
                 style: textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: context.colors.textPrimary,
                   letterSpacing: 1.5,
                 ),
               ),

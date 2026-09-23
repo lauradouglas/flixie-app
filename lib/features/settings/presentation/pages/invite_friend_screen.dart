@@ -367,8 +367,8 @@ class _JointListPreview extends StatelessWidget {
               ),
               borderRadius: BorderRadius.circular(10),
             ),
-            child:
-                Icon(Icons.movie_filter_rounded, color: context.colors.white),
+            child: Icon(Icons.movie_filter_rounded,
+                color: Theme.of(context).colorScheme.onPrimary),
           ),
           const SizedBox(width: 10),
           Expanded(

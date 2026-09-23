@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/models/movie_list.dart';
 import 'package:flixie_app/models/movie_list_membership.dart';
@@ -352,10 +353,36 @@ class UserService {
       String userId, Iterable<int> movieIds) async {
     final ids = movieIds.toSet().toList(growable: false);
     if (ids.isEmpty) return;
-    await ApiClient.post(
+    final saved = await ApiClient.post(
       '/users/$userId/movies/favorites',
       body: {'movieIds': ids},
     );
+    _verifySavedFavourites(saved, ids, 'movieId');
+  }
+
+  /// Imports missing shows and adds favourites without duplicating existing ones.
+  static Future<void> addShowsToFavorites(
+      String userId, Iterable<int> showIds) async {
+    final ids = showIds.toSet().toList(growable: false);
+    if (ids.isEmpty) return;
+    final saved = await ApiClient.post('/users/$userId/shows/favorites',
+        body: {'showIds': ids});
+    _verifySavedFavourites(saved, ids, 'showId');
+  }
+
+  static void _verifySavedFavourites(
+      dynamic response, List<int> ids, String key) {
+    final saved = response is List
+        ? response
+            .whereType<Map>()
+            .where((row) => row['removed'] != true)
+            .map((row) => row[key])
+            .toSet()
+        : <dynamic>{};
+    if (!ids.every(saved.contains)) {
+      throw StateError(
+          'The server did not save all selected favourites. Please retry.');
+    }
   }
 
   /// Adds a group of watched movies, importing missing TMDB movies first on
@@ -456,6 +483,10 @@ class UserService {
         }
       },
     );
+    if (review.movieId != null) {
+      MovieRatingPrivacy.instance
+          .ratingSaved(review.userId, review.movieId!, review.rating);
+    }
     return Review.fromJson(data as Map<String, dynamic>);
   }
 
@@ -870,7 +901,10 @@ class UserService {
       '/users/$userId/movie/watches',
       body: request.toJson(),
     );
-    return MovieWatchEntry.fromJson(data as Map<String, dynamic>);
+    final entry = MovieWatchEntry.fromJson(data as Map<String, dynamic>);
+    MovieRatingPrivacy.instance
+        .ratingSaved(userId, entry.movieId, entry.rating);
+    return entry;
   }
 
   static Future<List<MovieWatchEntry>> getUserMovieWatches(
@@ -908,7 +942,10 @@ class UserService {
       '/users/$userId/movie/watches/$watchEntryId',
       body: request.toJson(),
     );
-    return MovieWatchEntry.fromJson(data as Map<String, dynamic>);
+    final entry = MovieWatchEntry.fromJson(data as Map<String, dynamic>);
+    MovieRatingPrivacy.instance
+        .ratingSaved(userId, entry.movieId, entry.rating);
+    return entry;
   }
 
   static Future<void> deleteMovieWatch(

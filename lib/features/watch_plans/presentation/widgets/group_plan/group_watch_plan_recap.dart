@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/core/safety/safety_service.dart';
@@ -99,7 +100,9 @@ class _GroupWatchPlanRecapState extends State<GroupWatchPlanRecap> {
     final rated = watched
         .where((r) => r.rating != null && r.rating! >= 1 && r.rating! <= 10)
         .toList();
-    final average = rated.isEmpty
+    final scoresHidden = hideMovieRatings(context, request.mediaId,
+        isShow: request.mediaType == 'show');
+    final average = scoresHidden || rated.isEmpty
         ? null
         : rated.fold<int>(0, (sum, r) => sum + r.rating!) / rated.length / 2;
     final yes = watched.where((r) => r.recommended == true).length;
@@ -138,19 +141,26 @@ class _GroupWatchPlanRecapState extends State<GroupWatchPlanRecap> {
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                  Text(average?.toStringAsFixed(1) ?? '—',
-                      semanticsLabel: average == null
-                          ? 'No ratings yet'
-                          : 'Average ${average.toStringAsFixed(1)} out of 5',
+                  Text(
+                      scoresHidden
+                          ? 'Rate to see'
+                          : average?.toStringAsFixed(1) ?? '—',
+                      semanticsLabel: scoresHidden
+                          ? 'Rate the movie to see group scores'
+                          : average == null
+                              ? 'No ratings yet'
+                              : 'Average ${average.toStringAsFixed(1)} out of 5',
                       style: TextStyle(
                           color: context.colors.textPrimary,
                           fontSize: 30,
                           fontWeight: FontWeight.w800,
                           height: 1.1)),
                   Text(
-                      average == null
-                          ? 'No ratings yet'
-                          : 'Average rating · /5',
+                      scoresHidden
+                          ? 'Movie scores hidden'
+                          : average == null
+                              ? 'No ratings yet'
+                              : 'Average rating · /5',
                       style: _body.copyWith(color: context.colors.light)),
                 ])),
           ]),
@@ -264,7 +274,9 @@ class _GroupWatchPlanRecapState extends State<GroupWatchPlanRecap> {
     final name = response.memberId == currentUserId
         ? 'You'
         : response.username ?? member?.displayName ?? 'Member';
-    final rating = response.rating;
+    final hidden = hideMovieRatings(context, request.mediaId,
+        isShow: request.mediaType == 'show', ownerId: response.memberId);
+    final rating = hidden ? null : response.rating;
     final score = !missed && rating != null && rating >= 1 && rating <= 10
         ? rating / 2
         : null;
@@ -276,7 +288,7 @@ class _GroupWatchPlanRecapState extends State<GroupWatchPlanRecap> {
             Text('Missed', style: _body.copyWith(color: context.colors.light))
           ])
         : score == null
-            ? Text('Watched · Not rated',
+            ? Text(hidden ? 'Rate to see score' : 'Watched · Not rated',
                 style: _body.copyWith(color: context.colors.light))
             : Semantics(
                 label: '$score out of 5 stars',

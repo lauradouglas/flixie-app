@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
@@ -1730,7 +1731,10 @@ class _MovieListPosterCard extends StatelessWidget {
         ? 'https://image.tmdb.org/t/p/w500$posterPath'
         : null;
     final year = _extractYear(movie?.releaseDate ?? show?.firstAirDate);
-    final rating = _entryRating(entry);
+    final rating =
+        hideMovieRatings(context, entry.movieId, isShow: entry.showId > 0)
+            ? null
+            : _entryRating(entry);
     final isRecent = _isRecentAddition(entry.createdAt);
 
     return Material(

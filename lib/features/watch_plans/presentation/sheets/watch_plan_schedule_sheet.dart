@@ -306,7 +306,9 @@ class _ScheduleModeSelector extends StatelessWidget {
             child: Text(label,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: selected ? context.colors.white : context.colors.light,
+                  color: selected
+                      ? Theme.of(context).colorScheme.onPrimary
+                      : context.colors.light,
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
                 )),
@@ -462,8 +464,8 @@ class _ScheduleTimePickerSheetState extends State<_ScheduleTimePickerSheet> {
               SizedBox(
                 height: 170,
                 child: CupertinoTheme(
-                  data: const CupertinoThemeData(
-                    brightness: Brightness.dark,
+                  data: CupertinoThemeData(
+                    brightness: Theme.of(context).brightness,
                     primaryColor: FlixieColors.primary,
                   ),
                   child: CupertinoDatePicker(

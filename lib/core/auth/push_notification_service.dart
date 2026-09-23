@@ -411,12 +411,8 @@ class PushNotificationService {
     await _onMessageSubscription?.cancel();
     _ensureRemoteTapListener();
 
-    final settings = await _messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-      provisional: false,
-    );
+    // Authentication must not interrupt signup with a permission prompt.
+    final settings = await _messaging.getNotificationSettings();
 
     logger.i(
       '[FCM] Permission status: auth=${settings.authorizationStatus}, '
@@ -545,15 +541,42 @@ class PushNotificationService {
     }
   }
 
+  static Future<bool> needsPermissionChoice() async {
+    try {
+      return (await _messaging.getNotificationSettings()).authorizationStatus ==
+          AuthorizationStatus.notDetermined;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Called only from an explicit Enable notifications button.
+  static Future<bool> enableNotifications() async {
+    final settings = await _messaging.requestPermission(
+        alert: true, badge: true, sound: true);
+    final allowed =
+        settings.authorizationStatus == AuthorizationStatus.authorized ||
+            settings.authorizationStatus == AuthorizationStatus.provisional;
+    if (allowed && _navigatorKey != null) {
+      await _initLocalNotifications(_navigatorKey!);
+      await _messaging.setForegroundNotificationPresentationOptions(
+          alert: true, badge: true, sound: true);
+      TabRefreshController.watchPlans.value++;
+    }
+    return allowed;
+  }
+
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------
 
   static Future<void> _initLocalNotifications(
       GlobalKey<NavigatorState> navigatorKey) async {
-    const androidSettings =
-        AndroidInitializationSettings('ic_stat_flixie');
-    const iosSettings = DarwinInitializationSettings();
+    const androidSettings = AndroidInitializationSettings('ic_stat_flixie');
+    const iosSettings = DarwinInitializationSettings(
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false);
 
     await _localNotifications.initialize(
       const InitializationSettings(
@@ -570,12 +593,6 @@ class PushNotificationService {
       },
     );
     _localNotificationsReady = true;
-    if (Platform.isIOS) {
-      await _localNotifications
-          .resolvePlatformSpecificImplementation<
-              IOSFlutterLocalNotificationsPlugin>()
-          ?.requestPermissions(alert: true, badge: true, sound: true);
-    }
 
     // Firebase's getInitialMessage only covers notifications opened by FCM.
     // Data-only messages are displayed through flutter_local_notifications,
@@ -648,9 +665,11 @@ class PushNotificationService {
 
   static Future<void> showBackgroundDataNotification(
       RemoteMessage message) async {
-    const androidSettings =
-        AndroidInitializationSettings('ic_stat_flixie');
-    const iosSettings = DarwinInitializationSettings();
+    const androidSettings = AndroidInitializationSettings('ic_stat_flixie');
+    const iosSettings = DarwinInitializationSettings(
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false);
     await _localNotifications.initialize(
       const InitializationSettings(
         android: androidSettings,

@@ -8,6 +8,8 @@ import 'package:flixie_app/app/theme/flixie_typography.dart';
 
 /// Flixie color palette - cinematic dark theme.
 class FlixieColors {
+  static const Color notificationBadge = Color(0xFFFFAD66);
+  static const Color onNotificationBadge = Color(0xFF261735);
   // Primary – vivid purple
   static const Color primary = Color(0xFF7C4DFF);
   static const Color primaryShade = Color(0xFF6534E8);

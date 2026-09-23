@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/movies/data/movie_watch_plan_choice.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 
@@ -14,8 +15,14 @@ class RewatchLogSheet extends StatefulWidget {
     this.onReviewSelected,
     this.isRewatch = false,
     this.previousWatch,
+    this.watchPlans,
+    this.onPlanSelected,
+    this.isPlanReview = false,
   });
 
+  final Future<List<MovieWatchPlanChoice>>? watchPlans;
+  final ValueChanged<MovieWatchPlanChoice?>? onPlanSelected;
+  final bool isPlanReview;
   final MovieWatchEntry? initial;
   final Future<void> Function({
     required String? watchedAt,
@@ -39,6 +46,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
   int? _rating;
   bool? _recommended;
   bool _saving = false;
+  MovieWatchPlanChoice? _selectedPlan;
   late bool _includeWatchedDate;
   bool _writeReview = false;
   String? _saveError;
@@ -124,6 +132,57 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (widget.watchPlans != null)
+                    FutureBuilder<List<MovieWatchPlanChoice>>(
+                      future: widget.watchPlans,
+                      builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          return const Padding(
+                            padding: EdgeInsets.only(bottom: 16),
+                            child: Text(
+                                'Couldn’t check your watch plans. Reopen this sheet to try again.'),
+                          );
+                        }
+                        if (!snapshot.hasData) {
+                          return const Padding(
+                              padding: EdgeInsets.only(bottom: 16),
+                              child: Text('Checking your watch plans…'));
+                        }
+                        if (snapshot.data!.isEmpty) {
+                          return const SizedBox.shrink();
+                        }
+                        return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Was this part of a watch plan?'),
+                              const SizedBox(height: 8),
+                              Wrap(spacing: 8, runSpacing: 8, children: [
+                                FlixiePill.choice(
+                                    label: const Text('Separate watch'),
+                                    selected: _selectedPlan == null,
+                                    onSelected: _saving
+                                        ? null
+                                        : (_) => setState(() {
+                                              _selectedPlan = null;
+                                              widget.onPlanSelected?.call(null);
+                                            })),
+                                for (final plan in snapshot.data!)
+                                  FlixiePill.choice(
+                                      label: Text(plan.label),
+                                      selected: _selectedPlan?.id == plan.id,
+                                      onSelected: _saving
+                                          ? null
+                                          : (_) => setState(() {
+                                                _selectedPlan = plan;
+                                                _writeReview = false;
+                                                widget.onPlanSelected
+                                                    ?.call(plan);
+                                              })),
+                              ]),
+                              const SizedBox(height: 16),
+                            ]);
+                      },
+                    ),
                   Text(
                     'Rating (optional)',
                     style: TextStyle(
@@ -132,33 +191,63 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 7,
-                    runSpacing: 7,
-                    children: List.generate(10, (i) {
-                      final value = i + 1;
-                      final isSelected = _rating == value;
-                      return ConstrainedBox(
-                        constraints:
-                            const BoxConstraints(minWidth: 48, minHeight: 42),
-                        child: FlixiePill.choice(
-                            label: Text('$value'),
-                            avatar: Icon(
-                                isSelected
-                                    ? Icons.star_rounded
-                                    : Icons.star_border_rounded,
-                                size: 17),
-                            selected: isSelected,
-                            showCheckmark: false,
-                            onSelected: (_) => setState(
-                                  () {
-                                    _rating = isSelected ? null : value;
-                                    if (_rating == null) _recommended = null;
-                                  },
-                                )),
-                      );
-                    }),
-                  ),
+                  LayoutBuilder(builder: (context, constraints) {
+                    final scale =
+                        MediaQuery.textScalerOf(context).scale(14) / 14;
+                    final columns =
+                        constraints.maxWidth >= 320 * scale ? 10 : 5;
+                    final width =
+                        (constraints.maxWidth - (columns - 1) * 3) / columns;
+                    return Wrap(
+                      spacing: 3,
+                      runSpacing: 8,
+                      children: List.generate(10, (i) {
+                        final value = i + 1;
+                        final selected = _rating == value;
+                        return SizedBox(
+                          width: width,
+                          child: Semantics(
+                            label: 'Rate $value out of 10',
+                            selected: selected,
+                            child: TextButton(
+                              style: TextButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 8),
+                                minimumSize: const Size(0, 56),
+                                foregroundColor: selected
+                                    ? Colors.white
+                                    : context.colors.primaryText,
+                                backgroundColor: selected
+                                    ? FlixieColors.primary
+                                    : context.colors.surfaceElevated,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10)),
+                              ),
+                              onPressed: _saving
+                                  ? null
+                                  : () => setState(() {
+                                        _rating = selected ? null : value;
+                                        if (_rating == null)
+                                          _recommended = null;
+                                      }),
+                              child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                        selected
+                                            ? Icons.star_rounded
+                                            : Icons.star_border_rounded,
+                                        size: 20),
+                                    const SizedBox(height: 4),
+                                    Text('$value',
+                                        style: const TextStyle(fontSize: 14)),
+                                  ]),
+                            ),
+                          ),
+                        );
+                      }),
+                    );
+                  }),
                   const SizedBox(height: 4),
                   Text(
                     _rating != null ? '$_rating / 10' : 'No rating',
@@ -178,7 +267,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                   ),
                   const SizedBox(height: 20),
                   _buildDetailsSection(context),
-                  if (widget.showReviewOption) ...[
+                  if (widget.showReviewOption && _selectedPlan == null) ...[
                     const SizedBox(height: 10),
                     _buildReviewOption(),
                   ],
@@ -304,7 +393,9 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
             Icon(Icons.tune_rounded, color: context.colors.medium, size: 18),
             const SizedBox(width: 8),
             Text(
-              'Details (optional)',
+              widget.isPlanReview || _selectedPlan != null
+                  ? 'Review & date (optional)'
+                  : 'Details (optional)',
               style: TextStyle(
                 color: context.colors.light,
                 fontSize: 14,
@@ -396,7 +487,9 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                 const SizedBox(height: 14),
               ],
               Text(
-                'Personal note',
+                widget.isPlanReview || _selectedPlan != null
+                    ? 'Review (optional)'
+                    : 'Personal note',
                 style: TextStyle(
                   color: context.colors.light,
                   fontWeight: FontWeight.w600,
@@ -404,7 +497,9 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
               ),
               const SizedBox(height: 3),
               Text(
-                'Only visible to you and friends',
+                widget.isPlanReview || _selectedPlan != null
+                    ? 'Saved with your rating on this watch plan'
+                    : 'Only visible to you and friends',
                 style: TextStyle(color: context.colors.medium, fontSize: 12),
               ),
               const SizedBox(height: 8),
@@ -413,7 +508,9 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                 maxLines: 3,
                 style: TextStyle(color: context.colors.white),
                 decoration: InputDecoration(
-                  hintText: 'Add a personal note (optional)',
+                  hintText: widget.isPlanReview || _selectedPlan != null
+                      ? 'What did you think?'
+                      : 'Add a personal note (optional)',
                   hintStyle: TextStyle(color: context.colors.medium),
                   filled: true,
                   fillColor: context.colors.surface,

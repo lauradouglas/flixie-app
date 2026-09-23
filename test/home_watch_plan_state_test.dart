@@ -60,6 +60,22 @@ WatchPlanCandidate candidate(
     );
 
 void main() {
+  test('today precedes actions, which precede ordinary upcoming plans', () {
+    final now = DateTime(2026, 9, 23, 9);
+    final states = homeWatchPlanStates([
+      plan(
+          id: 'upcoming',
+          scheduledFor: DateTime(2026, 9, 24, 19),
+          location: 'Cinema'),
+      plan(id: 'invite', status: 'pending', currentUserAccepted: false),
+      plan(
+          id: 'today',
+          scheduledFor: DateTime(2026, 9, 23, 20),
+          location: 'Cinema'),
+    ], 'me', now: now);
+    expect(states.map((s) => s.plan.id), ['today', 'invite', 'upcoming']);
+  });
+
   final now = DateTime(2026, 9, 2, 12);
 
   test('saved group picks wait for the group rather than one named friend', () {
@@ -256,28 +272,45 @@ void main() {
     expect(selected?.colorRole, WatchPlanColorRole.action);
   });
 
-  test('confirmed group slot ignores stale proposal with a declined invitee', () {
+  test('confirmed group slot ignores stale proposal with a declined invitee',
+      () {
     final slot = now.add(const Duration(days: 3));
     final request = plan(
-      groupId: 'group', groupName: 'Friday films', status: 'scheduled',
-      scheduledFor: slot, scheduleStatus: 'AGREED', location: 'Cinema',
+      groupId: 'group',
+      groupName: 'Friday films',
+      status: 'scheduled',
+      scheduledFor: slot,
+      scheduleStatus: 'AGREED',
+      location: 'Cinema',
       selectedCandidateId: 'one',
       participants: const [
         WatchRequestParticipant(user: me, response: 'ACCEPTED'),
         WatchRequestParticipant(user: jamie, response: 'ACCEPTED'),
-        WatchRequestParticipant(user: WatchRequestUser(id: 'declined', username: 'Declined'), response: 'DECLINED'),
+        WatchRequestParticipant(
+            user: WatchRequestUser(id: 'declined', username: 'Declined'),
+            response: 'DECLINED'),
       ],
-      proposals: [WatchScheduleProposal(id: 'old', proposerId: 'jamie',
-        proposedFor: slot, location: 'Cinema', status: 'PENDING', responses: const [
-          WatchScheduleProposalResponse(userId: 'me', status: 'ACCEPTED'),
-          WatchScheduleProposalResponse(userId: 'jamie', status: 'ACCEPTED'),
-          WatchScheduleProposalResponse(userId: 'declined', status: 'PENDING'),
-        ])],
+      proposals: [
+        WatchScheduleProposal(
+            id: 'old',
+            proposerId: 'jamie',
+            proposedFor: slot,
+            location: 'Cinema',
+            status: 'PENDING',
+            responses: const [
+              WatchScheduleProposalResponse(userId: 'me', status: 'ACCEPTED'),
+              WatchScheduleProposalResponse(
+                  userId: 'jamie', status: 'ACCEPTED'),
+              WatchScheduleProposalResponse(
+                  userId: 'declined', status: 'PENDING'),
+            ])
+      ],
     );
     expect(request.latestPendingProposal, isNull);
     for (final userId in ['me', 'jamie']) {
       final selected = selectHomeWatchPlanState([request], userId, now: now);
-      expect(selected?.type, isNot(HomeWatchPlanStateType.waitingForScheduleApproval));
+      expect(selected?.type,
+          isNot(HomeWatchPlanStateType.waitingForScheduleApproval));
       expect(selected?.type, isNot(HomeWatchPlanStateType.reviewSchedule));
       expect(selected?.requiresAttention, isFalse);
     }

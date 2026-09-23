@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -287,7 +288,15 @@ class ChatBubble extends StatelessWidget {
                 fontSize: 19,
                 fontWeight: FontWeight.w800,
                 height: 1.25)),
-        if (payload.rating != null) ...[
+        if (payload.rating != null &&
+            (isOwnActivity ||
+                !hideMovieRatings(
+                    context,
+                    int.tryParse(
+                        Uri.tryParse(payload.link)?.pathSegments.lastOrNull ??
+                            ''),
+                    isShow: Uri.tryParse(payload.link)?.host == 'shows',
+                    ownerId: payload.userId))) ...[
           const SizedBox(height: 8),
           Row(children: [
             Icon(Icons.star_rounded, color: context.colors.warning, size: 18),
@@ -478,9 +487,7 @@ class ChatBubble extends StatelessWidget {
             const SizedBox(height: 14),
             Text(payload.prompt,
                 style: TextStyle(
-                    color: context.colors.light,
-                    fontSize: 14.5,
-                    height: 1.4)),
+                    color: context.colors.light, fontSize: 14.5, height: 1.4)),
           ],
         ],
       ),

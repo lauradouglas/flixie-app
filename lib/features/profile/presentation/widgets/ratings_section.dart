@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -121,7 +122,10 @@ class _RatingCard extends StatelessWidget {
                   top: 4,
                   right: 4,
                   child: FlixiePill.label(
-                      label: Text('${rating.rating}'),
+                      label: Text(hideMovieRatings(context, rating.movieId,
+                              ownerId: rating.userId)
+                          ? 'Rate to see'
+                          : '${rating.rating}'),
                       avatar: Icon(Icons.star, color: context.colors.tertiary)),
                 ),
               ],
@@ -351,7 +355,10 @@ class _RatingListTile extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               FlixiePill.label(
-                  label: Text('${rating.rating}'),
+                  label: Text(hideMovieRatings(context, rating.movieId,
+                          ownerId: rating.userId)
+                      ? 'Rate to see'
+                      : '${rating.rating}'),
                   avatar: Icon(Icons.star, color: context.colors.tertiary)),
             ],
           ),

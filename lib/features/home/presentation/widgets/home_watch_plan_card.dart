@@ -221,9 +221,9 @@ class HomeWatchPlanEmptyCard extends StatelessWidget {
                                 fontWeight: FontWeight.w900,
                                 letterSpacing: .8)),
                         const SizedBox(height: 5),
-                        const Text('Plan your next watch',
+                        Text('Plan your next watch',
                             style: TextStyle(
-                                color: Colors.white,
+                                color: context.colors.textPrimary,
                                 fontSize: 17,
                                 fontWeight: FontWeight.w800)),
                         const SizedBox(height: 4),

@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:provider/provider.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
@@ -242,7 +243,11 @@ class _ReviewCardState extends State<ReviewCard> {
       children: [
         Icon(Icons.star_rounded, color: context.colors.warning, size: 20),
         const SizedBox(width: 4),
-        Text('${review.rating}/10',
+        Text(
+            hideMovieRatings(context, review.movieId,
+                    isShow: review.showId != null, ownerId: review.userId)
+                ? 'Rate to see score'
+                : '${review.rating}/10',
             style: TextStyle(
                 color: context.colors.white,
                 fontWeight: FontWeight.w700,
@@ -675,7 +680,12 @@ class _ReviewDetailSheetState extends State<ReviewDetailSheet> {
                           Icon(Icons.star_rounded,
                               color: context.colors.warning, size: 22),
                           const SizedBox(width: 4),
-                          Text('${review.rating}/10',
+                          Text(
+                              hideMovieRatings(context, review.movieId,
+                                      isShow: review.showId != null,
+                                      ownerId: review.userId)
+                                  ? 'Rate to see score'
+                                  : '${review.rating}/10',
                               style: TextStyle(
                                   color: context.colors.white,
                                   fontSize: 18,

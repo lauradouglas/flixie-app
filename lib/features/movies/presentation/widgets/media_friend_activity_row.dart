@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -6,7 +7,13 @@ import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_
 
 class MediaFriendActivityRow extends StatelessWidget {
   const MediaFriendActivityRow(
-      {super.key, required this.activity, required this.onTap});
+      {super.key,
+      required this.activity,
+      required this.onTap,
+      this.movieId,
+      this.isShow = false});
+  final int? movieId;
+  final bool isShow;
   final MovieFriendActivity activity;
   final VoidCallback? onTap;
   BoxDecoration _friendPanelDecoration(BuildContext context) => BoxDecoration(
@@ -44,35 +51,49 @@ class MediaFriendActivityRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final count = (activity.watchCount ?? 0) > 0
+        ? activity.watchCount!
+        : activity.isRewatch
+            ? 2
+            : 1;
     final chips = <Widget>[
       if (activity.watched)
+        _compactFriendChip('$count ${count == 1 ? 'time' : 'times'}',
+            Icons.check_rounded, context.colors.success,
+            description: 'Watched $count ${count == 1 ? 'time' : 'times'}'),
+      if (activity.rating != null)
         _compactFriendChip(
-          (activity.watchCount ?? 0) > 2
-              ? 'Watched ${activity.watchCount} times'
-              : activity.isRewatch || activity.watchCount == 2
-                  ? 'Watched twice'
-                  : 'Watched',
-          Icons.check_rounded,
-          context.colors.success,
-        ),
-      if (activity.onWatchlist)
+            hideMovieRatings(context, movieId,
+                    isShow: isShow, ownerId: activity.userId)
+                ? 'Rated'
+                : '${activity.rating}/10',
+            Icons.star_rounded,
+            context.colors.warning,
+            description: hideMovieRatings(context, movieId,
+                    isShow: isShow, ownerId: activity.userId)
+                ? 'Rated'
+                : 'Rated ${activity.rating} out of 10'),
+      if (activity.recommended != null)
         _compactFriendChip(
-          'In watchlist',
-          Icons.bookmark_outline_rounded,
-          FlixieColors.primary,
-        ),
+            null,
+            activity.recommended!
+                ? Icons.thumb_up_alt_rounded
+                : Icons.thumb_down_alt_rounded,
+            activity.recommended!
+                ? context.colors.success
+                : context.colors.danger,
+            description:
+                activity.recommended! ? 'Recommends' : "Doesn't recommend"),
       if (activity.favorited)
-        _compactFriendChip(
-          'Favourite',
-          Icons.favorite_rounded,
-          context.colors.danger,
-        ),
+        _compactFriendChip(null, Icons.favorite_rounded, context.colors.danger,
+            description: 'Favourite'),
+      if (activity.onWatchlist)
+        _compactFriendChip(null, Icons.bookmark_rounded, context.colors.warning,
+            description: 'In watchlist'),
       if (activity.reviewed)
         _compactFriendChip(
-          'Reviewed',
-          Icons.check_box_rounded,
-          const Color(0xFF70A7FF),
-        ),
+            null, Icons.rate_review_outlined, const Color(0xFF70A7FF),
+            description: 'Reviewed'),
     ];
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
@@ -110,42 +131,6 @@ class MediaFriendActivityRow extends StatelessWidget {
                   ],
                 ),
               ),
-              if (activity.recommended != null) ...[
-                const SizedBox(width: 7),
-                Tooltip(
-                  message: activity.recommended!
-                      ? 'Recommends'
-                      : "Doesn't recommend",
-                  child: Icon(
-                    activity.recommended!
-                        ? Icons.thumb_up_alt_rounded
-                        : Icons.thumb_down_alt_rounded,
-                    color: activity.recommended!
-                        ? context.colors.success
-                        : context.colors.danger,
-                    size: 17,
-                  ),
-                ),
-              ],
-              if (activity.rating != null) ...[
-                const SizedBox(width: 9),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.star_rounded,
-                        color: context.colors.warning, size: 16),
-                    const SizedBox(width: 2),
-                    Text(
-                      '${activity.rating}/10',
-                      style: TextStyle(
-                        color: context.colors.light,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
               const Icon(
                 Icons.chevron_right_rounded,
                 color: FlixieColors.primary,
@@ -158,8 +143,26 @@ class MediaFriendActivityRow extends StatelessWidget {
     );
   }
 
-  Widget _compactFriendChip(String label, IconData icon, Color color) {
-    return FlixiePill.label(
-        label: Text(label), avatar: Icon(icon, color: color));
+  Widget _compactFriendChip(String? label, IconData icon, Color color,
+      {required String description}) {
+    return Tooltip(
+      message: description,
+      child: Semantics(
+        label: description,
+        excludeSemantics: true,
+        child: FlixiePill.label(
+          label: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 18),
+              if (label != null) ...[
+                const SizedBox(width: 10),
+                Flexible(child: Text(label)),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

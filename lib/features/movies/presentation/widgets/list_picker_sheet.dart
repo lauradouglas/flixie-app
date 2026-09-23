@@ -388,7 +388,8 @@ class _PickerListRow extends StatelessWidget {
                 ),
                 child: selected
                     ? Icon(Icons.check_rounded,
-                        color: context.colors.white, size: 18)
+                        color: Theme.of(context).colorScheme.onPrimary,
+                        size: 18)
                     : null,
               ),
             ],

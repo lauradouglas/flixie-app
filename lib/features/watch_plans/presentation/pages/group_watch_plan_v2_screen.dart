@@ -1264,6 +1264,7 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
       backgroundColor: Colors.transparent,
       builder: (_) => RewatchLogSheet(
         showReviewOption: false,
+        isPlanReview: true,
         onSubmit: ({
           required watchedAt,
           required rating,

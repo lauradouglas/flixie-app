@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/features/pick_for_us/pick_for_us_screen.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/core/auth/startup_trace.dart';
@@ -277,18 +278,23 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadedForUserId = user?.id;
     _lastActivityVersion = auth.activityVersion;
 
-    // These are the two sections visible at the top of Home. Start them
-    // together while the launch treatment is on screen; all other content is
-    // deliberately deferred until the shell is usable.
+    // Home stays usable while each independent section loads in place.
     unawaited(_preloadInitialWatchPlans(user));
 
+    unawaited(_loadSecondaryContent(
+      user,
+      refreshRecommendations: refreshRecommendations,
+      generation: generation,
+    ).catchError((error) {
+      logger.w('[HomeScreen] secondary load error: $error');
+    }));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (current()) StartupTrace.mark('usable-home-frame');
+    });
     try {
-      final cachedTrending = auth.cachedTrending;
-      final trendingFuture = !refreshRecommendations &&
-              cachedTrending != null &&
-              cachedTrending.isNotEmpty
-          ? Future.value(cachedTrending)
-          : TrendingService.getTrendingMovies(refresh: refreshRecommendations);
+      // Use the expiring service cache; auth's snapshot has no freshness limit.
+      final trendingFuture =
+          TrendingService.getTrendingMovies(refresh: refreshRecommendations);
       final trendingMovies = await trendingFuture;
       if (!current() || auth.dbUser?.id != user?.id) return;
 
@@ -299,17 +305,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _featuredMovies = trendingMovies;
           _isLoading = false;
         });
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (current()) StartupTrace.mark('usable-home-frame');
-        });
       }
-      unawaited(_loadSecondaryContent(
-        user,
-        refreshRecommendations: refreshRecommendations,
-        generation: generation,
-      ).catchError((error) {
-        logger.w('[HomeScreen] secondary load error: $error');
-      }));
       unawaited(_precacheInitialHomeImages(trendingMovies));
       if (user != null) {
         unawaited(_loadHeroFriendInteractions(trendingMovies, user.id));
@@ -910,8 +906,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 inWatchlist
                     ? '${movie.name} removed from your watchlist'
                     : '${movie.name} added to your watchlist',
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color:
+                      inWatchlist ? context.colors.textPrimary : Colors.white,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -1064,8 +1061,8 @@ class _HomeScreenState extends State<HomeScreen> {
               isLabelVisible: unreadCount > 0,
               label:
                   unreadCount < 100 ? Text('$unreadCount') : const Text('99+'),
-              backgroundColor: FlixieColors.primaryShade,
-              textColor: Colors.white,
+              backgroundColor: FlixieColors.notificationBadge,
+              textColor: FlixieColors.onNotificationBadge,
               textStyle:
                   const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
               child: Icon(
@@ -1084,101 +1081,99 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const HomeBootLoadingScreen()
-          : _error != null
-              ? ErrorRetryWidget(message: _error!, onRetry: _loadAll)
-              : RefreshIndicator(
-                  color: FlixieColors.primary,
-                  backgroundColor: context.colors.background,
-                  onRefresh: _refreshAll,
-                  child: SingleChildScrollView(
-                    controller: _homeScrollController,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(0, 0, 0, 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (_secondaryError != null ||
-                            auth.recoveryError != null)
-                          ListTile(
-                            title: Text(auth.recoveryError ?? _secondaryError!),
-                            trailing: TextButton(
-                                onPressed: () async {
-                                  await auth.retrySession();
-                                  if (mounted) await _refreshAll();
-                                },
-                                child: const Text('Retry')),
-                          ),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: GreetingHeader(
-                            name: greetingName,
-                            avatar: user?.avatar,
-                            profileBadges: user?.profileBadges ?? const [],
-                            requestCount: attentionCount,
-                            onSearch: () => context.push('/search'),
-                            onWatchlist: () => context.go('/watchlist'),
-                            onInvite: () => context.go('/social'),
-                            onRequests: () => context.push('/watch-requests'),
-                            featureCard: showWatchPlansIntro
-                                ? WatchPlansIntroductionCard(
-                                    onCreate: _openWatchPlanCreation,
-                                    onLearnMore: _showWatchPlansExplanation,
-                                    onDismiss: _dismissWatchPlansIntroduction,
-                                  )
-                                : null,
-                          ),
-                        ),
-                        if (user != null)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                            child: ListTile(
-                              tileColor: context.colors.surface,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16)),
-                              leading: Icon(Icons.auto_awesome_outlined,
-                                  color: context.colors.secondary),
-                              title: const Text('Pick for me'),
-                              subtitle: const Text(
-                                  'Your mood. Your taste. Solo or with friends.'),
-                              trailing: const Icon(Icons.chevron_right),
-                              onTap: () async {
-                                await Navigator.of(context, rootNavigator: true)
-                                    .push(MaterialPageRoute<void>(
-                                        builder: (_) =>
-                                            PickForUsScreen(userId: user.id)));
-                                if (mounted) await _refreshAll();
-                              },
-                            ),
-                          ),
-                        _buildUpcomingWatchPlanSection(
-                          context,
-                          user,
-                          selectedState: selectedWatchPlan,
-                          suppressEmptyState: showWatchPlansIntro,
-                        ),
-                        if (heroMovies.isNotEmpty) ...[
-                          const HomeSectionHeader(title: 'Trending now'),
-                          const SizedBox(height: 4),
-                          _buildHeroCarousel(context, heroMovies),
-                          const SizedBox(height: 10),
-                          _buildCarouselDots(heroMovies),
-                          const SizedBox(height: 20),
-                        ],
-                        _buildBecauseYouRatedSection(context),
-                        _buildContinueWatchingSection(context),
-                        if (_isLoadingRecommendations &&
-                            _friendsActivity.isEmpty)
-                          _buildPosterRailLoadingState('Friends watching')
-                        else
-                          FriendsWatchingSection(activity: _friendsActivity),
-                        _buildFriendActivitySection(context),
-                        _buildWatchlistSection(context),
-                      ],
-                    ),
+      body: RefreshIndicator(
+        color: FlixieColors.primary,
+        backgroundColor: context.colors.background,
+        onRefresh: _refreshAll,
+        child: SingleChildScrollView(
+          controller: _homeScrollController,
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(0, 0, 0, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_secondaryError != null || auth.recoveryError != null)
+                ListTile(
+                  title: Text(auth.recoveryError ?? _secondaryError!),
+                  trailing: TextButton(
+                      onPressed: () async {
+                        await auth.retrySession();
+                        if (mounted) await _refreshAll();
+                      },
+                      child: const Text('Retry')),
+                ),
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: GreetingHeader(
+                  name: greetingName,
+                  avatar: user?.avatar,
+                  profileBadges: user?.profileBadges ?? const [],
+                  requestCount: attentionCount,
+                  onSearch: () => context.push('/search'),
+                  onWatchlist: () => context.go('/watchlist'),
+                  onInvite: () => context.go('/social'),
+                  onRequests: () => context.push('/watch-requests'),
+                  featureCard: showWatchPlansIntro
+                      ? WatchPlansIntroductionCard(
+                          onCreate: _openWatchPlanCreation,
+                          onLearnMore: _showWatchPlansExplanation,
+                          onDismiss: _dismissWatchPlansIntroduction,
+                        )
+                      : null,
+                ),
+              ),
+              if (user != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                  child: ListTile(
+                    tileColor: context.colors.surface,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                    leading: Icon(Icons.auto_awesome_outlined,
+                        color: context.colors.secondary),
+                    title: const Text('Pick for me'),
+                    subtitle: const Text(
+                        'Your mood. Your taste. Solo or with friends.'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () async {
+                      await Navigator.of(context, rootNavigator: true).push(
+                          MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  PickForUsScreen(userId: user.id)));
+                      if (mounted) await _refreshAll();
+                    },
                   ),
                 ),
+              _buildUpcomingWatchPlanSection(
+                context,
+                user,
+                selectedState: selectedWatchPlan,
+                suppressEmptyState: showWatchPlansIntro,
+              ),
+              if (_isLoading && heroMovies.isEmpty)
+                _buildPosterRailLoadingState('Trending now'),
+              if (_error != null)
+                ErrorRetryWidget(message: _error!, onRetry: _loadAll),
+              if (heroMovies.isNotEmpty) ...[
+                const HomeSectionHeader(title: 'Trending now'),
+                const SizedBox(height: 4),
+                _buildHeroCarousel(context, heroMovies),
+                const SizedBox(height: 10),
+                _buildCarouselDots(heroMovies),
+                const SizedBox(height: 20),
+              ],
+              _buildBecauseYouRatedSection(context),
+              _buildContinueWatchingSection(context),
+              if (_isLoadingRecommendations && _friendsActivity.isEmpty)
+                _buildPosterRailLoadingState('Friends watching')
+              else
+                FriendsWatchingSection(activity: _friendsActivity),
+              _buildFriendActivitySection(context),
+              _buildWatchlistSection(context),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1450,7 +1445,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     const Spacer(),
                     Row(
                       children: [
-                        if ((movie.voteAverage ?? 0) > 0) ...[
+                        if (!hideMovieRatings(context, movie.id) &&
+                            (movie.voteAverage ?? 0) > 0) ...[
                           Icon(
                             Icons.star_rounded,
                             color: context.colors.warning,

@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/notification_opt_in.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
@@ -998,6 +999,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
                 height: 1.35,
               ),
             ),
+            const NotificationOptIn(),
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,

@@ -150,7 +150,9 @@ class _GroupInvitationDetailScreenState
           style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(48),
               backgroundColor: context.colors.success,
-              foregroundColor: Colors.black),
+              foregroundColor: Theme.of(context).brightness == Brightness.light
+                  ? Colors.white
+                  : Colors.black),
         ),
         const SizedBox(height: 10),
         OutlinedButton.icon(

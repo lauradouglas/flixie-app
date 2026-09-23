@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/models/movie_rating.dart';
 import 'package:flixie_app/models/favorite_movie.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
@@ -200,7 +201,11 @@ class _FriendRecentReviewCardState extends State<_FriendRecentReviewCard> {
                             runSpacing: 5,
                             children: [
                               Text(
-                                '★ ${review.rating}/10',
+                                hideMovieRatings(context, review.movieId,
+                                        isShow: review.showId != null,
+                                        ownerId: review.userId)
+                                    ? 'Rate to see score'
+                                    : '★ ${review.rating}/10',
                                 style: TextStyle(
                                   color: context.colors.warning,
                                   fontSize: 13,
@@ -1902,7 +1907,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                           'RECENT REVIEWS',
                           style: textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            color: context.colors.textPrimary,
                             letterSpacing: 1.5,
                           ),
                         ),

@@ -1,9 +1,63 @@
+import 'package:flixie_app/features/movies/data/movie_watch_plan_choice.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_sheet.dart';
 import 'package:flixie_app/models/movie_watch_entry.dart';
 
 void main() {
+  testWidgets(
+      'selecting a watch plan links the rating and changes notes to a plan review',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    MovieWatchPlanChoice? selected;
+    double? savedRating;
+    String? savedReview;
+    final plan = MovieWatchPlanChoice(
+        id: 'group:1',
+        label: 'With Film Club',
+        save: ({watchedAt, rating, recommended, notes}) async {
+          savedRating = rating;
+          savedReview = notes;
+        });
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: RewatchLogSheet(
+      watchPlans: Future.value([plan]),
+      showReviewOption: true,
+      onPlanSelected: (value) => selected = value,
+      onSubmit: (
+          {required watchedAt,
+          required rating,
+          required recommended,
+          required notes}) async {
+        await selected!.save(
+            watchedAt: watchedAt,
+            rating: rating,
+            recommended: recommended,
+            notes: notes);
+      },
+    ))));
+    await tester.pumpAndSettle();
+    expect(selected, isNull);
+    await tester.tap(find.text('With Film Club'));
+    await tester.pump();
+    expect(selected, same(plan));
+    expect(find.text('Write a review after logging'), findsNothing);
+    await tester.tap(
+        find.ancestor(of: find.text('8'), matching: find.byType(TextButton)));
+    await tester.pump();
+    await tester.tap(find.text('Review & date (optional)'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.byType(TextField), 'Loved watching this together');
+    await tester.ensureVisible(find.text('Rate & mark watched'));
+    await tester.tap(find.text('Rate & mark watched'));
+    await tester.pumpAndSettle();
+    expect(savedRating, 8);
+    expect(savedReview, 'Loved watching this together');
+  });
+
   testWidgets('a rated watch can clear a recommendation to no opinion',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1400));

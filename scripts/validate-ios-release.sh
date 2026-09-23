@@ -3,6 +3,12 @@ set -eu
 
 case "${CONFIGURATION:-}" in Release*) ;; *) exit 0 ;; esac
 
+# Reject command-line overrides as well as stale generated test configuration.
+case "${FLUTTER_TARGET:-}" in
+  lib/main.dart|"${SRCROOT:-}/../lib/main.dart"|"${FLUTTER_APPLICATION_PATH:-}/lib/main.dart") ;;
+  *) echo 'error: Apple Release builds must use lib/main.dart, never a Patrol/test entry point. Run scripts/prepare-ios-release.sh before archiving.' >&2; exit 1 ;;
+esac
+
 # Mirror ApiClient's release default while rejecting local archive overrides.
 api_url=''
 use_prod_api=true

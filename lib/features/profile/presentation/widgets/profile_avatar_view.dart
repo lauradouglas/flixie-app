@@ -36,6 +36,21 @@ class _ProfileAvatarViewState extends State<ProfileAvatarView> {
   Future<String>? _url;
   bool _iconFailed = false;
 
+  double get _frameWidth => widget.profileBadges.contains('FOUNDER')
+      ? 4
+      : widget.profileBadges.any(const {
+          'OG_USER',
+          'VERIFIED',
+          'EARLY_ADOPTER',
+          'FOUNDING_FILM_FRIEND'
+        }.contains)
+          ? 3
+          : 0;
+
+  // The requested size includes the badge ring, rather than growing around it.
+  double get _imageSize =>
+      (widget.size - _frameWidth * 2).clamp(0, widget.size);
+
   bool get _usesIcon =>
       !widget.useFullSize &&
       widget.size <= 48 &&
@@ -95,7 +110,7 @@ class _ProfileAvatarViewState extends State<ProfileAvatarView> {
   }
 
   Widget _fallback() => CircleAvatar(
-        radius: widget.size / 2,
+        radius: _imageSize / 2,
         backgroundColor: context.colors.surfaceElevated,
         child: Padding(
           padding: EdgeInsets.all(widget.size * .18),
@@ -114,9 +129,12 @@ class _ProfileAvatarViewState extends State<ProfileAvatarView> {
   @override
   Widget build(BuildContext context) {
     final avatar = _buildAvatar();
-    return SpecialAvatarFrame(
-      badges: widget.profileBadges,
-      child: avatar,
+    return SizedBox.square(
+      dimension: widget.size,
+      child: SpecialAvatarFrame(
+        badges: widget.profileBadges,
+        child: avatar,
+      ),
     );
   }
 
@@ -165,7 +183,7 @@ class _ProfileAvatarViewState extends State<ProfileAvatarView> {
           }
           if (!snapshot.hasData) {
             return SizedBox.square(
-              dimension: widget.size,
+              dimension: _imageSize,
               child: const Padding(
                 padding: EdgeInsets.all(16),
                 child: CircularProgressIndicator(strokeWidth: 2),
@@ -175,8 +193,8 @@ class _ProfileAvatarViewState extends State<ProfileAvatarView> {
           return ClipOval(
             child: CachedNetworkImage(
               imageUrl: snapshot.data!,
-              width: widget.size,
-              height: widget.size,
+              width: _imageSize,
+              height: _imageSize,
               fit: BoxFit.cover,
               fadeInDuration: const Duration(milliseconds: 120),
               placeholder: (_, __) => _fallback(),

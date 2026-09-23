@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'dart:math' as math;
 
@@ -144,13 +145,15 @@ class _WrappedPage extends StatelessWidget {
                     _SectionTitle(
                         '$subject year in ${_number(films.length)} films'),
                     const SizedBox(height: 10),
-                    _FilmGrid(films: featured),
+                    _FilmGrid(films: featured, ownerId: user.id),
                   ],
                   if (wrapped.highestRatedMovies.isNotEmpty) ...[
                     const SizedBox(height: 24),
                     _SectionTitle('$subject standout'),
                     const SizedBox(height: 10),
-                    _Standout(movie: wrapped.highestRatedMovies.first),
+                    _Standout(
+                        movie: wrapped.highestRatedMovies.first,
+                        ownerId: user.id),
                   ],
                   if (wrapped.topGenres.isNotEmpty) ...[
                     const SizedBox(height: 24),
@@ -295,7 +298,8 @@ class _PosterFan extends StatelessWidget {
 }
 
 class _FilmGrid extends StatelessWidget {
-  const _FilmGrid({required this.films});
+  const _FilmGrid({required this.films, required this.ownerId});
+  final String ownerId;
   final List<_WrappedFilm> films;
   @override
   Widget build(BuildContext context) => GridView.builder(
@@ -336,7 +340,8 @@ class _FilmGrid extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                   fontWeight: FontWeight.w700))),
-                      if (film.rating != null)
+                      if (film.rating != null &&
+                          !hideMovieRatings(context, film.id, ownerId: ownerId))
                         Text('★ ${film.rating}/10',
                             style: TextStyle(
                                 color: context.colors.warning,
@@ -350,7 +355,8 @@ class _FilmGrid extends StatelessWidget {
 }
 
 class _Standout extends StatelessWidget {
-  const _Standout({required this.movie});
+  const _Standout({required this.movie, required this.ownerId});
+  final String ownerId;
   final WrappedRatedMovie movie;
   @override
   Widget build(BuildContext context) => InkWell(
@@ -381,7 +387,11 @@ class _Standout extends StatelessWidget {
                               style: const TextStyle(
                                   fontSize: 19, fontWeight: FontWeight.w800)),
                           const SizedBox(height: 7),
-                          Text('Highest rated  ★ ${movie.rating}/10',
+                          Text(
+                              hideMovieRatings(context, movie.movieId,
+                                      ownerId: ownerId)
+                                  ? 'Rate to see score'
+                                  : 'Highest rated  ★ ${movie.rating}/10',
                               style: TextStyle(color: context.colors.warning)),
                         ]))),
             Padding(
