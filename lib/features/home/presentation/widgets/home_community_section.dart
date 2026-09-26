@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/social/data/starred_people.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flixie_app/core/safety/safety_service.dart';
@@ -27,12 +28,18 @@ class HomeCommunitySectionState extends State<HomeCommunitySection> {
   @override
   void initState() {
     super.initState();
+    StarredPeople.instance.addListener(_starsChanged);
     SafetyService.changes.addListener(_safetyChanged);
     refresh();
   }
 
+  void _starsChanged() {
+    if (mounted) refresh();
+  }
+
   @override
   void dispose() {
+    StarredPeople.instance.removeListener(_starsChanged);
     SafetyService.changes.removeListener(_safetyChanged);
     super.dispose();
   }
@@ -59,7 +66,7 @@ class HomeCommunitySectionState extends State<HomeCommunitySection> {
       _items = [];
     });
     try {
-      final page = await widget.service.load();
+      final page = await widget.service.load(sort: 'for-you');
       if (mounted && generation == _generation) {
         setState(() => _items = page.items
             .where((item) => !SafetyService.isBlocked(item.userId))

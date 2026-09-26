@@ -96,3 +96,16 @@ android/build/
 pubspec.lock
 !/pubspec.lock
 docs/product-ideas.md
+
+# Fastlane local credentials and generated reports
+/fastlane/.env
+/fastlane/.env.*
+!/fastlane/.env.example
+/fastlane/report.xml
+/fastlane/README.md
+/fastlane/Preview.html
+/fastlane/screenshots/
+/fastlane/test_output/
+/.bundle/
+/vendor/bundle/
+*.p8

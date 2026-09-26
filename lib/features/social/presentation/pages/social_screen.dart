@@ -1,3 +1,5 @@
+import '../widgets/social_activity_view.dart';
+import '../widgets/people_directory.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/features/social/data/chat_unread_controller.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
@@ -13,7 +15,6 @@ import 'package:flixie_app/models/notification.dart';
 import 'package:flixie_app/features/social/presentation/controllers/friend_actions_controller.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
-import 'package:flixie_app/core/analytics/detail_source.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/add_friend_sheet.dart';
 import 'package:flixie_app/features/social/data/chat_service.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
@@ -22,7 +23,6 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/navigation/tab_refresh_controller.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
-import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/social/presentation/widgets/group_card.dart';
 import 'package:flixie_app/features/social/presentation/widgets/group_avatar.dart';
@@ -31,7 +31,6 @@ import 'package:flixie_app/features/social/presentation/widgets/pending_friend_c
 import 'package:flixie_app/features/social/presentation/widgets/social_section_header.dart';
 import 'package:flixie_app/features/social/presentation/widgets/segmented_toggle.dart';
 import 'package:flixie_app/features/social/presentation/widgets/visibility_chip.dart';
-import 'package:flixie_app/features/social/presentation/widgets/activity_filter_bar.dart';
 import 'package:flixie_app/features/social/presentation/widgets/conversations_hub.dart';
 
 class SocialScreen extends StatefulWidget {
@@ -43,13 +42,15 @@ class SocialScreen extends StatefulWidget {
 }
 
 class _SocialScreenState extends State<SocialScreen> {
-  int _selectedTab = 0; // 0 = Friends, 1 = Chats, 2 = Groups
+  int _selectedTab = 0; // People, Activity, Chats, Groups
+  bool _activityVisited = false;
   int _refreshRevision = 0;
 
   @override
   void initState() {
     super.initState();
     _selectedTab = widget.initialTab;
+    _activityVisited = _activityVisited || _selectedTab == 1;
     TabRefreshController.social.addListener(_onSocialTabRefresh);
   }
 
@@ -58,6 +59,7 @@ class _SocialScreenState extends State<SocialScreen> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.initialTab != widget.initialTab) {
       _selectedTab = widget.initialTab;
+      _activityVisited = _activityVisited || _selectedTab == 1;
     }
   }
 
@@ -74,6 +76,8 @@ class _SocialScreenState extends State<SocialScreen> {
   void _showAddFriendSheet() {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: context.colors.tabBarBackgroundFocused,
       shape: const RoundedRectangleBorder(
@@ -106,7 +110,7 @@ class _SocialScreenState extends State<SocialScreen> {
           ),
           IconButton(
             onPressed: () {
-              if (_selectedTab != 2) {
+              if (_selectedTab != 3) {
                 _showAddFriendSheet();
                 return;
               }
@@ -118,7 +122,7 @@ class _SocialScreenState extends State<SocialScreen> {
               );
             },
             icon: const Icon(Icons.person_add_alt_1_outlined),
-            tooltip: _selectedTab == 2 ? 'Create group' : 'Find friends',
+            tooltip: _selectedTab == 3 ? 'Create group' : 'Find friends',
           ),
         ],
       ),
@@ -126,9 +130,12 @@ class _SocialScreenState extends State<SocialScreen> {
         children: [
           SocialSegmentedToggle(
             selectedIndex: _selectedTab,
-            labels: const ['Friends', 'Chats', 'Groups'],
-            counts: {1: context.watch<ChatUnreadController?>()?.total ?? 0},
-            onChanged: (i) => setState(() => _selectedTab = i),
+            labels: const ['People', 'Activity', 'Chats', 'Groups'],
+            counts: {2: context.watch<ChatUnreadController?>()?.total ?? 0},
+            onChanged: (i) => setState(() {
+              _selectedTab = i;
+              _activityVisited = _activityVisited || i == 1;
+            }),
           ),
           Expanded(
             child: ClipRect(
@@ -138,6 +145,9 @@ class _SocialScreenState extends State<SocialScreen> {
                   index: _selectedTab,
                   children: [
                     _FriendsSubView(key: ValueKey('friends-$_refreshRevision')),
+                    _activityVisited
+                        ? const SocialActivityView()
+                        : const SizedBox.shrink(),
                     ConversationsHub(key: ValueKey('chats-$_refreshRevision')),
                     _GroupsSubView(key: ValueKey('groups-$_refreshRevision')),
                   ],
@@ -168,9 +178,6 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
   final TextEditingController _searchController = TextEditingController();
   bool _loading = true;
   FriendsData? _friendsData;
-  List<ActivityListItem> _activity = [];
-  bool _showMoreActivity = false;
-  ActivityFeedFilter _activityFilter = ActivityFeedFilter.all;
   String? _error;
 
   @override
@@ -179,7 +186,6 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
     _searchController.addListener(() => setState(() {}));
     final auth = context.read<AuthProvider>();
     _friendsData = auth.cachedFriends;
-    _activity = auth.cachedFriendsActivity ?? const [];
     _loading = _friendsData == null;
     _load();
   }
@@ -202,7 +208,6 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
         final groups = results[2] as List<Group>;
         setState(() {
           _friendsData = friends;
-          _activity = activity;
           _loading = false;
           _error = null;
         });
@@ -232,6 +237,8 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
   void _showAddFriendSheet() {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: context.colors.tabBarBackgroundFocused,
       shape: const RoundedRectangleBorder(
@@ -266,13 +273,6 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
               content: Text(
                   'Now friends with ${friendship.friendUser?.username ?? 'user'}')),
         );
-        // Repoll friends activity now that we have a new friend.
-        final userId = context.read<AuthProvider>().dbUser?.id;
-        if (userId != null) {
-          _friendActions.getFriendsActivityLists(userId).then((activity) {
-            if (mounted) setState(() => _activity = activity);
-          }).catchError((_) {});
-        }
       }
     } catch (e) {
       logger.e('Accept request error: $e');
@@ -328,14 +328,6 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
             .whereType<FriendshipUser>()
             .toList() ??
         const <FriendshipUser>[];
-    final query = _searchController.text.trim().toLowerCase();
-    final filteredFriends = query.isEmpty
-        ? friends
-        : friends
-            .where((friend) => friend.username.toLowerCase().contains(query))
-            .toList();
-    final filteredActivity =
-        _activity.where(_activityFilter.matches).toList(growable: false);
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -346,59 +338,11 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _InviteFriendsBanner(),
-            const SizedBox(height: 14),
-            Row(children: [
-              Expanded(
-                child: _FriendSearchField(controller: _searchController),
-              ),
-              const SizedBox(width: 10),
-              OutlinedButton.icon(
-                onPressed: _showAddFriendSheet,
-                icon: const Icon(Icons.add),
-                label: const Text('Add'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: context.colors.primaryText,
-                  side: const BorderSide(color: FlixieColors.primary),
-                  minimumSize: const Size(96, 52),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(22),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              _RequestBell(
-                count: data?.pendingFriends.length ?? 0,
-                onTap: () => context.push('/notifications'),
-              ),
-            ]),
-            const SizedBox(height: 20),
-            Row(children: [
-              Text('Friends',
-                  style: TextStyle(
-                      color: context.colors.white,
-                      fontSize: 19,
-                      fontWeight: FontWeight.w800)),
-              const Spacer(),
-              Text('${friends.length}',
-                  style: const TextStyle(
-                      color: FlixieColors.primary,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800)),
-            ]),
-            const SizedBox(height: 12),
-            if (filteredFriends.isEmpty)
-              _NoFriendsCard(
-                isSearching: query.isNotEmpty,
-                onAddFriend: _showAddFriendSheet,
-              )
-            else
-              _FriendStoryStrip(
-                friends: filteredFriends,
-              ),
-            const SizedBox(height: 14),
-            Divider(color: Colors.white.withValues(alpha: .08)),
-            const SizedBox(height: 14),
+            PeopleDirectory(
+              userId: context.read<AuthProvider>().dbUser?.id ?? '',
+              friends: friends,
+            ),
+            const SizedBox(height: 16),
             // Pending requests section
             if (data != null &&
                 (data.pendingFriends.isNotEmpty ||
@@ -422,50 +366,11 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
               ),
               const SizedBox(height: 14),
             ],
-            Row(children: [
-              const Expanded(
-                  child: SocialSectionHeader(title: 'Friend activity')),
-              TextButton(
-                  onPressed: () => context.push('/friends-activity'),
-                  child: const Text('Explore activity')),
-            ]),
-            const SizedBox(height: 10),
-            ActivityFilterBar(
-              selected: _activityFilter,
-              onChanged: (value) => setState(() => _activityFilter = value),
+            TextButton.icon(
+              onPressed: () => context.go('/social?tab=activity'),
+              icon: const Icon(Icons.dynamic_feed_outlined),
+              label: const Text('Explore activity'),
             ),
-            const SizedBox(height: 14),
-            if (filteredActivity.isEmpty)
-              _ActivityEmptyState(
-                hasFriends: friends.isNotEmpty,
-                onAddFriend: _showAddFriendSheet,
-                onOpenWatchlist: () => context.push('/watchlist'),
-              )
-            else ...[
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount:
-                    filteredActivity.take(_showMoreActivity ? 10 : 5).length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (_, i) => ActivityTile(
-                  item: filteredActivity[i],
-                  detailSource: DetailSource.friendActivity,
-                ),
-              ),
-              if (filteredActivity.length > 5) ...[
-                const SizedBox(height: 10),
-                if (!_showMoreActivity)
-                  Center(
-                    child: TextButton.icon(
-                      onPressed: () => setState(() => _showMoreActivity = true),
-                      icon: const Icon(Icons.keyboard_arrow_down_rounded),
-                      label: const Text('Show more activity'),
-                    ),
-                  ),
-              ],
-            ],
-            const SizedBox(height: 24),
           ],
         ),
       ),
@@ -488,177 +393,6 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
 // ---------------------------------------------------------------------------
 // Friends widgets
 // ---------------------------------------------------------------------------
-
-class _InviteFriendsBanner extends StatelessWidget {
-  const _InviteFriendsBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-        type: MaterialType.transparency,
-        child: InkWell(
-          onTap: () => context.push('/invite-friend?from=social_banner'),
-          borderRadius: BorderRadius.circular(18),
-          child: Ink(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(16, 15, 12, 15),
-            decoration: BoxDecoration(
-              color: context.colors.surface,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: context.colors.tabBarBorder,
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: FlixieColors.primary.withValues(alpha: .2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.group_add_rounded,
-                    color: FlixieColors.primary,
-                    size: 27,
-                  ),
-                ),
-                const SizedBox(width: 13),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Flixie is better together',
-                        style: TextStyle(
-                          color: context.colors.textPrimary,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Invite friends to compare favourites and plan what to watch.',
-                        style: TextStyle(
-                          color: context.colors.medium,
-                          fontSize: 12.5,
-                          height: 1.3,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const FlixiePill.label(
-                    label: Text('Invite'),
-                    avatar: Icon(Icons.arrow_forward_rounded)),
-              ],
-            ),
-          ),
-        ));
-  }
-}
-
-class _RequestBell extends StatelessWidget {
-  const _RequestBell({required this.count, required this.onTap});
-
-  final int count;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Stack(
-        clipBehavior: Clip.none,
-        children: [
-          IconButton.outlined(
-            onPressed: onTap,
-            icon: const Icon(Icons.notifications_none_rounded),
-            style: IconButton.styleFrom(
-              minimumSize: const Size(52, 52),
-              side: BorderSide(color: context.colors.tabBarBorder),
-            ),
-          ),
-          if (count > 0)
-            Positioned(
-              right: -2,
-              top: -5,
-              child: Container(
-                constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
-                alignment: Alignment.center,
-                padding: const EdgeInsets.symmetric(horizontal: 5),
-                decoration: const BoxDecoration(
-                    color: FlixieColors.primary, shape: BoxShape.circle),
-                child: Text('$count',
-                    style: TextStyle(
-                        color: Theme.of(context).colorScheme.onPrimary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800)),
-              ),
-            ),
-        ],
-      );
-}
-
-class _FriendStoryStrip extends StatelessWidget {
-  const _FriendStoryStrip({required this.friends});
-
-  final List<FriendshipUser> friends;
-
-  Color _avatarColor(Map<String, dynamic>? iconColor) {
-    final raw = (iconColor?['hexCode'] ?? iconColor?['hex']) as String?;
-    if (raw == null || raw.isEmpty) return FlixieColors.primary;
-    final hex = raw.replaceAll('#', '');
-    return Color(int.tryParse('0xFF$hex') ?? FlixieColors.primary.toARGB32());
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      // Avatar badges can extend the visual avatar slightly, and the username
-      // line needs a full text line at accessibility-safe metrics.
-      height: 86,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: friends.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
-        itemBuilder: (_, index) {
-          final friend = friends[index];
-          final initial = friend.username.isNotEmpty
-              ? friend.username[0].toUpperCase()
-              : '?';
-          return GestureDetector(
-            onTap: () => context.push('/friends/${friend.id}'),
-            child: Column(
-              children: [
-                ProfileAvatarView(
-                  avatar: friend.avatar,
-                  fallbackText: initial,
-                  fallbackColor: _avatarColor(friend.iconColor),
-                  size: 54,
-                  profileBadges: friend.profileBadges,
-                ),
-                const SizedBox(height: 4),
-                SizedBox(
-                  width: 62,
-                  child: Text(
-                    friend.username,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: context.colors.medium,
-                      fontSize: 11,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
 
 // ignore: unused_element
 class _SocialQuickStats extends StatelessWidget {
@@ -726,45 +460,6 @@ class _SocialQuickStats extends StatelessWidget {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _FriendSearchField extends StatelessWidget {
-  const _FriendSearchField({required this.controller});
-
-  final TextEditingController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      style: TextStyle(color: context.colors.light, fontSize: 14),
-      textInputAction: TextInputAction.search,
-      decoration: InputDecoration(
-        hintText: 'Search friends',
-        hintStyle: TextStyle(color: context.colors.medium),
-        prefixIcon: Icon(Icons.search_rounded, color: context.colors.medium),
-        suffixIcon: controller.text.isEmpty
-            ? null
-            : IconButton(
-                tooltip: 'Clear search',
-                icon: Icon(Icons.close_rounded, color: context.colors.medium),
-                onPressed: controller.clear,
-              ),
-        filled: true,
-        fillColor: context.colors.surfaceElevated,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: FlixieColors.primary),
         ),
       ),
     );
@@ -1143,67 +838,6 @@ class _EnhancedFriendCard extends StatelessWidget {
   }
 }
 
-class _ActivityEmptyState extends StatelessWidget {
-  const _ActivityEmptyState({
-    required this.hasFriends,
-    required this.onAddFriend,
-    required this.onOpenWatchlist,
-  });
-
-  final bool hasFriends;
-  final VoidCallback onAddFriend;
-  final VoidCallback onOpenWatchlist;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.colors.surfaceElevated,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'No recent activity yet.',
-            style: TextStyle(
-              color: context.colors.light,
-              fontWeight: FontWeight.w800,
-              fontSize: 15,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            hasFriends
-                ? 'Create a Watch Plan or add more titles to spark activity.'
-                : 'Add friends to start seeing ratings, watchlists and reviews here.',
-            style: TextStyle(color: context.colors.medium, fontSize: 13),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              FilledButton.tonalIcon(
-                onPressed: hasFriends ? onOpenWatchlist : onAddFriend,
-                icon: Icon(hasFriends
-                    ? Icons.movie_filter_outlined
-                    : Icons.person_add_outlined),
-                label: Text(hasFriends ? 'Pick a movie' : 'Add friends'),
-                style: FilledButton.styleFrom(
-                  foregroundColor: context.colors.light,
-                  backgroundColor: FlixieColors.primary.withValues(alpha: 0.2),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 // ignore: unused_element
 class _GroupsPreviewSection extends StatelessWidget {
   const _GroupsPreviewSection({required this.groups});
@@ -1452,6 +1086,8 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
   void _showCreateGroupSheet() {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: context.colors.tabBarBackgroundFocused,
       shape: const RoundedRectangleBorder(

@@ -92,6 +92,14 @@ void main() {
       ))));
       final field = find.byType(DropdownButtonFormField<String>);
       expect(tester.state<FormFieldState<String>>(field).value, 'recent');
+      // The preselected watch date is visible before opening or changing it.
+      final selectedDate = find.text('Watch 2 · Wed, Sep 23').hitTestable();
+      expect(selectedDate, findsOneWidget);
+      final fieldBounds = tester.getRect(field);
+      final dateBounds = tester.getRect(selectedDate);
+      expect(fieldBounds.contains(dateBounds.center), isTrue);
+      expect(dateBounds.top, greaterThanOrEqualTo(fieldBounds.top));
+      expect(dateBounds.bottom, lessThanOrEqualTo(fieldBounds.bottom));
       await tester.tap(field);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Watch 1 · Sat, Aug 1').last);

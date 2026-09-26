@@ -1,3 +1,4 @@
+import '../../data/starred_people.dart';
 import 'dart:async';
 import '../widgets/community_watchlist_button.dart';
 import 'package:go_router/go_router.dart';
@@ -24,10 +25,14 @@ class CommunityActivityFeed extends StatefulWidget {
       {super.key,
       this.service = const CommunityService(),
       this.showSettingsButton = true,
+      this.initialFollowing = false,
+      this.showAudienceSelector = true,
       this.onReady,
       this.friendActions = const FriendActionsController()});
   final CommunityService service;
   final bool showSettingsButton;
+  final bool initialFollowing;
+  final bool showAudienceSelector;
   final VoidCallback? onReady;
   final FriendActionsController friendActions;
   @override
@@ -40,7 +45,7 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
   CommunityConnectionsController? _connections;
   bool _loading = true, _loadingMore = false, _savingSetting = false;
   bool? _sharing;
-  String _filter = 'all', _sort = 'latest';
+  String _filter = 'all', _sort = 'for-you';
   bool _savedOnly = false,
       _following = false,
       _newPosts = false,
@@ -53,6 +58,8 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
   @override
   void initState() {
     super.initState();
+    StarredPeople.instance.addListener(_starsChanged);
+    _following = widget.initialFollowing;
     _refresh();
     _newPostsTimer =
         Timer.periodic(const Duration(minutes: 1), (_) => _checkNewPosts());
@@ -84,6 +91,10 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
     });
   }
 
+  void _starsChanged() {
+    if (mounted && _sort == 'for-you' && !_savedOnly) _refresh();
+  }
+
   void _blockedChanged() {
     if (mounted) {
       setState(() =>
@@ -93,6 +104,7 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
 
   @override
   void dispose() {
+    StarredPeople.instance.removeListener(_starsChanged);
     _newPostsTimer?.cancel();
     _connections?.dispose();
     SafetyService.changes.removeListener(_blockedChanged);
@@ -176,7 +188,7 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
     if (_checking ||
         _loading ||
         _savedOnly ||
-        _sort != 'latest' ||
+        (_sort != 'latest' && _sort != 'for-you') ||
         _items.isEmpty ||
         !(ModalRoute.of(context)?.isCurrent ?? true)) {
       return;
@@ -185,8 +197,8 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
     final generation = _generation;
     try {
       final page = _following
-          ? await widget.service.following(filter: _filter)
-          : await widget.service.load(filter: _filter);
+          ? await widget.service.following(filter: _filter, sort: _sort)
+          : await widget.service.load(filter: _filter, sort: _sort);
       if (mounted &&
           generation == _generation &&
           page.items.isNotEmpty &&
@@ -370,33 +382,34 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
     return RefreshIndicator(
         onRefresh: _refresh,
         child: ListView(
-          key: const PageStorageKey('community-feed'),
+          key: PageStorageKey('community-feed-${widget.initialFollowing}'),
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
           children: [
-            Wrap(
-                spacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  ChoiceChip(
-                      label: const Text('Discover'),
-                      selected: !_following,
-                      onSelected: (_) {
-                        setState(() => _following = false);
-                        _query(saved: false);
-                      }),
-                  ChoiceChip(
-                      label: const Text('Following'),
-                      selected: _following,
-                      onSelected: (_) {
-                        setState(() => _following = true);
-                        _query(saved: false);
-                      }),
-                  TextButton.icon(
-                      onPressed: () => context.push('/community/people'),
-                      icon: const Icon(Icons.people_outline),
-                      label: const Text('Find people')),
-                ]),
+            if (widget.showAudienceSelector)
+              Wrap(
+                  spacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    ChoiceChip(
+                        label: const Text('Discover'),
+                        selected: !_following,
+                        onSelected: (_) {
+                          setState(() => _following = false);
+                          _query(saved: false);
+                        }),
+                    ChoiceChip(
+                        label: const Text('Following'),
+                        selected: _following,
+                        onSelected: (_) {
+                          setState(() => _following = true);
+                          _query(saved: false);
+                        }),
+                    TextButton.icon(
+                        onPressed: () => context.push('/community/people'),
+                        icon: const Icon(Icons.people_outline),
+                        label: const Text('Find people')),
+                  ]),
             if (_newPosts)
               Align(
                   alignment: Alignment.center,
@@ -447,6 +460,8 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
                     value: _sort,
                     underline: const SizedBox.shrink(),
                     items: const [
+                      DropdownMenuItem(
+                          value: 'for-you', child: Text('For you')),
                       DropdownMenuItem(value: 'latest', child: Text('Latest')),
                       DropdownMenuItem(value: 'popular', child: Text('Popular'))
                     ],

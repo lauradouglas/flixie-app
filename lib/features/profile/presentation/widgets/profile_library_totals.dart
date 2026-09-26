@@ -7,15 +7,21 @@ import 'package:flixie_app/models/user.dart';
 enum ProfileLibrary { watched, watchlist, favourites }
 
 extension on ProfileLibrary {
+  Color color(BuildContext context) {
+    final light = Theme.of(context).brightness == Brightness.light;
+    return switch (this) {
+      ProfileLibrary.watched => context.colors.primaryText,
+      ProfileLibrary.watchlist =>
+        light ? const Color(0xFF2863A6) : const Color(0xFF8EBEFF),
+      ProfileLibrary.favourites =>
+        light ? const Color(0xFFA33783) : const Color(0xFFEEA0D5),
+    };
+  }
+
   String get title => switch (this) {
         ProfileLibrary.watched => 'Watched',
         ProfileLibrary.watchlist => 'Watchlist',
         ProfileLibrary.favourites => 'Favourites',
-      };
-  Color color(BuildContext context) => switch (this) {
-        ProfileLibrary.watched => context.colors.success,
-        ProfileLibrary.watchlist => context.colors.warning,
-        ProfileLibrary.favourites => context.colors.danger,
       };
 }
 

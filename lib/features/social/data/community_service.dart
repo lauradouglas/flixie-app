@@ -1,3 +1,4 @@
+import 'people_cache.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/models/friendship.dart';
@@ -83,6 +84,19 @@ class CommunityService {
     await ApiClient.put('${postPath(item)}/bookmark', body: {'saved': saved});
   }
 
+  Future<List<FriendshipUser>> followedPeople() async {
+    final users = <FriendshipUser>[];
+    String? cursor;
+    do {
+      final data = await ApiClient.get('/community/following/people',
+          queryParams: {if (cursor != null) 'cursor': cursor}) as Map;
+      users.addAll((data['items'] as List)
+          .map((u) => FriendshipUser.fromJson(Map<String, dynamic>.from(u))));
+      cursor = data['nextCursor'] as String?;
+    } while (cursor != null);
+    return users;
+  }
+
   Future<List<Map<String, dynamic>>> people() async =>
       List<Map<String, dynamic>>.from(
           (await ApiClient.get('/community/people'))['items']);
@@ -100,7 +114,18 @@ class CommunityService {
   Future<bool> follows(String path) async =>
       (await ApiClient.get('/community/$path/follow'))['following'] == true;
   Future<void> follow(String path, bool value) async {
+    final account = PeopleCache.instance.userId;
     await ApiClient.put('/community/$path/follow', body: {'following': value});
+    if (path.startsWith('profiles/') &&
+        account != null &&
+        PeopleCache.instance.userId == account) {
+      if (!value) {
+        PeopleCache.instance.remove(path.substring('profiles/'.length));
+      } else {
+        PeopleCache.instance.invalidateRead();
+        await PeopleCache.instance.load(followedPeople, refresh: true);
+      }
+    }
   }
 
   Future<void> feedPreference(ActivityListItem item, String action) async {

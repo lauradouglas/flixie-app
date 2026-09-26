@@ -1,3 +1,4 @@
+import '../../data/starred_people.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -24,6 +25,7 @@ class _FriendsActivityFeedState extends State<FriendsActivityFeed> {
   @override
   void initState() {
     super.initState();
+    StarredPeople.instance.addListener(_starsChanged);
     final cached = context.read<AuthProvider>().cachedFriendsActivity;
     if (cached != null) {
       final cutoff = DateTime.now().subtract(const Duration(days: 14));
@@ -34,6 +36,16 @@ class _FriendsActivityFeedState extends State<FriendsActivityFeed> {
       _loading = false;
     }
     _load(showSpinner: cached == null);
+  }
+
+  void _starsChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    StarredPeople.instance.removeListener(_starsChanged);
+    super.dispose();
   }
 
   Future<void> _load({bool showSpinner = false}) async {
@@ -66,6 +78,7 @@ class _FriendsActivityFeedState extends State<FriendsActivityFeed> {
 
   @override
   Widget build(BuildContext context) {
+    final ranked = StarredPeople.instance.rank(_items);
     return RefreshIndicator(
       onRefresh: () => _load(),
       child: _loading
@@ -98,37 +111,12 @@ class _FriendsActivityFeedState extends State<FriendsActivityFeed> {
                     )
                   : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-                      itemCount: _items.length + 1,
+                      itemCount: ranked.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 10),
                       itemBuilder: (_, index) {
-                        if (index == 0) {
-                          return Row(
-                            children: [
-                              const Icon(Icons.calendar_today_outlined,
-                                  size: 16, color: FlixieColors.primary),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Last 14 days · ratings and recommendations first',
-                                  style: TextStyle(
-                                    color: context.colors.medium,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                              Text(
-                                '${_items.length}',
-                                style: TextStyle(
-                                  color: context.colors.light,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          );
-                        }
                         return ActivityTile(
                           feedStyle: true,
-                          item: _items[index - 1],
+                          item: ranked[index],
                           detailSource: DetailSource.friendActivity,
                         );
                       },

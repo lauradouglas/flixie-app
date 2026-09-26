@@ -535,7 +535,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   SliverToBoxAdapter(
                       child: Padding(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 8),
+                              horizontal: 8, vertical: 0),
                           child: dbUser == null
                               ? const SizedBox.shrink()
                               : ProfileLibraryTotals(user: dbUser))),

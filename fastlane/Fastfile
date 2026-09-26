@@ -1,0 +1,108 @@
+require "shellwords"
+
+# Paths are rooted explicitly: Fastlane executes lanes from fastlane/.
+ROOT = File.expand_path("..", __dir__)
+PRODUCTION_API = "https://flixie-api-fmcehvaecwdheccm.northeurope-01.azurewebsites.net"
+ENV["FASTLANE_OPT_OUT_USAGE"] = "1"
+ENV["DEBUG"] = "false"
+
+def required_env(name)
+  value = ENV[name].to_s.strip
+  UI.user_error!("Set #{name}; see docs/fastlane.md") if value.empty?
+  value
+end
+
+def release_number(options)
+  value = (options[:build_number] || ENV["BUILD_NUMBER"]).to_s
+  UI.user_error!("build_number must be a positive integer above all uploaded builds") unless value.match?(/\A[1-9][0-9]*\z/)
+  value
+end
+
+def release_file(path)
+  absolute = File.expand_path(path, ROOT)
+  UI.user_error!("Required file is missing: #{absolute}") unless File.file?(absolute)
+  absolute
+end
+
+def flutter_release(kind, number)
+  release_file(".firebase.json")
+  args = ["flutter", "build", kind, "--release", "--target=lib/main.dart",
+          "--build-number=#{number}", "--dart-define-from-file=.firebase.json",
+          "--dart-define=API_BASE_URL=#{PRODUCTION_API}"]
+  args << "--export-method=app-store" if kind == "ipa"
+  Dir.chdir(ROOT) { sh(Shellwords.join(args)) }
+end
+
+def apple_key
+  app_store_connect_api_key(
+    key_id: required_env("APP_STORE_CONNECT_KEY_ID"),
+    issuer_id: required_env("APP_STORE_CONNECT_ISSUER_ID"),
+    key_filepath: release_file(required_env("APP_STORE_CONNECT_KEY_FILE")),
+    in_house: false
+  )
+end
+
+def play_options
+  {
+    package_name: "com.flixie.app",
+    json_key: release_file(required_env("PLAY_STORE_KEY_FILE")),
+    release_status: "draft",
+    skip_upload_metadata: true, skip_upload_images: true,
+    skip_upload_screenshots: true, skip_upload_changelogs: true
+  }
+end
+
+platform :ios do
+  desc "Build a signed App Store IPA without uploading"
+  lane :build do |options|
+    number = release_number(options)
+    release_file("ios/Runner/GoogleService-Info.plist")
+    flutter_release("ipa", number)
+    ipas = Dir[File.join(ROOT, "build/ios/ipa/*.ipa")]
+    UI.user_error!("Expected exactly one IPA in build/ios/ipa; remove stale IPA files and retry") unless ipas.length == 1
+    ipas.first
+  end
+
+  desc "Build and upload to TestFlight (no external distribution or review submission)"
+  lane :beta do |options|
+    release_number(options)
+    key = apple_key
+    ipa = build(options)
+    upload_to_testflight(
+      api_key: key, app_identifier: "com.flixie.flixieApp", ipa: ipa,
+      skip_waiting_for_build_processing: true, distribute_external: false
+    )
+  end
+end
+
+platform :android do
+  desc "Build a signed production AAB without uploading"
+  lane :build do |options|
+    number = release_number(options)
+    release_file("android/key.properties")
+    release_file("android/app/google-services.json")
+    flutter_release("appbundle", number)
+    release_file("build/app/outputs/bundle/release/app-release.aab")
+  end
+
+  desc "Build and upload Play drafts; track:internal (default), production or both"
+  lane :draft do |options|
+    number = release_number(options)
+    track = (options[:track] || ENV["PLAY_STORE_TRACK"] || "internal").to_s
+    UI.user_error!("track must be internal, production or both") unless %w[internal production both].include?(track)
+    config = play_options
+    aab = build(options)
+    upload_to_play_store(**config.merge(aab: aab, track: track == "both" ? "internal" : track))
+    promote(options) if track == "both"
+  end
+
+  desc "Promote an already uploaded internal build to a production draft without rebuilding"
+  lane :promote do |options|
+    number = release_number(options)
+    upload_to_play_store(**play_options.merge(
+      track: "internal", track_promote_to: "production",
+      track_promote_release_status: "draft", version_code: number.to_i,
+      skip_upload_aab: true, skip_upload_apk: true
+    ))
+  end
+end

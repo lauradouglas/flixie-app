@@ -38,6 +38,7 @@ class _CommunityFollowButtonState extends State<CommunityFollowButton> {
   }
 
   Future<void> _toggle() async {
+    if (_busy || _following == null) return;
     setState(() => _busy = true);
     try {
       await widget.service.follow(widget.path, !_following!);
@@ -53,18 +54,31 @@ class _CommunityFollowButtonState extends State<CommunityFollowButton> {
   }
 
   @override
-  Widget build(BuildContext context) => TextButton.icon(
-      onPressed: _busy
-          ? null
-          : _failed
-              ? _load
-              : _following == null
-                  ? null
-                  : _toggle,
-      icon: Icon(_following == true ? Icons.check : Icons.add),
-      label: Text(_failed
-          ? 'Retry follow status'
-          : _following == true
-              ? 'Following${widget.list ? ' list' : ''}'
-              : 'Follow${widget.list ? ' list' : ''}'));
+  Widget build(BuildContext context) => Tooltip(
+      message: _following == true
+          ? 'Unfollow${widget.list ? ' list' : ''}'
+          : 'Follow',
+      child: TextButton.icon(
+          onPressed: _busy
+              ? null
+              : _failed
+                  ? _load
+                  : _following == null
+                      ? null
+                      : _toggle,
+          icon: _busy
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : Icon(_following == true ? Icons.check : Icons.add, size: 16),
+          style: TextButton.styleFrom(
+              minimumSize: const Size(44, 44),
+              textStyle:
+                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          label: Text(_failed
+              ? 'Retry follow status'
+              : _following == true
+                  ? 'Following${widget.list ? ' list' : ''}'
+                  : 'Follow${widget.list ? ' list' : ''}')));
 }

@@ -190,6 +190,26 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
                         initialValue: _watchEntryId ?? '',
                         isExpanded: true,
                         itemHeight: null,
+                        // Menu rows need generous tap padding, but the selected
+                        // value must fit inside the closed field from first paint.
+                        selectedItemBuilder: (context) => [
+                          const Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text('Standalone review'),
+                          ),
+                          if (widget.watchEntryId != null &&
+                              !widget.watchEntries.any(
+                                  (entry) => entry.id == widget.watchEntryId))
+                            const Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text('The watch you just logged'),
+                            ),
+                          for (final entry in widget.watchEntries)
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(_watchLabel(entry)),
+                            ),
+                        ],
                         decoration:
                             const InputDecoration(labelText: 'Link to a watch'),
                         items: [

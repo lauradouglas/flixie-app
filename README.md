@@ -146,3 +146,8 @@ The app uses the current Flixie dark palette:
 | Background | Deep Plum | `#120A24` |
 | Surface | Plum | `#1A1033` |
 | Surface Elevated | Plum Elevated | `#27194A` |
+
+### Store deployments
+
+Use the [Fastlane deployment lanes](docs/fastlane.md) to build signed iOS/Android
+artifacts, upload to TestFlight, and create Google Play drafts.

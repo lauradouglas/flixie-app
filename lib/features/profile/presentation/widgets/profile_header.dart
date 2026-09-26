@@ -1,3 +1,4 @@
+import 'expandable_profile_bio.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -68,7 +69,7 @@ class ProfileHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Semantics(
@@ -106,9 +107,9 @@ class ProfileHeader extends StatelessWidget {
         ],
         if (bio?.isNotEmpty == true) ...[
           const SizedBox(height: 12),
-          _ExpandableProfileBio(text: bio!),
+          ExpandableProfileBio(text: bio!),
         ],
-        const SizedBox(height: 4),
+        const SizedBox(height: 0),
         Wrap(spacing: 12, children: [
           TextButton.icon(
               onPressed: () => _openEditSheet(context),
@@ -123,48 +124,4 @@ class ProfileHeader extends StatelessWidget {
       ]),
     );
   }
-}
-
-class _ExpandableProfileBio extends StatefulWidget {
-  const _ExpandableProfileBio({required this.text});
-  final String text;
-  @override
-  State<_ExpandableProfileBio> createState() => _ExpandableProfileBioState();
-}
-
-class _ExpandableProfileBioState extends State<_ExpandableProfileBio> {
-  bool expanded = false;
-  @override
-  Widget build(BuildContext context) =>
-      LayoutBuilder(builder: (context, constraints) {
-        final style =
-            TextStyle(color: context.colors.light, fontSize: 14, height: 1.4);
-        final painter = TextPainter(
-            text: TextSpan(text: widget.text, style: style),
-            maxLines: 2,
-            textDirection: Directionality.of(context),
-            textScaler: MediaQuery.textScalerOf(context))
-          ..layout(maxWidth: constraints.maxWidth);
-        final overflows = painter.didExceedMaxLines;
-        painter.dispose();
-        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(widget.text,
-              style: style,
-              maxLines: expanded ? null : 2,
-              overflow:
-                  expanded ? TextOverflow.visible : TextOverflow.ellipsis),
-          if (overflows)
-            TextButton(
-                onPressed: () => setState(() => expanded = !expanded),
-                style: TextButton.styleFrom(
-                  foregroundColor: context.colors.light,
-                  textStyle: const TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.w500),
-                  padding: EdgeInsets.zero,
-                  alignment: Alignment.centerLeft,
-                  minimumSize: const Size(48, 40),
-                ),
-                child: Text(expanded ? 'Read less' : 'Read more')),
-        ]);
-      });
 }

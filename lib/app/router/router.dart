@@ -291,8 +291,12 @@ GoRouter buildRouter(
             pageBuilder: (context, state) => _calmPage(
                 state,
                 SocialScreen(
-                    initialTab:
-                        state.uri.queryParameters['tab'] == 'groups' ? 2 : 0)),
+                    initialTab: switch (state.uri.queryParameters['tab']) {
+                  'groups' => 3,
+                  'chats' => 2,
+                  'activity' => 1,
+                  _ => 0,
+                })),
           ),
           GoRoute(
               path: '/community/people',

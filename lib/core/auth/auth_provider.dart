@@ -1,3 +1,6 @@
+import 'package:flixie_app/features/social/data/starred_people.dart';
+import 'package:flixie_app/features/social/data/people_cache.dart';
+import 'package:flixie_app/features/social/data/community_service.dart';
 import 'package:flixie_app/features/profile/data/milestone_cache.dart';
 import 'package:flixie_app/core/safety/safety_service.dart';
 import 'dart:async';
@@ -364,6 +367,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
       ApiClient.setToken(null);
       if (user != null) {
         _dbUser = null;
+        PeopleCache.instance.selectAccount(null);
         _cachedFriendsActivity = null;
         _cachedActivity = null;
         _cachedFriends = null;
@@ -404,6 +408,9 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> retrySession() async {
     _recoveryTimer?.cancel();
     _recoveryAttempts = 0;
+    if (_dbUser != null) {
+      unawaited(StarredPeople.instance.refresh().catchError((_) {}));
+    }
     if (_dbUser == null) {
       await _onAuthStateChanged(_authService.currentUser, retry: true);
     } else {
@@ -500,6 +507,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
         if (invalid) {
           ApiClient.setToken(null);
           _dbUser = null;
+          PeopleCache.instance.selectAccount(null);
           _status = AuthStatus.unauthenticated;
           _errorMessage = 'Your session expired. Please sign in again.';
         } else {
@@ -520,6 +528,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
       }
       ApiClient.setToken(null);
       _dbUser = null;
+      PeopleCache.instance.selectAccount(null);
       _status = AuthStatus.unauthenticated;
       _isPrefetching = false;
       _cachedActivity = null;
@@ -577,6 +586,10 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Fetches profile/friend/home cache in parallel right after login.
   void _prefetch(String userId, {String? region}) {
+    PeopleCache.instance.selectAccount(userId);
+    unawaited(StarredPeople.instance.refresh().catchError((_) {}));
+    unawaited(
+        PeopleCache.instance.load(const CommunityService().followedPeople));
     // Independent of startup readiness and all other prefetch work.
     unawaited(MilestoneCache.instance.warm(userId));
     final session = _sessionGeneration;

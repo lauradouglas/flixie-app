@@ -1,3 +1,5 @@
+import '../widgets/expandable_profile_bio.dart';
+import '../widgets/creator_interview.dart';
 import 'package:flixie_app/features/social/data/community_service.dart';
 import 'package:flixie_app/features/social/presentation/widgets/community_follow_button.dart';
 import 'package:flixie_app/features/profile/presentation/pages/milestones_screen.dart';
@@ -393,7 +395,6 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
   }
 
   bool get _isSelf => context.read<AuthProvider>().dbUser?.id == widget.userId;
-  bool _bioExpanded = false;
   String? _activityCursor;
   bool _activityFailed = false;
   bool _reviewsFailed = false;
@@ -928,84 +929,141 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     final favourites =
         (user.favoriteMovies?.length ?? 0) + (user.favoriteShows?.length ?? 0);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_isSelf ? 'Public profile preview' : 'Profile'),
-        centerTitle: true,
-        actions: [
-          if (!widget.previewMode && !_isSelf)
-            PopupMenuButton<String>(
-              tooltip: 'Profile actions',
-              onSelected: (action) async {
-                if (action == 'wrapped') {
-                  _openWrappedSheet();
-                } else if (action == 'report') {
-                  await SafetyActions.report(
-                    context,
-                    targetType: 'USER',
-                    targetId: widget.userId,
-                    reportedUserId: widget.userId,
-                  );
-                } else if (action == 'block') {
-                  final blocked = await SafetyActions.block(
-                    context,
-                    userId: widget.userId,
-                    username: user.username,
-                  );
-                  if (blocked && context.mounted) context.pop();
-                } else if (action == 'remove_friend') {
-                  await _removeFriend();
-                }
-              },
-              itemBuilder: (_) => [
-                const PopupMenuItem(
-                  value: 'wrapped',
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.auto_awesome_outlined),
-                    title: Text('View Wrapped'),
-                  ),
+    final coverUrl = user.creatorProfile?.coverUrl;
+    final hasCover = coverUrl != null;
+    final toolbar = AppBar(
+      backgroundColor: hasCover ? Colors.transparent : null,
+      foregroundColor: hasCover ? Colors.white : null,
+      surfaceTintColor: hasCover ? Colors.transparent : null,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      title: hasCover && !_isSelf
+          ? null
+          : Text(_isSelf ? 'Public profile preview' : 'Profile'),
+      centerTitle: true,
+      actions: [
+        if (!widget.previewMode && !_isSelf)
+          PopupMenuButton<String>(
+            tooltip: 'Profile actions',
+            onSelected: (action) async {
+              if (action == 'wrapped') {
+                _openWrappedSheet();
+              } else if (action == 'report') {
+                await SafetyActions.report(
+                  context,
+                  targetType: 'USER',
+                  targetId: widget.userId,
+                  reportedUserId: widget.userId,
+                );
+              } else if (action == 'block') {
+                final blocked = await SafetyActions.block(
+                  context,
+                  userId: widget.userId,
+                  username: user.username,
+                );
+                if (blocked && context.mounted) context.pop();
+              } else if (action == 'remove_friend') {
+                await _removeFriend();
+              }
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'wrapped',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.auto_awesome_outlined),
+                  title: Text('View Wrapped'),
                 ),
-                const PopupMenuItem(
-                  value: 'report',
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.flag_outlined),
-                    title: Text('Report user'),
-                  ),
+              ),
+              const PopupMenuItem(
+                value: 'report',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.flag_outlined),
+                  title: Text('Report user'),
                 ),
+              ),
+              PopupMenuItem(
+                value: 'block',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.block, color: context.colors.danger),
+                  title: Text('Block user',
+                      style: TextStyle(color: context.colors.danger)),
+                ),
+              ),
+              if (_friendshipStatus == _FriendshipStatus.friends)
                 PopupMenuItem(
-                  value: 'block',
+                  value: 'remove_friend',
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.block, color: context.colors.danger),
-                    title: Text('Block user',
+                    leading: Icon(Icons.person_remove_outlined,
+                        color: context.colors.danger),
+                    title: Text('Remove friend',
                         style: TextStyle(color: context.colors.danger)),
                   ),
                 ),
-                if (_friendshipStatus == _FriendshipStatus.friends)
-                  PopupMenuItem(
-                    value: 'remove_friend',
-                    child: ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.person_remove_outlined,
-                          color: context.colors.danger),
-                      title: Text('Remove friend',
-                          style: TextStyle(color: context.colors.danger)),
-                    ),
-                  ),
-              ],
-            )
-          else
-            const SizedBox(width: 48),
-        ],
-      ),
+            ],
+          )
+        else
+          const SizedBox(width: 48),
+      ],
+    );
+    return Scaffold(
+      appBar: hasCover ? null : toolbar,
       body: RefreshIndicator(
         onRefresh: _loadAll,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 32),
+          padding: EdgeInsets.only(top: hasCover ? 0 : 8, bottom: 32),
           children: [
-            _modernHeader(user),
+            if (hasCover)
+              LayoutBuilder(
+                key: const ValueKey('profile-cover'),
+                builder: (context, constraints) {
+                  final top =
+                      MediaQuery.paddingOf(context).top + kToolbarHeight;
+                  final imageSpace =
+                      (constraints.maxWidth * .36).clamp(100.0, 200.0);
+                  return Stack(children: [
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: top + imageSpace + 88,
+                      child: Stack(fit: StackFit.expand, children: [
+                        CachedNetworkImage(
+                          imageUrl: coverUrl,
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                        ),
+                        DecoratedBox(
+                            decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            stops: const [0, .4, 1],
+                            colors: [
+                              Colors.black.withValues(alpha: .45),
+                              context.colors.background.withValues(alpha: .3),
+                              context.colors.background
+                            ],
+                          ),
+                        )),
+                      ]),
+                    ),
+                    Column(children: [
+                      SizedBox(height: top, child: toolbar),
+                      SizedBox(height: imageSpace),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: _modernHeader(user),
+                      ),
+                    ]),
+                  ]);
+                },
+              )
+            else
+              _modernHeader(user),
             // Notification deep links use preview mode to suppress ordinary
             // profile actions. An incoming friend request is an exception:
             // its recipient still needs the Accept / Decline decision here.
@@ -1014,33 +1072,25 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                     _friendshipStatus == _FriendshipStatus.pending)) ...[
               const SizedBox(height: 18),
               _profileActions(),
-              if (widget.showCommunityFollow)
-                Center(
-                  child: CommunityFollowButton(
-                    path: 'profiles/${widget.userId}',
-                    service: const CommunityService(),
-                  ),
-                ),
-              if (_friendshipStatus == _FriendshipStatus.friends) ...[
-                const SizedBox(height: 10),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.check,
-                        size: 17, color: FlixieColors.primary),
-                    const SizedBox(width: 7),
-                    Text('Friends',
-                        style: TextStyle(color: context.colors.medium)),
-                  ],
-                ),
-              ],
             ],
             const SizedBox(height: 20),
-            _modernStats(watched, watchlist, favourites),
+            if (watched + watchlist + favourites > 0)
+              _modernStats(watched, watchlist, favourites),
+            const SizedBox(height: 12),
+            if (_activity.isNotEmpty ||
+                _reviews.isNotEmpty ||
+                _activityFailed ||
+                _reviewsFailed ||
+                _selectedTab != 0)
+              _profileTabs(),
+            const SizedBox(height: 18),
+            if (_selectedTab == 0) ..._overviewContent(user),
+            if (_selectedTab == 1) ..._activityContent(user),
+            if (_selectedTab == 2) ..._reviewsContent(),
             if (_isSelf || _friendshipStatus == _FriendshipStatus.friends) ...[
               const SizedBox(height: 20),
-              OutlinedButton.icon(
-                icon: const Icon(Icons.workspace_premium_outlined),
+              TextButton.icon(
+                icon: const Icon(Icons.workspace_premium_outlined, size: 20),
                 label: const Text('View earned milestones'),
                 onPressed: () => Navigator.of(context).push(MaterialPageRoute(
                     builder: (_) => MilestonesScreen(
@@ -1050,18 +1100,15 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                         ))),
               ),
             ],
-
-            const SizedBox(height: 12),
-            _profileTabs(),
-            const SizedBox(height: 18),
-            if (_selectedTab == 0) ..._overviewContent(user),
-            if (_selectedTab == 1) ..._activityContent(user),
-            if (_selectedTab == 2) ..._reviewsContent(),
           ]
-              .map((child) => child.key == const ValueKey('profile-totals')
+              .map((child) => child.key == const ValueKey('profile-cover')
                   ? child
                   : Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      padding: EdgeInsets.symmetric(
+                          horizontal:
+                              child.key == const ValueKey('profile-totals')
+                                  ? 8
+                                  : 20),
                       child: child))
               .toList(),
         ),
@@ -1078,7 +1125,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
             fallbackText: user.initials ??
                 (user.username.isEmpty ? '?' : user.username[0]),
             fallbackColor: _avatarColor,
-            size: 76,
+            size: 64,
             profileBadges: user.profileBadges),
         const SizedBox(width: 16),
         Expanded(
@@ -1089,6 +1136,10 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
                   color: context.colors.white)),
+          if (user.creatorProfile != null)
+            Text('✓ Verified ${user.creatorProfile!.role}',
+                style:
+                    TextStyle(color: context.colors.primaryText, fontSize: 13)),
           Text('@${user.username}',
               style: TextStyle(color: context.colors.medium)),
           if (user.profileBadges.isNotEmpty)
@@ -1098,24 +1149,24 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                     badges: user.profileBadges, compact: true)),
         ])),
       ]),
+      if (_friendshipStatus == _FriendshipStatus.friends) ...[
+        const SizedBox(height: 2),
+        Wrap(
+            spacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text('✓ Friends',
+                  style:
+                      TextStyle(color: context.colors.success, fontSize: 13)),
+              CommunityFollowButton(
+                  path: 'profiles/${widget.userId}',
+                  service: const CommunityService()),
+            ]),
+      ],
       if (user.bio?.trim().isNotEmpty == true) ...[
-        const SizedBox(height: 14),
-        Text(user.bio!.trim(),
-            maxLines: _bioExpanded ? null : 2,
-            overflow:
-                _bioExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
-            style: TextStyle(color: context.colors.light, height: 1.4)),
-        TextButton(
-            onPressed: () => setState(() => _bioExpanded = !_bioExpanded),
-            style: TextButton.styleFrom(
-              foregroundColor: context.colors.light,
-              textStyle:
-                  const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-              padding: EdgeInsets.zero,
-              alignment: Alignment.centerLeft,
-              minimumSize: const Size(48, 40),
-            ),
-            child: Text(_bioExpanded ? 'Read less' : 'Read more')),
+        const SizedBox(height: 6),
+        ExpandableProfileBio(text: user.bio!),
+        const SizedBox(height: 8),
       ],
       Text(_memberSinceLabel,
           style: TextStyle(color: context.colors.medium, fontSize: 12)),
@@ -1148,26 +1199,53 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       );
     }
     if (_friendshipStatus != _FriendshipStatus.friends) {
-      return SizedBox(width: double.infinity, child: _buildFriendshipButton());
+      final friendship = _buildFriendshipButton();
+      if (!widget.showCommunityFollow) return friendship;
+      return Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            friendship,
+            CommunityFollowButton(
+                path: 'profiles/${widget.userId}',
+                service: const CommunityService()),
+          ]);
     }
-    return Row(children: [
-      Expanded(
-          child: OutlinedButton.icon(
+    return LayoutBuilder(builder: (context, constraints) {
+      final style = FilledButton.styleFrom(
+        minimumSize: const Size(0, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      );
+      final message = FilledButton.tonalIcon(
         onPressed: () => context.push('/chat/${widget.userId}'),
         icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
         label: const Text('Message'),
-        style: OutlinedButton.styleFrom(minimumSize: const Size(0, 50)),
-      )),
-      const SizedBox(width: 12),
-      Expanded(
-        child: FilledButton.icon(
-          onPressed: _inviteToWatch,
-          icon: const Icon(Icons.person_add_alt_1),
-          label: const Text('Plan a watch'),
-          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
-        ),
-      ),
-    ]);
+        style: style.copyWith(
+            backgroundColor: WidgetStatePropertyAll(context.colors.surface),
+            foregroundColor:
+                WidgetStatePropertyAll(context.colors.primaryText)),
+      );
+      final plan = FilledButton.icon(
+        onPressed: _inviteToWatch,
+        icon: const Icon(Icons.movie_outlined, size: 18),
+        label: const Text('Plan a watch'),
+        style: style,
+      );
+      if (constraints.maxWidth < 330 ||
+          MediaQuery.textScalerOf(context).scale(14) > 19) {
+        return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [message, const SizedBox(height: 8), plan]);
+      }
+      return Row(children: [
+        Expanded(child: message),
+        const SizedBox(width: 10),
+        Expanded(child: plan)
+      ]);
+    });
   }
 
   Widget _modernStats(int watched, int watchlist, int favourites) {
@@ -1383,7 +1461,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
         .toList();
     if (shared.isEmpty) return [];
     return [
-      const Text('Watch together',
+      const Text('Your next movie night',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
       const SizedBox(height: 4),
       Text('Films you both want to see',
@@ -1474,7 +1552,39 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       );
 
   List<Widget> _overviewContent(User user) => [
-        if (!_isSelf &&
+        if (user.creatorProfile != null &&
+            (user.creatorProfile!.answers.isNotEmpty ||
+                user.creatorProfile!.credits.isNotEmpty))
+          CreatorInterview(profile: user.creatorProfile!),
+        if (user.creatorProfile == null &&
+            !_activityLoading &&
+            !_reviewsLoading &&
+            !_activityFailed &&
+            !_reviewsFailed &&
+            _activity.isEmpty &&
+            _reviews.isEmpty &&
+            (user.favoriteMovies ?? []).isEmpty &&
+            (user.favoriteShows ?? []).isEmpty)
+          Padding(
+              padding: const EdgeInsets.symmetric(vertical: 28),
+              child: Column(children: [
+                Icon(Icons.movie_outlined,
+                    size: 36, color: context.colors.primaryText),
+                const SizedBox(height: 16),
+                const Text('A new story starts here',
+                    style:
+                        TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                Text('No films or reviews shared here yet.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: context.colors.light)),
+                const SizedBox(height: 8),
+                Text('Only activity available to you appears on this profile.',
+                    textAlign: TextAlign.center,
+                    style:
+                        TextStyle(color: context.colors.medium, fontSize: 13)),
+              ])),
+        if (_friendshipStatus == _FriendshipStatus.friends &&
             !_compatibilityLoading &&
             _sharedRatings.isNotEmpty) ...[
           Material(
@@ -1518,10 +1628,13 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
           ),
           const SizedBox(height: 24),
         ],
-        ..._sharedWatchlist(user),
+        if (_friendshipStatus == _FriendshipStatus.friends)
+          ..._sharedWatchlist(user),
         ListsPreviewSection(
           userId: widget.userId,
-          title: 'Shared lists',
+          title: _friendshipStatus == _FriendshipStatus.friends
+              ? 'Shared lists'
+              : 'Public lists',
           hideWhenEmpty: true,
           emptyMessage: 'No lists shared with you yet.',
           embedded: true,

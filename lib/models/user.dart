@@ -1,3 +1,4 @@
+import 'creator_profile.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/models/favorite_movie.dart';
 import 'package:flixie_app/models/watched_movie.dart';
@@ -12,6 +13,7 @@ class User {
   final String username;
   final String email;
   final String? bio;
+  final CreatorProfile? creatorProfile;
   final int iconColorId;
   final int? countryId;
   final int? languageId;
@@ -46,6 +48,7 @@ class User {
     required this.username,
     required this.email,
     this.bio,
+    this.creatorProfile,
     required this.iconColorId,
     this.countryId,
     this.languageId,
@@ -78,6 +81,7 @@ class User {
       username: _stringOrFallback(json['username'], fallback: 'user'),
       email: _stringOrFallback(json['email']),
       bio: _nullableString(json['bio']),
+      creatorProfile: CreatorProfile.parse(json['creatorProfile']),
       iconColorId: _intValue(json['iconColorId']) ?? 0,
       countryId: _intValue(json['countryId']),
       languageId: _intValue(json['languageId']),
@@ -268,6 +272,7 @@ class User {
       username: username ?? this.username,
       email: email ?? this.email,
       bio: bio ?? this.bio,
+      creatorProfile: creatorProfile,
       iconColorId: iconColorId ?? this.iconColorId,
       countryId: countryId ?? this.countryId,
       languageId: languageId ?? this.languageId,
