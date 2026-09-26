@@ -36,6 +36,10 @@ class WatchPlanPoster extends StatelessWidget {
             : CachedNetworkImage(
                 imageUrl: url,
                 fit: BoxFit.cover,
+                placeholder: (_, __) => ColoredBox(
+                    color: context.colors.surfaceElevated,
+                    child: Icon(Icons.movie_outlined,
+                        color: context.colors.medium)),
                 errorWidget: (_, __, ___) => ColoredBox(
                   color: context.colors.surfaceElevated,
                   child:

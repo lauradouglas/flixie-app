@@ -1,9 +1,12 @@
+import 'package:flixie_app/core/navigation/instant_swipe_page.dart';
+import 'package:flixie_app/features/social/presentation/pages/community_people_screen.dart';
+import 'package:flixie_app/features/social/presentation/pages/friend_activity_screen.dart';
+import 'package:flixie_app/features/social/presentation/pages/community_post_screen.dart';
 import 'package:flixie_app/core/legal/terms_acceptance_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:flixie_app/features/social/data/chat_unread_controller.dart';
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -64,11 +67,11 @@ Page<void> _calmPage(GoRouterState state, Widget child) {
   );
 }
 
-/// A native-feeling page for routes pushed above the main tabs.
+/// Opens immediately on iOS, retaining an interactive left-edge back gesture.
 /// CupertinoPageRoute supplies iOS's interactive left-edge back gesture.
 Page<void> _pushPage(GoRouterState state, Widget child) {
   if (defaultTargetPlatform == TargetPlatform.iOS) {
-    return CupertinoPage<void>(
+    return InstantSwipePage<void>(
       key: state.pageKey,
       name: _screenNameFor(state),
       child: child,
@@ -88,12 +91,12 @@ String _screenNameFor(GoRouterState state) {
     '/search' => 'Search',
     '/watchlist' => 'Watchlist',
     '/social' => 'Social',
-    '/friends-activity' => 'Friends Activity',
+    '/friends-activity' => 'Activity',
     '/groups/:id' => 'Group Detail',
     '/group-invites/:requestId' => 'Group Invitation',
     '/groups/:id/members' => 'Group Members',
     '/profile' => 'Profile',
-    '/friends/:id' => 'Friend Profile',
+    '/friends/:id' => 'User Profile',
     '/movies/:id' => 'Movie Detail',
     '/shows/:id' => 'Show Detail',
     '/people/:id' => 'Person Detail',
@@ -292,9 +295,37 @@ GoRouter buildRouter(
                         state.uri.queryParameters['tab'] == 'groups' ? 2 : 0)),
           ),
           GoRoute(
+              path: '/community/people',
+              pageBuilder: (context, state) =>
+                  _pushPage(state, const CommunityPeopleScreen())),
+          GoRoute(
+              path: '/community/profiles/:id',
+              redirect: (context, state) =>
+                  context.read<AuthProvider>().dbUser?.id ==
+                          state.pathParameters['id']
+                      ? '/profile'
+                      : null,
+              pageBuilder: (context, state) => _pushPage(
+                  state,
+                  FriendProfileScreen(
+                    userId: state.pathParameters['id']!,
+                    showCommunityFollow: true,
+                  ))),
+          GoRoute(
+              path: '/community/posts/:ownerId/:type/:id',
+              pageBuilder: (context, state) => _pushPage(
+                  state,
+                  CommunityPostScreen(
+                      ownerId: state.pathParameters['ownerId']!,
+                      type: state.pathParameters['type']!,
+                      postId: state.pathParameters['id']!))),
+          GoRoute(
             path: '/friends-activity',
-            pageBuilder: (context, state) =>
-                _calmPage(state, const FriendsActivityScreen()),
+            pageBuilder: (context, state) => _calmPage(
+                state,
+                FriendsActivityScreen(
+                    initialCommunity:
+                        state.uri.queryParameters['tab'] == 'community')),
           ),
           GoRoute(
             path: '/groups/:id',
@@ -394,6 +425,15 @@ GoRouter buildRouter(
                 requestId: state.pathParameters['requestId'] ?? '',
               ),
             ),
+          ),
+          GoRoute(
+            path: '/friends/activity/:ownerId/:type/:postId',
+            pageBuilder: (context, state) => _pushPage(
+                state,
+                FriendActivityScreen(
+                    ownerId: state.pathParameters['ownerId']!,
+                    type: state.pathParameters['type']!,
+                    postId: state.pathParameters['postId']!)),
           ),
           GoRoute(
             path: '/friends/:id',

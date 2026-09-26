@@ -20,7 +20,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flixie_app/models/movie_short.dart';
 import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'package:flixie_app/models/review.dart';
-import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/models/friend_media_interaction.dart';
 import 'package:flixie_app/models/watch_request.dart';
 import 'package:flixie_app/models/watchlist_movie.dart';
@@ -32,7 +31,6 @@ import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/core/auth/push_notification_service.dart';
 import 'package:flixie_app/features/movies/data/show_service.dart';
 import 'package:flixie_app/features/home/data/recommendation_service.dart';
-import 'package:flixie_app/features/social/data/request_service.dart';
 import 'package:flixie_app/features/social/data/watch_plan_visibility_store.dart';
 import 'package:flixie_app/features/home/data/trending_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -47,7 +45,7 @@ import 'package:flixie_app/core/analytics/recommendation_attribution.dart';
 import 'package:flixie_app/features/home/presentation/widgets/greeting_header.dart';
 import 'package:flixie_app/features/home/presentation/widgets/section_header.dart';
 import 'package:flixie_app/features/home/presentation/widgets/continue_watching_carousel.dart';
-import 'package:flixie_app/features/home/presentation/widgets/trending_friends_section.dart';
+import 'package:flixie_app/features/home/presentation/widgets/home_community_section.dart';
 import 'package:flixie_app/features/home/presentation/widgets/personalized_recommendation_card.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_sheet.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/write_review_sheet.dart';
@@ -55,7 +53,6 @@ import 'package:flixie_app/features/movies/presentation/widgets/watch_request_sh
 import 'package:flixie_app/features/home/presentation/models/home_watch_plan_state.dart';
 import 'package:flixie_app/features/home/presentation/widgets/home_watch_plan_card.dart';
 import 'package:flixie_app/features/home/presentation/widgets/watch_plans_introduction_card.dart';
-import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/sharing/models/share_card_data.dart';
 import 'package:flixie_app/features/sharing/presentation/share_card_sheet.dart';
@@ -67,7 +64,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   static _HomeSessionSnapshot? _sessionSnapshot;
   // Keep hero carousel concise so primary CTA and dots remain visible above fold.
   static const int _maxHeroCarouselItems = 12;
@@ -76,10 +73,9 @@ class _HomeScreenState extends State<HomeScreen> {
   List<MovieShort> _featuredMovies = [];
   List<MovieShort> _forYouMovies = [];
   List<ContinueWatchingShow> _continueWatchingShows = [];
-  List<ActivityListItem> _friendsActivity = [];
+  final _communityKey = GlobalKey<HomeCommunitySectionState>();
   final Map<int, List<FriendMediaInteraction>> _heroFriendInteractions = {};
   final Set<int> _heroFriendErrors = {};
-  bool _showMoreFriendActivity = false;
   final Set<int> _watchlistUpdatesInFlight = <int>{};
   Set<int> _watchlistMovieIds = {};
   int _watchRequestsNeedingResponse = 0;
@@ -133,6 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     TabRefreshController.watchPlans.addListener(_refreshWatchPlanReminders);
     // Listen for dbUser becoming available after auth resolves
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -142,13 +139,15 @@ class _HomeScreenState extends State<HomeScreen> {
       if (_loadedForUserId == null) {
         _loadAll();
       } else {
-        unawaited(_preloadInitialWatchPlans(_authProvider?.dbUser));
+        unawaited(
+            _preloadInitialWatchPlans(_authProvider?.dbUser, force: false));
       }
     });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     TabRefreshController.watchPlans.removeListener(_refreshWatchPlanReminders);
     _storeSessionSnapshot();
     _authProvider?.removeListener(_onAuthChanged);
@@ -178,6 +177,13 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      unawaited(_preloadInitialWatchPlans(_authProvider?.dbUser, force: false));
+    }
+  }
+
   void _refreshWatchPlanReminders() {
     if (mounted) unawaited(_preloadInitialWatchPlans(_authProvider?.dbUser));
   }
@@ -202,7 +208,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _featuredMovies = List.of(snapshot.featuredMovies);
     _forYouMovies = List.of(snapshot.forYouMovies);
     _continueWatchingShows = List.of(snapshot.continueWatchingShows);
-    _friendsActivity = List.of(snapshot.friendsActivity);
     _heroFriendInteractions
       ..clear()
       ..addAll(
@@ -210,7 +215,6 @@ class _HomeScreenState extends State<HomeScreen> {
           (movieId, interactions) => MapEntry(movieId, List.of(interactions)),
         ),
       );
-    _showMoreFriendActivity = snapshot.showMoreFriendActivity;
     _watchlistMovieIds = Set.of(snapshot.watchlistMovieIds);
     _watchRequestsNeedingResponse = snapshot.watchRequestsNeedingResponse;
     _watchPlansToShow = List.of(snapshot.watchPlansToShow);
@@ -232,11 +236,9 @@ class _HomeScreenState extends State<HomeScreen> {
       featuredMovies: List.of(_featuredMovies),
       forYouMovies: List.of(_forYouMovies),
       continueWatchingShows: List.of(_continueWatchingShows),
-      friendsActivity: List.of(_friendsActivity),
       heroFriendInteractions: _heroFriendInteractions.map(
         (movieId, interactions) => MapEntry(movieId, List.of(interactions)),
       ),
-      showMoreFriendActivity: _showMoreFriendActivity,
       watchlistMovieIds: Set.of(_watchlistMovieIds),
       watchRequestsNeedingResponse: _watchRequestsNeedingResponse,
       watchPlansToShow: List.of(_watchPlansToShow),
@@ -252,8 +254,13 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _secondaryError;
   final Set<String> _loadingHomeSections = {};
 
-  Future<void> _refreshAll() =>
-      _loadAll(refreshRecommendations: true, showFullLoading: false);
+  Future<void> _refreshAll() async {
+    await Future.wait([
+      _loadAll(refreshRecommendations: true, showFullLoading: false),
+      if (_communityKey.currentState != null)
+        _communityKey.currentState!.refresh(),
+    ]);
+  }
 
   Future<void> _loadAll({
     bool refreshRecommendations = false,
@@ -279,7 +286,8 @@ class _HomeScreenState extends State<HomeScreen> {
     _lastActivityVersion = auth.activityVersion;
 
     // Home stays usable while each independent section loads in place.
-    unawaited(_preloadInitialWatchPlans(user));
+    unawaited(_preloadInitialWatchPlans(user,
+        force: refreshRecommendations || !showFullLoading));
 
     unawaited(_loadSecondaryContent(
       user,
@@ -406,7 +414,6 @@ class _HomeScreenState extends State<HomeScreen> {
     if (user == null) {
       if (!mounted) return;
       setState(() {
-        _friendsActivity = [];
         _forYouMovies = [];
         _continueWatchingShows = [];
         _watchlistMovieIds = {};
@@ -421,8 +428,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) setState(() => _isLoadingRecommendations = true);
 
     _secondaryError = null;
-    _loadingHomeSections
-        .addAll(['friends', 'recommendations', 'watchlist', 'continue']);
+    _loadingHomeSections.addAll(['recommendations', 'watchlist', 'continue']);
     Future<void> section<T>(
         String key, Future<T> request, void Function(T) apply) async {
       try {
@@ -444,17 +450,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
 
-    final cachedFriends = context.read<AuthProvider>().cachedFriendsActivity;
     await Future.wait([
-      section(
-          'friends',
-          !refreshRecommendations && cachedFriends != null
-              ? Future.value(cachedFriends)
-              : FriendService.getFriendsActivityLists(user.id,
-                  days: 30,
-                  limit: 200,
-                  cachedFriends: context.read<AuthProvider>().cachedFriends),
-          (value) => _friendsActivity = value),
       section(
           'recommendations',
           RecommendationService.getUserRecommendations(user.id,
@@ -474,7 +470,8 @@ class _HomeScreenState extends State<HomeScreen> {
     _scheduleRecommendationVisibilityCheck();
   }
 
-  Future<void> _preloadInitialWatchPlans(models.User? user) async {
+  Future<void> _preloadInitialWatchPlans(models.User? user,
+      {bool force = true}) async {
     final generation = ++_watchPlansLoadGeneration;
     if (user == null) {
       _isLoadingWatchPlans = false;
@@ -486,6 +483,8 @@ class _HomeScreenState extends State<HomeScreen> {
         _loadedForUserId == user.id &&
         generation == _watchPlansLoadGeneration;
 
+    final cache = context.read<WatchRequestCache>();
+    cache.syncUser(user.id);
     // Direct and group plans can appear independently. Retain the other
     // source's existing cards while its request is pending or fails.
     var direct = _watchPlansToShow
@@ -494,6 +493,12 @@ class _HomeScreenState extends State<HomeScreen> {
     var groups = _watchPlansToShow
         .where((plan) => plan.conversationId == '__group_home__')
         .toList();
+    if (cache.hasDirectSnapshot) direct = cache.direct;
+    if (cache.hasHomeSnapshot) {
+      groups = cache.home
+          .map((entry) => asHomeGroupWatchPlan(entry.group, entry.request))
+          .toList();
+    }
     var failed = false;
     final visibility = Future.wait<dynamic>([
       WatchPlanVisibilityStore.closedPlanIds(user.id),
@@ -508,6 +513,8 @@ class _HomeScreenState extends State<HomeScreen> {
       final hasUsed =
           allPlans.any((plan) => _hasCreatedOrAcceptedWatchPlan(plan, user.id));
       setState(() {
+        _watchRequestsNeedingResponse =
+            _countWatchRequestsNeedingResponse(direct, user.id);
         if (_watchPlansFingerprint(_watchPlansToShow) !=
             _watchPlansFingerprint(nextPlans)) {
           _watchPlansToShow = nextPlans;
@@ -538,24 +545,25 @@ class _HomeScreenState extends State<HomeScreen> {
         unawaited(_syncLocalWatchPlanReminders(plans, userId: user.id));
       } catch (error) {
         failed = true;
-        if (isGroup &&
-            isCurrent() &&
+        if (isCurrent() &&
             error is ApiException &&
             (error.statusCode == 401 || error.statusCode == 403)) {
-          setState(() => _watchPlansToShow = _watchPlansToShow
-              .where((plan) => plan.conversationId != '__group_home__')
-              .toList());
+          if (isGroup) {
+            groups = [];
+          } else {
+            direct = [];
+          }
+          applyPlans(await visibility);
         }
         logger.w('[HomeScreen] watch plans load failed: $error');
       }
     }
 
+    // Paint the last successful snapshot while the background check runs.
+    unawaited(visibility.then(applyPlans).catchError((Object _) {}));
     await Future.wait([
-      loadSource(
-          RequestService.getWatchRequests(user.id,
-              includeHomeState: true, activeOnly: true),
-          isGroup: false),
-      loadSource(_loadGroupWatchPlansForHome(), isGroup: true),
+      loadSource(cache.refreshDirect(force: force), isGroup: false),
+      loadSource(_loadGroupWatchPlansForHome(force: force), isGroup: true),
     ]);
     if (!isCurrent()) return;
     setState(() {
@@ -623,10 +631,11 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Adapt scheduled group plans to the same homepage card contract used by
   /// direct plans. This keeps their ordering, due-state and card layout truly
   /// identical while preserving a marker for the correct deep link.
-  Future<List<WatchRequest>> _loadGroupWatchPlansForHome() async {
+  Future<List<WatchRequest>> _loadGroupWatchPlansForHome(
+      {bool force = true}) async {
     final cache = context.read<WatchRequestCache>();
     cache.syncUser(_loadedForUserId);
-    final entries = await cache.refreshHome();
+    final entries = await cache.refreshHome(force: force);
     for (final entry in entries) {
       final request = entry.request;
       final canonicalId = request.databaseRequestId;
@@ -1164,14 +1173,8 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
               _buildBecauseYouRatedSection(context),
               _buildContinueWatchingSection(context),
-              if (_loadingHomeSections.contains('friends') &&
-                  _friendsActivity.isEmpty)
-                _buildActivityLoadingState(
-                    title: 'Friends are watching', avatars: true)
-              else
-                FriendsWatchingSection(activity: _friendsActivity),
-              _buildFriendActivitySection(context),
-              _buildWatchlistSection(context),
+              if (user != null)
+                HomeCommunitySection(key: _communityKey, userId: user.id),
             ],
           ),
         ),
@@ -1662,176 +1665,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildWatchlistSection(BuildContext context) {
-    final user = context.read<AuthProvider>().dbUser;
-    final watchlist = user?.movieWatchlist
-            ?.where((w) => w.removed != true)
-            .take(10)
-            .toList() ??
-        [];
-    if (watchlist.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        HomeSectionHeader(
-          title: 'On Your Watchlist',
-          onSeeAll: () => context.go('/watchlist'),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 180,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: watchlist.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
-            itemBuilder: (context, index) {
-              final item = watchlist[index];
-              final isUpdating = _watchlistUpdatesInFlight.contains(
-                item.movieId,
-              );
-              final posterUrl = item.movie?.posterPath != null
-                  ? 'https://image.tmdb.org/t/p/w342${item.movie!.posterPath}'
-                  : null;
-              return GestureDetector(
-                onTap: () => context.push(
-                  movieDetailPath(item.movieId, source: DetailSource.watchlist),
-                ),
-                onLongPress: () => _showQuickMovieActions(
-                  context,
-                  movieId: item.movieId,
-                  movieTitle: item.movie?.title ?? 'Movie',
-                  isInWatchlist: true,
-                ),
-                child: SizedBox(
-                  width: 110,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Stack(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: SizedBox(
-                              width: 110,
-                              height: 148,
-                              child: posterUrl != null
-                                  ? CachedNetworkImage(
-                                      imageUrl: posterUrl,
-                                      fit: BoxFit.cover,
-                                      errorWidget: (_, __, ___) => Container(
-                                        color: context
-                                            .colors.tabBarBackgroundFocused,
-                                        child: Icon(
-                                          Icons.movie_outlined,
-                                          color: context.colors.medium,
-                                        ),
-                                      ),
-                                    )
-                                  : Container(
-                                      color: context
-                                          .colors.tabBarBackgroundFocused,
-                                      child: Icon(
-                                        Icons.movie_outlined,
-                                        color: context.colors.medium,
-                                      ),
-                                    ),
-                            ),
-                          ),
-                          Positioned(
-                            top: 6,
-                            left: 6,
-                            child: GestureDetector(
-                              onTap: isUpdating
-                                  ? null
-                                  : () => _toggleWatchlistState(
-                                        context,
-                                        movieId: item.movieId,
-                                        movieTitle:
-                                            item.movie?.title ?? 'Movie',
-                                        posterPath: item.movie?.posterPath,
-                                        currentlyInWatchlist: true,
-                                      ),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 180),
-                                width: 30,
-                                height: 30,
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.55),
-                                  borderRadius: BorderRadius.circular(15),
-                                ),
-                                child: Icon(
-                                  Icons.bookmark,
-                                  color: isUpdating
-                                      ? context.colors.medium
-                                      : FlixieColors.primary,
-                                  size: 18,
-                                ),
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            top: 2,
-                            right: 2,
-                            child: PopupMenuButton<String>(
-                              tooltip: 'Quick actions',
-                              icon: Icon(
-                                Icons.more_vert_rounded,
-                                color: context.colors.light,
-                                size: 20,
-                              ),
-                              color: context.colors.tabBarBackgroundFocused,
-                              onSelected: (value) {
-                                _handleQuickActionSelection(
-                                  context,
-                                  action: value,
-                                  movieId: item.movieId,
-                                  movieTitle: item.movie?.title ?? 'Movie',
-                                  posterPath: item.movie?.posterPath,
-                                  isInWatchlist: true,
-                                );
-                              },
-                              itemBuilder: (context) => const [
-                                PopupMenuItem(
-                                  value: 'mark_watched',
-                                  child: Text('Mark as watched'),
-                                ),
-                                PopupMenuItem(
-                                  value: 'remove_watchlist',
-                                  child: Text('Remove from watchlist'),
-                                ),
-                                // TODO(release): Restore favourite, list,
-                                // invite and share quick actions when their
-                                // home-screen flows are implemented.
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        item.movie?.title ?? '',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: context.colors.light,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 20),
-      ],
-    );
-  }
-
   Widget _buildBecauseYouRatedSection(BuildContext context) {
     if (_isLoadingRecommendations && _forYouMovies.isEmpty) {
       return _buildRecommendationsLoadingState();
@@ -2195,62 +2028,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildFriendActivitySection(BuildContext context) {
-    if (_loadingHomeSections.contains('friends') && _friendsActivity.isEmpty) {
-      return _buildActivityLoadingState();
-    }
-    if (_friendsActivity.isEmpty) return const SizedBox.shrink();
-    final previewCount = _showMoreFriendActivity ? 8 : 3;
-    final items = _friendsActivity.take(previewCount).toList();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        HomeSectionHeader(
-          title: 'Popular with friends',
-          onSeeAll: () => context.push('/friends-activity'),
-        ),
-        const SizedBox(height: 12),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(
-            children: [
-              for (final item in items) ...[
-                ActivityTile(
-                  item: item,
-                  compact: true,
-                  detailSource: DetailSource.friendActivity,
-                ),
-                const SizedBox(height: 10),
-              ],
-            ],
-          ),
-        ),
-        if (_friendsActivity.length > 3) ...[
-          if (!_showMoreFriendActivity)
-            Center(
-              child: TextButton.icon(
-                onPressed: () => setState(() => _showMoreFriendActivity = true),
-                style: TextButton.styleFrom(
-                  foregroundColor: context.colors.primaryText,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 8,
-                  ),
-                ),
-                icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
-                label: Text(
-                  'Show ${(_friendsActivity.length - 3).clamp(0, 5)} more',
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-            ),
-          const SizedBox(height: 8),
-        ],
-        const SizedBox(height: 20),
-      ],
-    );
-  }
-
   Widget _buildPosterRailLoadingState(String title) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2268,20 +2045,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     width: 110, height: 148, borderRadius: 11),
               )),
           const SizedBox(height: 14),
-        ],
-      );
-
-  Widget _buildActivityLoadingState(
-          {String title = 'Popular with friends', bool avatars = false}) =>
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          HomeSectionHeader(title: title),
-          const SizedBox(height: 12),
-          Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: ActivityRowsSkeleton(avatars: avatars)),
-          const SizedBox(height: 20),
         ],
       );
 
@@ -2394,95 +2157,6 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() => _watchlistUpdatesInFlight.remove(movieId));
       }
-    }
-  }
-
-  void _showQuickMovieActions(
-    BuildContext context, {
-    required int movieId,
-    required String movieTitle,
-    String? posterPath,
-    required bool isInWatchlist,
-  }) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: context.colors.tabBarBackgroundFocused,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: Icon(
-                Icons.check_circle_outline,
-                color: context.colors.success,
-              ),
-              title: const Text('Mark as watched'),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                _openQuickMarkWatchedSheet(
-                  context,
-                  movieId: movieId,
-                  movieTitle: movieTitle,
-                  posterPath: posterPath,
-                  isInWatchlist: isInWatchlist,
-                );
-              },
-            ),
-            ListTile(
-              leading: Icon(
-                Icons.bookmark_remove_outlined,
-                color: context.colors.warning,
-              ),
-              title: const Text('Remove from watchlist'),
-              onTap: () {
-                Navigator.of(sheetContext).pop();
-                _toggleWatchlistState(
-                  context,
-                  movieId: movieId,
-                  movieTitle: movieTitle,
-                  posterPath: null,
-                  currentlyInWatchlist: true,
-                );
-              },
-            ),
-            // TODO(release): Restore favourite, list, invite and share quick
-            // actions when their home-screen flows are implemented.
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _handleQuickActionSelection(
-    BuildContext context, {
-    required String action,
-    required int movieId,
-    required String movieTitle,
-    String? posterPath,
-    required bool isInWatchlist,
-  }) {
-    switch (action) {
-      case 'mark_watched':
-        _openQuickMarkWatchedSheet(
-          context,
-          movieId: movieId,
-          movieTitle: movieTitle,
-          posterPath: posterPath,
-          isInWatchlist: isInWatchlist,
-        );
-        break;
-      case 'remove_watchlist':
-        _toggleWatchlistState(
-          context,
-          movieId: movieId,
-          movieTitle: movieTitle,
-          posterPath: null,
-          currentlyInWatchlist: true,
-        );
-        break;
     }
   }
 
@@ -2673,9 +2347,7 @@ class _HomeSessionSnapshot {
     required this.featuredMovies,
     required this.forYouMovies,
     required this.continueWatchingShows,
-    required this.friendsActivity,
     required this.heroFriendInteractions,
-    required this.showMoreFriendActivity,
     required this.watchlistMovieIds,
     required this.watchRequestsNeedingResponse,
     required this.watchPlansToShow,
@@ -2689,9 +2361,7 @@ class _HomeSessionSnapshot {
   final List<MovieShort> featuredMovies;
   final List<MovieShort> forYouMovies;
   final List<ContinueWatchingShow> continueWatchingShows;
-  final List<ActivityListItem> friendsActivity;
   final Map<int, List<FriendMediaInteraction>> heroFriendInteractions;
-  final bool showMoreFriendActivity;
   final Set<int> watchlistMovieIds;
   final int watchRequestsNeedingResponse;
   final List<WatchRequest> watchPlansToShow;

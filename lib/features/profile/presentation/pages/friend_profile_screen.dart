@@ -1,3 +1,5 @@
+import 'package:flixie_app/features/social/data/community_service.dart';
+import 'package:flixie_app/features/social/presentation/widgets/community_follow_button.dart';
 import 'package:flixie_app/features/profile/presentation/pages/milestones_screen.dart';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/models/movie_rating.dart';
@@ -44,14 +46,17 @@ import 'package:flixie_app/features/movies/presentation/widgets/review_card.dart
 
 enum _FriendshipStatus { none, pending, requested, friends }
 
+/// Shared other-user profile. The legacy class name does not imply friendship.
 class FriendProfileScreen extends StatefulWidget {
   final String userId;
   final bool previewMode;
+  final bool showCommunityFollow;
 
   const FriendProfileScreen({
     super.key,
     required this.userId,
     this.previewMode = false,
+    this.showCommunityFollow = false,
   });
 
   @override
@@ -1009,6 +1014,13 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                     _friendshipStatus == _FriendshipStatus.pending)) ...[
               const SizedBox(height: 18),
               _profileActions(),
+              if (widget.showCommunityFollow)
+                Center(
+                  child: CommunityFollowButton(
+                    path: 'profiles/${widget.userId}',
+                    service: const CommunityService(),
+                  ),
+                ),
               if (_friendshipStatus == _FriendshipStatus.friends) ...[
                 const SizedBox(height: 10),
                 Row(
@@ -1513,7 +1525,8 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
           hideWhenEmpty: true,
           emptyMessage: 'No lists shared with you yet.',
           embedded: true,
-          publicOnly: widget.previewMode,
+          publicOnly: widget.previewMode ||
+              (!_isSelf && _friendshipStatus != _FriendshipStatus.friends),
         ),
         if (user.favoriteMovies?.isNotEmpty == true) ...[
           const SizedBox(height: 18),
@@ -1841,7 +1854,9 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                     title: "${_user?.username ?? 'Friend'}'s Lists",
                     emptyMessage:
                         "No visible lists yet or this friend hasn't created one.",
-                    publicOnly: widget.previewMode,
+                    publicOnly: widget.previewMode ||
+                        (!_isSelf &&
+                            _friendshipStatus != _FriendshipStatus.friends),
                   ),
 
                   // Taste compatibility

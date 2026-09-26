@@ -12,6 +12,18 @@ String notificationDeepLinkPath(Map<String, dynamic> data) {
   final routeTab = Uri.tryParse(route ?? '')?.queryParameters['tab'];
   final requestId = _watchRequestId(data, route, type);
 
+  // Older clients use the safe `route`; this client also knows Community.
+  final communityRoute = data['communityRoute']?.toString();
+  if ((type == 'COMMUNITY_REACTION' ||
+          type == 'COMMUNITY_REPLY' ||
+          (type == 'LIST_SHARED' && category == 'COMMUNITY')) &&
+      communityRoute != null &&
+      (communityRoute == '/community/people' ||
+          RegExp(r'^/community/posts/[^/?#]+/(movie-review|show-review|movie-list-added)/[^/?#]+$')
+              .hasMatch(communityRoute))) {
+    return communityRoute;
+  }
+
   if (type == 'GROUP_MESSAGE' ||
       type == 'MESSAGE' ||
       type == 'TEXT' ||

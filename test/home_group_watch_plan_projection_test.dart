@@ -200,6 +200,8 @@ void main() {
       expect(paths.where((p) => p == '/groups/home/watch-plans').length, 3);
     },
         () => MockClient((request) async {
+              if (request.url.path.startsWith('/requests/'))
+                return response([]);
               paths.add(request.url.path);
               if (fail) return response({'error': 'Unavailable'}, 503);
               if (request.url.path == '/groups/g0/requests') {
@@ -243,6 +245,8 @@ void main() {
       expect(cache.home, isEmpty);
     },
         () => MockClient((request) {
+              if (request.url.path.startsWith('/requests/'))
+                return Future.value(response([]));
               final completion = Completer<http.Response>();
               pending.add(completion);
               return completion.future;

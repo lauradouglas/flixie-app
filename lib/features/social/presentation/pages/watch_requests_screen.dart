@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/social/data/watch_request_cache.dart';
 import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'package:flixie_app/core/widgets/notification_opt_in.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
@@ -147,7 +148,9 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
     final auth = context.read<AuthProvider>();
     _groups = auth.cachedGroups ?? [];
     _loadingGroups = _groups.isEmpty;
-    final cachedRequests = auth.cachedWatchRequests;
+    final planCache = context.read<WatchRequestCache?>();
+    final cachedRequests = auth.cachedWatchRequests ??
+        (planCache?.hasDirectSnapshot == true ? planCache!.direct : null);
     final focusedRequestId = widget.initialRequestId;
     if (focusedRequestId == null || focusedRequestId.isEmpty) {
       if (cachedRequests != null) {

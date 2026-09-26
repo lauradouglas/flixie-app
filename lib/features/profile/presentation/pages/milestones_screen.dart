@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/profile/data/milestone_cache.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/api/api_client.dart';
@@ -25,12 +26,10 @@ class _MilestonesScreenState extends State<MilestonesScreen> {
     _load = _fetch();
   }
 
-  Future<ProfileMilestones> _fetch() async =>
-      ProfileMilestones.fromJson(await ApiClient.get(
-              '/users/${Uri.encodeComponent(widget.userId)}/milestones')
-          as Map<String, dynamic>);
+  Future<ProfileMilestones> _fetch({bool refresh = false}) =>
+      MilestoneCache.instance.load(widget.userId, refresh: refresh);
   Future<void> _refresh() async {
-    final next = _fetch();
+    final next = _fetch(refresh: true);
     setState(() => _load = next);
     try {
       await next;
@@ -46,8 +45,9 @@ class _MilestonesScreenState extends State<MilestonesScreen> {
         body: SafeArea(
             child: FutureBuilder<ProfileMilestones>(
                 future: _load,
+                initialData: MilestoneCache.instance.peek(widget.userId),
                 builder: (context, snapshot) {
-                  if (snapshot.hasError) {
+                  if (snapshot.hasError && !snapshot.hasData) {
                     final private = snapshot.error is ApiException &&
                         (snapshot.error as ApiException).statusCode == 403;
                     return Center(

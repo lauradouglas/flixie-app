@@ -20,13 +20,32 @@ class ActivityTile extends StatefulWidget {
       {super.key,
       required this.item,
       this.compact = false,
+      this.feedStyle = false,
+      this.postDetail = false,
+      this.secondaryAction,
+      this.headerAction,
+      this.saveAction,
+      this.onOptions,
+      this.onDiscussion,
+      this.openPostOnContent = false,
+      this.community = false,
+      this.showComments = true,
+      this.onCommunityProfile,
       this.embedded = false,
       this.dismissSheetOnNavigate = false,
       this.showMoviePreview = true,
       this.detailSource = DetailSource.unknown});
   final ActivityListItem item;
   final bool compact, showMoviePreview;
+  final bool feedStyle, postDetail;
+  final bool openPostOnContent;
+  final Widget? secondaryAction;
+  final Widget? headerAction, saveAction;
+  final VoidCallback? onOptions, onDiscussion;
   final bool embedded;
+  final bool community;
+  final bool showComments;
+  final VoidCallback? onCommunityProfile;
   final bool dismissSheetOnNavigate;
   final DetailSource detailSource;
 
@@ -41,13 +60,37 @@ class _ActivityTileState extends State<ActivityTile>
   ActivityReactionSummary _reactions = const ActivityReactionSummary();
   bool _saving = false;
   int _generation = 0;
+  static final _reactionChanges = ValueNotifier<
+      ({
+        String actor,
+        String owner,
+        String key,
+        ActivityReactionSummary summary
+      })?>(null);
+  void _reactionChanged() {
+    final change = _reactionChanges.value;
+    if (!mounted ||
+        _saving ||
+        change == null ||
+        change.actor != context.read<AuthProvider?>()?.dbUser?.id ||
+        change.owner != item.userId ||
+        change.key != _key) {
+      return;
+    }
+    ++_generation;
+    setState(() => _reactions = change.summary);
+  }
+
   static final _loads = <String, ({DateTime time, Future<dynamic> future})>{};
   String get _key => '${item.type.value}:${item.id}';
-  String get _path => '/friends/activity-reactions/${item.userId}';
+  String get _path => widget.community
+      ? '/community/reactions/${item.userId}/${item.type.value}/${item.id}'
+      : '/friends/activity-reactions/${item.userId}';
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _reactionChanges.addListener(_reactionChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _load();
     });
@@ -76,6 +119,7 @@ class _ActivityTileState extends State<ActivityTile>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _reactionChanges.removeListener(_reactionChanged);
     super.dispose();
   }
 
@@ -83,7 +127,7 @@ class _ActivityTileState extends State<ActivityTile>
     final actor = context.read<AuthProvider?>()?.dbUser?.id;
     if (actor == null || item.userId.isEmpty || _saving) return;
     final generation = ++_generation;
-    final cacheKey = '$actor:${item.userId}';
+    final cacheKey = '$actor:$_path';
     final cached = _loads[cacheKey];
     final future = !force &&
             cached != null &&
@@ -95,10 +139,12 @@ class _ActivityTileState extends State<ActivityTile>
     try {
       final data = await future as Map;
       if (mounted && generation == _generation && !_saving) {
-        setState(() => _reactions = data[_key] is Map
-            ? ActivityReactionSummary.fromJson(
-                Map<String, dynamic>.from(data[_key]))
-            : const ActivityReactionSummary());
+        setState(() => _reactions = widget.community
+            ? ActivityReactionSummary.fromJson(Map<String, dynamic>.from(data))
+            : data[_key] is Map
+                ? ActivityReactionSummary.fromJson(
+                    Map<String, dynamic>.from(data[_key]))
+                : const ActivityReactionSummary());
       }
     } catch (_) {
       _loads.remove(cacheKey);
@@ -109,6 +155,8 @@ class _ActivityTileState extends State<ActivityTile>
     if (_saving) return;
     final previous = _reactions;
     final key = _key;
+    final owner = item.userId;
+    final actor = context.read<AuthProvider?>()?.dbUser?.id ?? '';
     ++_generation;
     setState(() {
       _saving = true;
@@ -121,7 +169,16 @@ class _ActivityTileState extends State<ActivityTile>
         'reaction': emoji
       });
       _loads.clear();
-      if (mounted && _key == key) {
+      if (mounted) {
+        _reactionChanges.value = (
+          actor: actor,
+          owner: owner,
+          key: key,
+          summary:
+              ActivityReactionSummary.fromJson(Map<String, dynamic>.from(data))
+        );
+      }
+      if (mounted && _key == key && item.userId == owner) {
         setState(() => _reactions =
             ActivityReactionSummary.fromJson(Map<String, dynamic>.from(data)));
       }
@@ -145,7 +202,8 @@ class _ActivityTileState extends State<ActivityTile>
   Future<void> _react(BuildContext anchor) async {
     final chosen = await showActivityReactionBubble(context, anchor,
         current: _reactions.mine,
-        canReply: item.userId != context.read<AuthProvider?>()?.dbUser?.id);
+        canReply: !widget.community &&
+            item.userId != context.read<AuthProvider?>()?.dbUser?.id);
     if (!mounted) return;
     if (chosen == 'reply') {
       final payload = ActivityReplyPayload.fromActivity(item);
@@ -302,22 +360,44 @@ class _ActivityTileState extends State<ActivityTile>
     }
     return ActivityFeedCard(
       item: item,
+      feedStyle: widget.feedStyle,
+      postDetail: widget.postDetail,
+      secondaryAction: widget.secondaryAction,
+      publicPost: widget.community,
+      headerAction: widget.headerAction,
+      saveAction: widget.saveAction,
+      onOptions: widget.onOptions,
       embedded: widget.embedded,
       reactions: _reactions,
       busy: _saving,
       onReact: item.userId == currentUserId ? null : _react,
       onReactionSelected: item.userId == currentUserId ? null : _save,
-      onOpen: route == null ? null : () => _navigate(route),
-      onProfile: () => _navigate(item.userId == currentUserId
-          ? '/profile'
-          : '/friends/${item.userId}'),
-      onReply: item.userId.isEmpty || item.userId == currentUserId
+      onOpen: widget.openPostOnContent
+          ? widget.onDiscussion
+          : route == null
+              ? null
+              : () => _navigate(route),
+      onProfile: widget.community
+          ? widget.onCommunityProfile
+          : () => _navigate(item.userId == currentUserId
+              ? '/profile'
+              : '/friends/${item.userId}'),
+      onComment: widget.onDiscussion ??
+          (widget.community || !widget.showComments || item.userId.isEmpty
+              ? null
+              : () => _navigate(
+                  '/friends/activity/${Uri.encodeComponent(item.userId)}/${item.type.value}/${Uri.encodeComponent(item.id)}')),
+      onReply: widget.community ||
+              item.userId.isEmpty ||
+              item.userId == currentUserId
           ? null
           : () => _navigate('/chat/${item.userId}',
               extra: payload.isUsable ? payload : null),
-      onOpenList: item.listId == null || item.listOwnerId == null
-          ? null
-          : () => _openList(context),
+      onOpenList: widget.openPostOnContent
+          ? widget.onDiscussion
+          : item.listId == null || item.listOwnerId == null
+              ? null
+              : () => _openList(context),
       onReview: item.reviewData == null
           ? null
           : () => showModalBottomSheet<void>(

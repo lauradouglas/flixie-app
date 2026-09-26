@@ -95,3 +95,4 @@ android/build/
 # Keep the app lockfile reproducible; nested package lockfiles stay local.
 pubspec.lock
 !/pubspec.lock
+docs/product-ideas.md

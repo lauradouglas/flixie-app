@@ -6,6 +6,7 @@ enum DetailSource {
   justForYou('just_for_you'),
   friendsWatching('friends_watching'),
   friendActivity('friend_activity'),
+  communityActivity('community_activity'),
   watchlist('watchlist'),
   watchHistory('watch_history'),
   list('list'),

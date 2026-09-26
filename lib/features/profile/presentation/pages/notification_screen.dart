@@ -267,59 +267,79 @@ class _NotificationScreenState extends State<NotificationScreen> {
         }
       }
 
-      await NotificationService.updateNotification(
-        id,
-        action: action,
-        read: true,
-      );
-      if (action == FlixieNotification.actionAccepted) {
-        if (notification.type == FlixieNotification.friendRequest) {
-          await analytics.friendConnected();
-        } else if (notification.type == FlixieNotification.movieWatchRequest ||
-            notification.type == FlixieNotification.showWatchRequest) {
-          final request = notification.linkedWatchRequest;
-          await analytics.watchPlanAccepted(
-            watchPlanId: requestId,
-            contentId: request?.analyticsContentId,
-            contentType: request?.analyticsContentType ??
-                (notification.type == FlixieNotification.showWatchRequest
-                    ? 'show'
-                    : 'movie'),
-            planType: 'friend',
-            participantCount: 2,
-            source: 'notification',
-          );
+      // The request endpoint has already saved the response and closed its
+      // notification. A secondary inbox update must not undo that success.
+      try {
+        await NotificationService.updateNotification(
+          id,
+          action: action,
+          read: true,
+        );
+      } catch (error) {
+        logger.w(
+            '[NotificationScreen] response saved; inbox sync failed: $error');
+      }
+      try {
+        if (action == FlixieNotification.actionAccepted) {
+          if (notification.type == FlixieNotification.friendRequest) {
+            await analytics.friendConnected();
+          } else if (notification.type ==
+                  FlixieNotification.movieWatchRequest ||
+              notification.type == FlixieNotification.showWatchRequest) {
+            final request = notification.linkedWatchRequest;
+            await analytics.watchPlanAccepted(
+              watchPlanId: requestId,
+              contentId: request?.analyticsContentId,
+              contentType: request?.analyticsContentType ??
+                  (notification.type == FlixieNotification.showWatchRequest
+                      ? 'show'
+                      : 'movie'),
+              planType: 'friend',
+              participantCount: 2,
+              source: 'notification',
+            );
+          }
         }
+      } catch (error) {
+        logger.w('[NotificationScreen] response analytics failed: $error');
       }
 
       if (mounted) {
         setState(() {
+          _dismissingIds.add(id);
           _notifications.removeWhere((n) => n.id == id);
         });
         auth.updateCachedNotifications(_notifications);
-        if (userId != null &&
-            notification.type == FlixieNotification.friendRequest) {
-          final friends = await _friendActions.getFriends(userId);
-          if (mounted) auth.updateCachedFriends(friends);
-        } else if (userId != null &&
-            notification.type == FlixieNotification.groupInvite) {
-          // Group membership has just changed on the server. Refresh this
-          // cache before returning to Social so its existing IndexedStack
-          // cannot render the stale pre-invite group list.
-          try {
-            final groups = await GroupService.getUserGroups(userId);
-            if (mounted) auth.updateCachedGroups(groups);
-          } catch (error) {
-            // The request itself has succeeded. Preserve that success and
-            // fall back to the usual background refresh if the cache fetch
-            // happens to fail.
-            logger.w('[NotificationScreen] group cache refresh failed: $error');
+        try {
+          if (userId != null &&
+              notification.type == FlixieNotification.friendRequest) {
+            final friends = await _friendActions.getFriends(userId);
+            if (mounted) auth.updateCachedFriends(friends);
+          } else if (userId != null &&
+              notification.type == FlixieNotification.groupInvite) {
+            // Group membership has just changed on the server. Refresh this
+            // cache before returning to Social so its existing IndexedStack
+            // cannot render the stale pre-invite group list.
+            try {
+              final groups = await GroupService.getUserGroups(userId);
+              if (mounted) auth.updateCachedGroups(groups);
+            } catch (error) {
+              // The request itself has succeeded. Preserve that success and
+              // fall back to the usual background refresh if the cache fetch
+              // happens to fail.
+              logger
+                  .w('[NotificationScreen] group cache refresh failed: $error');
+              await auth.refreshUserData();
+            }
+            TabRefreshController.requestSocialRefresh();
+          } else {
             await auth.refreshUserData();
           }
-          TabRefreshController.requestSocialRefresh();
-        } else {
-          await auth.refreshUserData();
+        } catch (error) {
+          logger.w(
+              '[NotificationScreen] response saved; cache refresh failed: $error');
         }
+        TabRefreshController.requestSocialRefresh();
         if (!mounted) return;
         // Show success toast
         final isWatchPlan =

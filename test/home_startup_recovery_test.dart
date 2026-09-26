@@ -65,6 +65,11 @@ void main() {
           reason:
               'Completed empty friend activity must not wait for recommendations');
       expect(find.text('Friends watching'), findsNothing);
+      expect(find.text('On Your Watchlist'), findsNothing);
+      await tester.scrollUntilVisible(find.text('Community'), 250,
+          scrollable: find.byType(Scrollable).first);
+      expect(find.text('Community'), findsOneWidget);
+      expect(find.text('Friends’ activity'), findsNothing);
       recommendations.complete(response({'error': 'offline'}, 500));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
@@ -88,6 +93,8 @@ void main() {
     },
         () => MockClient((request) async {
               final path = request.url.path;
+              if (path == '/community/activity')
+                return response({'items': [], 'nextCursor': null});
               if (path.contains('/trending/')) {
                 if (!trending.isCompleted) return await trending.future;
                 return response([

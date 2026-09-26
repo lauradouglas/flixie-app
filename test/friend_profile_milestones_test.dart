@@ -41,6 +41,8 @@ void main() {
             'completedSetup': true,
             'darkMode': true
           };
+        } else if (path.endsWith('/community/profiles/friend/follow')) {
+          data = {'following': false};
         } else if (path.endsWith('/friends/me')) {
           data = {
             'friendships': friends
@@ -66,8 +68,22 @@ void main() {
       addTearDown(auth.dispose);
       await tester.pumpWidget(ChangeNotifierProvider<AuthProvider>.value(
           value: auth,
-          child:
-              const MaterialApp(home: FriendProfileScreen(userId: 'friend'))));
+          child: const MaterialApp(
+              home: FriendProfileScreen(
+                  userId: 'friend', showCommunityFollow: true))));
+      await tester.pumpAndSettle();
+      expect(find.text('Profile'), findsOneWidget);
+      expect(find.text('Follow'), findsOneWidget);
+      expect(find.text('Add Friend'), friends ? findsNothing : findsOneWidget);
+      expect(find.text('Message'), friends ? findsOneWidget : findsNothing);
+      await tester.tap(find.text('Follow'));
+      await tester.pumpAndSettle();
+      expect(find.text('Following'), findsOneWidget);
+      await tester.tap(find.byTooltip('Profile actions'));
+      await tester.pumpAndSettle();
+      expect(find.text('Report user'), findsOneWidget);
+      expect(find.text('Block user'), findsOneWidget);
+      await tester.tapAt(const Offset(5, 150));
       await tester.pumpAndSettle();
       final link = find.text('View earned milestones');
       if (friends) {

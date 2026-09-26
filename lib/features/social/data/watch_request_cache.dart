@@ -1,3 +1,5 @@
+import 'package:flixie_app/features/social/data/request_service.dart';
+import 'package:flixie_app/models/watch_request.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 
@@ -11,7 +13,18 @@ import 'package:flixie_app/models/group_watch_request.dart';
 /// requests load when the group/plan opens and are never seeded from Home data.
 /// Both paths coalesce in-flight reads; explicit refreshes fetch fresh data.
 class WatchRequestCache extends ChangeNotifier {
+  WatchRequestCache({DateTime Function()? now}) : _now = now ?? DateTime.now;
+  final DateTime Function() _now;
   final Map<String, List<GroupWatchRequest>> _byGroup = {};
+  List<WatchRequest> _direct = const [];
+  Future<List<WatchRequest>>? _directInFlight;
+  DateTime? _directFetchedAt, _homeFetchedAt;
+  List<WatchRequest> get direct => List.unmodifiable(_direct);
+  bool get hasDirectSnapshot => _directFetchedAt != null;
+  bool get hasHomeSnapshot => _homeFetchedAt != null;
+  bool _fresh(DateTime? at) =>
+      at != null && _now().difference(at) < const Duration(seconds: 30);
+
   final Map<String, Future<List<GroupWatchRequest>>> _inFlight = {};
   String? _userId;
   int _generation = 0;
@@ -35,6 +48,9 @@ class WatchRequestCache extends ChangeNotifier {
     _userId = userId;
     _generation++;
     _home = const [];
+    _direct = const [];
+    _directInFlight = null;
+    _directFetchedAt = _homeFetchedAt = null;
     _homeInFlight = null;
     _byGroup.clear();
     _inFlight.clear();
@@ -43,6 +59,7 @@ class WatchRequestCache extends ChangeNotifier {
       return;
     }
     _preload(userId);
+    _preloadDirect();
   }
 
   Future<void> _preload(String userId) async {
@@ -53,12 +70,59 @@ class WatchRequestCache extends ChangeNotifier {
     }
   }
 
-  Future<List<HomeGroupWatchPlan>> refreshHome() {
+  Future<void> _preloadDirect() async {
+    try {
+      await refreshDirect();
+    } catch (error) {
+      logger.w('Direct watch plan preload failed: $error');
+    }
+  }
+
+  Future<List<WatchRequest>> refreshDirect({bool force = true}) {
+    if (_disposed || _userId == null || _userId!.isEmpty) {
+      return Future.value(const []);
+    }
+    if (_directInFlight != null) return _directInFlight!;
+    if (!force && _fresh(_directFetchedAt)) return Future.value(direct);
+    final generation = _generation;
+    final request = RequestService.getWatchRequests(_userId!,
+            includeHomeState: true,
+            activeOnly: true,
+            requestScope: 'direct:$_userId:$generation')
+        .then((plans) {
+      if (_disposed || generation != _generation) return <WatchRequest>[];
+      _direct = List.unmodifiable(plans);
+      _directFetchedAt = _now();
+      notifyListeners();
+      return direct;
+    }).catchError((Object error) {
+      if (!_disposed &&
+          generation == _generation &&
+          error is ApiException &&
+          (error.statusCode == 401 || error.statusCode == 403)) {
+        _direct = const [];
+        _directFetchedAt = null;
+        notifyListeners();
+      }
+      throw error;
+    });
+    _directInFlight = request;
+    void clear() {
+      if (identical(_directInFlight, request)) _directInFlight = null;
+    }
+
+    request.then<void>((_) => clear(),
+        onError: (Object _, StackTrace __) => clear());
+    return request;
+  }
+
+  Future<List<HomeGroupWatchPlan>> refreshHome({bool force = true}) {
     if (_disposed || _userId == null || _userId!.isEmpty) {
       return Future.value(const []);
     }
     final existing = _homeInFlight;
     if (existing != null) return existing;
+    if (!force && _fresh(_homeFetchedAt)) return Future.value(home);
     final generation = _generation;
     final request = _fetchHome(generation);
     _homeInFlight = request;
@@ -77,6 +141,7 @@ class WatchRequestCache extends ChangeNotifier {
           requestScope: 'home:$_userId:$generation');
       if (_disposed || generation != _generation) return const [];
       _home = List.unmodifiable(entries);
+      _homeFetchedAt = _now();
       notifyListeners();
       return home;
     } catch (error) {
@@ -85,6 +150,7 @@ class WatchRequestCache extends ChangeNotifier {
           error is ApiException &&
           (error.statusCode == 401 || error.statusCode == 403)) {
         _home = const [];
+        _homeFetchedAt = null;
         _byGroup.clear();
         notifyListeners();
       }

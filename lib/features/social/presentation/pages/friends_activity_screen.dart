@@ -1,150 +1,60 @@
-import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-
-import 'package:flixie_app/app/theme/app_theme.dart';
-import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
-import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
-import 'package:flixie_app/core/analytics/detail_source.dart';
-import 'package:flixie_app/features/social/data/friend_service.dart';
-import 'package:flixie_app/models/activity_list_item.dart';
+import 'friends_activity_feed.dart';
+import 'package:flixie_app/features/social/data/community_service.dart';
+import 'community_activity_feed.dart';
 
 class FriendsActivityScreen extends StatefulWidget {
-  const FriendsActivityScreen({super.key});
-
+  const FriendsActivityScreen(
+      {super.key,
+      this.communityService = const CommunityService(),
+      this.initialCommunity = false});
+  final CommunityService communityService;
+  final bool initialCommunity;
   @override
   State<FriendsActivityScreen> createState() => _FriendsActivityScreenState();
 }
 
 class _FriendsActivityScreenState extends State<FriendsActivityScreen> {
-  List<ActivityListItem> _items = const [];
-  bool _loading = true;
-  String? _error;
-
+  bool _settingsPending = false;
+  final _communityKey = GlobalKey<CommunityActivityFeedState>();
   @override
-  void initState() {
-    super.initState();
-    final cached = context.read<AuthProvider>().cachedFriendsActivity;
-    if (cached != null) {
-      final cutoff = DateTime.now().subtract(const Duration(days: 14));
-      _items = cached.where((item) {
-        final timestamp = DateTime.tryParse(item.timestamp);
-        return timestamp == null || timestamp.isAfter(cutoff);
-      }).toList();
-      _loading = false;
-    }
-    _load(showSpinner: cached == null);
-  }
-
-  Future<void> _load({bool showSpinner = false}) async {
-    final auth = context.read<AuthProvider>();
-    final userId = auth.dbUser?.id;
-    if (userId == null) {
-      if (mounted) setState(() => _loading = false);
-      return;
-    }
-    if (showSpinner) setState(() => _loading = true);
-    setState(() => _error = null);
-    try {
-      final items = await FriendService.getFriendsActivityLists(
-        userId,
-        days: 14,
-        limit: 100,
-        cachedFriends: auth.cachedFriends,
-      );
-      if (mounted) {
-        setState(() => _items = items);
-      }
-    } catch (_) {
-      if (mounted && _items.isEmpty) {
-        setState(() => _error = 'Couldn\'t load friend activity.');
-      }
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FlixiePageScaffold(
-      appBar: FlixieTitleAppBar(
-        title: Text(
-          'Friend Activity',
-          style: TextStyle(
-            color: context.colors.light,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-      body: RefreshIndicator(
-        onRefresh: () => _load(),
-        child: _loading
-            ? ListView(padding: const EdgeInsets.all(16), children: const [
-                ActivityRowsSkeleton(),
-                ActivityRowsSkeleton()
-              ])
-            : _error != null
-                ? ListView(
-                    children: [
-                      const SizedBox(height: 180),
-                      Center(child: Text(_error!)),
-                      TextButton(
-                          onPressed: _load, child: const Text('Try again')),
+  Widget build(BuildContext context) => DefaultTabController(
+      length: 2,
+      initialIndex: widget.initialCommunity ? 1 : 0,
+      child: Builder(
+          builder: (context) => FlixiePageScaffold(
+                appBar: FlixieTitleAppBar(
+                    title: const Text('Activity'),
+                    actions: [
+                      IconButton(
+                          tooltip: 'Around Flixie sharing',
+                          onPressed: () {
+                            DefaultTabController.of(context).animateTo(1);
+                            final feed = _communityKey.currentState;
+                            if (feed != null) {
+                              feed.showSettings();
+                            } else {
+                              _settingsPending = true;
+                            }
+                          },
+                          icon: const Icon(Icons.tune))
                     ],
-                  )
-                : _items.isEmpty
-                    ? ListView(
-                        padding: const EdgeInsets.all(24),
-                        children: [
-                          const SizedBox(height: 160),
-                          Icon(Icons.people_outline_rounded,
-                              size: 52, color: context.colors.medium),
-                          const SizedBox(height: 12),
-                          Text(
-                            'No friend activity in the last two weeks.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: context.colors.medium),
-                          ),
-                        ],
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-                        itemCount: _items.length + 1,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (_, index) {
-                          if (index == 0) {
-                            return Row(
-                              children: [
-                                const Icon(Icons.calendar_today_outlined,
-                                    size: 16, color: FlixieColors.primary),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Last 14 days · ratings and recommendations first',
-                                    style: TextStyle(
-                                      color: context.colors.medium,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                                Text(
-                                  '${_items.length}',
-                                  style: TextStyle(
-                                    color: context.colors.light,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            );
-                          }
-                          return ActivityTile(
-                            item: _items[index - 1],
-                            detailSource: DetailSource.friendActivity,
-                          );
-                        },
-                      ),
-      ),
-    );
-  }
+                    bottom: const TabBar(
+                        dividerColor: Colors.transparent,
+                        tabs: [Tab(text: 'Friends'), Tab(text: 'Around Flixie')])),
+                body: TabBarView(children: [
+                  const FriendsActivityFeed(),
+                  CommunityActivityFeed(
+                      key: _communityKey,
+                      onReady: () {
+                        if (_settingsPending && mounted) {
+                          _settingsPending = false;
+                          _communityKey.currentState?.showSettings();
+                        }
+                      },
+                      service: widget.communityService,
+                      showSettingsButton: false)
+                ]),
+              )));
 }

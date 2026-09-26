@@ -10,6 +10,8 @@ class FlixieNotification {
   static const String showWatchRequest = 'SHOW_WATCH_REQUEST';
   static const String listShared = 'LIST_SHARED';
   static const String referralJoined = 'REFERRAL_JOINED';
+  static const String communityReply = 'COMMUNITY_REPLY';
+  static const String communityReaction = 'COMMUNITY_REACTION';
 
   // Notification action constants
   static const String actionSent = 'SENT';

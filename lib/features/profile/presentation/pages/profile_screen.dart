@@ -1,3 +1,5 @@
+import 'package:flixie_app/features/profile/presentation/widgets/favourite_poster_rail.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_library_totals.dart';
 import 'package:flixie_app/features/profile/presentation/pages/milestones_screen.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/favourite_ranking_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
@@ -468,12 +470,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         .where(isActiveFavouriteShow)
         .toList(growable: false);
     final favoritePeople = dbUser?.favoritePeople ?? [];
-    final watchedCount = (dbUser?.watchedMovies?.length ?? 0) +
-        (dbUser?.watchedShows?.length ?? 0);
-    final watchlistCount = (dbUser?.movieWatchlist?.length ?? 0) +
-        (dbUser?.showWatchlist?.length ?? 0);
-    final favoritesCount = favoriteMovies.length + favoriteShows.length;
-
     final visibleActivity = _activity;
 
     return FlixiePageScaffold(
@@ -540,22 +536,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: Padding(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 8),
-                          child: _ProfileDashboard(
-                            watched: watchedCount,
-                            watchlist: watchlistCount,
-                            favorites: favoritesCount,
-                            breakdowns: [
-                              '${dbUser?.watchedMovies?.length ?? 0} movies · ${dbUser?.watchedShows?.length ?? 0} shows',
-                              '${dbUser?.movieWatchlist?.length ?? 0} movies · ${dbUser?.showWatchlist?.length ?? 0} shows',
-                              '${favoriteMovies.length} movies · ${favoriteShows.length} shows',
-                            ],
-                            onWatchHistory: () =>
-                                context.push('/watch-history'),
-                            onWatchlist: () => context.push('/watchlist'),
-                            onFavourites: () => setState(
-                                () => _selectedTab = _ProfileTab.library),
-                            onRecap: () => context.push('/stats'),
-                          ))),
+                          child: dbUser == null
+                              ? const SizedBox.shrink()
+                              : ProfileLibraryTotals(user: dbUser))),
                   if (_wrapped?.insights != null)
                     SliverToBoxAdapter(
                         child: Padding(
@@ -1024,19 +1007,8 @@ class _FavouritesLibrary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rankedMovies = movies
-        .whereType<FavoriteMovie>()
-        .where((e) => e.removed != true)
-        .toList()
-      ..sort((a, b) => (a.rank ?? 999).compareTo(b.rank ?? 999));
-    final movieItems = rankedMovies.map((favorite) {
-      final movie = favorite.movie ?? const <String, dynamic>{};
-      return _FavouriteDisplayItem(
-        title: movie['title']?.toString() ?? 'Movie',
-        imagePath: movie['posterPath']?.toString(),
-        route: '/movies/${favorite.movieId}',
-      );
-    }).toList(growable: false);
+    final movieItems =
+        favouriteMovieItems(movies.whereType<FavoriteMovie>().toList());
     final rankedShows = shows
         .whereType<Map>()
         .where((e) => e['removed'] != true)
@@ -1050,7 +1022,7 @@ class _FavouritesLibrary extends StatelessWidget {
           ? outer['show'] as Map<String, dynamic>
           : outer;
       final id = show['id'] ?? outer['showId'];
-      return _FavouriteDisplayItem(
+      return FavouriteDisplayItem(
         title: (show['title'] ?? show['name'] ?? 'Show').toString(),
         imagePath: show['posterPath']?.toString(),
         route: id == null ? null : '/shows/$id',
@@ -1060,7 +1032,7 @@ class _FavouritesLibrary extends StatelessWidget {
       final person =
           raw is Map<String, dynamic> ? raw : const <String, dynamic>{};
       final id = person['id'] ?? person['personId'];
-      return _FavouriteDisplayItem(
+      return FavouriteDisplayItem(
         title: (person['name'] ?? 'Person').toString(),
         imagePath:
             (person['profileImgUrl'] ?? person['profilePath'])?.toString(),
@@ -1072,7 +1044,7 @@ class _FavouritesLibrary extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (movieItems.isNotEmpty)
-          _FavouritePosterRail(
+          FavouritePosterRail(
             title: 'Favourite movies',
             items: movieItems,
             limit: maxFavouriteMovies,
@@ -1082,7 +1054,7 @@ class _FavouritesLibrary extends StatelessWidget {
             (peopleItems.isNotEmpty || showItems.isNotEmpty))
           const SizedBox(height: 18),
         if (showItems.isNotEmpty)
-          _FavouritePosterRail(
+          FavouritePosterRail(
             title: 'Favourite shows',
             items: showItems,
             limit: maxFavouriteShows,
@@ -1091,246 +1063,11 @@ class _FavouritesLibrary extends StatelessWidget {
         if (showItems.isNotEmpty && peopleItems.isNotEmpty)
           const SizedBox(height: 18),
         if (peopleItems.isNotEmpty)
-          _FavouritePosterRail(
+          FavouritePosterRail(
             title: 'Favourite people',
             items: peopleItems,
             circular: true,
           ),
-      ],
-    );
-  }
-}
-
-class _FavouriteDisplayItem {
-  const _FavouriteDisplayItem({
-    required this.title,
-    required this.imagePath,
-    required this.route,
-  });
-
-  final String title;
-  final String? imagePath;
-  final String? route;
-}
-
-class _FavouritePosterRail extends StatelessWidget {
-  const _FavouritePosterRail({
-    required this.title,
-    required this.items,
-    this.limit,
-    this.circular = false,
-    this.onRank,
-  });
-
-  final VoidCallback? onRank;
-  final String title;
-  final List<_FavouriteDisplayItem> items;
-  final int? limit;
-  final bool circular;
-
-  void _showAll(BuildContext context) {
-    showModalBottomSheet<void>(
-        context: context,
-        useRootNavigator: true,
-        useSafeArea: true,
-        isScrollControlled: true,
-        builder: (context) => SizedBox(
-            height: MediaQuery.sizeOf(context).height * .8,
-            child: Column(children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 8, 12),
-                child: Row(children: [
-                  Expanded(
-                      child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(title,
-                          style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w800,
-                              color: context.colors.textPrimary)),
-                      const SizedBox(height: 4),
-                      Text(
-                          limit == null
-                              ? '${items.length} favourites'
-                              : '${items.length} of $limit favourites',
-                          style: TextStyle(
-                              fontSize: 13, color: context.colors.light)),
-                    ],
-                  )),
-                  IconButton(
-                      tooltip: 'Close',
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context)),
-                ]),
-              ),
-              Expanded(
-                child: ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                  itemCount: items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (sheetContext, index) {
-                    final item = items[index];
-                    final raw = item.imagePath;
-                    final url = raw == null
-                        ? null
-                        : raw.startsWith('http')
-                            ? raw
-                            : 'https://image.tmdb.org/t/p/w185$raw';
-                    return Material(
-                      color: context.colors.surfaceElevated,
-                      borderRadius: BorderRadius.circular(14),
-                      clipBehavior: Clip.antiAlias,
-                      child: InkWell(
-                        onTap: item.route == null
-                            ? null
-                            : () {
-                                final router = GoRouter.of(context);
-                                Navigator.pop(sheetContext);
-                                router.push(item.route!);
-                              },
-                        child: Padding(
-                          padding: const EdgeInsets.all(10),
-                          child: Row(children: [
-                            if (!circular) ...[
-                              SizedBox(
-                                  width: 26,
-                                  child: Text('${index + 1}',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w800,
-                                          color: context.colors.primaryText))),
-                              const SizedBox(width: 10),
-                            ],
-                            ClipRRect(
-                              borderRadius:
-                                  BorderRadius.circular(circular ? 50 : 6),
-                              child: SizedBox(
-                                  width: 44,
-                                  height: circular ? 44 : 66,
-                                  child: url == null
-                                      ? const Icon(Icons.movie_outlined)
-                                      : Image.network(url,
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) =>
-                                              const Icon(
-                                                  Icons.movie_outlined))),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                                child: Text(item.title,
-                                    style: TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w700,
-                                        color: context.colors.textPrimary))),
-                            const SizedBox(width: 8),
-                            Icon(Icons.chevron_right,
-                                size: 20, color: context.colors.light),
-                          ]),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ])));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(children: [
-          Expanded(
-              child: Text(title,
-                  style: TextStyle(
-                      color: context.colors.textPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800))),
-          if (onRank != null)
-            IconButton(
-              tooltip:
-                  title == 'Favourite shows' ? 'Rank shows' : 'Rank movies',
-              onPressed: onRank,
-              icon: Icon(Icons.format_list_numbered,
-                  color: context.colors.primaryText, size: 22),
-            ),
-          TextButton(
-            onPressed: () => _showAll(context),
-            child: Text('See all',
-                style: TextStyle(color: context.colors.light, fontSize: 13)),
-          ),
-        ]),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: (circular ? 96 : 146) +
-              6 +
-              MediaQuery.textScalerOf(context).scale(36),
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: circular ? items.length : items.length.clamp(0, 10),
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
-            itemBuilder: (context, index) {
-              final item = items[index];
-              final rawPath = item.imagePath;
-              final imageUrl = rawPath == null
-                  ? null
-                  : rawPath.startsWith('http')
-                      ? rawPath
-                      : 'https://image.tmdb.org/t/p/w342$rawPath';
-              return SizedBox(
-                width: 104,
-                child: InkWell(
-                  onTap: item.route == null
-                      ? null
-                      : () => context.push(item.route!),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Column(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(
-                          circular ? 999 : 10,
-                        ),
-                        child: SizedBox(
-                          width: circular ? 96 : 104,
-                          height: circular ? 96 : 146,
-                          child: imageUrl == null
-                              ? ColoredBox(
-                                  color: context.colors.surfaceElevated,
-                                  child: Icon(
-                                    Icons.favorite_outline_rounded,
-                                    color: context.colors.medium,
-                                  ),
-                                )
-                              : Image.network(
-                                  imageUrl,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => const Icon(
-                                    Icons.image_not_supported_outlined,
-                                  ),
-                                ),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        item.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: context.colors.light,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
       ],
     );
   }
@@ -2198,117 +1935,6 @@ class _StatsBreakdown extends StatelessWidget {
           },
         ),
       ],
-    );
-  }
-}
-
-class _ProfileDashboard extends StatelessWidget {
-  const _ProfileDashboard({
-    required this.watched,
-    required this.watchlist,
-    required this.favorites,
-    required this.breakdowns,
-    required this.onWatchHistory,
-    required this.onWatchlist,
-    required this.onFavourites,
-    required this.onRecap,
-  });
-
-  final int watched;
-  final int watchlist;
-  final int favorites;
-  final List<String> breakdowns;
-  final VoidCallback onWatchHistory;
-  final VoidCallback onWatchlist;
-  final VoidCallback onFavourites;
-  final VoidCallback onRecap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(children: [
-            Expanded(
-              child: _DashboardMetric(
-                icon: Icons.visibility_outlined,
-                label: 'Watched',
-                value: '$watched',
-                breakdown: breakdowns[0],
-                onTap: onWatchHistory,
-              ),
-            ),
-            Container(width: 1, height: 48, color: context.colors.tabBarBorder),
-            Expanded(
-              child: _DashboardMetric(
-                icon: Icons.bookmark_border_rounded,
-                label: 'Watchlist',
-                value: '$watchlist',
-                breakdown: breakdowns[1],
-                onTap: onWatchlist,
-              ),
-            ),
-            Container(width: 1, height: 48, color: context.colors.tabBarBorder),
-            Expanded(
-              child: _DashboardMetric(
-                icon: Icons.favorite_border_rounded,
-                label: 'Favourites',
-                value: '$favorites',
-                breakdown: breakdowns[2],
-                onTap: onFavourites,
-              ),
-            ),
-          ]),
-        ),
-      ],
-    );
-  }
-}
-
-class _DashboardMetric extends StatelessWidget {
-  const _DashboardMetric({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.breakdown,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final String breakdown;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(10),
-      onTap: onTap,
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Text(value,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                color: context.colors.white,
-                fontWeight: FontWeight.w900,
-                fontSize: 24)),
-        Text(label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                color: context.colors.medium,
-                fontSize: 13,
-                fontWeight: FontWeight.w600)),
-        const SizedBox(height: 5),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Text(breakdown,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                  fontSize: 11, height: 1.4, color: context.colors.light)),
-        ),
-      ]),
     );
   }
 }

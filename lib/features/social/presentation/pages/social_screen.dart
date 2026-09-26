@@ -422,7 +422,13 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
               ),
               const SizedBox(height: 14),
             ],
-            const SocialSectionHeader(title: 'Friend activity'),
+            Row(children: [
+              const Expanded(
+                  child: SocialSectionHeader(title: 'Friend activity')),
+              TextButton(
+                  onPressed: () => context.push('/friends-activity'),
+                  child: const Text('Explore activity')),
+            ]),
             const SizedBox(height: 10),
             ActivityFilterBar(
               selected: _activityFilter,

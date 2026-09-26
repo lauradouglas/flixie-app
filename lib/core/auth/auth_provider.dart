@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/profile/data/milestone_cache.dart';
 import 'package:flixie_app/core/safety/safety_service.dart';
 import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
@@ -302,6 +303,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Call after adding an item to any list so activity-watching screens can refresh.
   void markActivityChanged() {
+    MilestoneCache.instance.invalidate();
     _cachedActivity = null;
     _cachedFriendsActivity = null;
     _activityVersion++;
@@ -346,6 +348,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     if (sameUser && !retry && _status == AuthStatus.authenticated) return;
     if (!sameUser || user == null) {
       SafetyService.reset();
+      MilestoneCache.instance.clear();
       _termsVerified = false;
       _sessionGeneration++;
       _prefetchGeneration++;
@@ -574,6 +577,8 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Fetches profile/friend/home cache in parallel right after login.
   void _prefetch(String userId, {String? region}) {
+    // Independent of startup readiness and all other prefetch work.
+    unawaited(MilestoneCache.instance.warm(userId));
     final session = _sessionGeneration;
     final generation = ++_prefetchGeneration;
     bool current() =>

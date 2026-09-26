@@ -1,3 +1,5 @@
+import 'activity_post_detail.dart';
+import 'compact_activity_post.dart';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
@@ -17,20 +19,32 @@ class ActivityFeedCard extends StatefulWidget {
       required this.onOpen,
       required this.onProfile,
       this.onReply,
+      this.onComment,
       this.onReview,
       this.onOpenList,
       this.busy = false,
-      this.embedded = false});
+      this.embedded = false,
+      this.feedStyle = false,
+      this.postDetail = false,
+      this.secondaryAction,
+      this.publicPost = false,
+      this.headerAction,
+      this.saveAction,
+      this.onOptions});
   final ActivityListItem item;
   final ActivityReactionSummary reactions;
   final ValueChanged<BuildContext>? onReact;
   final ValueChanged<String?>? onReactionSelected;
-  final VoidCallback onProfile;
+  final VoidCallback? onProfile;
   final VoidCallback? onOpen;
-  final VoidCallback? onReply;
+  final VoidCallback? onReply, onComment;
   final VoidCallback? onReview, onOpenList;
   final bool busy;
   final bool embedded;
+  final bool feedStyle, publicPost, postDetail;
+  final Widget? secondaryAction;
+  final Widget? headerAction, saveAction;
+  final VoidCallback? onOptions;
   @override
   State<ActivityFeedCard> createState() => _ActivityFeedCardState();
 }
@@ -60,7 +74,9 @@ class _ActivityFeedCardState extends State<ActivityFeedCard> {
             'Rated a ${widget.item.showId != null ? 'show' : 'film'}',
           ActivityListType.movieReview ||
           ActivityListType.showReview =>
-            'Wrote a review',
+            (widget.feedStyle || widget.postDetail)
+                ? 'Reviewed a ${widget.item.showId != null ? 'show' : 'film'}'
+                : 'Wrote a review',
           ActivityListType.movieWatchlist ||
           ActivityListType.showWatchlist =>
             'Added to watchlist',
@@ -70,7 +86,7 @@ class _ActivityFeedCardState extends State<ActivityFeedCard> {
             'Added to favourites',
           ActivityListType.watchRequest ||
           ActivityListType.watchRequestSent =>
-            'Shared a film',
+            'Shared a ${widget.item.showId != null ? 'show' : 'film'}',
           ActivityListType.watchRequestAccepted => 'Joined a watch plan',
           ActivityListType.movieListAdded => 'Added to a list',
           _ => 'Shared an update',
@@ -94,6 +110,44 @@ class _ActivityFeedCardState extends State<ActivityFeedCard> {
   @override
   Widget build(BuildContext context) {
     final item = widget.item;
+    if (widget.postDetail) {
+      return ActivityPostDetail(
+          item: item,
+          label: _label,
+          age: _age,
+          reactions: widget.reactions,
+          onProfile: widget.onProfile,
+          onOpen: widget.onOpen,
+          onOpenList: widget.onOpenList,
+          onReply: widget.onReply,
+          onOptions: widget.onOptions,
+          onReact: widget.onReact,
+          onReactionSelected: widget.onReactionSelected,
+          busy: widget.busy,
+          publicPost: widget.publicPost,
+          saveAction: widget.saveAction,
+          headerAction: widget.headerAction,
+          secondaryAction: widget.secondaryAction);
+    }
+    if (widget.feedStyle) {
+      return CompactActivityPost(
+          publicPost: widget.publicPost,
+          item: item,
+          label: _label,
+          age: _age,
+          reactions: widget.reactions,
+          onProfile: widget.onProfile,
+          onOpen: widget.onOpen,
+          onOpenList: widget.onOpenList,
+          onReview: widget.onReview,
+          onComment: widget.onComment,
+          onReply: widget.onReply,
+          onReact: widget.onReact,
+          busy: widget.busy,
+          headerAction: widget.headerAction,
+          saveAction: widget.saveAction,
+          onOptions: widget.onOptions);
+    }
     final name = item.username.isNotEmpty ? item.username : item.firstName;
     final review = item.reviewData;
     final text = review?.body ?? item.notes;
@@ -128,19 +182,22 @@ class _ActivityFeedCardState extends State<ActivityFeedCard> {
                           style: TextStyle(
                               color: context.colors.light, fontSize: 13)),
                     ])),
-                PopupMenuButton<String>(
-                    tooltip: 'Activity options',
-                    icon: Icon(Icons.more_horiz, color: context.colors.light),
-                    onSelected: (value) => value == 'profile'
-                        ? widget.onProfile()
-                        : widget.onOpen?.call(),
-                    itemBuilder: (_) => [
-                          const PopupMenuItem(
-                              value: 'profile', child: Text('View profile')),
-                          if (widget.onOpen != null)
-                            const PopupMenuItem(
-                                value: 'media', child: Text('View title'))
-                        ]),
+                if (widget.onProfile != null || widget.onOpen != null)
+                  PopupMenuButton<String>(
+                      tooltip: 'Activity options',
+                      icon: Icon(Icons.more_horiz, color: context.colors.light),
+                      onSelected: (value) => value == 'profile'
+                          ? widget.onProfile?.call()
+                          : widget.onOpen?.call(),
+                      itemBuilder: (_) => [
+                            if (widget.onProfile != null)
+                              const PopupMenuItem(
+                                  value: 'profile',
+                                  child: Text('View profile')),
+                            if (widget.onOpen != null)
+                              const PopupMenuItem(
+                                  value: 'media', child: Text('View title'))
+                          ]),
               ]),
               const SizedBox(height: 12),
               Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
@@ -155,7 +212,8 @@ class _ActivityFeedCardState extends State<ActivityFeedCard> {
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                      Text(item.mediaTitle ?? 'Shared activity',
+                      Text(
+                          item.mediaTitle ?? item.listName ?? 'Shared activity',
                           style: TextStyle(
                               color: context.colors.textPrimary,
                               fontSize: 22,
@@ -280,12 +338,17 @@ class _ActivityFeedCardState extends State<ActivityFeedCard> {
                     TextButton.icon(
                         onPressed: widget.onReply,
                         icon: const Icon(Icons.chat_bubble_outline),
-                        label: const Text('Reply'),
+                        label: const Text('Message'),
                         style: TextButton.styleFrom(
                             foregroundColor: context.colors.light)),
                   ],
                 ]),
               ],
+              if (widget.onComment != null)
+                TextButton.icon(
+                    onPressed: widget.onComment,
+                    icon: const Icon(Icons.forum_outlined),
+                    label: const Text('Comments')),
             ])));
   }
 }

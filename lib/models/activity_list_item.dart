@@ -64,6 +64,8 @@ class ActivityListItem {
   final List<String> profileBadges;
   final String? listId;
   final String? listName;
+  final String? listDescription;
+  final List<String> listPreviewPosterPaths;
   final String? listOwnerId;
   final int? listAdditionCount;
 
@@ -101,6 +103,8 @@ class ActivityListItem {
     this.profileBadges = const [],
     this.listId,
     this.listName,
+    this.listDescription,
+    this.listPreviewPosterPaths = const [],
     this.listOwnerId,
     this.listAdditionCount,
   });
@@ -133,6 +137,8 @@ class ActivityListItem {
         profileBadges: profileBadges,
         listId: listId,
         listName: listName,
+        listDescription: listDescription,
+        listPreviewPosterPaths: listPreviewPosterPaths,
         listOwnerId: listOwnerId,
         listAdditionCount: listAdditionCount,
       );
@@ -245,6 +251,11 @@ class ActivityListItem {
       activityScore: _parseInt(json['activityScore']) ?? 0,
       listId: json['listId']?.toString(),
       listName: json['listName']?.toString(),
+      listDescription: json['listDescription']?.toString(),
+      listPreviewPosterPaths:
+          (json['listPreviewPosterPaths'] as List? ?? const [])
+              .whereType<String>()
+              .toList(),
       listOwnerId: json['listOwnerId']?.toString(),
       listAdditionCount: _parseInt(json['listAdditionCount']),
     );

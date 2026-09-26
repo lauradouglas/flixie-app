@@ -3,6 +3,45 @@ import 'package:flixie_app/models/notification.dart';
 import 'package:flixie_app/core/utils/notification_destination.dart';
 
 void main() {
+  test(
+      'new clients use the Community destination alongside a build 70 fallback',
+      () {
+    expect(
+        notificationDestination(const FlixieNotification(
+          userId: 'me',
+          type: 'COMMUNITY_REACTION',
+          message: '',
+          data: {
+            'route': '/movies/101',
+            'communityRoute': '/community/posts/me/movie-review/review-7'
+          },
+        )),
+        '/community/posts/me/movie-review/review-7');
+  });
+  test(
+      'fallback-only Community notifications still open existing media screens',
+      () {
+    expect(
+        notificationDestination(const FlixieNotification(
+          userId: 'me',
+          type: 'COMMUNITY_REACTION',
+          message: '',
+          data: {'route': '/movies/101'},
+        )),
+        '/movies/101?source=notification');
+  });
+  test('invalid optional Community destinations use the compatible fallback',
+      () {
+    expect(
+        notificationDestination(const FlixieNotification(
+          userId: 'me',
+          type: 'COMMUNITY_REACTION',
+          message: '',
+          data: {'route': '/shows/202', 'communityRoute': '/unknown-screen'},
+        )),
+        '/shows/202?source=notification');
+  });
+
   for (final type in ['MOVIE_WATCH_REQUEST', 'SHOW_WATCH_REQUEST']) {
     test('$type opens its exact plan', () {
       expect(
