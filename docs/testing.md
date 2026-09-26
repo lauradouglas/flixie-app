@@ -165,3 +165,23 @@ from an explicit contextual opt-in, not authentication.
 skipping, the search contract, watchlist addition and responsive layouts.
 `patrol_test/setup_test.dart` exercises movie/TV picks and adding a show on a
 fixture account. `notification_opt_in_test.dart` protects consent timing.
+
+### Genre communities
+
+Focused UI checks: `flutter test test/genre_communities_test.dart`.
+Native join → review → leave journey (isolated fixtures):
+`scripts/test-patrol.sh -d <dedicated-test-device> -t patrol_test/genre_communities_test.dart`.
+The backend has a focused `src/routes/genreCommunities.test.ts` API test and a
+local-only rollback verification script; see `../FlixieBE/docs/genre-communities.md`.
+Verified 26 September 2026: genre join/read/leave passed on the dedicated
+**Flixie Patrol** iOS simulator; focused genre widget tests and backend privacy,
+pagination/aggregation integration checks passed. No golden baselines changed.
+
+Anime extension: `test/genre_communities_test.dart` includes mixed movie/show IDs,
+separate member averages and joining; seven widget tests pass. Backend Anime API
+checks and rollback local integration cover exact keywords, joining/leaving,
+private/nonmember exclusions, member scores and tied mixed-media pagination.
+The dedicated Patrol community journey now runs for Horror and Anime series.
+Anime verification completed: seven Flutter tests, clean focused analyzer, two
+API tests, rollback database checks, 12 build-70 checks and both dedicated iOS
+Patrol journeys pass. Production was not modified.

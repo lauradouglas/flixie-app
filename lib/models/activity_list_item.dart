@@ -51,6 +51,7 @@ class ActivityListItem {
   final String? mediaPosterPath;
   final double? mediaRating;
   final bool? recommended;
+  final bool favorited;
   final String? watchedAt;
   final int? watchCount;
   final bool isRewatch;
@@ -92,6 +93,7 @@ class ActivityListItem {
     this.mediaPosterPath,
     this.mediaRating,
     this.recommended,
+    this.favorited = false,
     this.watchedAt,
     this.watchCount,
     this.isRewatch = false,
@@ -126,6 +128,7 @@ class ActivityListItem {
         mediaPosterPath: mediaPosterPath,
         mediaRating: mediaRating,
         recommended: recommended,
+        favorited: favorited,
         watchedAt: watchedAt,
         watchCount: watchCount,
         isRewatch: isRewatch,
@@ -229,6 +232,7 @@ class ActivityListItem {
           ? (json['rating'] as num?)?.toDouble()
           : (json['rating'] as num?)?.toDouble() ??
               (review?['rating'] as num?)?.toDouble(),
+      favorited: json['favorited'] == true,
       recommended: json['watchEntryId'] != null
           ? json['recommended'] as bool?
           : json['recommended'] as bool? ?? (review?['recommended'] as bool?),

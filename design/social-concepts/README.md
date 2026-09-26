@@ -25,3 +25,8 @@ redundant summary card with a concise count/average, presents each friend's scor
 clearly with watch count/recommendation/favourite, and adds a separate public
 followed-person review section. Nina's review is illustrative. Not implemented.
 Actual avatars and badge borders must come from user data, not generated art.
+
+Movie concept implemented locally on 26 September 2026: friends who are also
+followed appear only under Friends. The actual implementation uses a compact
+public review title and opens the full post, and expands View all inline with
+paginated Load more. Movie-only; backend deployment required for followed reviews.

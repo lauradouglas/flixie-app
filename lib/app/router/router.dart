@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/social/presentation/pages/genre_community_feed_screen.dart';
 import 'package:flixie_app/core/navigation/instant_swipe_page.dart';
 import 'package:flixie_app/features/social/presentation/pages/community_people_screen.dart';
 import 'package:flixie_app/features/social/presentation/pages/friend_activity_screen.dart';
@@ -315,6 +316,16 @@ GoRouter buildRouter(
                     userId: state.pathParameters['id']!,
                     showCommunityFollow: true,
                   ))),
+          GoRoute(
+              path: '/genre-communities/:genreId',
+              pageBuilder: (context, state) => _pushPage(
+                  state,
+                  GenreCommunityFeedScreen(
+                      key: ValueKey(
+                          'genre:${state.pathParameters['genreId']}:${context.read<AuthProvider>().dbUser?.id}'),
+                      genreId:
+                          int.tryParse(state.pathParameters['genreId'] ?? '') ??
+                              0))),
           GoRoute(
               path: '/community/posts/:ownerId/:type/:id',
               pageBuilder: (context, state) => _pushPage(

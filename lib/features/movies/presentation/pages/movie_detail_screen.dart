@@ -8,7 +8,7 @@ import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/watch_provider_header.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/provider_tab_label.dart';
 import 'package:flixie_app/features/sharing/presentation/media_chat_share.dart';
-import 'package:flixie_app/features/movies/presentation/widgets/media_friend_activity_row.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/movie_social_opinions.dart';
 import 'package:flixie_app/features/settings/presentation/pages/settings_screen.dart'
     show showSettingsEditDetailsSheet;
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
@@ -1501,6 +1501,14 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                         const SizedBox(height: 18),
                         _optionalSection('friend summary', 'friend summary',
                             _buildFriendSummarySection(context)),
+                      ],
+                      if (context.read<AuthProvider>().dbUser?.id
+                          case final String viewerId) ...[
+                        const SizedBox(height: 18),
+                        MovieFollowingOpinions(
+                            key: ValueKey('following:$viewerId:${movie.id}'),
+                            movieId: movie.id,
+                            viewerId: viewerId),
                       ],
                       _optionalSection('activity', 'friend activity',
                           const SizedBox.shrink()),
@@ -3356,13 +3364,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               ),
           ],
         ),
-        Text(
-          '${activities.length} ${activities.length == 1 ? 'friend' : 'friends'} interacted',
-          style: TextStyle(color: context.colors.medium, fontSize: 11),
-        ),
-        const SizedBox(height: 8),
-        _buildFriendsSummaryPanel(activities),
-        const SizedBox(height: 8),
+        MovieFriendsRatingSummary(activities: activities, movieId: movieId!),
+        const SizedBox(height: 12),
         ...activities.take(5).map(_compactFriendRow),
       ],
     );
@@ -3453,8 +3456,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   }
 
   Widget _compactFriendRow(MovieFriendActivity activity) =>
-      MediaFriendActivityRow(
-          movieId: int.tryParse(widget.movieId),
+      MovieFriendOpinionRow(
+          movieId: int.parse(widget.movieId),
           activity: activity,
           onTap: () => context.push('/friends/${activity.userId}'));
 

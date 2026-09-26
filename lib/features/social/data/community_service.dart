@@ -111,6 +111,24 @@ class CommunityService {
         'sort': sort,
         if (cursor != null) 'cursor': cursor
       }));
+
+  /// Public reviews for this film, excluding every current friend server-side.
+  Future<CommunityPage> followedMovieReviews(int movieId,
+      {String? cursor}) async {
+    final data = await ApiClient.get('/community/activity', queryParams: {
+      'audience': 'following',
+      'filter': 'films',
+      'sort': 'latest',
+      'movieId': '$movieId',
+      if (cursor != null) 'cursor': cursor,
+    }) as Map;
+    // An older backend ignores this scope: never show its unfiltered feed here.
+    if (data['movieId'] != movieId) {
+      throw StateError('Movie review scope is not available on this server.');
+    }
+    return CommunityPage.fromJson(data);
+  }
+
   Future<bool> follows(String path) async =>
       (await ApiClient.get('/community/$path/follow'))['following'] == true;
   Future<void> follow(String path, bool value) async {

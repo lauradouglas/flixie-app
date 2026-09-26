@@ -18,6 +18,39 @@ class SocialSegmentedToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (labels.length > 4) {
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+            children: List.generate(
+                labels.length,
+                (i) => Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Semantics(
+                          selected: selectedIndex == i,
+                          child: TextButton(
+                            style: TextButton.styleFrom(
+                                minimumSize: const Size(48, 48),
+                                foregroundColor: selectedIndex == i
+                                    ? context.colors.white
+                                    : context.colors.medium,
+                                backgroundColor: selectedIndex == i
+                                    ? context.colors.surface
+                                    : Colors.transparent),
+                            onPressed: () => onChanged(i),
+                            child:
+                                Row(mainAxisSize: MainAxisSize.min, children: [
+                              Text(labels[i]),
+                              if ((counts[i] ?? 0) > 0) ...[
+                                const SizedBox(width: 6),
+                                Badge(label: Text('${counts[i]}'))
+                              ],
+                            ]),
+                          )),
+                    ))),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       child: DecoratedBox(

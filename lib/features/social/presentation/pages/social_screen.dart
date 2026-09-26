@@ -1,3 +1,4 @@
+import 'genre_communities_screen.dart';
 import '../widgets/social_activity_view.dart';
 import '../widgets/people_directory.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
@@ -44,6 +45,7 @@ class SocialScreen extends StatefulWidget {
 class _SocialScreenState extends State<SocialScreen> {
   int _selectedTab = 0; // People, Activity, Chats, Groups
   bool _activityVisited = false;
+  bool _communitiesVisited = false;
   int _refreshRevision = 0;
 
   @override
@@ -51,6 +53,7 @@ class _SocialScreenState extends State<SocialScreen> {
     super.initState();
     _selectedTab = widget.initialTab;
     _activityVisited = _activityVisited || _selectedTab == 1;
+    _communitiesVisited = _communitiesVisited || _selectedTab == 4;
     TabRefreshController.social.addListener(_onSocialTabRefresh);
   }
 
@@ -60,6 +63,7 @@ class _SocialScreenState extends State<SocialScreen> {
     if (oldWidget.initialTab != widget.initialTab) {
       _selectedTab = widget.initialTab;
       _activityVisited = _activityVisited || _selectedTab == 1;
+      _communitiesVisited = _communitiesVisited || _selectedTab == 4;
     }
   }
 
@@ -130,11 +134,18 @@ class _SocialScreenState extends State<SocialScreen> {
         children: [
           SocialSegmentedToggle(
             selectedIndex: _selectedTab,
-            labels: const ['People', 'Activity', 'Chats', 'Groups'],
+            labels: const [
+              'People',
+              'Activity',
+              'Chats',
+              'Groups',
+              'Communities'
+            ],
             counts: {2: context.watch<ChatUnreadController?>()?.total ?? 0},
             onChanged: (i) => setState(() {
               _selectedTab = i;
               _activityVisited = _activityVisited || i == 1;
+              _communitiesVisited = _communitiesVisited || i == 4;
             }),
           ),
           Expanded(
@@ -150,6 +161,11 @@ class _SocialScreenState extends State<SocialScreen> {
                         : const SizedBox.shrink(),
                     ConversationsHub(key: ValueKey('chats-$_refreshRevision')),
                     _GroupsSubView(key: ValueKey('groups-$_refreshRevision')),
+                    _communitiesVisited
+                        ? GenreCommunitiesView(
+                            key: ValueKey(
+                                'communities:${context.watch<AuthProvider>().dbUser?.id}'))
+                        : const SizedBox.shrink(),
                   ],
                 ),
               ),
