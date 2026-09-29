@@ -23,6 +23,7 @@ class GreetingHeader extends StatelessWidget {
     required this.onInvite,
     required this.onRequests,
     this.featureCard,
+    this.showShortcuts = true,
   });
 
   final String? name;
@@ -34,6 +35,7 @@ class GreetingHeader extends StatelessWidget {
   final VoidCallback onInvite;
   final VoidCallback onRequests;
   final Widget? featureCard;
+  final bool showShortcuts;
 
   @override
   Widget build(BuildContext context) {
@@ -62,8 +64,6 @@ class GreetingHeader extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: context.colors.white,
                     fontSize: 16,
@@ -79,34 +79,56 @@ class GreetingHeader extends StatelessWidget {
             featureCard!,
           ],
           const SizedBox(height: 10),
-          Row(
-            children: [
-              _ActionButton(
-                icon: Icons.search_rounded,
-                label: 'Search',
-                onTap: onSearch,
-              ),
-              const SizedBox(width: 8),
-              _ActionButton(
-                icon: Icons.bookmark_rounded,
-                label: 'Watchlist',
-                onTap: onWatchlist,
-              ),
-              const SizedBox(width: 8),
-              _ActionButton(
-                icon: Icons.group_add_rounded,
-                label: 'Invite friends',
-                onTap: onInvite,
-              ),
-              const SizedBox(width: 8),
-              _ActionButton(
-                icon: Icons.local_activity_rounded,
-                label: 'Plans',
-                onTap: onRequests,
-                badgeCount: requestCount,
-              ),
-            ],
-          ),
+          if (showShortcuts)
+            LayoutBuilder(builder: (context, constraints) {
+              final largeText = MediaQuery.textScalerOf(context).scale(12) > 15;
+              final columns = constraints.maxWidth < 360 || largeText ? 2 : 4;
+              final width =
+                  (constraints.maxWidth - 8 * (columns - 1)) / columns;
+              final actions = [
+                _ActionButton(
+                    icon: Icons.search_rounded,
+                    label: 'Search',
+                    onTap: onSearch),
+                _ActionButton(
+                    icon: Icons.bookmark_rounded,
+                    label: 'Watchlist',
+                    onTap: onWatchlist),
+                _ActionButton(
+                    icon: Icons.group_add_rounded,
+                    label: 'Invite friends',
+                    onTap: onInvite),
+                _ActionButton(
+                    icon: Icons.local_activity_rounded,
+                    label: 'Plans',
+                    onTap: onRequests,
+                    badgeCount: requestCount),
+              ];
+              // Reserve the tallest wrapped label for every shortcut.
+              // Text scaling remains enabled; none of the labels are clipped.
+              var height = 64.0;
+              for (final action in actions) {
+                final painter = TextPainter(
+                  text: TextSpan(
+                      text: action.label,
+                      style: DefaultTextStyle.of(context).style.merge(
+                          const TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w700))),
+                  textDirection: Directionality.of(context),
+                  textScaler: MediaQuery.textScalerOf(context),
+                )..layout(maxWidth: width - 12);
+                final measured = 46 + painter.height;
+                if (measured > height) height = measured;
+                painter.dispose();
+              }
+              return Wrap(spacing: 8, runSpacing: 8, children: [
+                for (final action in actions)
+                  SizedBox(
+                      width: width,
+                      height: height.ceilToDouble(),
+                      child: action)
+              ]);
+            }),
         ],
       ),
     );
@@ -128,60 +150,39 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
+    return Semantics(
+      button: true,
+      label: badgeCount > 0
+          ? '$label, $badgeCount plans need your attention'
+          : label,
+      excludeSemantics: true,
+      onTap: onTap,
       child: Material(
         color: context.colors.surface,
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: onTap,
-          child: SizedBox(
-            height: 64,
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 7),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      height: 27,
-                      child: Center(
-                        child: Badge(
-                          isLabelVisible: badgeCount > 0,
-                          label: Text(
-                            badgeCount > 99 ? '99+' : '$badgeCount',
-                            semanticsLabel:
-                                '$badgeCount plans need your attention',
-                          ),
-                          backgroundColor: FlixieColors.notificationBadge,
-                          textColor: FlixieColors.onNotificationBadge,
-                          textStyle: const TextStyle(
-                              fontSize: 11, fontWeight: FontWeight.w700),
-                          child:
-                              Icon(icon, color: FlixieColors.primary, size: 18),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    SizedBox(
-                      height: 12,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          label,
-                          maxLines: 1,
-                          style: TextStyle(
-                            color: context.colors.light,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            height: 1,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 64),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Badge(
+                  isLabelVisible: badgeCount > 0,
+                  label: Text(badgeCount > 99 ? '99+' : '$badgeCount'),
+                  backgroundColor: FlixieColors.notificationBadge,
+                  textColor: FlixieColors.onNotificationBadge,
+                  child: Icon(icon, color: FlixieColors.primary, size: 20),
                 ),
-              ),
+                const SizedBox(height: 6),
+                Text(label,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        color: context.colors.light,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700)),
+              ]),
             ),
           ),
         ),

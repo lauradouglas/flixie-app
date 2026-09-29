@@ -3,8 +3,6 @@ import 'package:flixie_app/features/profile/presentation/widgets/profile_library
 import 'package:flixie_app/features/profile/presentation/pages/milestones_screen.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/favourite_ranking_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
-import 'package:flixie_app/features/social/presentation/pages/social_screen.dart'
-    show showProfileCreateGroupSheet;
 import 'package:flixie_app/features/profile/presentation/controllers/review_reactions_controller.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/review_card.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
@@ -36,7 +34,6 @@ import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/utils/favourite_limits.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
-import 'package:flixie_app/features/profile/presentation/widgets/friends_row.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/movie_taste_badge.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/lists_preview_section.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_header.dart';
@@ -48,9 +45,8 @@ import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 import 'package:flixie_app/features/settings/presentation/widgets/watch_providers_sheet.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/features/social/data/request_service.dart';
-import 'package:flixie_app/features/social/presentation/widgets/group_card.dart';
 
-enum _ProfileTab { library, activity, social, stats }
+enum _ProfileTab { library, activity, stats }
 
 enum _ActivityFilter { all, watches, ratings, reviews, lists }
 
@@ -70,8 +66,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   FriendsData? _friendsData;
   bool _friendsLoading = true;
 
+  final _ratingsKey = GlobalKey();
   List<MovieRating> _ratings = [];
   bool _ratingsLoading = true;
+  int _ratingsGeneration = 0;
   List<ContinueWatchingShow> _continueWatching = [];
   List<WatchProvider> _watchProviders = [];
   int _activityLimit = 20;
@@ -147,6 +145,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _loadAll();
       } else {
         _loadActivity();
+        _loadRatings(forceRefresh: true);
       }
     }
   }
@@ -407,7 +406,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _loadRatings() async {
+  Future<void> _loadRatings({bool forceRefresh = false}) async {
+    final generation = ++_ratingsGeneration;
     logger.d('[ProfileScreen] _loadRatings called');
     final auth = context.read<AuthProvider>();
     final userId = auth.dbUser?.id;
@@ -418,7 +418,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     // Use prefetched cache if ready
-    if (auth.cachedRatings != null) {
+    if (!forceRefresh && auth.cachedRatings != null) {
       logger.i(
           '[ProfileScreen] Using cached ratings (${auth.cachedRatings!.length})');
       if (mounted) {
@@ -435,7 +435,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           '[ProfileScreen] Calling ProfileLookupController.getUserMovieRatings...');
       final ratings = await _profileLookup.getUserMovieRatings(userId);
       logger.i('[ProfileScreen] Loaded ${ratings.length} ratings');
-      if (mounted) {
+      if (mounted &&
+          generation == _ratingsGeneration &&
+          auth.dbUser?.id == userId) {
         setState(() {
           _ratings = ratings;
           _ratingsLoading = false;
@@ -444,7 +446,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e, stackTrace) {
       logger.e('[ProfileScreen] ratings load error: $e');
       logger.e('[ProfileScreen] Stack trace: $stackTrace');
-      if (mounted) setState(() => _ratingsLoading = false);
+      if (mounted &&
+          generation == _ratingsGeneration &&
+          auth.dbUser?.id == userId) {
+        setState(() => _ratingsLoading = false);
+      }
     }
   }
 
@@ -539,6 +545,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: dbUser == null
                               ? const SizedBox.shrink()
                               : ProfileLibraryTotals(user: dbUser))),
+                  SliverToBoxAdapter(
+                      child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton.icon(
+                                  onPressed: () =>
+                                      context.go('/social?tab=people'),
+                                  icon: const Icon(Icons.people_outline,
+                                      size: 19),
+                                  label: const Text('Friends & following'))))),
                   if (_wrapped?.insights != null)
                     SliverToBoxAdapter(
                         child: Padding(
@@ -652,8 +669,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       case _ProfileTab.activity:
         return _buildActivityTab(context, textTheme, visibleActivity);
-      case _ProfileTab.social:
-        return _buildSocialTab(context);
       case _ProfileTab.stats:
         return _buildStatsTab(context, favoriteGenres, user);
     }
@@ -669,6 +684,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Wrap(spacing: 14, runSpacing: 4, children: [
+          TextButton.icon(
+              onPressed: () => context.push('/watch-history'),
+              icon: const Icon(Icons.history, size: 18),
+              label: const Text('Watch history')),
+          TextButton.icon(
+              onPressed: () => context.push('/my-reviews'),
+              icon: const Icon(Icons.rate_review_outlined, size: 18),
+              label: const Text('Reviews')),
+          TextButton.icon(
+              onPressed: () {
+                final target = _ratingsKey.currentContext;
+                if (target != null) {
+                  Scrollable.ensureVisible(target,
+                      alignment: .1,
+                      duration: MediaQuery.disableAnimationsOf(context)
+                          ? Duration.zero
+                          : const Duration(milliseconds: 250));
+                }
+              },
+              icon: const Icon(Icons.star_outline, size: 18),
+              label: const Text('Ratings')),
+          TextButton.icon(
+              onPressed: () => context.push('/movie-lists'),
+              icon: const Icon(Icons.list_alt, size: 18),
+              label: const Text('Lists')),
+        ]),
+        const SizedBox(height: 12),
         if (_continueWatching.isNotEmpty) ...[
           _ProfileContinueWatching(
             shows: _continueWatching,
@@ -717,7 +760,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Center(child: CircularProgressIndicator()),
           )
         else ...[
-          RatingsSection(ratings: _ratings),
+          RatingsSection(key: _ratingsKey, ratings: _ratings),
           const SizedBox(height: 16),
         ],
         _WatchProvidersSummary(
@@ -849,109 +892,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           item: item,
           compact: true);
     }, childCount: rows.length + 2));
-  }
-
-  Widget _buildSocialTab(BuildContext context) {
-    final userId = context.read<AuthProvider>().dbUser?.id ?? '';
-    final groups = _groups
-        .where((group) => group.status?.toUpperCase() != 'CLOSED')
-        .toList();
-    final plans = _watchRequests
-        .where((request) =>
-            request.scheduledFor != null &&
-            !request.isTerminal &&
-            request.scheduledFor!.isAfter(DateTime.now()))
-        .toList()
-      ..sort((a, b) => a.scheduledFor!.compareTo(b.scheduledFor!));
-    final needsReply = _watchRequests.where((request) {
-      if (!request.isPending || request.requesterId == userId) return false;
-      final participant = request.participantFor(userId);
-      return participant == null ||
-          participant.response.toLowerCase() == 'pending';
-    }).length;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        FriendsRow(
-          data: _friendsData ??
-              const FriendsData(
-                friendships: [],
-                pendingFriends: [],
-                requestedFriends: [],
-              ),
-          isLoading: _friendsLoading,
-          onFriendsChanged: (updated) {
-            setState(() => _friendsData = updated);
-            context.read<AuthProvider>().updateCachedFriends(updated);
-          },
-        ),
-        const SizedBox(height: 22),
-        _SocialSectionHeader(
-          title: 'Your groups',
-          count: groups.length,
-          onSeeAll: () => context.push('/social?tab=groups'),
-        ),
-        const SizedBox(height: 10),
-        if (groups.isEmpty)
-          Text('No groups yet.', style: TextStyle(color: context.colors.medium))
-        else
-          ...groups.take(3).map((group) => GroupCard(
-                compact: true,
-                group: group,
-                memberCount: group.memberCount,
-                onTap: () => context.push('/groups/${group.id}'),
-              )),
-        TextButton.icon(
-          onPressed: () =>
-              showProfileCreateGroupSheet(context, onCreated: (group) {
-            if (mounted) setState(() => _groups.add(group));
-          }),
-          icon: const Icon(Icons.add_rounded),
-          label: const Text('Create group'),
-        ),
-        const SizedBox(height: 18),
-        _SocialSectionHeader(
-          title: 'Watch plans',
-          count: plans.isEmpty ? null : plans.length,
-          onSeeAll: () => context.push('/watch-requests'),
-        ),
-        if (needsReply > 0)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Material(
-              color: context.colors.tabBarBackgroundFocused,
-              borderRadius: BorderRadius.circular(14),
-              child: ListTile(
-                onTap: () => context.push('/watch-requests'),
-                title: const Text('Watch plan requests'),
-                subtitle: const Text('Awaiting your reply'),
-                leading: CircleAvatar(
-                    radius: 14,
-                    backgroundColor: context.colors.warning,
-                    child: Text('$needsReply',
-                        style: TextStyle(
-                            color:
-                                Theme.of(context).brightness == Brightness.light
-                                    ? Colors.white
-                                    : Colors.black,
-                            fontWeight: FontWeight.w700))),
-                trailing: const Icon(Icons.chevron_right_rounded),
-              ),
-            ),
-          ),
-        ...plans.take(2).map((request) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _ProfileWatchPlanCard(request: request),
-            )),
-        if (_socialLoadFailed)
-          TextButton.icon(
-            onPressed: _loadProfileExtras,
-            icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Couldn’t refresh groups and plans. Retry'),
-          ),
-      ],
-    );
   }
 
   Widget _buildStatsTab(
@@ -1990,7 +1930,6 @@ class _ProfileTabSelector extends StatelessWidget {
     return switch (tab) {
       _ProfileTab.library => 'Library',
       _ProfileTab.activity => 'Activity',
-      _ProfileTab.social => 'Social',
       _ProfileTab.stats => 'Stats',
     };
   }

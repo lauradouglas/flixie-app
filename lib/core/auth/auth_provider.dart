@@ -309,6 +309,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     MilestoneCache.instance.invalidate();
     _cachedActivity = null;
     _cachedFriendsActivity = null;
+    _cachedRatings = null;
     _activityVersion++;
     notifyListeners();
   }

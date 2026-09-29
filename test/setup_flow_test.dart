@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/social/data/genre_community_service.dart';
 import 'dart:async';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/core/widgets/flixie_wordmark.dart';
@@ -21,6 +22,9 @@ import 'package:flixie_app/features/authentication/presentation/pages/onboarding
 import 'support/watchlist_auth.dart';
 
 class SetupFixture extends SetupService {
+  @override
+  Future<List<GenreCommunity>> communities() async => [];
+
   bool failSave = false;
   Completer<List<SetupTitle>>? showLoad;
   List<WatchProvider> extraProviders = [];
@@ -418,14 +422,14 @@ void main() {
     await tester.pumpAndSettle();
     await tap(tester, 'Continue');
     expect(service.taste.map((t) => t.key), ['movie:1', 'show:1']);
-    await tap(tester, 'Show my picks');
+    await tap(tester, 'Continue');
     await tap(tester, 'Add to watchlist');
     expect(service.added.single.isShow, isTrue);
     expect(find.text('Added'), findsOneWidget);
     expect(find.text('Take an optional tour'), findsOneWidget);
   });
   testWidgets(
-      'taste limit, deselection and pinned preferences preserve choices',
+      'taste limit, deselection and pinned community actions preserve choices',
       (tester) async {
     final service = SetupFixture()
       ..browseTitles = List.generate(
@@ -456,8 +460,8 @@ void main() {
     await tester.pumpAndSettle();
     await tap(tester, 'Continue');
     expect(service.taste.map((title) => title.id), [2, 3, 4, 5, 6]);
-    expect(find.text('Show my picks').hitTestable(), findsOneWidget);
-    expect(find.text('Keep current preferences').hitTestable(), findsOneWidget);
+    expect(find.text('Continue').hitTestable(), findsOneWidget);
+    expect(find.text('Skip for now').hitTestable(), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -504,7 +508,7 @@ void main() {
     await tap(tester, 'Skip for now');
     await tap(tester, 'Skip taste picks');
     expect(service.taste, isEmpty);
-    await tap(tester, 'Keep current preferences');
+    await tap(tester, 'Skip for now');
     expect(find.text('Popular picks to get you started'), findsOneWidget);
   });
   testWidgets('setup reflows across screen sizes and large text',
@@ -537,7 +541,7 @@ void main() {
       expect(tester.takeException(), isNull);
       await tap(tester, 'Skip taste picks');
       expect(tester.takeException(), isNull);
-      await tap(tester, 'Keep current preferences');
+      await tap(tester, 'Skip for now');
       expect(tester.takeException(), isNull);
     }
   });

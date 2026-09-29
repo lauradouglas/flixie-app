@@ -195,6 +195,8 @@ class _GroupsSubViewState extends State<GroupsSubView> {
   void _showCreateGroupSheet() {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: context.colors.tabBarBackgroundFocused,
       shape: const RoundedRectangleBorder(

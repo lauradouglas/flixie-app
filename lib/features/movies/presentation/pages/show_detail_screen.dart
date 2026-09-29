@@ -489,6 +489,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
 
     final changed = await showModalBottomSheet<bool>(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => AddShowToListSheet(
@@ -1814,6 +1816,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     final still = _tmdbImage(episode.stillPath, 'w780');
     showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: context.colors.background,
       clipBehavior: Clip.antiAlias,
@@ -2676,6 +2680,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
   void _showAllShowFriends(TvShowFriendSummary summary) {
     showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => DraggableScrollableSheet(

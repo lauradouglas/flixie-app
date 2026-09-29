@@ -5,6 +5,30 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/write_review_sheet.dart';
 
 void main() {
+  testWidgets(
+      'unrated review requires an explicit score instead of defaulting to five',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: WriteReviewSheet(
+                movieId: 1, userId: 'user-1', onSubmitted: (_) {}))));
+    expect(find.text('5 / 10'), findsNothing);
+    expect(
+        tester
+            .widgetList<FlixiePill>(find.byType(FlixiePill))
+            .where((p) => p.selected),
+        isEmpty);
+    expect(tester.widget<ElevatedButton>(find.byType(ElevatedButton)).onPressed,
+        isNull);
+    await tester.tap(find.text('8'));
+    await tester.pump();
+    expect(find.text('8 / 10'), findsOneWidget);
+    expect(tester.widget<ElevatedButton>(find.byType(ElevatedButton)).onPressed,
+        isNotNull);
+  });
+
   testWidgets('uses the rating and recommendation from the watch entry',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1000));

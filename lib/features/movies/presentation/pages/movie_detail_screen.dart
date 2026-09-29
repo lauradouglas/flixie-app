@@ -2094,6 +2094,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       // Add rating and get updated vote average and count
       final response = await movieService.addMovieRating(
           movieId, user.id, rating, recommended);
+      authProvider.markActivityChanged();
       await analytics.ratingAdded(
         contentType: 'movie',
         contentId: movieId,
@@ -4638,7 +4639,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         watchEntryId: watchEntryId,
         watchEntries: _movieWatchHistory,
         userId: user.id,
-        initialRating: initialRating,
+        initialRating: initialRating ?? _userRating?.toDouble(),
         initialRecommended: initialRecommended,
         onSubmitted: (review) {
           final auth = context.read<AuthProvider>();

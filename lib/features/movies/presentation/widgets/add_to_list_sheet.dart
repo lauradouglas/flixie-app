@@ -437,6 +437,7 @@ class _AddToListSheetBodyState extends State<_AddToListSheetBody> {
     final provider = context.read<MovieListsProvider>();
     final created = await showModalBottomSheet<MovieList>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: context.colors.background,

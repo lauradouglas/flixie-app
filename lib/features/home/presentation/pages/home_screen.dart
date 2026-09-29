@@ -1,5 +1,5 @@
+import 'package:flixie_app/features/home/presentation/widgets/find_tonights_film_section.dart';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
-import 'package:flixie_app/features/pick_for_us/pick_for_us_screen.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/core/auth/startup_trace.dart';
 import 'package:flixie_app/features/home/presentation/models/home_watch_plan_visibility.dart';
@@ -68,7 +68,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   static _HomeSessionSnapshot? _sessionSnapshot;
   // Keep hero carousel concise so primary CTA and dots remain visible above fold.
   static const int _maxHeroCarouselItems = 12;
-  static const double _heroViewportFraction = 0.84;
+  static const double _heroViewportFraction = 0.42;
 
   List<MovieShort> _featuredMovies = [];
   List<MovieShort> _forYouMovies = [];
@@ -1114,6 +1114,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: GreetingHeader(
+                  showShortcuts: false,
                   name: greetingName,
                   avatar: user?.avatar,
                   profileBadges: user?.profileBadges ?? const [],
@@ -1121,7 +1122,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   onSearch: () => context.push('/search'),
                   onWatchlist: () => context.go('/watchlist'),
                   onInvite: () => context.go('/social'),
-                  onRequests: () => context.push('/watch-requests'),
+                  onRequests: () => context.push('/plans'),
                   featureCard: showWatchPlansIntro
                       ? WatchPlansIntroductionCard(
                           onCreate: _openWatchPlanCreation,
@@ -1131,34 +1132,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       : null,
                 ),
               ),
-              if (user != null)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                  child: ListTile(
-                    tileColor: context.colors.surface,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
-                    leading: Icon(Icons.auto_awesome_outlined,
-                        color: context.colors.secondary),
-                    title: const Text('Pick for me'),
-                    subtitle: const Text(
-                        'Your mood. Your taste. Solo or with friends.'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () async {
-                      await Navigator.of(context, rootNavigator: true).push(
-                          MaterialPageRoute<void>(
-                              builder: (_) =>
-                                  PickForUsScreen(userId: user.id)));
-                      if (mounted) await _refreshAll();
-                    },
-                  ),
-                ),
               _buildUpcomingWatchPlanSection(
                 context,
                 user,
                 selectedState: selectedWatchPlan,
                 suppressEmptyState: showWatchPlansIntro,
               ),
+              _buildBecauseYouRatedSection(context),
+              _buildContinueWatchingSection(context),
+              if (user != null)
+                FindTonightsFilmSection(onPick: () async {
+                  await context.push('/pick-for-us');
+                  if (mounted) await _refreshAll();
+                }),
+              if (user != null)
+                HomeCommunitySection(key: _communityKey, userId: user.id),
               if (_isLoading && heroMovies.isEmpty)
                 _buildPosterRailLoadingState('Trending now'),
               if (_error != null)
@@ -1171,10 +1159,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 _buildCarouselDots(heroMovies),
                 const SizedBox(height: 20),
               ],
-              _buildBecauseYouRatedSection(context),
-              _buildContinueWatchingSection(context),
-              if (user != null)
-                HomeCommunitySection(key: _communityKey, userId: user.id),
             ],
           ),
         ),
@@ -1246,12 +1230,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ? _heroPosterHeight(movie)
           : largest,
     );
-    final textScale =
-        MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6).toDouble();
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
     // Every page reserves the height required by the largest card in this
     // carousel. This keeps card edges and pagination aligned when a title,
     // date, or social row takes more room than its neighbours.
-    final carouselHeight = sharedPosterHeight + (220 * textScale);
+    final carouselHeight = sharedPosterHeight + (120 * textScale);
     return SizedBox(
       height: carouselHeight,
       child: Stack(
@@ -1271,6 +1254,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     context,
                     movies[index],
                     posterHeight: sharedPosterHeight,
+                    compact: true,
                   ),
                 );
               },
@@ -1281,7 +1265,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  double _heroPosterHeight(MovieShort movie) => 280.0;
+  double _heroPosterHeight(MovieShort movie) => 170.0;
 
   Widget _buildCarouselDots(List<MovieShort> movies) {
     final count = movies.length.clamp(0, _maxHeroCarouselItems);
@@ -1313,9 +1297,59 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     BuildContext context,
     MovieShort movie, {
     required double posterHeight,
+    bool compact = false,
   }) {
     final inWatchlist = _watchlistMovieIds.contains(movie.id);
     final isUpdating = _watchlistUpdatesInFlight.contains(movie.id);
+    if (compact) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        InkWell(
+            onTap: () => context
+                .push(movieDetailPath(movie.id, source: DetailSource.trending)),
+            borderRadius: BorderRadius.circular(10),
+            child: Semantics(
+                button: true,
+                label: 'View ${movie.name}',
+                child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: SizedBox(
+                        width: double.infinity,
+                        height: posterHeight,
+                        child: movie.poster == null
+                            ? _heroFallback()
+                            : CachedNetworkImage(
+                                imageUrl:
+                                    'https://image.tmdb.org/t/p/w342${movie.poster}',
+                                fit: BoxFit.cover,
+                                errorWidget: (_, __, ___) =>
+                                    _heroFallback()))))),
+        Expanded(
+            child: SingleChildScrollView(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+              const SizedBox(height: 8),
+              Text(movie.name,
+                  style: const TextStyle(
+                      fontSize: 13, height: 1.5, fontWeight: FontWeight.w700)),
+              TextButton.icon(
+                  onPressed: isUpdating
+                      ? null
+                      : () => _toggleWatchlistState(context,
+                          movieId: movie.id,
+                          movieTitle: movie.name,
+                          posterPath: movie.poster,
+                          currentlyInWatchlist: inWatchlist),
+                  style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      textStyle: const TextStyle(fontSize: 12)),
+                  icon: Icon(
+                      inWatchlist ? Icons.bookmark : Icons.bookmark_border,
+                      size: 17),
+                  label: Text(inWatchlist ? 'Saved' : 'Watchlist')),
+            ]))),
+      ]);
+    }
     final friendActivityLoading = context.read<AuthProvider>().dbUser != null &&
         !_heroFriendInteractions.containsKey(movie.id);
     final interactions = _heroFriendInteractions[movie.id] ?? const [];
@@ -1908,7 +1942,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       children: [
         HomeSectionHeader(
           title: 'Watch together',
-          onSeeAll: () => context.push('/watch-requests'),
+          onSeeAll: () => context.push('/plans'),
         ),
         const SizedBox(height: 8),
         LayoutBuilder(
@@ -2182,6 +2216,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     await showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => RewatchLogSheet(
@@ -2270,6 +2306,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (writeReview) {
       await showModalBottomSheet<Review>(
         context: this.context,
+        useRootNavigator: true,
+        useSafeArea: true,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
         builder: (_) => WriteReviewSheet(

@@ -372,6 +372,8 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
     if (_movieChoices.length >= _maxMovieChoices) return;
     final movie = await showModalBottomSheet<MovieShort>(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: context.colors.surface,
       builder: (_) => MovieSearchSheet(
@@ -399,6 +401,8 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
         context.read<AuthProvider>().dbUser?.watchProviderRegion ?? 'GB';
     final movie = await showModalBottomSheet<MovieShort>(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: context.colors.surface,
       builder: (_) => MovieSearchSheet(

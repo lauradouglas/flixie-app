@@ -32,10 +32,9 @@ import 'package:flixie_app/features/social/presentation/widgets/pending_friend_c
 import 'package:flixie_app/features/social/presentation/widgets/social_section_header.dart';
 import 'package:flixie_app/features/social/presentation/widgets/segmented_toggle.dart';
 import 'package:flixie_app/features/social/presentation/widgets/visibility_chip.dart';
-import 'package:flixie_app/features/social/presentation/widgets/conversations_hub.dart';
 
 class SocialScreen extends StatefulWidget {
-  const SocialScreen({super.key, this.initialTab = 0});
+  const SocialScreen({super.key, this.initialTab = 1});
   final int initialTab;
 
   @override
@@ -43,7 +42,8 @@ class SocialScreen extends StatefulWidget {
 }
 
 class _SocialScreenState extends State<SocialScreen> {
-  int _selectedTab = 0; // People, Activity, Chats, Groups
+  int _selectedTab =
+      1; // Legacy IDs: People 0, Activity 1, Groups 3, Communities 4
   bool _activityVisited = false;
   bool _communitiesVisited = false;
   int _refreshRevision = 0;
@@ -51,7 +51,7 @@ class _SocialScreenState extends State<SocialScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedTab = widget.initialTab;
+    _selectedTab = widget.initialTab == 2 ? 1 : widget.initialTab;
     _activityVisited = _activityVisited || _selectedTab == 1;
     _communitiesVisited = _communitiesVisited || _selectedTab == 4;
     TabRefreshController.social.addListener(_onSocialTabRefresh);
@@ -61,7 +61,7 @@ class _SocialScreenState extends State<SocialScreen> {
   void didUpdateWidget(covariant SocialScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.initialTab != widget.initialTab) {
-      _selectedTab = widget.initialTab;
+      _selectedTab = widget.initialTab == 2 ? 1 : widget.initialTab;
       _activityVisited = _activityVisited || _selectedTab == 1;
       _communitiesVisited = _communitiesVisited || _selectedTab == 4;
     }
@@ -104,50 +104,51 @@ class _SocialScreenState extends State<SocialScreen> {
         ),
         actions: [
           TextButton.icon(
-            onPressed: () => context.push('/invite-friend?from=social'),
-            icon: const Icon(Icons.person_add_alt_1_rounded, size: 19),
-            label: const Text('Invite'),
-            style: TextButton.styleFrom(
-              foregroundColor: context.colors.primaryText,
-              textStyle: const TextStyle(fontWeight: FontWeight.w800),
-            ),
-          ),
-          IconButton(
-            onPressed: () {
-              if (_selectedTab != 3) {
-                _showAddFriendSheet();
-                return;
-              }
-              ScaffoldMessenger.of(context).showFlixieToast(
-                FlixieToast(
-                    type: FlixieToastType.info,
-                    content:
-                        const Text('Use Create on the Groups tab for groups.')),
-              );
-            },
-            icon: const Icon(Icons.person_add_alt_1_outlined),
-            tooltip: _selectedTab == 3 ? 'Create group' : 'Find friends',
+            onPressed: () => context.push('/messages'),
+            icon: Badge(
+                isLabelVisible:
+                    (context.watch<ChatUnreadController?>()?.total ?? 0) > 0,
+                label: Text(
+                    '${context.watch<ChatUnreadController?>()?.total ?? 0}'),
+                child: const Icon(Icons.chat_bubble_outline, size: 20)),
+            label: const Text('Messages'),
           ),
         ],
       ),
       body: Column(
         children: [
           SocialSegmentedToggle(
-            selectedIndex: _selectedTab,
-            labels: const [
-              'People',
-              'Activity',
-              'Chats',
-              'Groups',
-              'Communities'
-            ],
-            counts: {2: context.watch<ChatUnreadController?>()?.total ?? 0},
+            selectedIndex: const [1, 0, 3, 4].indexOf(_selectedTab),
+            labels: const ['Activity', 'People', 'Groups', 'Communities'],
             onChanged: (i) => setState(() {
-              _selectedTab = i;
-              _activityVisited = _activityVisited || i == 1;
-              _communitiesVisited = _communitiesVisited || i == 4;
+              _selectedTab = const [1, 0, 3, 4][i];
+              _activityVisited = _activityVisited || _selectedTab == 1;
+              _communitiesVisited = _communitiesVisited || _selectedTab == 4;
             }),
           ),
+          Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Wrap(spacing: 16, children: [
+                    TextButton.icon(
+                        onPressed: () => context.push('/plans'),
+                        icon: const Icon(Icons.event_outlined, size: 19),
+                        label: const Text('Plans')),
+                    if (_selectedTab == 0) ...[
+                      TextButton.icon(
+                          onPressed: _showAddFriendSheet,
+                          icon: const Icon(Icons.person_search_outlined,
+                              size: 19),
+                          label: const Text('Find friends')),
+                      TextButton.icon(
+                          onPressed: () =>
+                              context.push('/invite-friend?from=social'),
+                          icon: const Icon(Icons.person_add_alt_1_outlined,
+                              size: 19),
+                          label: const Text('Invite')),
+                    ],
+                  ]))),
           Expanded(
             child: ClipRect(
               child: Material(
@@ -159,7 +160,7 @@ class _SocialScreenState extends State<SocialScreen> {
                     _activityVisited
                         ? const SocialActivityView()
                         : const SizedBox.shrink(),
-                    ConversationsHub(key: ValueKey('chats-$_refreshRevision')),
+                    const SizedBox.shrink(),
                     _GroupsSubView(key: ValueKey('groups-$_refreshRevision')),
                     _communitiesVisited
                         ? GenreCommunitiesView(

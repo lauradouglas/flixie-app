@@ -6,10 +6,12 @@ class CommunityFollowButton extends StatefulWidget {
       {super.key,
       required this.path,
       required this.service,
-      this.list = false});
+      this.list = false,
+      this.outlined = false});
   final String path;
   final CommunityService service;
   final bool list;
+  final bool outlined;
   @override
   State<CommunityFollowButton> createState() => _CommunityFollowButtonState();
 }
@@ -58,27 +60,51 @@ class _CommunityFollowButtonState extends State<CommunityFollowButton> {
       message: _following == true
           ? 'Unfollow${widget.list ? ' list' : ''}'
           : 'Follow',
-      child: TextButton.icon(
-          onPressed: _busy
-              ? null
-              : _failed
-                  ? _load
-                  : _following == null
-                      ? null
-                      : _toggle,
-          icon: _busy
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2))
-              : Icon(_following == true ? Icons.check : Icons.add, size: 16),
-          style: TextButton.styleFrom(
-              minimumSize: const Size(44, 44),
-              textStyle:
-                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-          label: Text(_failed
-              ? 'Retry follow status'
-              : _following == true
-                  ? 'Following${widget.list ? ' list' : ''}'
-                  : 'Follow${widget.list ? ' list' : ''}')));
+      child: widget.outlined
+          ? OutlinedButton(
+              onPressed: _busy
+                  ? null
+                  : _failed
+                      ? _load
+                      : _following == null
+                          ? null
+                          : _toggle,
+              style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(76, 44),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10))),
+              child: Text(_busy
+                  ? 'Saving…'
+                  : _failed
+                      ? 'Retry follow status'
+                      : _following == null
+                          ? 'Loading…'
+                          : _following!
+                              ? 'Following'
+                              : 'Follow'),
+            )
+          : TextButton.icon(
+              onPressed: _busy
+                  ? null
+                  : _failed
+                      ? _load
+                      : _following == null
+                          ? null
+                          : _toggle,
+              icon: _busy
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : Icon(_following == true ? Icons.check : Icons.add,
+                      size: 16),
+              style: TextButton.styleFrom(
+                  minimumSize: const Size(44, 44),
+                  textStyle: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600)),
+              label: Text(_failed
+                  ? 'Retry follow status'
+                  : _following == true
+                      ? 'Following${widget.list ? ' list' : ''}'
+                      : 'Follow${widget.list ? ' list' : ''}')));
 }

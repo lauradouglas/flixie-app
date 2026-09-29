@@ -81,8 +81,8 @@ class _CommunityPreferencesState extends State<CommunityPreferences> {
           'Include my favourite genres in my public profile.'
         ),
         'communityReplyNotifications': (
-          'Reply notifications',
-          'Notify me when someone replies to my public posts.'
+          'Replies and mentions',
+          'Notify me about replies to my public posts or comments, and when someone mentions me in a community.'
         ),
         'communityReactionNotifications': (
           'Reaction notifications',

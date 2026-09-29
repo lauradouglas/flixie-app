@@ -30,10 +30,21 @@ class _SkeletonBoxState extends State<SkeletonBox>
     _ctrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1100),
-    )..repeat(reverse: true);
+    );
     _anim = Tween<double>(begin: 0.3, end: 0.65).animate(
       CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
     );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _ctrl.stop();
+      _ctrl.value = .5;
+    } else if (!_ctrl.isAnimating) {
+      _ctrl.repeat(reverse: true);
+    }
   }
 
   @override
@@ -136,7 +147,7 @@ class _HomeBootLoadingScreenState extends State<HomeBootLoadingScreen>
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 4200),
-  )..repeat();
+  );
 
   static const _messages = [
     'Finding tonight’s good stuff…',
@@ -144,6 +155,17 @@ class _HomeBootLoadingScreenState extends State<HomeBootLoadingScreen>
     'Picking films that feel like you…',
     'Putting your watch plans together…',
   ];
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.stop();
+      _controller.value = 0;
+    } else if (!_controller.isAnimating) {
+      _controller.repeat();
+    }
+  }
 
   @override
   void dispose() {
@@ -695,8 +717,7 @@ class ActivityRowsSkeleton extends StatelessWidget {
                       SkeletonBox(height: 14),
                       SizedBox(height: 10),
                       FractionallySizedBox(
-                          widthFactor: .6,
-                          child: SkeletonBox(height: 12)),
+                          widthFactor: .6, child: SkeletonBox(height: 12)),
                     ])),
               ]),
             ),

@@ -86,6 +86,7 @@ flutter:
   assets:
     - assets/images/
     - assets/icon/
+    - assets/icon/communities/
     - assets/splash/
 
 # Native icons are maintained directly, including Apple appearances and Android

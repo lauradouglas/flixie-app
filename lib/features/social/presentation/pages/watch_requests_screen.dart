@@ -1528,8 +1528,8 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
     }
 
     addSection(
-      'Needs you',
-      'Watch Plans with an action for you',
+      'Needs your response',
+      'Watch plans with an action for you',
       sections.needsReply,
     );
     addSection('Upcoming', 'Your agreed watch plans', sections.upcoming);

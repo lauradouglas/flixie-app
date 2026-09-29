@@ -461,10 +461,16 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
     final isOwner = _group?.ownerId == currentUserId;
     final action = await showModalBottomSheet<String>(
       context: pageContext,
+      useRootNavigator: true,
+      useSafeArea: true,
+      isScrollControlled: true,
+      constraints:
+          BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .9),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (modalContext) => SafeArea(
+          child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -500,7 +506,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
               ),
           ],
         ),
-      ),
+      )),
     );
 
     if (!mounted) return;

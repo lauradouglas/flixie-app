@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/load_failure_notice.dart';
 import 'package:flixie_app/core/safety/safety_actions.dart';
 import 'package:flixie_app/features/social/data/request_service.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
@@ -160,6 +161,10 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
     final currentUserId = context.read<AuthProvider>().dbUser?.id;
     if (currentUserId == null) return;
 
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final results = await Future.wait([
         UserService.getUserById(widget.otherUserId),
@@ -250,10 +255,10 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
         backgroundColor: context.colors.background,
         appBar: AppBar(backgroundColor: context.colors.background),
         body: Center(
-          child: Text(
-            _error ?? 'Could not open chat',
-            style: TextStyle(color: context.colors.medium),
-          ),
+          child: SingleChildScrollView(
+              child: LoadFailureNotice(
+                  message: 'Couldn’t load this chat.',
+                  onRetry: _initConversation)),
         ),
       );
     }

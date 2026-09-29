@@ -1,4 +1,8 @@
-import 'package:flixie_app/features/social/presentation/pages/genre_community_feed_screen.dart';
+import 'package:flixie_app/features/social/presentation/widgets/conversations_hub.dart';
+import 'package:flixie_app/features/social/presentation/pages/community_discussion_screen.dart';
+import 'package:flixie_app/features/social/data/community_space_service.dart';
+import 'package:flixie_app/features/pick_for_us/pick_for_us_screen.dart';
+import 'package:flixie_app/features/social/presentation/pages/community_space_screen.dart';
 import 'package:flixie_app/core/navigation/instant_swipe_page.dart';
 import 'package:flixie_app/features/social/presentation/pages/community_people_screen.dart';
 import 'package:flixie_app/features/social/presentation/pages/friend_activity_screen.dart';
@@ -17,7 +21,6 @@ import 'package:flixie_app/core/auth/referral_attribution_store.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/core/analytics/detail_source.dart';
 import 'package:flixie_app/core/analytics/recommendation_attribution.dart';
-import 'package:flixie_app/core/navigation/tab_refresh_controller.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/home/presentation/pages/home_screen.dart';
 import 'package:flixie_app/features/movies/presentation/pages/movie_detail_screen.dart';
@@ -109,6 +112,8 @@ String _screenNameFor(GoRouterState state) {
     '/my-reviews' => 'My Reviews',
     '/stats' => 'Stats',
     '/wrapped' || '/wrapped/:userId' => 'Wrapped',
+    '/plans' => 'Watch Plans',
+    '/messages' => 'Messages',
     '/watch-requests' => 'Watch Plans',
     '/watch-requests/:requestId' => 'Watch Plan',
     '/settings' => 'Settings',
@@ -256,326 +261,376 @@ GoRouter buildRouter(
         ),
       ),
 
-      // Main shell (authenticated)
-      ShellRoute(
-        observers: [_FlixieAnalyticsObserver(analytics)],
-        builder: (context, state, child) => MainNavigationShell(child: child),
-        routes: [
-          GoRoute(
-            path: '/',
-            pageBuilder: (context, state) =>
-                _calmPage(state, const HomeScreen()),
-          ),
-          GoRoute(
-            path: '/search',
-            pageBuilder: (context, state) =>
-                _calmPage(state, const SearchScreen()),
-          ),
-          GoRoute(
-            path: '/watchlist',
-            pageBuilder: (context, state) =>
-                _calmPage(state, const WatchlistScreen()),
-          ),
-          GoRoute(
-            path: '/group-watch-plans-v2',
-            pageBuilder: (context, state) => _calmPage(
-              state,
-              GroupWatchPlanV2Screen(
-                groupId: state.uri.queryParameters['groupId'],
-                groupName: state.uri.queryParameters['groupName'],
-                initialRequestId: state.uri.queryParameters['requestId'],
-              ),
-            ),
-          ),
-          GoRoute(
-            path: '/social',
-            pageBuilder: (context, state) => _calmPage(
-                state,
-                SocialScreen(
-                    initialTab: switch (state.uri.queryParameters['tab']) {
-                  'groups' => 3,
-                  'chats' => 2,
-                  'activity' => 1,
-                  _ => 0,
-                })),
-          ),
-          GoRoute(
-              path: '/community/people',
+      // Each primary destination owns a retained navigator and scroll state.
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, shell) =>
+            MainNavigationShell(navigationShell: shell),
+        branches: [
+          StatefulShellBranch(observers: [
+            _FlixieAnalyticsObserver(analytics)
+          ], routes: [
+            GoRoute(
+              path: '/',
               pageBuilder: (context, state) =>
-                  _pushPage(state, const CommunityPeopleScreen())),
-          GoRoute(
-              path: '/community/profiles/:id',
-              redirect: (context, state) =>
-                  context.read<AuthProvider>().dbUser?.id ==
-                          state.pathParameters['id']
-                      ? '/profile'
+                  _calmPage(state, const HomeScreen()),
+            ),
+          ]),
+          StatefulShellBranch(observers: [
+            _FlixieAnalyticsObserver(analytics)
+          ], routes: [
+            GoRoute(
+              path: '/watchlist',
+              pageBuilder: (context, state) =>
+                  _calmPage(state, const WatchlistScreen()),
+            ),
+          ]),
+          StatefulShellBranch(observers: [
+            _FlixieAnalyticsObserver(analytics)
+          ], routes: [
+            GoRoute(
+              path: '/search',
+              pageBuilder: (context, state) =>
+                  _calmPage(state, const SearchScreen()),
+            ),
+          ]),
+          StatefulShellBranch(observers: [
+            _FlixieAnalyticsObserver(analytics)
+          ], routes: [
+            GoRoute(
+              path: '/social',
+              redirect: (_, state) =>
+                  state.uri.queryParameters['tab'] == 'chats'
+                      ? '/messages'
                       : null,
-              pageBuilder: (context, state) => _pushPage(
+              pageBuilder: (context, state) => _calmPage(
                   state,
-                  FriendProfileScreen(
-                    userId: state.pathParameters['id']!,
-                    showCommunityFollow: true,
-                  ))),
-          GoRoute(
-              path: '/genre-communities/:genreId',
-              pageBuilder: (context, state) => _pushPage(
-                  state,
-                  GenreCommunityFeedScreen(
-                      key: ValueKey(
-                          'genre:${state.pathParameters['genreId']}:${context.read<AuthProvider>().dbUser?.id}'),
-                      genreId:
-                          int.tryParse(state.pathParameters['genreId'] ?? '') ??
-                              0))),
-          GoRoute(
-              path: '/community/posts/:ownerId/:type/:id',
-              pageBuilder: (context, state) => _pushPage(
-                  state,
-                  CommunityPostScreen(
-                      ownerId: state.pathParameters['ownerId']!,
-                      type: state.pathParameters['type']!,
-                      postId: state.pathParameters['id']!))),
-          GoRoute(
-            path: '/friends-activity',
-            pageBuilder: (context, state) => _calmPage(
-                state,
-                FriendsActivityScreen(
-                    initialCommunity:
-                        state.uri.queryParameters['tab'] == 'community')),
-          ),
-          GoRoute(
-            path: '/groups/:id',
-            pageBuilder: (context, state) => _calmPage(
-              state,
-              GroupDetailScreen(
-                groupId: state.pathParameters['id'] ?? '',
-                initialRequestId: state.uri.queryParameters['requestId'],
-                initialTab: state.uri.queryParameters['tab'] == 'requests'
-                    ? 2
-                    : state.uri.queryParameters['tab'] == 'insights'
-                        ? 3
-                        : state.uri.queryParameters['tab'] == 'chat'
-                            ? 0
-                            : null,
-              ),
+                  SocialScreen(
+                      initialTab: switch (state.uri.queryParameters['tab']) {
+                    'communities' => 4,
+                    'groups' => 3,
+                    'chats' => 2,
+                    'activity' => 1,
+                    'people' => 0,
+                    _ => 1,
+                  })),
             ),
-          ),
-          GoRoute(
-            path: '/groups/:id/members',
-            pageBuilder: (context, state) => _calmPage(
-              state,
-              GroupMembersScreen(
-                groupId: state.pathParameters['id'] ?? '',
-                groupName: state.extra as String? ?? 'Group',
-              ),
+          ]),
+          StatefulShellBranch(observers: [
+            _FlixieAnalyticsObserver(analytics)
+          ], routes: [
+            GoRoute(
+              path: '/profile',
+              pageBuilder: (context, state) =>
+                  _calmPage(state, const ProfileScreen()),
             ),
-          ),
-          GoRoute(
-            path: '/profile',
-            pageBuilder: (context, state) =>
-                _calmPage(state, const ProfileScreen()),
-          ),
-          GoRoute(
-            path: '/movies/:id',
-            pageBuilder: (context, state) => _pushPage(
-              state,
-              MovieDetailScreen(
-                movieId: state.pathParameters['id'] ?? '0',
-                source: DetailSource.fromValue(
-                  state.uri.queryParameters['source'],
-                ),
-                fromMovieMatch:
-                    state.uri.queryParameters['source'] == 'movie_match' ||
-                        state.uri.queryParameters['movieMatch'] == '1',
-                recommendation: state.uri.queryParameters['recSource'] == null
-                    ? null
-                    : RecommendationAttribution.fromRoute(
-                        contentId:
-                            int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
-                        contentType: 'movie',
-                        query: state.uri.queryParameters,
-                      ),
-              ),
-            ),
-          ),
-          GoRoute(
-            path: '/shows/:id',
-            pageBuilder: (context, state) => _pushPage(
-              state,
-              ShowDetailScreen(
-                showId: state.pathParameters['id'] ?? '0',
-                source: DetailSource.fromValue(
-                  state.uri.queryParameters['source'],
-                ),
-              ),
-            ),
-          ),
-          GoRoute(
-            path: '/people/:id',
-            pageBuilder: (context, state) => _pushPage(
-              state,
-              PersonDetailScreen(
-                personId: state.pathParameters['id'] ?? '0',
-                source: DetailSource.fromValue(
-                  state.uri.queryParameters['source'],
-                ),
-                parentContentId: int.tryParse(
-                  state.uri.queryParameters['parentContentId'] ?? '',
-                ),
-                parentContentType:
-                    state.uri.queryParameters['parentContentType'],
-              ),
-            ),
-          ),
-          GoRoute(
-            path: '/my-reviews',
-            pageBuilder: (context, state) =>
-                _calmPage(state, const MyReviewsScreen()),
-          ),
-          GoRoute(
-            path: '/group-invites/:requestId',
-            pageBuilder: (context, state) => _pushPage(
-              state,
-              GroupInvitationDetailScreen(
-                groupId: state.uri.queryParameters['groupId'] ?? '',
-                requestId: state.pathParameters['requestId'] ?? '',
-              ),
-            ),
-          ),
-          GoRoute(
-            path: '/friends/activity/:ownerId/:type/:postId',
-            pageBuilder: (context, state) => _pushPage(
-                state,
-                FriendActivityScreen(
-                    ownerId: state.pathParameters['ownerId']!,
-                    type: state.pathParameters['type']!,
-                    postId: state.pathParameters['postId']!)),
-          ),
-          GoRoute(
-            path: '/friends/:id',
-            pageBuilder: (context, state) => _calmPage(
-              state,
-              FriendProfileScreen(
-                userId: state.pathParameters['id'] ?? '',
-                previewMode: state.uri.queryParameters['preview'] == 'true',
-              ),
-            ),
-          ),
-          GoRoute(
-            path: '/chat/:id',
-            pageBuilder: (context, state) => _pushPage(
-              state,
-              DirectChatScreen(
-                otherUserId: state.pathParameters['id'] ?? '',
-                initialActivityReply: state.extra is ActivityReplyPayload
-                    ? state.extra as ActivityReplyPayload
-                    : null,
-              ),
-            ),
-          ),
-          GoRoute(
-            path: '/notifications',
-            pageBuilder: (context, state) =>
-                _calmPage(state, const NotificationScreen()),
-          ),
-          GoRoute(
-            path: '/watch-history',
-            pageBuilder: (context, state) =>
-                _calmPage(state, const WatchHistoryScreen()),
-          ),
-          GoRoute(
-            path: '/movie-lists',
-            pageBuilder: (context, state) =>
-                _calmPage(state, const MovieListsScreen()),
-          ),
-          GoRoute(
-            path: '/movie-lists/:id',
-            pageBuilder: (context, state) => _calmPage(
-              state,
-              MovieListDetailScreen(
-                listId: state.pathParameters['id'] ?? '',
-                listName: state.uri.queryParameters['name'] ?? 'List',
-                ownerUserId: state.uri.queryParameters['owner'],
-                isOwnerOverride: state.uri.queryParameters['isOwner'] == null
-                    ? null
-                    : state.uri.queryParameters['isOwner'] == 'true',
-                canEditOverride: state.uri.queryParameters['canEdit'] == null
-                    ? null
-                    : state.uri.queryParameters['canEdit'] == 'true',
-              ),
-            ),
-          ),
-          GoRoute(
-            path: '/about-credits',
-            pageBuilder: (context, state) =>
-                _calmPage(state, const AboutCreditsScreen()),
-          ),
-          GoRoute(
-            path: '/stats',
-            pageBuilder: (context, state) =>
-                _calmPage(state, const StatsScreen()),
-          ),
-          GoRoute(
-            path: '/wrapped',
-            pageBuilder: (context, state) =>
-                _pushPage(state, const UserWrappedScreen()),
-          ),
-          GoRoute(
-            path: '/wrapped/:userId',
-            pageBuilder: (context, state) => _pushPage(
-              state,
-              UserWrappedScreen(
-                userId: state.pathParameters['userId'],
-                initialYear: int.tryParse(
-                  state.uri.queryParameters['year'] ?? '',
-                ),
-              ),
-            ),
-          ),
-          GoRoute(
-            path: '/watch-requests',
-            pageBuilder: (context, state) => _calmPage(
+          ]),
+        ],
+      ),
+      GoRoute(
+          path: '/messages',
+          pageBuilder: (context, state) =>
+              _pushPage(state, const _MessagesPage())),
+      GoRoute(
+          path: '/plans',
+          pageBuilder: (context, state) => _pushPage(
               state,
               WatchRequestsScreen(
-                initialRequestId: state.uri.queryParameters['requestId'],
-              ),
-            ),
+                  initialRequestId: state.uri.queryParameters['requestId']))),
+      GoRoute(
+        path: '/pick-for-us',
+        pageBuilder: (context, state) => _pushPage(
+          state,
+          PickForUsScreen(userId: context.read<AuthProvider>().dbUser!.id),
+        ),
+      ),
+      GoRoute(
+        path: '/group-watch-plans-v2',
+        pageBuilder: (context, state) => _calmPage(
+          state,
+          GroupWatchPlanV2Screen(
+            groupId: state.uri.queryParameters['groupId'],
+            groupName: state.uri.queryParameters['groupName'],
+            initialRequestId: state.uri.queryParameters['requestId'],
           ),
-          GoRoute(
-            path: '/watch-requests/:requestId',
-            pageBuilder: (context, state) => _calmPage(
+        ),
+      ),
+      GoRoute(
+          path: '/community/people',
+          pageBuilder: (context, state) =>
+              _pushPage(state, const CommunityPeopleScreen())),
+      GoRoute(
+          path: '/community/profiles/:id',
+          redirect: (context, state) =>
+              context.read<AuthProvider>().dbUser?.id ==
+                      state.pathParameters['id']
+                  ? '/profile'
+                  : null,
+          pageBuilder: (context, state) => _pushPage(
               state,
-              WatchRequestDetailScreen(
-                requestId: state.pathParameters['requestId'] ?? '',
-              ),
+              FriendProfileScreen(
+                userId: state.pathParameters['id']!,
+                showCommunityFollow: true,
+              ))),
+      GoRoute(
+          path: '/genre-communities/:genreId/discussions/:discussionId',
+          pageBuilder: (context, state) => _pushPage(
+              state,
+              CommunityDiscussionScreen(
+                  communityId:
+                      int.tryParse(state.pathParameters['genreId'] ?? '') ?? 0,
+                  discussionId: state.pathParameters['discussionId']!,
+                  initialReplyId: state.uri.queryParameters['reply'],
+                  service: const CommunitySpaceService()))),
+      GoRoute(
+          path: '/genre-communities/:genreId',
+          pageBuilder: (context, state) => _pushPage(
+              state,
+              CommunitySpaceScreen(
+                  key: ValueKey(
+                      'genre:${state.pathParameters['genreId']}:${context.read<AuthProvider>().dbUser?.id}'),
+                  communityId:
+                      int.tryParse(state.pathParameters['genreId'] ?? '') ??
+                          0))),
+      GoRoute(
+          path: '/community/posts/:ownerId/:type/:id',
+          pageBuilder: (context, state) => _pushPage(
+              state,
+              CommunityPostScreen(
+                  ownerId: state.pathParameters['ownerId']!,
+                  type: state.pathParameters['type']!,
+                  postId: state.pathParameters['id']!))),
+      GoRoute(
+        path: '/friends-activity',
+        pageBuilder: (context, state) => _calmPage(
+            state,
+            FriendsActivityScreen(
+                initialCommunity:
+                    state.uri.queryParameters['tab'] == 'community')),
+      ),
+      GoRoute(
+        path: '/groups/:id',
+        pageBuilder: (context, state) => _calmPage(
+          state,
+          GroupDetailScreen(
+            groupId: state.pathParameters['id'] ?? '',
+            initialRequestId: state.uri.queryParameters['requestId'],
+            initialTab: state.uri.queryParameters['tab'] == 'requests'
+                ? 2
+                : state.uri.queryParameters['tab'] == 'insights'
+                    ? 3
+                    : state.uri.queryParameters['tab'] == 'chat'
+                        ? 0
+                        : null,
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/groups/:id/members',
+        pageBuilder: (context, state) => _calmPage(
+          state,
+          GroupMembersScreen(
+            groupId: state.pathParameters['id'] ?? '',
+            groupName: state.extra as String? ?? 'Group',
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/movies/:id',
+        pageBuilder: (context, state) => _pushPage(
+          state,
+          MovieDetailScreen(
+            movieId: state.pathParameters['id'] ?? '0',
+            source: DetailSource.fromValue(
+              state.uri.queryParameters['source'],
+            ),
+            fromMovieMatch:
+                state.uri.queryParameters['source'] == 'movie_match' ||
+                    state.uri.queryParameters['movieMatch'] == '1',
+            recommendation: state.uri.queryParameters['recSource'] == null
+                ? null
+                : RecommendationAttribution.fromRoute(
+                    contentId:
+                        int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+                    contentType: 'movie',
+                    query: state.uri.queryParameters,
+                  ),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/shows/:id',
+        pageBuilder: (context, state) => _pushPage(
+          state,
+          ShowDetailScreen(
+            showId: state.pathParameters['id'] ?? '0',
+            source: DetailSource.fromValue(
+              state.uri.queryParameters['source'],
             ),
           ),
-          GoRoute(
-            path: '/help-support',
-            pageBuilder: (context, state) =>
-                _calmPage(state, const HelpSupportScreen()),
+        ),
+      ),
+      GoRoute(
+        path: '/people/:id',
+        pageBuilder: (context, state) => _pushPage(
+          state,
+          PersonDetailScreen(
+            personId: state.pathParameters['id'] ?? '0',
+            source: DetailSource.fromValue(
+              state.uri.queryParameters['source'],
+            ),
+            parentContentId: int.tryParse(
+              state.uri.queryParameters['parentContentId'] ?? '',
+            ),
+            parentContentType: state.uri.queryParameters['parentContentType'],
           ),
-          GoRoute(
-            path: '/settings',
-            pageBuilder: (context, state) =>
-                _calmPage(state, const SettingsScreen()),
+        ),
+      ),
+      GoRoute(
+        path: '/my-reviews',
+        pageBuilder: (context, state) =>
+            _calmPage(state, const MyReviewsScreen()),
+      ),
+      GoRoute(
+        path: '/group-invites/:requestId',
+        pageBuilder: (context, state) => _pushPage(
+          state,
+          GroupInvitationDetailScreen(
+            groupId: state.uri.queryParameters['groupId'] ?? '',
+            requestId: state.pathParameters['requestId'] ?? '',
           ),
-          GoRoute(
-            path: '/invite-friend',
-            pageBuilder: (context, state) =>
-                _calmPage(state, const InviteFriendScreen()),
+        ),
+      ),
+      GoRoute(
+        path: '/friends/activity/:ownerId/:type/:postId',
+        pageBuilder: (context, state) => _pushPage(
+            state,
+            FriendActivityScreen(
+                ownerId: state.pathParameters['ownerId']!,
+                type: state.pathParameters['type']!,
+                postId: state.pathParameters['postId']!)),
+      ),
+      GoRoute(
+        path: '/friends/:id',
+        pageBuilder: (context, state) => _calmPage(
+          state,
+          FriendProfileScreen(
+            userId: state.pathParameters['id'] ?? '',
+            previewMode: state.uri.queryParameters['preview'] == 'true',
           ),
-          // Widget deep-link targets
-          GoRoute(
-            path: '/trending',
-            // Redirect trending to home (home already shows trending content).
-            redirect: (_, __) => '/',
+        ),
+      ),
+      GoRoute(
+        path: '/chat/:id',
+        pageBuilder: (context, state) => _pushPage(
+          state,
+          DirectChatScreen(
+            otherUserId: state.pathParameters['id'] ?? '',
+            initialActivityReply: state.extra is ActivityReplyPayload
+                ? state.extra as ActivityReplyPayload
+                : null,
           ),
-          GoRoute(
-            path: '/groups',
-            // Redirect bare /groups to social screen (groups live there).
-            redirect: (_, __) => '/social',
+        ),
+      ),
+      GoRoute(
+        path: '/notifications',
+        pageBuilder: (context, state) =>
+            _calmPage(state, const NotificationScreen()),
+      ),
+      GoRoute(
+        path: '/watch-history',
+        pageBuilder: (context, state) =>
+            _calmPage(state, const WatchHistoryScreen()),
+      ),
+      GoRoute(
+        path: '/movie-lists',
+        pageBuilder: (context, state) =>
+            _calmPage(state, const MovieListsScreen()),
+      ),
+      GoRoute(
+        path: '/movie-lists/:id',
+        pageBuilder: (context, state) => _calmPage(
+          state,
+          MovieListDetailScreen(
+            listId: state.pathParameters['id'] ?? '',
+            listName: state.uri.queryParameters['name'] ?? 'List',
+            ownerUserId: state.uri.queryParameters['owner'],
+            isOwnerOverride: state.uri.queryParameters['isOwner'] == null
+                ? null
+                : state.uri.queryParameters['isOwner'] == 'true',
+            canEditOverride: state.uri.queryParameters['canEdit'] == null
+                ? null
+                : state.uri.queryParameters['canEdit'] == 'true',
           ),
-        ],
+        ),
+      ),
+      GoRoute(
+        path: '/about-credits',
+        pageBuilder: (context, state) =>
+            _calmPage(state, const AboutCreditsScreen()),
+      ),
+      GoRoute(
+        path: '/stats',
+        pageBuilder: (context, state) => _calmPage(state, const StatsScreen()),
+      ),
+      GoRoute(
+        path: '/wrapped',
+        pageBuilder: (context, state) =>
+            _pushPage(state, const UserWrappedScreen()),
+      ),
+      GoRoute(
+        path: '/wrapped/:userId',
+        pageBuilder: (context, state) => _pushPage(
+          state,
+          UserWrappedScreen(
+            userId: state.pathParameters['userId'],
+            initialYear: int.tryParse(
+              state.uri.queryParameters['year'] ?? '',
+            ),
+          ),
+        ),
+      ),
+      GoRoute(
+          path: '/watch-requests',
+          redirect: (_, state) => Uri(
+                  path: '/plans',
+                  queryParameters: state.uri.queryParameters.isEmpty
+                      ? null
+                      : state.uri.queryParameters)
+              .toString()),
+      GoRoute(
+        path: '/watch-requests/:requestId',
+        pageBuilder: (context, state) => _calmPage(
+          state,
+          WatchRequestDetailScreen(
+            requestId: state.pathParameters['requestId'] ?? '',
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/help-support',
+        pageBuilder: (context, state) =>
+            _calmPage(state, const HelpSupportScreen()),
+      ),
+      GoRoute(
+        path: '/settings',
+        pageBuilder: (context, state) =>
+            _calmPage(state, const SettingsScreen()),
+      ),
+      GoRoute(
+        path: '/invite-friend',
+        pageBuilder: (context, state) =>
+            _calmPage(state, const InviteFriendScreen()),
+      ),
+      // Widget deep-link targets
+      GoRoute(
+        path: '/trending',
+        // Redirect trending to home (home already shows trending content).
+        redirect: (_, __) => '/',
+      ),
+      GoRoute(
+        path: '/groups',
+        // Redirect bare /groups to social screen (groups live there).
+        redirect: (_, __) => '/social?tab=groups',
       ),
 
       GoRoute(
@@ -629,37 +684,12 @@ GoRouter buildRouter(
 
 /// Bottom-navigation shell shown when the user is authenticated.
 class MainNavigationShell extends StatelessWidget {
-  const MainNavigationShell({super.key, required this.child});
-
-  final Widget child;
-
-  static int _indexFromLocation(String location) {
-    if (location.startsWith('/invite-friend')) {
-      final uri = Uri.tryParse(location);
-      return uri?.queryParameters['from'] == 'settings' ? 4 : 3;
-    }
-    if (location.startsWith('/watchlist')) return 1;
-    if (location.startsWith('/search')) return 2;
-    if (location.startsWith('/social') || location.startsWith('/groups')) {
-      return 3;
-    }
-    if (location.startsWith('/profile')) return 4;
-    if (location.startsWith('/settings')) return 4;
-    return 0;
-  }
-
-  static const List<String> _routes = [
-    '/',
-    '/watchlist',
-    '/search',
-    '/social',
-    '/profile',
-  ];
+  const MainNavigationShell({super.key, required this.navigationShell});
+  final StatefulNavigationShell navigationShell;
 
   @override
   Widget build(BuildContext context) {
-    final location = GoRouterState.of(context).uri.toString();
-    final selectedIndex = _indexFromLocation(location);
+    final selectedIndex = navigationShell.currentIndex;
 
     return Container(
       decoration: BoxDecoration(
@@ -677,19 +707,12 @@ class MainNavigationShell extends StatelessWidget {
         backgroundColor: Colors.transparent,
         // Android's navigation bar can occupy a side in landscape.
         // Pages handle their own top inset; the shell owns side protection.
-        body: SafeArea(top: false, bottom: false, child: child),
+        body: SafeArea(top: false, bottom: false, child: navigationShell),
         bottomNavigationBar: _FlixieNavBar(
           selectedIndex: selectedIndex,
           onDestinationSelected: (index) {
-            final isAtDestinationRoot =
-                GoRouterState.of(context).uri.path == _routes[index];
-            if (index == selectedIndex && isAtDestinationRoot) {
-              if (index == 0) TabRefreshController.requestHomeRefresh();
-              if (index == 1) TabRefreshController.watchlist.value++;
-              if (index == 3) TabRefreshController.requestSocialRefresh();
-              return;
-            }
-            context.go(_routes[index]);
+            if (index == selectedIndex) return;
+            navigationShell.goBranch(index);
           },
         ),
       ),
@@ -797,69 +820,98 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: GestureDetector(
+      child: Semantics(
+        button: true,
+        selected: isSelected,
+        label: dest.label == 'Social' &&
+                (context.watch<ChatUnreadController?>()?.total ?? 0) > 0
+            ? 'Social, ${context.watch<ChatUnreadController?>()!.total} unread messages'
+            : dest.label,
         onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeInOut,
-          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 5,
-                ),
-                decoration: isSelected
-                    ? BoxDecoration(
-                        color: FlixieColors.primary,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: FlixieColors.primary.withValues(alpha: 0.32),
-                            blurRadius: 8,
-                            spreadRadius: 0,
-                          ),
-                        ],
-                      )
-                    : null,
-                child: Badge(
-                  isLabelVisible: dest.label == 'Social' &&
-                      (context.watch<ChatUnreadController?>()?.total ?? 0) > 0,
-                  backgroundColor: const Color(0xFFFFAD66),
-                  smallSize: 9,
-                  offset: const Offset(3, -3),
-                  child: Icon(
-                    isSelected ? dest.activeIcon : dest.icon,
-                    semanticLabel: dest.label == 'Social' &&
-                            (context.watch<ChatUnreadController?>()?.total ??
-                                    0) >
-                                0
-                        ? 'Social, unread messages'
-                        : null,
-                    size: 22,
-                    color: isSelected ? Colors.white : context.colors.medium,
+        excludeSemantics: true,
+        child: InkWell(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 5,
+                  ),
+                  decoration: isSelected
+                      ? BoxDecoration(
+                          color: FlixieColors.primary,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color:
+                                  FlixieColors.primary.withValues(alpha: 0.32),
+                              blurRadius: 8,
+                              spreadRadius: 0,
+                            ),
+                          ],
+                        )
+                      : null,
+                  child: Badge(
+                    isLabelVisible: dest.label == 'Social' &&
+                        (context.watch<ChatUnreadController?>()?.total ?? 0) >
+                            0,
+                    backgroundColor: const Color(0xFFFFAD66),
+                    smallSize: 9,
+                    offset: const Offset(3, -3),
+                    child: Icon(
+                      isSelected ? dest.activeIcon : dest.icon,
+                      semanticLabel: dest.label == 'Social' &&
+                              (context.watch<ChatUnreadController?>()?.total ??
+                                      0) >
+                                  0
+                          ? 'Social, unread messages'
+                          : null,
+                      size: 22,
+                      color: isSelected ? Colors.white : context.colors.medium,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: 200),
-                style: TextStyle(
-                  color:
-                      isSelected ? FlixieColors.primary : context.colors.medium,
-                  fontSize: 10,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
+                const SizedBox(height: 2),
+                AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 200),
+                  style: TextStyle(
+                    color: isSelected
+                        ? FlixieColors.primary
+                        : context.colors.medium,
+                    fontSize: 10,
+                    fontWeight:
+                        isSelected ? FontWeight.w700 : FontWeight.normal,
+                  ),
+                  child: Text(dest.label, textAlign: TextAlign.center),
                 ),
-                child: Text(dest.label),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+}
+
+class _MessagesPage extends StatelessWidget {
+  const _MessagesPage();
+  @override
+  Widget build(BuildContext context) => Scaffold(
+      appBar: AppBar(
+          title: const Text('Messages'),
+          leading: BackButton(onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/social');
+            }
+          })),
+      body: const ConversationsHub());
 }

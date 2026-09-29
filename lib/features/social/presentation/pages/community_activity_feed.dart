@@ -454,7 +454,10 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
                     onPressed: showSettings,
                     icon: const Icon(Icons.tune)),
             ]),
-            Row(children: [
+            OverflowBar(
+              alignment: MainAxisAlignment.spaceBetween,
+              overflowAlignment: OverflowBarAlignment.end,
+              children: [
               if (!_savedOnly)
                 DropdownButton<String>(
                     value: _sort,
@@ -471,7 +474,6 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
               else
                 const Text('Saved posts',
                     style: TextStyle(fontWeight: FontWeight.w700)),
-              const Spacer(),
               TextButton.icon(
                   onPressed: () => _query(saved: !_savedOnly),
                   icon:

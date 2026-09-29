@@ -93,9 +93,9 @@ class HelpSupportScreen extends StatelessWidget {
           ),
           _FaqTile(
             question: 'Where do I see my Watch Plans?',
-            answer: 'Go to your Profile and tap "Watch Plans" in the menu. '
-                'You can filter by status (Pending, Accepted, Declined) and search '
-                'by movie title or username.',
+            answer: 'Tap "Plans" on Home to see your Watch Plans. '
+                'Plans needing a reply and upcoming plans are grouped separately. '
+                'Open a plan to reply, check the time or see its recap.',
           ),
           SizedBox(height: 12),
           _SectionHeader('Account & Settings'),

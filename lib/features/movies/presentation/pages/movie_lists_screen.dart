@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/load_failure_notice.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
@@ -81,111 +82,124 @@ class _MovieListsViewState extends State<_MovieListsView> {
       appBar: const FlixieTitleAppBar(title: Text('Your lists')),
       body: provider.isLoading
           ? const MovieListsScreenSkeleton()
-          : provider.lists.isEmpty
-              ? _EmptyState(
-                  message:
-                      provider.error ?? 'No lists yet. Create your first one.',
-                )
-              : Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
-                      child: Column(
-                        children: [
-                          Row(
+          : provider.error != null && provider.lists.isEmpty
+              ? Center(
+                  child: SingleChildScrollView(
+                      child: LoadFailureNotice(
+                          message: 'Couldn’t load your lists.',
+                          onRetry: provider.loadLists)))
+              : provider.lists.isEmpty
+                  ? const _EmptyState(
+                      message: 'No lists yet. Create your first one.',
+                    )
+                  : Column(
+                      children: [
+                        if (provider.error != null)
+                          LoadFailureNotice(
+                              message:
+                                  'Couldn’t refresh your lists. Your saved lists are still here.',
+                              onRetry: provider.loadLists),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+                          child: Column(
                             children: [
-                              OutlinedButton.icon(
-                                onPressed: () => _openListEditor(context),
-                                icon: const Icon(Icons.add, size: 18),
-                                label: const Text('New list'),
+                              Row(
+                                children: [
+                                  OutlinedButton.icon(
+                                    onPressed: () => _openListEditor(context),
+                                    icon: const Icon(Icons.add, size: 18),
+                                    label: const Text('New list'),
+                                  ),
+                                  const Spacer(),
+                                  IconButton(
+                                    onPressed: () => setState(
+                                        () => _showSearch = !_showSearch),
+                                    icon: const Icon(Icons.search_rounded),
+                                  ),
+                                  PopupMenuButton<String>(
+                                    icon: const Icon(Icons.more_horiz_rounded),
+                                    itemBuilder: (_) => const [
+                                      PopupMenuItem(
+                                          value: 'manage',
+                                          child: Text('Manage lists')),
+                                    ],
+                                  ),
+                                ],
                               ),
-                              const Spacer(),
-                              IconButton(
-                                onPressed: () =>
-                                    setState(() => _showSearch = !_showSearch),
-                                icon: const Icon(Icons.search_rounded),
-                              ),
-                              PopupMenuButton<String>(
-                                icon: const Icon(Icons.more_horiz_rounded),
-                                itemBuilder: (_) => const [
-                                  PopupMenuItem(
-                                      value: 'manage',
-                                      child: Text('Manage lists')),
+                              if (_showSearch) ...[
+                                const SizedBox(height: 8),
+                                TextField(
+                                  autofocus: true,
+                                  onChanged: (value) =>
+                                      setState(() => _query = value),
+                                  decoration: const InputDecoration(
+                                    hintText: 'Search lists',
+                                    prefixIcon: Icon(Icons.search_rounded),
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(child: _buildFilterControl()),
+                                  const SizedBox(width: 10),
+                                  PopupMenuButton<_ListSort>(
+                                    initialValue: _sort,
+                                    onSelected: (value) =>
+                                        setState(() => _sort = value),
+                                    itemBuilder: (_) => const [
+                                      PopupMenuItem(
+                                        value: _ListSort.updated,
+                                        child: Text('Recently updated'),
+                                      ),
+                                      PopupMenuItem(
+                                        value: _ListSort.name,
+                                        child: Text('List name'),
+                                      ),
+                                    ],
+                                    child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 4),
+                                        child: FlixiePill.label(
+                                            compact: false,
+                                            avatar:
+                                                const Icon(Icons.sort_rounded),
+                                            label: Text(
+                                                _sort == _ListSort.updated
+                                                    ? 'Updated'
+                                                    : 'Name'))),
+                                  ),
                                 ],
                               ),
                             ],
                           ),
-                          if (_showSearch) ...[
-                            const SizedBox(height: 8),
-                            TextField(
-                              autofocus: true,
-                              onChanged: (value) =>
-                                  setState(() => _query = value),
-                              decoration: const InputDecoration(
-                                hintText: 'Search lists',
-                                prefixIcon: Icon(Icons.search_rounded),
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(child: _buildFilterControl()),
-                              const SizedBox(width: 10),
-                              PopupMenuButton<_ListSort>(
-                                initialValue: _sort,
-                                onSelected: (value) =>
-                                    setState(() => _sort = value),
-                                itemBuilder: (_) => const [
-                                  PopupMenuItem(
-                                    value: _ListSort.updated,
-                                    child: Text('Recently updated'),
+                        ),
+                        Expanded(
+                          child: visibleLists.isEmpty
+                              ? const _EmptyState(
+                                  message: 'No lists match these filters.')
+                              : GridView.builder(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(16, 0, 16, 28),
+                                  gridDelegate:
+                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    crossAxisSpacing: 10,
+                                    mainAxisSpacing: 10,
+                                    childAspectRatio: 0.72,
                                   ),
-                                  PopupMenuItem(
-                                    value: _ListSort.name,
-                                    child: Text('List name'),
+                                  itemCount: visibleLists.length,
+                                  itemBuilder: (_, index) => _ListGridCard(
+                                    list: visibleLists[index],
+                                    onOpen: () =>
+                                        _openList(context, visibleLists[index]),
+                                    onMenu: (value) => _handleListMenu(context,
+                                        provider, visibleLists[index], value),
                                   ),
-                                ],
-                                child: Padding(
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 4),
-                                    child: FlixiePill.label(
-                                        compact: false,
-                                        avatar: const Icon(Icons.sort_rounded),
-                                        label: Text(_sort == _ListSort.updated
-                                            ? 'Updated'
-                                            : 'Name'))),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                                ),
+                        ),
+                      ],
                     ),
-                    Expanded(
-                      child: visibleLists.isEmpty
-                          ? const _EmptyState(
-                              message: 'No lists match these filters.')
-                          : GridView.builder(
-                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
-                              gridDelegate:
-                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                                crossAxisSpacing: 10,
-                                mainAxisSpacing: 10,
-                                childAspectRatio: 0.72,
-                              ),
-                              itemCount: visibleLists.length,
-                              itemBuilder: (_, index) => _ListGridCard(
-                                list: visibleLists[index],
-                                onOpen: () =>
-                                    _openList(context, visibleLists[index]),
-                                onMenu: (value) => _handleListMenu(context,
-                                    provider, visibleLists[index], value),
-                              ),
-                            ),
-                    ),
-                  ],
-                ),
     );
   }
 
@@ -201,26 +215,33 @@ class _MovieListsViewState extends State<_MovieListsView> {
         children: _ListFilter.values.map((filter) {
           final selected = _filter == filter;
           return Expanded(
-            child: InkWell(
-              borderRadius: BorderRadius.circular(18),
-              onTap: () => setState(() => _filter = filter),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: selected ? FlixieColors.primary : Colors.transparent,
+            child: Semantics(
+                button: true,
+                selected: selected,
+                child: InkWell(
                   borderRadius: BorderRadius.circular(18),
-                ),
-                child: Text(
-                    switch (filter) {
-                      _ListFilter.all => 'All',
-                      _ListFilter.private => 'Private',
-                      _ListFilter.shared => 'Shared',
-                    },
-                    style: const TextStyle(fontSize: 11.5)),
-              ),
-            ),
+                  onTap: () => setState(() => _filter = filter),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    constraints: const BoxConstraints(minHeight: 48),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color:
+                          selected ? FlixieColors.primary : Colors.transparent,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Text(
+                        switch (filter) {
+                          _ListFilter.all => 'All',
+                          _ListFilter.private => 'Private',
+                          _ListFilter.shared => 'Shared',
+                        },
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 13)),
+                  ),
+                )),
           );
         }).toList(),
       ),

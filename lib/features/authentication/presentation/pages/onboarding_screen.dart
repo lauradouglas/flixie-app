@@ -37,6 +37,12 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   int _step = 0;
+  List<SetupCommunitySuggestion> _communityChoices = [];
+  final Set<int> _selectedCommunities = {};
+  bool _loadingCommunities = false;
+  String? _communityError;
+  int _communityRevision = 0;
+
   bool _busy = false, _loading = true, _shows = false, _searching = false;
   String? _error, _searchError, _picksError, _referrer;
   List<Country> _countries = [];
@@ -113,7 +119,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       _error = null;
     });
     if (_scroll.hasClients) _scroll.jumpTo(0);
-    if (step == 2) {
+    if (step == 2) _loadCommunities();
+    if (step == 3) {
       EpisodeSpoilerPreference.instance.load().catchError((Object _) {});
     }
     if (step == 1 && _browse.isEmpty) {
@@ -284,13 +291,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     const titles = [
       'Less searching.\nMore watching.',
       'Your taste.\nBetter discoveries.',
-      'Enjoy the surprise.\nTrust your own taste.',
+      'Find your people.',
       'Start your next\nmovie night.'
     ];
     const subtitles = [
       'Find your next watch—and where to stream it.',
       'Choose a few favourites to shape your first picks.',
-      'Keep spoilers and other people’s scores out of the way.',
+      'Reviews and ratings from people who enjoy your genres. Join now or skip.',
       'Save anything that catches your eye for later.'
     ];
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
@@ -386,7 +393,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           ],
                           if (_step == 0) ..._watching(),
                           if (_step == 1) ..._tastes(),
-                          if (_step == 2) ..._preferences(),
+                          if (_step == 2) ..._communities(),
                           if (_step == 3) ..._results(),
                         ],
                       )),
@@ -402,14 +409,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final label = switch (_step) {
       0 => _country == null ? 'Choose country' : 'Continue',
       1 => _taste.isEmpty ? 'Continue without picks' : 'Continue',
-      2 => 'Show my picks',
+      2 => _selectedCommunities.isEmpty
+          ? 'Continue'
+          : 'Join ${_selectedCommunities.length} & continue',
       _ => 'Explore Flixie',
     };
     final secondary = switch (_step) {
       0 => 'Skip for now',
       1 => 'Skip taste picks',
-      2 => 'Keep current preferences',
-      _ => 'Back to preferences',
+      2 => 'Skip for now',
+      _ => 'Back to communities',
     };
     return SafeArea(
       top: false,
@@ -440,7 +449,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 PrimaryButton(
                   label: label,
                   isLoading: _busy,
-                  onPressed: _busy || (_step == 0 && _loading)
+                  onPressed: _busy ||
+                          (_step == 0 && _loading) ||
+                          (_step == 2 &&
+                              _loadingCommunities &&
+                              _selectedCommunities.isNotEmpty)
                       ? null
                       : () {
                           switch (_step) {
@@ -457,7 +470,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             case 1:
                               _saveTaste();
                             case 2:
-                              _showPicks();
+                              _joinCommunities();
                             default:
                               _finish('/');
                           }
@@ -473,6 +486,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             case 1:
                               _saveTaste(skip: true);
                             case 2:
+                              _selectedCommunities.clear();
                               _showPicks();
                             default:
                               _move(2);
@@ -699,6 +713,123 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           _move(2);
         }
       });
+  Future<void> _loadCommunities() async {
+    final revision = ++_communityRevision;
+    setState(() {
+      _loadingCommunities = true;
+      _communityError = null;
+    });
+    try {
+      final choices = await widget.service
+          .communitySuggestions(_taste.values.toList(), Set.of(_genres));
+      if (!mounted || revision != _communityRevision) return;
+      setState(() {
+        _communityChoices = choices;
+        _selectedCommunities.removeWhere((id) =>
+            !choices.any((c) => c.community.id == id && !c.community.joined));
+      });
+    } catch (_) {
+      if (mounted && revision == _communityRevision) {
+        setState(() => _communityError =
+            'Couldn’t load communities. Retry or skip for now.');
+      }
+    } finally {
+      if (mounted && revision == _communityRevision) {
+        setState(() => _loadingCommunities = false);
+      }
+    }
+  }
+
+  Future<void> _joinCommunities() async {
+    if (_busy || (_loadingCommunities && _selectedCommunities.isNotEmpty)) {
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _communityError = null;
+    });
+    try {
+      for (final id in _selectedCommunities.toList()) {
+        await widget.service.joinCommunity(id);
+        if (!mounted) return;
+        setState(() {
+          _selectedCommunities.remove(id);
+          _communityChoices = _communityChoices
+              .map((c) => c.community.id == id ? c.joined() : c)
+              .toList();
+        });
+      }
+      if (mounted) _showPicks();
+    } catch (_) {
+      if (mounted) {
+        setState(() => _communityError =
+            'Some communities couldn’t be joined. Your successful joins are saved. Retry the remaining choices or skip.');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Widget _communityRow(SetupCommunitySuggestion suggestion) {
+    final community = suggestion.community;
+    return CheckboxListTile(
+      contentPadding: EdgeInsets.zero,
+      controlAffinity: ListTileControlAffinity.leading,
+      value: community.joined || _selectedCommunities.contains(community.id),
+      onChanged: community.joined || _busy
+          ? null
+          : (value) => setState(() {
+                if (value == true) {
+                  _selectedCommunities.add(community.id);
+                } else {
+                  _selectedCommunities.remove(community.id);
+                }
+              }),
+      title: Text(community.name,
+          style: const TextStyle(fontWeight: FontWeight.w700)),
+      subtitle: Text(community.joined
+          ? 'Already joined'
+          : suggestion.reason ?? 'Reviews and ratings from community members'),
+    );
+  }
+
+  List<Widget> _communities() => [
+        if (_loadingCommunities) const LinearProgressIndicator(),
+        if (_communityError != null) ...[
+          Semantics(
+              liveRegion: true,
+              child: Text(_communityError!,
+                  style: TextStyle(color: context.colors.danger))),
+          if (_selectedCommunities.isEmpty)
+            TextButton(
+                onPressed:
+                    _loadingCommunities || _busy ? null : _loadCommunities,
+                child: const Text('Retry communities')),
+        ],
+        if (!_loadingCommunities &&
+            _communityChoices.isEmpty &&
+            _communityError == null)
+          const Text('You can discover and join communities later in Social.'),
+        if (_communityChoices.any((c) => c.suggested)) ...[
+          const SizedBox(height: 12),
+          const Text('Suggested for you',
+              style: TextStyle(fontWeight: FontWeight.w700)),
+          ..._communityChoices.where((c) => c.suggested).map(_communityRow),
+        ],
+        if (_communityChoices.any((c) => !c.suggested))
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title: const Text('Browse communities'),
+            children: _communityChoices
+                .where((c) => !c.suggested)
+                .map(_communityRow)
+                .toList(),
+          ),
+        const SizedBox(height: 16),
+        const Text(
+            'Joining adds communities to Social. It doesn’t turn on public sharing. Any reviews you already share publicly can appear in communities you join.'),
+      ];
+
   List<Widget> _preferences() => [
         ListenableBuilder(
             listenable: EpisodeSpoilerPreference.instance,
@@ -733,6 +864,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               'No picks available yet. Explore Flixie or try choosing a few more titles.'),
         for (final title in _picks) _pickRow(title),
         const SizedBox(height: 24),
+        ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          title: const Text('Privacy and spoilers'),
+          subtitle: const Text('Keep or adjust your current preferences'),
+          children: _preferences(),
+        ),
+        if (_communityChoices.any((c) => c.community.joined))
+          TextButton.icon(
+              onPressed:
+                  _busy ? null : () => _finish('/social?tab=communities'),
+              icon: const Icon(Icons.groups_outlined),
+              label: const Text('Explore your communities')),
         TextButton.icon(
             onPressed: _busy
                 ? null

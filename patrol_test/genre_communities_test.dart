@@ -23,7 +23,9 @@ class _GenresFixture extends GenreCommunityService {
 
   @override
   Future<GenreCommunityPage> feed(int id,
-          {String sort = 'latest', String? cursor}) async =>
+          {String sort = 'latest',
+          String? cursor,
+          String filter = 'all'}) async =>
       GenreCommunityPage(community: horror, items: [
         ActivityListItem.fromJson({
           'id': 'fixture-review',

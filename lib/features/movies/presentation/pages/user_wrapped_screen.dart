@@ -33,7 +33,15 @@ class _UserWrappedScreenState extends State<UserWrappedScreen> {
   void initState() {
     super.initState();
     _year = widget.initialYear ?? DateTime.now().year;
-    _future = _load();
+    _future = _observedLoad();
+  }
+
+  Future<(User, MovieWrapped)> _observedLoad() {
+    final future = _load();
+    // A retry can fail before the next frame attaches FutureBuilder. Observe
+    // errors immediately; FutureBuilder still receives and displays the failure.
+    future.ignore();
+    return future;
   }
 
   Future<(User, MovieWrapped)> _load() async {
@@ -49,7 +57,7 @@ class _UserWrappedScreenState extends State<UserWrappedScreen> {
   void _changeYear(int year) {
     setState(() {
       _year = year;
-      _future = _load();
+      _future = _observedLoad();
     });
   }
 
@@ -65,8 +73,10 @@ class _UserWrappedScreenState extends State<UserWrappedScreen> {
           }
           if (snapshot.hasError || !snapshot.hasData) {
             return _WrappedError(
-              message: snapshot.error?.toString() ?? 'Wrapped is unavailable.',
-              onRetry: () => setState(() => _future = _load()),
+              message: "Couldn’t load this Wrapped. Please try again.",
+              onRetry: () => setState(() {
+                _future = _observedLoad();
+              }),
             );
           }
           final (user, wrapped) = snapshot.data!;

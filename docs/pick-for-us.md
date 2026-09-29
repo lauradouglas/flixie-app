@@ -1,26 +1,125 @@
 # Pick for me / Pick for us
 
-Home opens a scrollable picker using Flixie’s existing dark palette, Manrope typography, and profile avatars with each person’s badge border. No app-wide design changes.
+Updated 26 September 2026. The user approved a guided mood-first overhaul of the
+picker, preserving Flixie’s visual system and the existing lower Home entry.
 
-## Flow
+## Journey
 
-- “Just me” is selected by default; no social connection is required. Optionally select one friend or all accepted members of an existing group (2–12 people).
-- Choose streaming or cinema, a maximum movie runtime, and a mood. A 300-character request supports common mood/genre phrases, including chill, cozy/cosy, rom coms, and genre exclusions such as “no horror”. Recognized text overrides the mood chip; results explain the interpretation. Unknown wording falls back explicitly to the selected mood and taste.
-- Rewatches are opt-in, via the switch or wording such as “even something I’ve watched before”. Explicit “not watched before” or “no rewatches” takes priority. Rejected and poorly rated movies stay excluded.
-- Streaming together needs a matching service for at least one viewer. Optional rentals are labelled as paid and used when no subscription offer matches that movie.
-- Streaming separately requires the same provider to be saved by every viewer and the film to be available on that provider in each viewer’s saved country. Rentals are excluded.
-- Cinema uses the existing TMDB now-playing feed for the organiser’s saved country. It does not guarantee local showtimes. Runtime excludes trailers and adverts.
-- Up to three choices show evidence-based reasons. A missing third match is explained, never filled with an unsuitable title.
-- Solo results open the movie details. With other viewers, Make a Watch Plan opens the existing form with the movie, friend/group and Cinema venue preselected. The user still reviews and submits the plan.
+1. Choose an experience: Switch off, Feel good, Have a laugh, Get hooked,
+   Feel something, Escape somewhere, Be challenged or Get scared. Keep my options
+   open is the explicit default. The actual chosen mood reaches the ranking engine.
+2. Set up the evening: Just me, With a friend or With a group; streaming or cinema.
+   Viewers are searchable and constrained to a scrollable area. Solo works while
+   social data loads or fails. Friend avatars preserve their personal borders.
+   Streaming with others also offers Together or Separately.
+3. Refine your picks is optional: runtime (90/120/150/180/240 minutes, default 120),
+   genre, content exclusions, rewatches and eligible rental opt-in. Mood and genre
+   remain separate. Exclusion controls do not promise certainty from missing data:
+   titles with unknown relevant content are excluded.
+4. Results present one film with alternatives, runtime, overview and factual reasons.
+   View movie is the fixed solo action; Make a Watch Plan is the social action.
+   Social viewers can also open the movie details. The existing plan sheet receives
+   the selected friend/group and venue and still requires explicit submission.
+5. Show different films excludes every film already returned in this search, up to
+   60 IDs, without recording a dislike. If none remain, keep the previous picks and
+   offer refinement. Back/Change preferences preserve inputs. A new search after
+   editing starts fresh. Retry after a request failure preserves the criteria;
+   failure while replacing results preserves the previous shortlist.
 
-## Backend
+The primary action remains reachable while scrolling. At large text sizes the
+secondary result actions scroll with content so the footer does not crowd out the
+film. Layouts inherit dark/light themes, use app typography and reflow on narrow
+phones, tablets and landscape. The flow does not introduce decorative animation.
 
-`POST /recommendations/pick-for-us` requires authenticated identity; it never trusts a client user ID. Body: neither `friendId` nor `groupId` for solo, otherwise exactly one, `maxMinutes` (90/120/150/180/240), `mood` (anything/chill/cozy/romcom/thrilling/funny/comforting/moving/adventurous/scary), `venue` (streaming/cinema), `watching` (together/separately), `openToRent` (boolean), optional `request` (string, maximum 300 characters), optional `allowRewatches` (boolean, default false). Rental opt-in is valid for solo streaming or streaming together. Solo uses `watching: together` internally for backwards compatibility.
+## Request and compatibility
 
-Friendship or accepted group membership is checked before reading profiles. Ranking combines watchlist overlap, positive genre affinities (including the weakest viewer’s match), previously liked rewatches, TMDB quality and vote-count popularity. Watched titles are excluded unless rewatches are enabled; not-interested and negatively rated titles remain excluded for every viewer. Runtime and mood are hard constraints. Provider lookup failures never count as availability.
+`POST /recommendations/pick-for-us` still authenticates the viewer server-side.
+Neither friendId nor groupId means solo; otherwise exactly one is allowed, with
+friendship/accepted membership checked before accessing taste. Groups support
+2–12 accepted viewers. Private/unrelated groups are not selectable by arbitrary IDs.
 
-The streaming candidate pool is bounded to 500 saved/history movies plus 300 quality discovery titles ordered by audience vote count, with availability checked for at most the top 36. Cinema inherits the existing now-playing feed’s top-12 limit. This first version uses genre-based moods and genre taste affinities; it uses explicit phrase rules, not an LLM, and does not infer arbitrary requests or complex emotional tone. Rom coms require both romance and comedy; chill/cozy exclude horror, thriller, crime and war. Popularity reflects cached TMDB vote counts, not a live trending feed. Streaming availability inherits the existing 24-hour provider cache. No schema migration is needed; deploy the FlixieBE endpoint alongside the app changes.
+Existing fields/defaults remain unchanged. **New optional field** `excludeMovieIds`
+is an array of at most 60 positive safe-integer movie IDs, default `[]`. Both cinema
+and streaming exclude them before selecting the shortlist and checking providers.
+No database migration, persistent feedback or notification changes are introduced.
+Build 70 remains supported. Deploy the additive backend before expecting fresh
+shortlists from new clients; the frontend also rejects repeated films from an older
+server and retains the previous picks instead of pretending they are new.
+
+The structured UI uses existing mood IDs from `WatchlistMood`. The backend retains
+legacy mood aliases and optional bounded `request` text for older clients; this
+screen does not add a free-text interpretation promise. Runtime, content, personal
+rejections, country and service constraints remain mandatory. This overhaul uses
+the existing title-level experience/taste engine, not a new recommendation model.
+
+Together requires an included service for at least one viewer. Separately requires
+a shared provider available in every viewer’s country. Rentals are opt-in and only
+apply to solo/together streaming; actual availability reasons label paid rentals.
+Cinema uses the existing country-specific now-playing catalogue, not showtimes.
+The runtime limit excludes adverts and trailers. Provider lookup failures never
+count as availability. The bounded existing candidate pools and lookup limits remain.
+
+## Local testing and preview
+
+`test/support/pick_fixture.dart` contains fictional viewers and deterministic
+recommendations for widget/Patrol tests. Its film results are UI fixtures, not proof
+of recommendation quality; backend tests exercise actual ranking and availability.
+
+For a fully offline **solo** preview:
+
+```sh
+flutter run -t tool/preview_pick_journey.dart -d <dedicated-device>
+```
+
+This preview has no friends/groups to avoid connecting watch-plan actions. Movie
+navigation ends at a labelled preview destination. Actual Flutter screen captures
+are in `design/pick-journey-2026-09-26/index.html` (fictional data, no live controls).
+
+Local database fixtures (from FlixieBE):
+
+```sh
+NODE_ENV=development node --env-file=.env.local -r ts-node/register scripts/seed-dev-pick-journey.ts --dry-run
+NODE_ENV=development node --env-file=.env.local -r ts-node/register scripts/seed-dev-pick-journey.ts
+```
+
+The guarded script refuses remote targets and identity collisions. Upserts preserve
+existing edits. Fictional `dev_pick_casey`, `dev_pick_robin` and `dev_pick_ellis` have
+saved services and overlapping watchlists containing local catalogue titles such
+as Alien, The Odyssey, Spider-Man and Obsession. Casey/Robin are friends and accepted
+members of the private fixture group; Ellis is pending. Profiles do not publish
+activity. These are data fixtures, not production logins; no real account credentials
+or relationships are created. Availability and catalogue metadata are not fabricated.
 
 ## Verification
 
-Focused backend tests cover solo identity, rewatch opt-in and exclusions, mood interpretation, popularity, relationship permissions, cinema region/source, provider checks by country, rentals, runtime/mood exclusions, and explanation evidence. Flutter tests cover solo mood/rewatch submission, selection, retry, and scrollable layouts on 320/430-pixel phones, landscape and tablet with 1.8× text. Optional widget-render captures use `--dart-define=PICK_VISUAL_REVIEW=true --update-goldens` and write to `.impeccable/review/`. Live provider calls and device builds are not covered by these fixtures.
+- 22 widget tests: preserved original picker coverage plus guided mood submission,
+  separate filters, alternatives/exhaustion, older-server repeats, failure recovery,
+  independent social loading, avatar borders, back navigation, duplicate submission,
+  disposal and phone/tablet/landscape at 1.8× text; light theme included.
+- One request-contract test checks real service JSON and optional defaults.
+- 19 backend controller/ranking tests pass, including new exclusions in both venues,
+  exhaustion, input validation and legacy requests without the new field.
+- 14 build-70 compatibility checks pass. TypeScript checking passes.
+- Dedicated iOS Patrol journey passes: mood → picks → different films → movie →
+  app background/foreground → return → revise preferences, with fictional services.
+- Static analysis and patch whitespace checks clean. No goldens regenerated.
+
+No production deployment, Android native run or live streaming-provider verification
+was performed. The full regression suite was not run.
+
+## Movie-detail navigation fix — 27 September 2026
+
+Home now pushes the routed `/pick-for-us` page on the same shell navigator as
+movie details. Previously a root Navigator MaterialPageRoute covered the shell,
+so a detail route could open underneath the picker and appear unresponsive.
+The focused journey harness now launches the picker through a nested shell and
+checks solo and shared alternative detail navigation, including returning to the
+selected result. All 23 focused picker tests passed.
+
+## Direct exit — 27 September 2026
+
+The app bar now has a Close picker action at every stage. Close exits the journey
+in one tap, including during loading and after repeated changes of preferences.
+Back still moves between stages. Direct route entry without a previous page falls
+back to Home. All 26 focused picker tests passed, covering close from mood,
+evening, results and an in-flight request completing after disposal.

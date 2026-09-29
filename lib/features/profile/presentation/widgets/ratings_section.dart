@@ -20,6 +20,8 @@ class RatingsSection extends StatelessWidget {
   void _showAllRatingsSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: context.colors.tabBarBackgroundFocused,
       shape: const RoundedRectangleBorder(

@@ -19,6 +19,8 @@ String notificationDeepLinkPath(Map<String, dynamic> data) {
           (type == 'LIST_SHARED' && category == 'COMMUNITY')) &&
       communityRoute != null &&
       (communityRoute == '/community/people' ||
+          RegExp(r'^/genre-communities/-?[0-9]+/discussions/[^/?#]+(?:\?reply=[^&#]+)?$')
+              .hasMatch(communityRoute) ||
           RegExp(r'^/community/posts/[^/?#]+/(movie-review|show-review|movie-list-added)/[^/?#]+$')
               .hasMatch(communityRoute))) {
     return communityRoute;

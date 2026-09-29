@@ -70,8 +70,13 @@ class GenreCommunityService {
   }
 
   Future<GenreCommunityPage> feed(int id,
-          {String sort = 'latest', String? cursor}) async =>
-      GenreCommunityPage.fromJson(await ApiClient.get('${_path(id)}/activity',
-              queryParams: {'sort': sort, if (cursor != null) 'cursor': cursor})
-          as Map);
+          {String sort = 'latest',
+          String? cursor,
+          String filter = 'all'}) async =>
+      GenreCommunityPage.fromJson(
+          await ApiClient.get('${_path(id)}/activity', queryParams: {
+        'sort': sort,
+        if (id == -1) 'filter': filter,
+        if (cursor != null) 'cursor': cursor
+      }) as Map);
 }

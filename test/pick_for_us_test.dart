@@ -32,6 +32,7 @@ class FakePickService extends PickForUsService {
       String request = '',
       bool allowRewatches = false,
       Set<String> avoid = const {},
+      Set<int> excludeMovieIds = const {},
       List<int> genreIds = const [],
       bool includePossible = true,
       bool includeUnknownContent = false,
@@ -65,9 +66,14 @@ class FakePickService extends PickForUsService {
   }
 }
 
-Future<void> scroll(WidgetTester tester, Finder finder, double delta) =>
-    tester.scrollUntilVisible(finder, delta,
+Future<void> scroll(WidgetTester tester, Finder finder, double delta) async {
+  if (finder.evaluate().isEmpty) {
+    await tester.scrollUntilVisible(finder, delta,
         scrollable: find.byType(Scrollable).first);
+  }
+  await Scrollable.ensureVisible(tester.element(finder), alignment: .5);
+  await tester.pumpAndSettle();
+}
 
 void main() {
   setUpAll(() async {
@@ -79,8 +85,9 @@ void main() {
           ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf')))
         .load();
   });
-  Future<void> show(WidgetTester tester, FakePickService service, Size size,
-      double scale) async {
+  Future<void> show(
+      WidgetTester tester, FakePickService service, Size size, double scale,
+      {bool solo = false}) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -93,6 +100,16 @@ void main() {
             child: child!),
         home: PickForUsScreen(userId: 'me', service: service)));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Next · Your evening'));
+    await tester.pumpAndSettle();
+    if (!solo) {
+      await scroll(tester, find.text('With a friend'), 180);
+      await tester.tap(find.text('With a friend'));
+      await tester.pumpAndSettle();
+    }
+    await scroll(tester, find.text('Refine your picks'), 200);
+    await tester.tap(find.text('Refine your picks'));
+    await tester.pumpAndSettle();
   }
 
   testWidgets(
@@ -100,10 +117,11 @@ void main() {
       (tester) async {
     final service = FakePickService();
     await show(tester, service, const Size(390, 844), 1);
-    await scroll(tester, find.text('Alex'), 250);
+    await scroll(tester, find.text('Alex'), -200);
     await tester.ensureVisible(
         find.ancestor(of: find.text('Alex'), matching: find.byType(ListTile)));
     await tester.pumpAndSettle();
+    await scroll(tester, find.text('Alex'), -200);
     await tester.tap(find.text('Alex'));
     await scroll(tester, find.text('Cinema'), 150);
     await tester.tap(find.text('Cinema'));
@@ -128,8 +146,8 @@ void main() {
           matchesGoldenFile('../.impeccable/review/pick-phone.png'));
     }
     expect(find.text('Make a Watch Plan'), findsOneWidget);
-    await scroll(tester, find.text('Change viewers, time or mood'), 250);
-    await tester.tap(find.text('Change viewers, time or mood'));
+    await scroll(tester, find.text('Change preferences'), 250);
+    await tester.tap(find.text('Change preferences'));
     await tester.pumpAndSettle();
     expect(find.text('Who’s watching?'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -138,7 +156,9 @@ void main() {
       (tester) async {
     final service = FakePickService();
     await show(tester, service, const Size(1024, 1366), 1);
+    await scroll(tester, find.text('Alex'), -200);
     await tester.tap(find.text('Alex'));
+    await scroll(tester, find.text('Open to renting'), 200);
     await tester.tap(find.text('Open to renting'));
     await tester.pumpAndSettle();
     await scroll(tester, find.text('Find our picks'), 200);
@@ -146,8 +166,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(service.openToRent, isTrue);
     expect(service.watching, 'together');
-    await scroll(tester, find.text('Change viewers, time or mood'), 200);
-    await tester.tap(find.text('Change viewers, time or mood'));
+    await scroll(tester, find.text('Change preferences'), 200);
+    await tester.tap(find.text('Change preferences'));
     await tester.pumpAndSettle();
     await scroll(tester, find.text('Separately'), -200);
     await tester.tap(find.text('Separately'));
@@ -162,7 +182,7 @@ void main() {
   testWidgets('solo sends mood and rewatch preference without a friend',
       (tester) async {
     final service = FakePickService();
-    await show(tester, service, const Size(390, 844), 1);
+    await show(tester, service, const Size(390, 844), 1, solo: true);
     expect(find.text('Just me'), findsOneWidget);
     expect(find.text('Together or separately?'), findsNothing);
     expect(find.byType(TextField), findsNothing);
@@ -197,10 +217,11 @@ void main() {
             matchesGoldenFile(
                 '../.impeccable/review/pick-${size.width.toInt()}.png'));
       }
-      await scroll(tester, find.text('Alex'), 150);
+      await scroll(tester, find.text('Alex'), -200);
       await tester.ensureVisible(find.ancestor(
           of: find.text('Alex'), matching: find.byType(ListTile)));
       await tester.pumpAndSettle();
+      await scroll(tester, find.text('Alex'), -200);
       await tester.tap(find.text('Alex'));
       await scroll(tester, find.text('Find our picks'), 200);
       await tester.ensureVisible(find.ancestor(
@@ -220,6 +241,7 @@ void main() {
     await tester.ensureVisible(
         find.ancestor(of: find.text('Alex'), matching: find.byType(ListTile)));
     await tester.pumpAndSettle();
+    await scroll(tester, find.text('Alex'), -200);
     await tester.tap(find.text('Alex'));
     await scroll(tester, find.text('Find our picks'), 250);
     await tester.ensureVisible(find.ancestor(
@@ -230,7 +252,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(
         find.text(
-            'We couldn’t find your picks. Check your connection and try again.'),
+            'Couldn’t find your picks. Your choices are saved—please try again.'),
         findsOneWidget);
     service.fail = false;
     await tester.ensureVisible(find.ancestor(
@@ -239,6 +261,6 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Find our picks'));
     await tester.pumpAndSettle();
-    expect(find.text('Your shortlist, sorted.'), findsOneWidget);
+    expect(find.text('Your picks'), findsOneWidget);
   });
 }

@@ -372,6 +372,31 @@ void main() {
     await auth.changes.close();
     await tester.pump();
   });
+  testWidgets(
+      'saved activity invalidates prefetched profile ratings before notifying',
+      (tester) async {
+    final auth = Auth._();
+    final prefetch = Prefetch()
+      ..load = (_) async => const AuthPrefetchSnapshot(ratings: []);
+    final provider = AuthProvider(auth, MovieService(),
+        prefetchCoordinator: prefetch,
+        profileLoader: (id) async => profile(id));
+    auth.emit(Identity('ratings-user'));
+    await tester.pump();
+    expect(provider.cachedRatings, isNotNull);
+    final before = provider.activityVersion;
+    var notified = false;
+    provider.addListener(() {
+      notified = true;
+      expect(provider.cachedRatings, isNull);
+    });
+    provider.markActivityChanged();
+    expect(notified, isTrue);
+    expect(provider.activityVersion, before + 1);
+    provider.dispose();
+    await auth.changes.close();
+    await tester.pump();
+  });
   testWidgets('missing initial auth event reaches a retry state',
       (tester) async {
     final auth = Auth._();

@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/social/data/genre_community_service.dart';
 import 'package:flixie_app/core/auth/referral_attribution_store.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -48,8 +49,76 @@ class SetupTasteStore {
   }
 }
 
+class SetupCommunitySuggestion {
+  const SetupCommunitySuggestion(this.community,
+      {this.reason, this.suggested = false});
+  final GenreCommunity community;
+  final String? reason;
+  final bool suggested;
+  SetupCommunitySuggestion joined() =>
+      SetupCommunitySuggestion(community.withJoined(true),
+          reason: reason, suggested: suggested);
+}
+
 class SetupService {
   const SetupService();
+  Future<List<GenreCommunity>> communities() =>
+      const GenreCommunityService().list();
+  Future<void> joinCommunity(int id) =>
+      const GenreCommunityService().setJoined(id, true);
+
+  Future<Set<int>> titleCommunityGenres(
+      SetupTitle title, List<GenreCommunity> available) async {
+    if (!title.isShow) {
+      final movie = await MovieService().getMovieById(title.id);
+      return (movie.genres ?? []).map((g) => g.id).toSet();
+    }
+    final show = await ShowService.getShowById(title.id);
+    // Match actual genre names; Animation never implies Anime membership.
+    final names = show.genres.map((g) => g.toLowerCase()).toSet();
+    return available
+        .where((g) => g.id > 0 && names.contains(g.name.toLowerCase()))
+        .map((g) => g.id)
+        .toSet();
+  }
+
+  Future<List<SetupCommunitySuggestion>> communitySuggestions(
+      List<SetupTitle> titles, Set<int> genres) async {
+    final available = List<GenreCommunity>.of(await communities());
+    if (available.isEmpty) return [];
+    final scores = <int, int>{for (final id in genres) id: 2};
+    final reasons = <int, String>{
+      for (final id in genres) id: 'Matches a genre you chose'
+    };
+    // At most five metadata reads, independent failures do not block browsing.
+    final matches = await Future.wait(titles.take(5).map((title) async {
+      try {
+        return (title, await titleCommunityGenres(title, available));
+      } catch (_) {
+        return (title, <int>{});
+      }
+    }));
+    for (final match in matches) {
+      for (final id in match.$2) {
+        scores[id] = (scores[id] ?? 0) + 1;
+        reasons.putIfAbsent(id, () => 'Because you chose ${match.$1.name}');
+      }
+    }
+    available.sort((a, b) {
+      final byScore = (scores[b.id] ?? 0).compareTo(scores[a.id] ?? 0);
+      return byScore != 0 ? byScore : a.name.compareTo(b.name);
+    });
+    final suggested = available
+        .where((c) => !c.joined && (scores[c.id] ?? 0) > 0)
+        .take(3)
+        .map((c) => c.id)
+        .toSet();
+    return available
+        .map((c) => SetupCommunitySuggestion(c,
+            reason: reasons[c.id], suggested: suggested.contains(c.id)))
+        .toList();
+  }
+
   static Future<void> rememberInviter(String id, String username) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('setup_inviter_v1:$id', username);

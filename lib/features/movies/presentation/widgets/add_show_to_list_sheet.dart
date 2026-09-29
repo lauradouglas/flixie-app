@@ -337,6 +337,7 @@ class _AddShowToListSheetState extends State<AddShowToListSheet> {
   Future<void> _openCreateListSheet() async {
     final created = await showModalBottomSheet<ShowList>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: context.colors.background,

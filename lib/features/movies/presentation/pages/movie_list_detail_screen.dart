@@ -149,6 +149,8 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
     final provider = context.read<MovieListsProvider>();
     final added = await showModalBottomSheet<bool>(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: context.colors.surfaceElevated,
       builder: (sheetContext) =>
@@ -280,6 +282,8 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
         .toList(growable: false);
     final selected = await showModalBottomSheet<FriendshipUser>(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: context.colors.surfaceElevated,
       builder: (_) => _AddListMemberSheet(friends: available),
@@ -309,9 +313,15 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
     if (membership == null) return;
     await showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
+      isScrollControlled: true,
+      constraints:
+          BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .9),
       backgroundColor: context.colors.surfaceElevated,
       showDragHandle: true,
-      builder: (_) => SafeArea(
+      builder: (sheetContext) => SafeArea(
+          child: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
           child: Column(
@@ -373,7 +383,7 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     onPressed: () {
-                      Navigator.pop(context);
+                      Navigator.pop(sheetContext);
                       _leaveList();
                     },
                     icon: const Icon(Icons.logout_rounded),
@@ -383,7 +393,7 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
             ],
           ),
         ),
-      ),
+      )),
     );
   }
 

@@ -1,4 +1,8 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:ui' as ui;
+import 'package:flutter/services.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -47,7 +51,7 @@ class FakeGenres extends GenreCommunityService {
 
   @override
   Future<GenreCommunityPage> feed(int id,
-      {String sort = 'latest', String? cursor}) async {
+      {String sort = 'latest', String? cursor, String filter = 'all'}) async {
     calls++;
     cursors.add(cursor);
     if (pendingLatest != null && sort == 'latest') return pendingLatest!.future;
@@ -63,7 +67,9 @@ class FakeGenres extends GenreCommunityService {
 class FakeAnime extends FakeGenres {
   @override
   Future<GenreCommunityPage> feed(int id,
-          {String sort = 'latest', String? cursor}) async =>
+          {String sort = 'latest',
+          String? cursor,
+          String filter = 'all'}) async =>
       GenreCommunityPage.fromJson({
         'community': {'id': -1, 'name': 'Anime', 'joined': joined},
         'items': [
@@ -93,6 +99,42 @@ class FakeAnime extends FakeGenres {
 }
 
 void main() {
+  setUpAll(() async {
+    final font = FontLoader('Manrope')
+      ..addFont(rootBundle.load('assets/fonts/Manrope-VariableFont_wght.ttf'));
+    await font.load();
+  });
+  testWidgets(
+      'review layout exposes read and discuss with full spoiler-free body',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(430, 932));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: Scaffold(
+            body: SingleChildScrollView(
+                padding: const EdgeInsets.all(18),
+                child: GenreReviewCard(
+                    item: genrePost('preview'),
+                    genreName: 'Horror',
+                    rating: const GenreMemberRating(6, 2))))));
+    await tester.pumpAndSettle();
+    expect(find.text('A secret ending'), findsOneWidget);
+    expect(find.text('Read & discuss'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    if (const bool.fromEnvironment('COMMUNITY_CAPTURE')) {
+      final boundary = tester.renderObject<RenderRepaintBoundary>(
+          find.byType(RepaintBoundary).first);
+      await tester.runAsync(() async {
+        final img = await boundary.toImage();
+        final data = await img.toByteData(format: ui.ImageByteFormat.png);
+        await File('/tmp/flixie-review-layout.png')
+            .writeAsBytes(data!.buffer.asUint8List());
+        img.dispose();
+      });
+    }
+  });
+
   testWidgets(
       'Anime mixes films and series without ID collisions and joins independently',
       (tester) async {
@@ -101,12 +143,14 @@ void main() {
         theme: AppTheme.darkTheme,
         home: GenreCommunityFeedScreen(genreId: -1, service: service)));
     await tester.pumpAndSettle();
-    expect(find.text('Spirited Away · Film'), findsOneWidget);
-    expect(find.text('Anime series · Series'), findsOneWidget);
+    expect(find.text('Spirited Away'), findsOneWidget);
     expect(find.textContaining('7.0/10 · 2 members'), findsOneWidget);
-    expect(find.textContaining('4.0/10 · 1 member'), findsOneWidget);
     await tester.tap(find.text('Join community'));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Anime series'), 250,
+        scrollable: find.byType(Scrollable).first);
+    expect(find.text('Anime series'), findsOneWidget);
+    expect(find.textContaining('4.0/10 · 1 member'), findsOneWidget);
     expect(service.joined, isTrue);
   });
   testWidgets(
@@ -117,23 +161,33 @@ void main() {
         theme: AppTheme.darkTheme,
         home: Scaffold(body: GenreCommunitiesView(service: service))));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(TextButton, 'Join').first);
+    final before = tester.getTopLeft(find.text('Horror'));
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Join').first);
+    await tester.pumpAndSettle();
+    expect(service.joined, isFalse);
+    await tester.tap(find.text('Join community'));
     await tester.pumpAndSettle();
     expect(service.joined, isTrue);
-    expect(find.text('Leave'), findsOneWidget);
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Joined'));
+    expect(tester.getTopLeft(find.text('Horror')), before);
+    await tester.tap(find.text('Your communities · 1'));
     await tester.pumpAndSettle();
     expect(find.text('Science Fiction'), findsNothing);
     service.fail = true;
-    await tester.tap(find.text('Leave'));
+    await tester.tap(find.text('✓ Joined'));
     await tester.pumpAndSettle();
-    expect(find.text('Leave'), findsOneWidget);
+    await tester.tap(find.text('Leave community'));
+    await tester.pumpAndSettle();
     expect(service.joined, isTrue);
+    expect(find.text('Retry'), findsOneWidget);
     service.fail = false;
-    await tester.tap(find.text('Leave'));
+    await tester.tap(find.text('Retry'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('No joined communities'), findsOneWidget);
-    await tester.tap(find.widgetWithText(ChoiceChip, 'All communities'));
+    expect(service.joined, isFalse);
+    expect(find.text('Horror'), findsOneWidget);
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+    expect(service.joined, isTrue);
+    await tester.tap(find.text('Explore all'));
     await tester.enterText(find.byType(TextField), 'science');
     await tester.pumpAndSettle();
     expect(find.text('Science Fiction'), findsOneWidget);
@@ -169,18 +223,20 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Leave community'), findsOneWidget);
     service.fail = true;
-    await tester.ensureVisible(find.text('Load more reviews'));
+    await tester
+        .ensureVisible(find.widgetWithText(TextButton, 'Load more reviews'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Load more reviews'));
     await tester.pumpAndSettle();
-    expect(find.text('Alien · Film'), findsOneWidget);
+    expect(find.text('Alien'), findsOneWidget);
     expect(find.text('Couldn’t load reviews. Try again.'), findsOneWidget);
     service.fail = false;
     await tester.tap(find.text('Couldn’t load reviews. Try again.'));
     await tester.pumpAndSettle();
-    expect(find.text('Alien · Film'), findsNWidgets(2));
+    expect(find.text('Alien'), findsNWidgets(2));
     expect(service.cursors.last, 'next');
-    await tester.ensureVisible(find.text('Alien · Film').first);
-    await tester.tap(find.text('Alien · Film').first);
+    await tester.ensureVisible(find.text('Alien').first);
+    await tester.tap(find.text('Alien').first);
     await tester.pumpAndSettle();
     expect(find.text('Opened latest'), findsOneWidget);
   });
@@ -191,7 +247,9 @@ void main() {
     await tester.pumpWidget(MaterialApp(
         home: GenreCommunityFeedScreen(genreId: 27, service: service)));
     await tester.pump();
-    await tester.tap(find.text('Popular'));
+    await tester.tap(find.byType(DropdownButton<String>));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.text('Popular').last);
     await tester.pumpAndSettle();
     service.pendingLatest!.complete(GenreCommunityPage(
         community: service.horror, items: [genrePost('stale')]));

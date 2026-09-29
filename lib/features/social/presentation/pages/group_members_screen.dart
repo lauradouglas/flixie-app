@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/load_failure_notice.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
@@ -203,6 +204,8 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
   void _showInviteSheet() {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -225,10 +228,16 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
 
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
+      isScrollControlled: true,
+      constraints:
+          BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .9),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (sheetContext) => SafeArea(
+          child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -300,7 +309,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
             const SizedBox(height: 8),
           ],
         ),
-      ),
+      )),
     );
   }
 
@@ -579,6 +588,7 @@ class _InviteMembersSheetState extends State<_InviteMembersSheet> {
   final TextEditingController _search = TextEditingController();
   bool _loading = true;
   bool _inviting = false;
+  String? _loadError;
 
   @override
   void initState() {
@@ -599,6 +609,10 @@ class _InviteMembersSheetState extends State<_InviteMembersSheet> {
       if (mounted) setState(() => _loading = false);
       return;
     }
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     try {
       final data = await FriendService.getFriends(userId);
       if (mounted) {
@@ -612,7 +626,12 @@ class _InviteMembersSheetState extends State<_InviteMembersSheet> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadError = 'Couldn’t load your friends.';
+        });
+      }
     }
   }
 
@@ -733,53 +752,56 @@ class _InviteMembersSheetState extends State<_InviteMembersSheet> {
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
-                : filtered.isEmpty
+                : _loadError != null
                     ? Center(
-                        child: Text(
-                          _friends.isEmpty
-                              ? 'All your friends are already in the group'
-                              : 'No friends match your search',
-                          style: TextStyle(color: context.colors.medium),
-                          textAlign: TextAlign.center,
-                        ),
-                      )
-                    : ListView.builder(
-                        controller: scrollController,
-                        itemCount: filtered.length,
-                        itemBuilder: (_, i) {
-                          final friend = filtered[i];
-                          final selected = _selected.contains(friend.id);
-                          return CheckboxListTile(
-                            value: selected,
-                            onChanged: (val) {
-                              setState(() {
-                                if (val == true) {
-                                  _selected.add(friend.id);
-                                } else {
-                                  _selected.remove(friend.id);
-                                }
-                              });
-                            },
-                            title: Text(
-                              friend.username,
-                              style: TextStyle(color: context.colors.light),
+                        child: SingleChildScrollView(
+                            child: LoadFailureNotice(
+                                message: _loadError!, onRetry: _loadFriends)))
+                    : filtered.isEmpty
+                        ? Center(
+                            child: Text(
+                              _friends.isEmpty
+                                  ? 'All your friends are already in the group'
+                                  : 'No friends match your search',
+                              style: TextStyle(color: context.colors.medium),
+                              textAlign: TextAlign.center,
                             ),
-                            activeColor: FlixieColors.primary,
-                            checkColor: Colors.white,
-                            secondary: CircleAvatar(
-                              backgroundColor:
-                                  FlixieColors.primary.withValues(alpha: 0.2),
-                              child: Text(
-                                friend.username[0].toUpperCase(),
-                                style: const TextStyle(
-                                  color: FlixieColors.primary,
-                                  fontWeight: FontWeight.bold,
+                          )
+                        : ListView.builder(
+                            controller: scrollController,
+                            itemCount: filtered.length,
+                            itemBuilder: (_, i) {
+                              final friend = filtered[i];
+                              final selected = _selected.contains(friend.id);
+                              return CheckboxListTile(
+                                value: selected,
+                                onChanged: (val) {
+                                  setState(() {
+                                    if (val == true) {
+                                      _selected.add(friend.id);
+                                    } else {
+                                      _selected.remove(friend.id);
+                                    }
+                                  });
+                                },
+                                title: Text(
+                                  friend.username,
+                                  style: TextStyle(color: context.colors.light),
                                 ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+                                activeColor: FlixieColors.primary,
+                                checkColor: Colors.white,
+                                secondary: ProfileAvatarView(
+                                  avatar: friend.avatar,
+                                  profileBadges: friend.profileBadges,
+                                  fallbackText: friend.username.isEmpty
+                                      ? '?'
+                                      : friend.username[0].toUpperCase(),
+                                  fallbackColor: FlixieColors.primary,
+                                  size: 36,
+                                ),
+                              );
+                            },
+                          ),
           ),
           const SizedBox(height: 8),
         ],

@@ -366,6 +366,8 @@ class GroupChatTabState extends State<GroupChatTab> {
 
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: context.colors.tabBarBackground,
       shape: const RoundedRectangleBorder(

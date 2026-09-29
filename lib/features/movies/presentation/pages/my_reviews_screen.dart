@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/load_failure_notice.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/review_card.dart'
     as shared;
@@ -26,6 +27,8 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
   List<Review> _allReviews = [];
   List<Review> _filteredReviews = [];
   bool _loading = true;
+  bool _refreshing = false;
+  String? _error;
   String _sortBy = 'newest'; // newest, oldest
 
   @override
@@ -51,34 +54,43 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
     super.dispose();
   }
 
-  Future<void> _loadReviews() async {
+  Future<void> _loadReviews({bool refresh = false}) async {
+    if (_refreshing) return;
     final auth = context.read<AuthProvider>();
     final userId = auth.dbUser?.id;
     if (userId == null) {
-      setState(() => _loading = false);
-      return;
-    }
-
-    // Use prefetched cache if ready - no spinner needed
-    if (auth.cachedReviews != null) {
       setState(() {
-        _allReviews = auth.cachedReviews!;
-        _filterReviews();
         _loading = false;
+        _error = 'Sign in to load your reviews.';
       });
       return;
     }
-
+    if (!refresh && auth.cachedReviews != null) {
+      _allReviews = List<Review>.of(auth.cachedReviews!);
+      _loading = false;
+      _filterReviews();
+      return;
+    }
+    setState(() {
+      _refreshing = true;
+      _loading = _allReviews.isEmpty;
+      _error = null;
+    });
     try {
       final reviews = await UserService.getUserReviews(userId);
-      setState(() {
-        _allReviews = reviews;
-        _filterReviews();
-        _loading = false;
-      });
+      if (!mounted) return;
+      _allReviews = reviews;
+      _filterReviews();
     } catch (e) {
-      debugPrint('Error loading reviews: $e');
-      setState(() => _loading = false);
+      if (!mounted) return;
+      setState(() => _error = 'Couldn’t load your reviews.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _refreshing = false;
+        });
+      }
     }
   }
 
@@ -209,6 +221,20 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
   }
 
   Widget _buildContent() {
+    if (_error != null) {
+      final notice = LoadFailureNotice(
+          message: _error!,
+          onRetry: () => _loadReviews(refresh: true),
+          retrying: _refreshing);
+      if (_allReviews.isEmpty) {
+        return Center(child: SingleChildScrollView(child: notice));
+      }
+      return Column(children: [notice, Expanded(child: _buildReviews())]);
+    }
+    return _buildReviews();
+  }
+
+  Widget _buildReviews() {
     if (_filteredReviews.isEmpty) {
       return Center(
         child: Column(

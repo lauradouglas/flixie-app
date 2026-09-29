@@ -298,6 +298,7 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
   Future<void> _create() async {
     await showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: context.colors.surface,

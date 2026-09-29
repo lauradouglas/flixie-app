@@ -1900,6 +1900,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
   void _showAllCredits(BuildContext context, List<_PersonFilmCredit> credits) {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: context.colors.background,
       shape: const RoundedRectangleBorder(

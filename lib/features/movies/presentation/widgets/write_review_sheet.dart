@@ -43,7 +43,7 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
   final _bodyController = TextEditingController();
 
   String? _watchEntryId;
-  late int _rating;
+  int? _rating;
   late bool _recommended;
   bool _containsSpoilers = false;
   bool _isSubmitting = false;
@@ -52,7 +52,10 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
   void initState() {
     super.initState();
     _watchEntryId = widget.watchEntryId;
-    _rating = (widget.initialRating?.round() ?? 5).clamp(1, 10);
+    final initial = widget.initialRating;
+    _rating = initial != null && initial >= 1 && initial <= 10
+        ? initial.round()
+        : null;
     _recommended = widget.initialRecommended ?? true;
   }
 
@@ -64,7 +67,9 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_isSubmitting || _rating == null || !_formKey.currentState!.validate()) {
+      return;
+    }
     setState(() => _isSubmitting = true);
 
     try {
@@ -74,7 +79,7 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
         movieId: widget.movieId,
         watchEntryId: _watchEntryId,
         showId: widget.showId,
-        rating: _rating,
+        rating: _rating!,
         title: _titleController.text.trim(),
         body: _bodyController.text.trim(),
         upvotes: 0,
@@ -273,7 +278,9 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '$_rating / 10',
+                      _rating == null
+                          ? 'Choose your rating to submit a review'
+                          : '$_rating / 10',
                       style: TextStyle(
                         color: context.colors.medium,
                         fontSize: 13,
@@ -362,7 +369,8 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          onPressed: _isSubmitting ? null : _submit,
+                          onPressed:
+                              _isSubmitting || _rating == null ? null : _submit,
                           child: _isSubmitting
                               ? const SizedBox(
                                   height: 20,

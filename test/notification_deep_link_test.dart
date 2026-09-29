@@ -2,6 +2,26 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flixie_app/core/auth/notification_deep_link.dart';
 
 void main() {
+  test(
+      'community mentions open a precise comment with a compatible legacy route',
+      () {
+    expect(
+        notificationDeepLinkPath({
+          'type': 'COMMUNITY_REPLY',
+          'route': '/movies/129',
+          'communityRoute':
+              '/genre-communities/-1/discussions/thread?reply=comment'
+        }),
+        '/genre-communities/-1/discussions/thread?reply=comment');
+    expect(
+        notificationDeepLinkPath({
+          'type': 'COMMUNITY_REPLY',
+          'route': '/movies/129',
+          'communityRoute': 'https://untrusted.example/'
+        }),
+        '/movies/129?source=notification');
+  });
+
   test('group message opens the group chat tab', () {
     expect(
       notificationDeepLinkPath({

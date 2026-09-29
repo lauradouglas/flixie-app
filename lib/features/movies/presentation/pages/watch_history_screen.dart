@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/load_failure_notice.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -44,6 +45,9 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
   List<_WatchedEntry> _all = [];
   List<_WatchedEntry> _filtered = [];
   bool _loading = true;
+  bool _refreshing = false;
+  String? _error;
+  int _loadGeneration = 0;
   // Sort options: dateDesc, dateAsc, titleAsc, titleDesc
   String _sortBy = 'dateDesc';
 
@@ -61,49 +65,75 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
   }
 
   Future<void> _load() async {
+    final generation = ++_loadGeneration;
+    bool isCurrent() => mounted && generation == _loadGeneration;
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (userId == null) {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
+      setState(() {
+        _loading = false;
+        _error = 'Sign in to load your watch history.';
+      });
       return;
     }
+    setState(() {
+      _loading = _all.isEmpty;
+      _refreshing = true;
+      _error = null;
+    });
     try {
       final results = await Future.wait<dynamic>([
         UserService.getUserWatchedMovies(userId),
         UserService.getUserMovieReviews(userId),
       ]);
+      if (!isCurrent()) return;
       final watched = results[0] as List<WatchedMovie>;
       final reviews = results[1] as List<Review>;
-      final history = await Future.wait(watched.map((item) async {
-        try {
-          return await WatchlistActionsController.instance
-              .getMovieWatchHistory(userId, item.movieId);
-        } catch (_) {
-          return <MovieWatchEntry>[];
-        }
-      }));
       final reviewsByMovie = <int, Review>{
         for (final review in reviews)
-          if (review.movieId != null) review.movieId!: review,
+          if (review.movieId != null) review.movieId!: review
       };
-      final entries = <_WatchedEntry>[
-        for (var index = 0; index < watched.length; index++)
-          _toWatchedEntry(
-            watched[index],
-            watches: history[index],
-            review: reviewsByMovie[watched[index].movieId],
-          ),
-      ].where((entry) => entry.movie != null).toList();
-      if (!mounted) return;
-      setState(() {
-        _all = entries;
+      final history = <int, List<MovieWatchEntry>>{};
+      void publish() {
+        if (!isCurrent()) return;
+        _all = watched
+            .map((item) => _toWatchedEntry(item,
+                watches: history[item.movieId] ?? const [],
+                review: reviewsByMovie[item.movieId]))
+            .where((entry) => entry.movie != null)
+            .toList();
         _loading = false;
-      });
-      _applyFilter();
+        _applyFilter();
+      }
+
+      // Show the useful base library immediately; enrich details in bounded batches.
+      publish();
+      var detailFailed = false;
+      for (var offset = 0; offset < watched.length; offset += 4) {
+        if (!isCurrent()) return;
+        await Future.wait(watched.skip(offset).take(4).map((item) async {
+          try {
+            history[item.movieId] = await WatchlistActionsController.instance
+                .getMovieWatchHistory(userId, item.movieId);
+          } catch (_) {
+            detailFailed = true;
+          }
+        }));
+        publish();
+      }
+      if (isCurrent() && detailFailed) {
+        setState(() => _error =
+            'Some watch details couldn’t load. Your saved history is still here.');
+      }
     } catch (_) {
-      if (mounted) {
-        setState(() => _loading = false);
+      if (isCurrent()) {
+        setState(() => _error = 'Couldn’t load your watch history.');
+      }
+    } finally {
+      if (isCurrent()) {
+        setState(() {
+          _loading = false;
+          _refreshing = false;
+        });
       }
     }
   }
@@ -141,6 +171,8 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
     if (userId == null) return;
     await showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => RewatchLogSheet(
@@ -187,10 +219,13 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
     if (userId == null) return;
     await showModalBottomSheet<Review>(
       context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => WriteReviewSheet(
         movieId: entry.movieId,
+        initialRating: entry.rating,
         userId: userId,
         onSubmitted: (_) {
           auth.invalidateCachedReviews();
@@ -253,7 +288,7 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
                     color: context.colors.white,
                     fontSize: 22,
                     fontWeight: FontWeight.bold)),
-            if (!_loading)
+            if (!_loading && (_error == null || _all.isNotEmpty))
               Text('${_all.length} movies watched',
                   style: TextStyle(color: context.colors.medium, fontSize: 12)),
           ],
@@ -313,41 +348,56 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _filtered.isEmpty
-              ? _buildEmpty()
-              : GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.48,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                  ),
-                  itemCount: _filtered.length,
-                  itemBuilder: (_, i) {
-                    final entry = _filtered[i];
-                    return _WatchedMovieCard(
-                      entry: entry,
-                      formattedDate: _formatDate(entry.watchedAt),
-                      onTap: () => context.push(movieDetailPath(
-                        entry.movieId,
-                        source: DetailSource.watchHistory,
-                      )),
-                      onLogAgain: () => _openWatchEntry(entry),
-                      onEditEntry: entry.watches.isEmpty
-                          ? null
-                          : () => _openWatchEntry(
-                                entry,
-                                initial: entry.watches.first,
-                              ),
-                      onWriteReview: entry.review == null
-                          ? () => _writeReview(entry)
-                          : null,
-                    );
-                  },
-                ),
+          : _error != null && _all.isEmpty
+              ? Center(
+                  child: SingleChildScrollView(
+                      child: LoadFailureNotice(
+                          message: _error!,
+                          onRetry: _load,
+                          retrying: _refreshing)))
+              : Column(children: [
+                  if (_error != null)
+                    LoadFailureNotice(
+                        message: _error!,
+                        onRetry: _load,
+                        retrying: _refreshing),
+                  Expanded(child: _buildHistory()),
+                ]),
     );
   }
+
+  Widget _buildHistory() => _filtered.isEmpty
+      ? _buildEmpty()
+      : GridView.builder(
+          padding: const EdgeInsets.all(16),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            childAspectRatio: 0.48,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+          ),
+          itemCount: _filtered.length,
+          itemBuilder: (_, i) {
+            final entry = _filtered[i];
+            return _WatchedMovieCard(
+              entry: entry,
+              formattedDate: _formatDate(entry.watchedAt),
+              onTap: () => context.push(movieDetailPath(
+                entry.movieId,
+                source: DetailSource.watchHistory,
+              )),
+              onLogAgain: () => _openWatchEntry(entry),
+              onEditEntry: entry.watches.isEmpty
+                  ? null
+                  : () => _openWatchEntry(
+                        entry,
+                        initial: entry.watches.first,
+                      ),
+              onWriteReview:
+                  entry.review == null ? () => _writeReview(entry) : null,
+            );
+          },
+        );
 
   Widget _buildEmpty() {
     return Center(
@@ -488,8 +538,9 @@ class _WatchedMovieCard extends StatelessWidget {
                       left: 7,
                       bottom: 7,
                       child: FlixiePill.label(
-                          label: Text(
-                              '${entry.watches.isEmpty ? 1 : entry.watches.length}× watched')),
+                          label: Text(entry.watches.isEmpty
+                              ? 'Watched'
+                              : '${entry.watches.length}× watched')),
                     ),
                   ],
                 ),
