@@ -518,7 +518,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
           : RefreshIndicator(
               color: FlixieColors.primary,
               onRefresh: () async {
-                await context.read<AuthProvider>().refreshUserData();
+                final auth = context.read<AuthProvider>();
+                await auth.refreshUserData();
+                if (!mounted) return;
+                final id = auth.dbUser?.id;
+                if (id != null) {
+                  final lists = await UserService.getMovieLists(id);
+                  if (mounted && auth.dbUser?.id == id) {
+                    auth.updateCachedMovieLists(lists);
+                  }
+                }
                 await _loadAll();
               },
               child: ProfileScrollView(

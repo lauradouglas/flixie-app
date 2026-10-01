@@ -35,6 +35,7 @@ class MovieListDetailScreen extends StatelessWidget {
     this.ownerUserId,
     this.isOwnerOverride,
     this.canEditOverride,
+    this.addOnOpen = false,
   });
 
   final String listId;
@@ -42,6 +43,7 @@ class MovieListDetailScreen extends StatelessWidget {
   final String? ownerUserId;
   final bool? isOwnerOverride;
   final bool? canEditOverride;
+  final bool addOnOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -59,6 +61,7 @@ class MovieListDetailScreen extends StatelessWidget {
       )..loadListMovies(listId),
       child: _MovieListDetailView(
         listId: listId,
+        addOnOpen: addOnOpen,
         listName: listName,
         ownerUserId: userId,
         isOwner: isOwnerOverride ??
@@ -77,6 +80,7 @@ class _MovieListDetailView extends StatefulWidget {
     required this.ownerUserId,
     required this.isOwner,
     required this.canEdit,
+    this.addOnOpen = false,
   });
 
   final String listId;
@@ -84,6 +88,7 @@ class _MovieListDetailView extends StatefulWidget {
   final String ownerUserId;
   final bool isOwner;
   final bool canEdit;
+  final bool addOnOpen;
 
   @override
   State<_MovieListDetailView> createState() => _MovieListDetailViewState();
@@ -112,6 +117,11 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
       _loadOwner(widget.ownerUserId);
     }
     _loadMembership();
+    if (widget.addOnOpen && widget.canEdit) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showAddMovieSheet();
+      });
+    }
   }
 
   Future<void> _loadMembership() async {
@@ -525,14 +535,18 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                     SliverPadding(
                       padding: const EdgeInsets.fromLTRB(16, 6, 16, 120),
                       sliver: SliverGrid(
-                        gridDelegate:
-                            const SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: 190,
-                          // Each row deliberately reserves enough room for the
-                          // two-line contributor/date attribution. Grid tiles
-                          // share this height, so a longer attribution cannot
-                          // clip one card or make a row look uneven.
-                          childAspectRatio: 0.40,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount:
+                              MediaQuery.sizeOf(context).width >= 700 ? 4 : 2,
+                          mainAxisExtent: ((MediaQuery.sizeOf(context).width -
+                                              32) /
+                                          (MediaQuery.sizeOf(context).width >=
+                                                  700
+                                              ? 4
+                                              : 2) -
+                                      12) *
+                                  1.5 +
+                              MediaQuery.textScalerOf(context).scale(160),
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 18,
                         ),
@@ -837,13 +851,19 @@ class _AddMovieToListSheetState extends State<_AddMovieToListSheet> {
 
   Future<void> _search(String query) async {
     try {
-      final response = await SearchService.search(query, type: 'movie');
+      final response = await SearchService.search(query);
       if (!mounted || _controller.text.trim() != query) return;
       setState(() {
         _results = response.results
-            .map((item) => item.movie)
+            .map((item) => item.show == null
+                ? item.movie
+                : MovieShort(
+                    id: item.show!.id,
+                    name: item.show!.name,
+                    poster: item.show!.posterPath,
+                    releaseDate: item.show!.firstAirDate,
+                    mediaType: 'tv'))
             .whereType<MovieShort>()
-            .where((movie) => movie.mediaType != 'tv')
             .toList(growable: false);
         _searching = false;
       });
@@ -851,7 +871,7 @@ class _AddMovieToListSheetState extends State<_AddMovieToListSheet> {
       if (!mounted) return;
       setState(() {
         _searching = false;
-        _error = 'Unable to search movies right now.';
+        _error = 'Unable to search titles right now.';
       });
     }
   }
@@ -863,25 +883,29 @@ class _AddMovieToListSheetState extends State<_AddMovieToListSheet> {
       _addingMovieId = movie.id;
       _error = null;
     });
-    final ok = await provider.addMovieToList(widget.listId, movie.id);
+    final ok = movie.mediaType == 'tv'
+        ? await provider.addShowToList(widget.listId, movie.id)
+        : await provider.addMovieToList(widget.listId, movie.id);
     if (ok) await analytics.movieAddedToList();
     if (!mounted) return;
     setState(() => _addingMovieId = null);
     if (ok) {
       final messenger = ScaffoldMessenger.of(context);
-      Navigator.of(context).pop(true);
+      // Keep the picker open so several titles can be added in one visit.
       messenger.showFlixieToast(FlixieToast(
           type: FlixieToastType.success, content: Text('Added ${movie.name}')));
     } else {
       setState(() {
-        _error = provider.error ?? 'Unable to add movie.';
+        _error = provider.error ?? 'Unable to add title.';
       });
     }
   }
 
-  bool _isAlreadyInList(MovieListsProvider provider, int movieId) {
+  bool _isAlreadyInList(MovieListsProvider provider, MovieShort movie) {
     final entries = provider.listMovies[widget.listId] ?? const [];
-    return entries.any((entry) => _entryMovieId(entry) == movieId);
+    return entries.any((entry) => movie.mediaType == 'tv'
+        ? entry.showId == movie.id
+        : entry.showId == 0 && _entryMovieId(entry) == movie.id);
   }
 
   @override
@@ -936,7 +960,7 @@ class _AddMovieToListSheetState extends State<_AddMovieToListSheet> {
                 onChanged: _onQueryChanged,
                 style: TextStyle(color: context.colors.white),
                 decoration: InputDecoration(
-                  hintText: 'Search movies',
+                  hintText: 'Search movies or shows',
                   hintStyle: TextStyle(color: context.colors.medium),
                   prefixIcon: Icon(
                     Icons.search_rounded,
@@ -1003,7 +1027,7 @@ class _AddMovieToListSheetState extends State<_AddMovieToListSheet> {
     if (_controller.text.trim().length < 2) {
       return Center(
         child: Text(
-          'Search by title to add a movie.',
+          'Find movies or shows to start your collection.',
           style: TextStyle(color: context.colors.medium),
         ),
       );
@@ -1011,7 +1035,7 @@ class _AddMovieToListSheetState extends State<_AddMovieToListSheet> {
     if (_results.isEmpty) {
       return Center(
         child: Text(
-          'No movies found.',
+          'No titles found.',
           style: TextStyle(color: context.colors.medium),
         ),
       );
@@ -1022,13 +1046,15 @@ class _AddMovieToListSheetState extends State<_AddMovieToListSheet> {
       separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final movie = _results[index];
-        final alreadyAdded = _isAlreadyInList(provider, movie.id);
+        final alreadyAdded = _isAlreadyInList(provider, movie);
         final isAdding = _addingMovieId == movie.id;
         return _AddMovieResultTile(
           movie: movie,
           alreadyAdded: alreadyAdded,
           isAdding: isAdding,
-          onAdd: alreadyAdded || isAdding ? null : () => _addMovie(movie),
+          onAdd: alreadyAdded || _addingMovieId != null
+              ? null
+              : () => _addMovie(movie),
         );
       },
     );
@@ -1056,8 +1082,17 @@ class _AddMovieResultTile extends StatelessWidget {
     final year = _extractYear(movie.releaseDate);
 
     return Material(
-      color: context.colors.tabBarBackgroundFocused,
-      borderRadius: BorderRadius.circular(12),
+      color: alreadyAdded
+          ? FlixieColors.primary.withValues(alpha: .09)
+          : context.colors.tabBarBackgroundFocused,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: alreadyAdded
+              ? FlixieColors.primary.withValues(alpha: .45)
+              : Colors.transparent,
+        ),
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: onAdd,
@@ -1098,22 +1133,37 @@ class _AddMovieResultTile extends StatelessWidget {
                   children: [
                     Text(
                       movie.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: context.colors.white,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w600,
                         height: 1.15,
                       ),
                     ),
-                    if (year != null) ...[
+                    ...[
                       const SizedBox(height: 4),
                       Text(
-                        year,
+                        '${movie.mediaType == 'tv' ? 'Show' : 'Movie'}${year == null ? '' : ' · $year'}',
                         style: TextStyle(
                           color: context.colors.medium,
                           fontSize: 12,
                         ),
+                      ),
+                    ],
+                    if (alreadyAdded) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.check_rounded,
+                              size: 16, color: context.colors.primaryText),
+                          const SizedBox(width: 4),
+                          Flexible(
+                              child: Text('Added',
+                                  style: TextStyle(
+                                      color: context.colors.primaryText,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600))),
+                        ],
                       ),
                     ],
                   ],
@@ -1126,20 +1176,18 @@ class _AddMovieResultTile extends StatelessWidget {
                   height: 22,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              else if (alreadyAdded)
-                const Icon(
-                  Icons.check_circle_rounded,
-                  color: FlixieColors.primary,
-                )
-              else
-                IconButton.filled(
-                  tooltip: 'Add movie',
+              else if (!alreadyAdded)
+                IconButton.outlined(
+                  tooltip: 'Add ${movie.name}',
                   onPressed: onAdd,
                   style: IconButton.styleFrom(
-                    backgroundColor: FlixieColors.primary,
-                    foregroundColor: Colors.white,
+                    minimumSize: const Size(44, 44),
+                    foregroundColor: context.colors.primaryText,
+                    side: BorderSide(
+                        color:
+                            context.colors.primaryText.withValues(alpha: .3)),
                   ),
-                  icon: const Icon(Icons.add_rounded),
+                  icon: const Icon(Icons.add_rounded, size: 22),
                 ),
             ],
           ),
@@ -1284,12 +1332,11 @@ class _ListHeader extends StatelessWidget {
     final identity = _listIdentity(listName);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _PosterCollage(posterUrls: posterUrls),
-          const SizedBox(width: 14),
-          Expanded(
+          SizedBox(
+            width: double.infinity,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1319,8 +1366,6 @@ class _ListHeader extends StatelessWidget {
                                 Flexible(
                                   child: Text(
                                     membership?.groupName ?? 'Group list',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       color: context.colors.light,
                                       fontSize: 15,
@@ -1354,8 +1399,6 @@ class _ListHeader extends StatelessWidget {
                                     owner == null
                                         ? 'Loading creator…'
                                         : '@${owner!.username} · ${_visibilityLabel(membership?.visibility)}',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       color: context.colors.medium,
                                       fontSize: 11,
@@ -1398,8 +1441,6 @@ class _ListHeader extends StatelessWidget {
                                 owner == null
                                     ? 'Loading owner…'
                                     : '@${owner!.username} · ${_visibilityLabel(membership?.visibility)}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   color: context.colors.light,
                                   fontSize: 13,
@@ -1419,12 +1460,10 @@ class _ListHeader extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(
                   identity.$1,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: context.colors.white,
-                    fontSize: 23,
-                    height: 1.05,
+                    fontSize: 28,
+                    height: 1.25,
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.5,
                   ),
@@ -1433,8 +1472,6 @@ class _ListHeader extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     identity.$2!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: context.colors.light,
                       fontSize: 15,
@@ -1446,11 +1483,9 @@ class _ListHeader extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     membership!.description!.trim(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: context.colors.medium,
-                      fontSize: 11.5,
+                      fontSize: 14,
                     ),
                   ),
                 ],
@@ -1497,63 +1532,6 @@ class _ListHeader extends StatelessWidget {
   String _ownerInitial(models.User? user) {
     final username = user?.username.trim() ?? '';
     return username.isEmpty ? '?' : username[0].toUpperCase();
-  }
-}
-
-class _PosterCollage extends StatelessWidget {
-  const _PosterCollage({required this.posterUrls});
-
-  final List<String> posterUrls;
-
-  @override
-  Widget build(BuildContext context) {
-    if (posterUrls.isEmpty) {
-      return Container(
-        width: 92,
-        height: 138,
-        decoration: BoxDecoration(
-          color: context.colors.surfaceElevated,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(
-          Icons.movie_creation_outlined,
-          color: context.colors.medium,
-          size: 34,
-        ),
-      );
-    }
-
-    return SizedBox(
-      width: 108,
-      height: 142,
-      child: Stack(
-        children: List.generate(posterUrls.length.clamp(0, 4), (index) {
-          final offset = index * 7.0;
-          return Positioned(
-            left: offset,
-            top: index.isOdd ? 8 : 0,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: CachedNetworkImage(
-                imageUrl: posterUrls[index],
-                width: 86,
-                height: 134,
-                fit: BoxFit.cover,
-                errorWidget: (_, __, ___) => Container(
-                  width: 86,
-                  height: 134,
-                  color: context.colors.surfaceElevated,
-                  child: Icon(
-                    Icons.movie_outlined,
-                    color: context.colors.medium,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }).reversed.toList(),
-      ),
-    );
   }
 }
 
@@ -1896,7 +1874,7 @@ class _MovieListPosterCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SizedBox(
-                    height: 30,
+                    height: MediaQuery.textScalerOf(context).scale(32),
                     child: Text(
                       _entryTitle(entry),
                       maxLines: 2,

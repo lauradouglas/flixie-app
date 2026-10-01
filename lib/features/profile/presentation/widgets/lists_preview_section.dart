@@ -39,15 +39,38 @@ class _ListsPreviewSectionState extends State<ListsPreviewSection> {
   @override
   void initState() {
     super.initState();
-    _listsFuture = UserService.getMovieLists(widget.userId);
+    _listsFuture = _fetchLists();
   }
 
   @override
   void didUpdateWidget(covariant ListsPreviewSection oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.userId != widget.userId) {
-      _listsFuture = UserService.getMovieLists(widget.userId);
+      _listsFuture = _fetchLists();
     }
+  }
+
+  Future<List<MovieList>> _fetchLists() async {
+    final userId = widget.userId;
+    final lists = await UserService.getMovieLists(userId);
+    if (mounted && widget.userId == userId) {
+      final auth = context.read<AuthProvider>();
+      if (auth.dbUser?.id == userId) auth.updateCachedMovieLists(lists);
+    }
+    return lists;
+  }
+
+  Future<void> _openAndRefresh(String route) async {
+    await context.push(route);
+    if (!mounted) return;
+    final future = _fetchLists();
+    setState(() => _listsFuture = future);
+    try {
+      final lists = await future;
+      if (!mounted) return;
+      final auth = context.read<AuthProvider>();
+      if (auth.dbUser?.id == widget.userId) auth.updateCachedMovieLists(lists);
+    } catch (_) {/* Keep the last successful preview on refresh failure. */}
   }
 
   @override
@@ -56,21 +79,24 @@ class _ListsPreviewSectionState extends State<ListsPreviewSection> {
     final isOwnProfile = auth.dbUser?.id == widget.userId;
     final cachedLists = isOwnProfile ? auth.cachedMovieLists : null;
     return FutureBuilder<List<MovieList>>(
-      future: cachedLists == null ? _listsFuture : null,
+      future: _listsFuture,
       initialData: cachedLists,
       builder: (context, snapshot) {
-        final loadedLists = (snapshot.data ?? const <MovieList>[])
-            .where((list) =>
-                isOwnProfile ||
-                list.userId == null ||
-                list.userId == widget.userId)
-            .toList(growable: false);
+        final loadedLists =
+            (cachedLists ?? snapshot.data ?? const <MovieList>[])
+                .where((list) =>
+                    isOwnProfile ||
+                    list.userId == null ||
+                    list.userId == widget.userId)
+                .toList(growable: false);
         final lists = loadedLists
             .where((list) => list.visibleInProfile(
                   viewerId: auth.dbUser?.id,
                   publicPreview: widget.publicOnly,
                 ))
             .toList(growable: false);
+        lists.sort((a, b) => (b.updatedAt ?? b.createdAt ?? '')
+            .compareTo(a.updatedAt ?? a.createdAt ?? ''));
         final previewLists =
             (widget.allowManage ? lists.take(2) : lists).map((list) {
           final posters = list.previewPosterUrls.map(_posterUrl).toList();
@@ -120,13 +146,8 @@ class _ListsPreviewSectionState extends State<ListsPreviewSection> {
                       if (widget.allowManage && !widget.publicOnly) ...[
                         const SizedBox(height: 12),
                         OutlinedButton.icon(
-                            onPressed: () async {
-                              await context.push('/movie-lists?create=true');
-                              if (mounted) {
-                                setState(() => _listsFuture =
-                                    UserService.getMovieLists(widget.userId));
-                              }
-                            },
+                            onPressed: () =>
+                                _openAndRefresh('/movie-lists?create=true'),
                             icon: const Icon(Icons.add, size: 18),
                             label: const Text('Create a list')),
                       ],
@@ -143,14 +164,14 @@ class _ListsPreviewSectionState extends State<ListsPreviewSection> {
                     editLabel: 'Manage',
                     showOwnItemCount: true,
                     showEdit: false,
-                    onEdit: () => context.push('/movie-lists'),
+                    onEdit: () => _openAndRefresh('/movie-lists'),
                     onSeeAll: widget.allowManage
-                        ? () => context.push('/movie-lists')
+                        ? () => _openAndRefresh('/movie-lists')
                         : null,
                     onOpenList: (item) {
                       final list =
                           lists.firstWhere((list) => list.id == item.id);
-                      context.push(
+                      _openAndRefresh(
                         '/movie-lists/${list.id}?name=${Uri.encodeComponent(list.name)}&owner=${Uri.encodeComponent(list.userId ?? widget.userId)}&isOwner=${list.isOwner}&canEdit=${list.canEdit}',
                       );
                     },

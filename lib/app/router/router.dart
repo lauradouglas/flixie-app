@@ -576,6 +576,7 @@ GoRouter buildRouter(
           state,
           MovieListDetailScreen(
             listId: state.pathParameters['id'] ?? '',
+            addOnOpen: state.uri.queryParameters['add'] == 'true',
             listName: state.uri.queryParameters['name'] ?? 'List',
             ownerUserId: state.uri.queryParameters['owner'],
             isOwnerOverride: state.uri.queryParameters['isOwner'] == null

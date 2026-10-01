@@ -180,6 +180,18 @@ class MovieListsProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> addShowToList(String listId, int showId) async {
+    try {
+      await UserService.addShowToList(userId, listId, showId);
+      await loadListMovies(listId);
+      return true;
+    } catch (e) {
+      error = _friendlyError(e);
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<bool> removeMovieFromList(String listId, int movieId) async {
     try {
       await UserService.removeMovieFromList(userId, listId, movieId);

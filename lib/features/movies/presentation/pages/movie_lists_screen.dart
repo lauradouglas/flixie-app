@@ -117,7 +117,15 @@ class _MovieListsViewState extends State<_MovieListsView> {
                             children: [
                               Row(
                                 children: [
-                                  OutlinedButton.icon(
+                                  TextButton.icon(
+                                    style: TextButton.styleFrom(
+                                      minimumSize: const Size(0, 44),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 14, vertical: 8),
+                                      textStyle: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600),
+                                    ),
                                     onPressed: () => _openListEditor(context),
                                     icon: const Icon(Icons.add, size: 18),
                                     label: const Text('New list'),
@@ -127,14 +135,6 @@ class _MovieListsViewState extends State<_MovieListsView> {
                                     onPressed: () => setState(
                                         () => _showSearch = !_showSearch),
                                     icon: const Icon(Icons.search_rounded),
-                                  ),
-                                  PopupMenuButton<String>(
-                                    icon: const Icon(Icons.more_horiz_rounded),
-                                    itemBuilder: (_) => const [
-                                      PopupMenuItem(
-                                          value: 'manage',
-                                          child: Text('Manage lists')),
-                                    ],
                                   ),
                                 ],
                               ),
@@ -169,17 +169,9 @@ class _MovieListsViewState extends State<_MovieListsView> {
                                         child: Text('List name'),
                                       ),
                                     ],
-                                    child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 4),
-                                        child: FlixiePill.label(
-                                            compact: false,
-                                            avatar:
-                                                const Icon(Icons.sort_rounded),
-                                            label: Text(
-                                                _sort == _ListSort.updated
-                                                    ? 'Updated'
-                                                    : 'Name'))),
+                                    tooltip: 'Sort lists',
+                                    icon: const Icon(Icons.sort_rounded,
+                                        size: 21),
                                   ),
                                 ],
                               ),
@@ -190,16 +182,9 @@ class _MovieListsViewState extends State<_MovieListsView> {
                           child: visibleLists.isEmpty
                               ? const _EmptyState(
                                   message: 'No lists match these filters.')
-                              : GridView.builder(
+                              : ListView.builder(
                                   padding:
                                       const EdgeInsets.fromLTRB(16, 0, 16, 28),
-                                  gridDelegate:
-                                      const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 2,
-                                    crossAxisSpacing: 10,
-                                    mainAxisSpacing: 10,
-                                    childAspectRatio: 0.72,
-                                  ),
                                   itemCount: visibleLists.length,
                                   itemBuilder: (_, index) => _ListGridCard(
                                     list: visibleLists[index],
@@ -215,50 +200,43 @@ class _MovieListsViewState extends State<_MovieListsView> {
     );
   }
 
-  Widget _buildFilterControl() {
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: context.colors.surface.withValues(alpha: 0.55),
-        border: Border.all(color: context.colors.tabBarBorder),
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: Row(
-        children: _ListFilter.values.map((filter) {
-          final selected = _filter == filter;
-          return Expanded(
-            child: Semantics(
-                button: true,
-                selected: selected,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(18),
-                  onTap: () => setState(() => _filter = filter),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 160),
-                    constraints: const BoxConstraints(minHeight: 48),
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color:
-                          selected ? FlixieColors.primary : Colors.transparent,
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: Text(
-                        switch (filter) {
-                          _ListFilter.all => 'All',
-                          _ListFilter.private => 'Private',
-                          _ListFilter.shared => 'Shared',
-                        },
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 13)),
-                  ),
-                )),
-          );
-        }).toList(),
-      ),
-    );
-  }
+  Widget _buildFilterControl() => Row(children: [
+        for (final filter in _ListFilter.values)
+          Expanded(
+              child: Semantics(
+            selected: _filter == filter,
+            child: InkWell(
+              onTap: () => setState(() => _filter = filter),
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 44),
+                alignment: Alignment.center,
+                padding:
+                    const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                decoration: BoxDecoration(
+                    border: Border(
+                        bottom: BorderSide(
+                            color: _filter == filter
+                                ? context.colors.primaryText
+                                : context.colors.tabBarBorder,
+                            width: _filter == filter ? 2 : 1))),
+                child: Text(
+                    switch (filter) {
+                      _ListFilter.all => 'All',
+                      _ListFilter.private => 'Private',
+                      _ListFilter.shared => 'Shared'
+                    },
+                    style: TextStyle(
+                        fontSize: 14,
+                        color: _filter == filter
+                            ? context.colors.textPrimary
+                            : context.colors.medium,
+                        fontWeight: _filter == filter
+                            ? FontWeight.w700
+                            : FontWeight.w500)),
+              ),
+            ),
+          )),
+      ]);
 
   void _openList(BuildContext context, MovieList list) => context.push(
         '/movie-lists/${list.id}?name=${Uri.encodeComponent(list.name)}&isOwner=${list.isOwner}&canEdit=${list.canEdit}',
@@ -342,6 +320,7 @@ class _MovieListsViewState extends State<_MovieListsView> {
       friendSearchController.dispose();
       return;
     }
+    MovieList? createdList;
     ModalRoute<dynamic>? editorRoute;
     await showModalBottomSheet<void>(
       context: context,
@@ -360,124 +339,267 @@ class _MovieListsViewState extends State<_MovieListsView> {
                 top: 16,
                 bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
               ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(isEdit ? 'Rename List' : 'Create List',
-                        style: Theme.of(ctx).textTheme.titleLarge),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: controller,
-                      autofocus: true,
-                      maxLength: 50,
-                      decoration: const InputDecoration(hintText: 'List name'),
+              child: _ListEditorLayout(
+                children: [
+                  Text(isEdit ? 'Edit list' : 'Make a little collection.',
+                      style: Theme.of(ctx).textTheme.titleLarge),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: controller,
+                    autofocus: false,
+                    maxLength: 50,
+                    decoration: const InputDecoration(
+                        labelText: 'List name',
+                        hintText: 'Films for a rainy Sunday'),
+                  ),
+                  TextField(
+                    controller: descriptionController,
+                    maxLength: 140,
+                    minLines: 2,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      hintText: 'Description (optional)',
                     ),
-                    TextField(
-                      controller: descriptionController,
-                      maxLength: 140,
-                      minLines: 2,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        hintText: 'Description (optional)',
-                      ),
-                    ),
-                    StatefulBuilder(
-                      builder: (context, setInnerState) =>
-                          DropdownButtonFormField<String>(
-                        initialValue: visibility,
-                        decoration: const InputDecoration(labelText: 'Privacy'),
-                        items: const [
-                          DropdownMenuItem(
-                            value: ListVisibility.private,
-                            child: Text('Private'),
-                          ),
-                          DropdownMenuItem(
-                            value: ListVisibility.friends,
-                            child: Text('Friends'),
-                          ),
-                          DropdownMenuItem(
-                            value: ListVisibility.public,
-                            child: Text('Public'),
-                          ),
-                        ],
-                        onChanged: (value) => setInnerState(
-                          () => visibility = value ?? ListVisibility.private,
+                  ),
+                  StatefulBuilder(
+                    builder: (context, setInnerState) => _ListChoiceGroup(
+                      value: visibility,
+                      title: 'Who can see it?',
+                      items: const [
+                        DropdownMenuItem(
+                          value: ListVisibility.private,
+                          child: Text('Private'),
                         ),
+                        DropdownMenuItem(
+                          value: ListVisibility.friends,
+                          child: Text('Friends only'),
+                        ),
+                        DropdownMenuItem(
+                          value: ListVisibility.public,
+                          child: Text('Public'),
+                        ),
+                      ],
+                      onChanged: (value) => setInnerState(
+                        () => visibility = value ?? ListVisibility.private,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    if (isEdit)
-                      StatefulBuilder(
-                        builder: (context, setInnerState) {
-                          final query = friendSearch.trim().toLowerCase();
-                          final visibleFriends = query.isEmpty
-                              ? friends
-                              : friends
-                                  .where((friend) => [
-                                        friend.username,
-                                        friend.firstName ?? '',
-                                        friend.lastName ?? '',
-                                      ].join(' ').toLowerCase().contains(query))
-                                  .toList(growable: false);
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              DropdownButtonFormField<String>(
-                                initialValue: scope,
-                                decoration: const InputDecoration(
-                                  labelText: 'Who can add to this list',
-                                ),
-                                items: initialScope == ListScope.group
-                                    ? const [
-                                        DropdownMenuItem(
-                                          value: ListScope.group,
-                                          child: Text('Group members'),
-                                        ),
-                                      ]
-                                    : const [
-                                        DropdownMenuItem(
-                                          value: ListScope.personal,
-                                          child: Text('Just me'),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: ListScope.friends,
-                                          child: Text('Selected friends'),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: ListScope.group,
-                                          child: Text('A group'),
-                                        ),
-                                      ],
-                                onChanged: initialScope == ListScope.group
-                                    ? null
-                                    : (value) => setInnerState(() {
-                                          scope = value ?? ListScope.personal;
-                                          if (scope != ListScope.group) {
-                                            selectedGroupId = null;
-                                          }
-                                          if (scope == ListScope.personal) {
-                                            selectedFriendIds.clear();
-                                          }
-                                        }),
+                  ),
+                  const SizedBox(height: 8),
+                  if (isEdit)
+                    StatefulBuilder(
+                      builder: (context, setInnerState) {
+                        final query = friendSearch.trim().toLowerCase();
+                        final visibleFriends = query.isEmpty
+                            ? friends
+                            : friends
+                                .where((friend) => [
+                                      friend.username,
+                                      friend.firstName ?? '',
+                                      friend.lastName ?? '',
+                                    ].join(' ').toLowerCase().contains(query))
+                                .toList(growable: false);
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            DropdownButtonFormField<String>(
+                              initialValue: scope,
+                              decoration: const InputDecoration(
+                                labelText: 'Who can add to this list',
                               ),
-                              if (scope == ListScope.friends) ...[
-                                const SizedBox(height: 12),
+                              items: initialScope == ListScope.group
+                                  ? const [
+                                      DropdownMenuItem(
+                                        value: ListScope.group,
+                                        child: Text('Group members'),
+                                      ),
+                                    ]
+                                  : const [
+                                      DropdownMenuItem(
+                                        value: ListScope.personal,
+                                        child: Text('Just me'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: ListScope.friends,
+                                        child: Text('Selected friends'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: ListScope.group,
+                                        child: Text('With a group'),
+                                      ),
+                                    ],
+                              onChanged: initialScope == ListScope.group
+                                  ? null
+                                  : (value) => setInnerState(() {
+                                        scope = value ?? ListScope.personal;
+                                        if (scope != ListScope.group) {
+                                          selectedGroupId = null;
+                                        }
+                                        if (scope == ListScope.personal) {
+                                          selectedFriendIds.clear();
+                                        }
+                                      }),
+                            ),
+                            if (scope == ListScope.friends) ...[
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: friendSearchController,
+                                onChanged: (value) => setInnerState(
+                                  () => friendSearch = value,
+                                ),
+                                decoration: const InputDecoration(
+                                  hintText: 'Search friends',
+                                  prefixIcon:
+                                      Icon(Icons.search_rounded, size: 20),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              if (friends.isEmpty)
+                                const Text('No accepted friends available.')
+                              else
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 6,
+                                  children: visibleFriends
+                                      .map(
+                                        (friend) => FlixiePill.filter(
+                                            label: Text('@${friend.username}'),
+                                            selected: selectedFriendIds
+                                                .contains(friend.id),
+                                            onSelected: (selected) =>
+                                                setInnerState(() {
+                                                  if (selected) {
+                                                    selectedFriendIds
+                                                        .add(friend.id);
+                                                  } else {
+                                                    selectedFriendIds
+                                                        .remove(friend.id);
+                                                  }
+                                                })),
+                                      )
+                                      .toList(growable: false),
+                                ),
+                            ],
+                            if (scope == ListScope.group &&
+                                initialScope != ListScope.group) ...[
+                              const SizedBox(height: 12),
+                              DropdownButtonFormField<String>(
+                                initialValue: selectedGroupId,
+                                decoration: const InputDecoration(
+                                    labelText: 'Choose group'),
+                                items: groups
+                                    .where((group) => group.id != null)
+                                    .map((group) => DropdownMenuItem(
+                                          value: group.id,
+                                          child: Text(group.name),
+                                        ))
+                                    .toList(growable: false),
+                                onChanged: (value) => setInnerState(
+                                    () => selectedGroupId = value),
+                              ),
+                            ],
+                            if (initialScope == ListScope.group)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text(
+                                  'Group lists cannot be changed to solo lists.',
+                                  style:
+                                      TextStyle(color: context.colors.medium),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                  if (!isEdit)
+                    StatefulBuilder(
+                      builder: (context, setInnerState) {
+                        final query = friendSearch.trim().toLowerCase();
+                        final visibleFriends = query.isEmpty
+                            ? friends
+                            : friends.where((friend) {
+                                final searchable = [
+                                  friend.username,
+                                  friend.firstName ?? '',
+                                  friend.lastName ?? '',
+                                ].join(' ').toLowerCase();
+                                return searchable.contains(query);
+                              }).toList(growable: false);
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _ListChoiceGroup(
+                              value: scope,
+                              title: 'Who’s making it?',
+                              items: const [
+                                DropdownMenuItem(
+                                  value: ListScope.personal,
+                                  child: Text('Just me'),
+                                ),
+                                DropdownMenuItem(
+                                  value: ListScope.friends,
+                                  child: Text('With friends'),
+                                ),
+                                DropdownMenuItem(
+                                  value: ListScope.group,
+                                  child: Text('With a group'),
+                                ),
+                              ],
+                              onChanged: (value) => setInnerState(() {
+                                scope = value ?? ListScope.personal;
+                                selectedGroupId = null;
+                                selectedFriendIds.clear();
+                                friendSearch = '';
+                                whoCanAddMovies = scope == ListScope.personal
+                                    ? 'owner'
+                                    : 'members';
+                              }),
+                            ),
+                            if (scope == ListScope.friends) ...[
+                              const SizedBox(height: 12),
+                              const Text(
+                                'Choose friends',
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                              const SizedBox(height: 8),
+                              if (friends.isEmpty)
+                                Text(
+                                  'No accepted friends available.',
+                                  style:
+                                      TextStyle(color: context.colors.medium),
+                                )
+                              else ...[
                                 TextField(
                                   controller: friendSearchController,
                                   onChanged: (value) => setInnerState(
                                     () => friendSearch = value,
                                   ),
-                                  decoration: const InputDecoration(
+                                  textInputAction: TextInputAction.search,
+                                  decoration: InputDecoration(
                                     hintText: 'Search friends',
-                                    prefixIcon:
-                                        Icon(Icons.search_rounded, size: 20),
+                                    prefixIcon: const Icon(Icons.search_rounded,
+                                        size: 20),
+                                    suffixIcon: friendSearch.isEmpty
+                                        ? null
+                                        : IconButton(
+                                            tooltip: 'Clear search',
+                                            onPressed: () {
+                                              friendSearchController.clear();
+                                              setInnerState(
+                                                () => friendSearch = '',
+                                              );
+                                            },
+                                            icon:
+                                                const Icon(Icons.close_rounded),
+                                          ),
                                   ),
                                 ),
                                 const SizedBox(height: 10),
-                                if (friends.isEmpty)
-                                  const Text('No accepted friends available.')
+                                if (visibleFriends.isEmpty)
+                                  Text(
+                                    'No friends match your search.',
+                                    style:
+                                        TextStyle(color: context.colors.medium),
+                                  )
                                 else
                                   Wrap(
                                     spacing: 8,
@@ -503,210 +625,70 @@ class _MovieListsViewState extends State<_MovieListsView> {
                                         .toList(growable: false),
                                   ),
                               ],
-                              if (scope == ListScope.group &&
-                                  initialScope != ListScope.group) ...[
-                                const SizedBox(height: 12),
-                                DropdownButtonFormField<String>(
-                                  initialValue: selectedGroupId,
-                                  decoration: const InputDecoration(
-                                      labelText: 'Choose group'),
-                                  items: groups
-                                      .where((group) => group.id != null)
-                                      .map((group) => DropdownMenuItem(
-                                            value: group.id,
-                                            child: Text(group.name),
-                                          ))
-                                      .toList(growable: false),
-                                  onChanged: (value) => setInnerState(
-                                      () => selectedGroupId = value),
-                                ),
-                              ],
-                              if (initialScope == ListScope.group)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 8),
-                                  child: Text(
-                                    'Group lists cannot be changed to solo lists.',
-                                    style:
-                                        TextStyle(color: context.colors.medium),
-                                  ),
-                                ),
                             ],
-                          );
-                        },
-                      ),
-                    if (!isEdit)
-                      StatefulBuilder(
-                        builder: (context, setInnerState) {
-                          final query = friendSearch.trim().toLowerCase();
-                          final visibleFriends = query.isEmpty
-                              ? friends
-                              : friends.where((friend) {
-                                  final searchable = [
-                                    friend.username,
-                                    friend.firstName ?? '',
-                                    friend.lastName ?? '',
-                                  ].join(' ').toLowerCase();
-                                  return searchable.contains(query);
-                                }).toList(growable: false);
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
+                            if (scope == ListScope.group) ...[
+                              const SizedBox(height: 12),
                               DropdownButtonFormField<String>(
-                                initialValue: scope,
+                                initialValue: selectedGroupId,
                                 decoration: const InputDecoration(
-                                    labelText: 'List ownership'),
-                                items: const [
-                                  DropdownMenuItem(
-                                    value: ListScope.personal,
-                                    child: Text('Just me'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: ListScope.friends,
-                                    child: Text('Me and selected friends'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: ListScope.group,
-                                    child: Text('A group'),
-                                  ),
-                                ],
-                                onChanged: (value) => setInnerState(() {
-                                  scope = value ?? ListScope.personal;
-                                  selectedGroupId = null;
-                                  selectedFriendIds.clear();
-                                  friendSearch = '';
-                                  whoCanAddMovies = scope == ListScope.personal
-                                      ? 'owner'
-                                      : 'members';
-                                }),
-                              ),
-                              if (scope == ListScope.friends) ...[
-                                const SizedBox(height: 12),
-                                const Text(
-                                  'Choose friends',
-                                  style: TextStyle(fontWeight: FontWeight.w700),
-                                ),
-                                const SizedBox(height: 8),
-                                if (friends.isEmpty)
-                                  Text(
-                                    'No accepted friends available.',
-                                    style:
-                                        TextStyle(color: context.colors.medium),
-                                  )
-                                else ...[
-                                  TextField(
-                                    controller: friendSearchController,
-                                    onChanged: (value) => setInnerState(
-                                      () => friendSearch = value,
-                                    ),
-                                    textInputAction: TextInputAction.search,
-                                    decoration: InputDecoration(
-                                      hintText: 'Search friends',
-                                      prefixIcon: const Icon(
-                                          Icons.search_rounded,
-                                          size: 20),
-                                      suffixIcon: friendSearch.isEmpty
-                                          ? null
-                                          : IconButton(
-                                              tooltip: 'Clear search',
-                                              onPressed: () {
-                                                friendSearchController.clear();
-                                                setInnerState(
-                                                  () => friendSearch = '',
-                                                );
-                                              },
-                                              icon: const Icon(
-                                                  Icons.close_rounded),
-                                            ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  if (visibleFriends.isEmpty)
-                                    Text(
-                                      'No friends match your search.',
-                                      style: TextStyle(
-                                          color: context.colors.medium),
+                                    labelText: 'Choose group'),
+                                items: groups
+                                    .where((group) => group.id != null)
+                                    .map(
+                                      (group) => DropdownMenuItem(
+                                        value: group.id,
+                                        child: Text(group.name),
+                                      ),
                                     )
-                                  else
-                                    Wrap(
-                                      spacing: 8,
-                                      runSpacing: 6,
-                                      children: visibleFriends
-                                          .map(
-                                            (friend) => FlixiePill.filter(
-                                                label:
-                                                    Text('@${friend.username}'),
-                                                selected: selectedFriendIds
-                                                    .contains(friend.id),
-                                                onSelected: (selected) =>
-                                                    setInnerState(() {
-                                                      if (selected) {
-                                                        selectedFriendIds
-                                                            .add(friend.id);
-                                                      } else {
-                                                        selectedFriendIds
-                                                            .remove(friend.id);
-                                                      }
-                                                    })),
-                                          )
-                                          .toList(growable: false),
-                                    ),
-                                ],
-                              ],
-                              if (scope == ListScope.group) ...[
-                                const SizedBox(height: 12),
-                                DropdownButtonFormField<String>(
-                                  initialValue: selectedGroupId,
-                                  decoration: const InputDecoration(
-                                      labelText: 'Choose group'),
-                                  items: groups
-                                      .where((group) => group.id != null)
-                                      .map(
-                                        (group) => DropdownMenuItem(
-                                          value: group.id,
-                                          child: Text(group.name),
-                                        ),
-                                      )
-                                      .toList(growable: false),
-                                  onChanged: (value) => setInnerState(
-                                      () => selectedGroupId = value),
-                                ),
-                              ],
-                            ],
-                          );
-                        },
-                      ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          final name = controller.text.trim();
-                          final editorUserId =
-                              context.read<AuthProvider>().dbUser?.id;
-                          if (name.isEmpty) return;
-                          if (scope == ListScope.friends &&
-                              selectedFriendIds.isEmpty) {
-                            ScaffoldMessenger.of(ctx).showFlixieToast(
-                              FlixieToast(
-                                type: FlixieToastType.warning,
-                                content:
-                                    const Text('Select at least one friend'),
+                                    .toList(growable: false),
+                                onChanged: (value) => setInnerState(
+                                    () => selectedGroupId = value),
                               ),
-                            );
-                            return;
-                          }
-                          if (scope == ListScope.group &&
-                              selectedGroupId == null) {
-                            ScaffoldMessenger.of(ctx).showFlixieToast(
-                              FlixieToast(
-                                  type: FlixieToastType.warning,
-                                  content: const Text('Choose a group')),
-                            );
-                            return;
-                          }
-                          var ok = isEdit
-                              ? await provider.renameList(
-                                  listId,
+                            ],
+                          ],
+                        );
+                      },
+                    ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        final name = controller.text.trim();
+                        final editorUserId =
+                            context.read<AuthProvider>().dbUser?.id;
+                        if (name.isEmpty) return;
+                        if (scope == ListScope.friends &&
+                            selectedFriendIds.isEmpty) {
+                          ScaffoldMessenger.of(ctx).showFlixieToast(
+                            FlixieToast(
+                              type: FlixieToastType.warning,
+                              content: const Text('Select at least one friend'),
+                            ),
+                          );
+                          return;
+                        }
+                        if (scope == ListScope.group &&
+                            selectedGroupId == null) {
+                          ScaffoldMessenger.of(ctx).showFlixieToast(
+                            FlixieToast(
+                                type: FlixieToastType.warning,
+                                content: const Text('Choose a group')),
+                          );
+                          return;
+                        }
+                        var ok = isEdit
+                            ? await provider.renameList(
+                                listId,
+                                name,
+                                description: descriptionController.text.trim(),
+                                visibility: visibility,
+                                whoCanAddMovies: whoCanAddMovies,
+                                scope: scope,
+                                groupId: selectedGroupId,
+                                collaboratorIds: selectedFriendIds.toList(),
+                              )
+                            : (createdList = await provider.createList(
                                   name,
                                   description:
                                       descriptionController.text.trim(),
@@ -715,63 +697,51 @@ class _MovieListsViewState extends State<_MovieListsView> {
                                   scope: scope,
                                   groupId: selectedGroupId,
                                   collaboratorIds: selectedFriendIds.toList(),
-                                )
-                              : (await provider.createList(
-                                    name,
-                                    description:
-                                        descriptionController.text.trim(),
-                                    visibility: visibility,
-                                    whoCanAddMovies: whoCanAddMovies,
-                                    scope: scope,
-                                    groupId: selectedGroupId,
-                                    collaboratorIds: selectedFriendIds.toList(),
-                                  )) !=
-                                  null;
-                          if (ok && isEdit && scope == ListScope.friends) {
-                            if (editorUserId == null) {
-                              ok = false;
-                            } else {
-                              try {
-                                final added = selectedFriendIds
-                                    .difference(originalFriendIds);
-                                final removed = originalFriendIds
-                                    .difference(selectedFriendIds);
-                                for (final friendId in added) {
-                                  await UserService.addMovieListMember(
-                                      editorUserId, listId, friendId);
-                                }
-                                for (final friendId in removed) {
-                                  await UserService.removeMovieListMember(
-                                      editorUserId, listId, friendId);
-                                }
-                                if (added.isNotEmpty || removed.isNotEmpty) {
-                                  await provider.loadLists();
-                                }
-                              } catch (_) {
-                                ok = false;
+                                )) !=
+                                null;
+                        if (ok && isEdit && scope == ListScope.friends) {
+                          if (editorUserId == null) {
+                            ok = false;
+                          } else {
+                            try {
+                              final added = selectedFriendIds
+                                  .difference(originalFriendIds);
+                              final removed = originalFriendIds
+                                  .difference(selectedFriendIds);
+                              for (final friendId in added) {
+                                await UserService.addMovieListMember(
+                                    editorUserId, listId, friendId);
                               }
+                              for (final friendId in removed) {
+                                await UserService.removeMovieListMember(
+                                    editorUserId, listId, friendId);
+                              }
+                              if (added.isNotEmpty || removed.isNotEmpty) {
+                                await provider.loadLists();
+                              }
+                            } catch (_) {
+                              ok = false;
                             }
                           }
-                          if (ctx.mounted) Navigator.pop(ctx);
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showFlixieToast(
-                              FlixieToast(
-                                type: ok
-                                    ? FlixieToastType.success
-                                    : FlixieToastType.error,
-                                content: Text(ok
-                                    ? (isEdit ? 'List renamed' : 'List created')
-                                    : (provider.error ??
-                                        'Unable to save list')),
-                              ),
-                            );
-                          }
-                        },
-                        child: Text(isEdit ? 'Save' : 'Create'),
-                      ),
+                        }
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showFlixieToast(
+                            FlixieToast(
+                              type: ok
+                                  ? FlixieToastType.success
+                                  : FlixieToastType.error,
+                              content: Text(ok
+                                  ? (isEdit ? 'List renamed' : 'List created')
+                                  : (provider.error ?? 'Unable to save list')),
+                            ),
+                          );
+                        }
+                      },
+                      child: Text(isEdit ? 'Save' : 'Create'),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ));
       },
@@ -780,6 +750,17 @@ class _MovieListsViewState extends State<_MovieListsView> {
     controller.dispose();
     descriptionController.dispose();
     friendSearchController.dispose();
+    if (createdList != null && context.mounted) {
+      await context.push(Uri(
+          path: '/movie-lists/${createdList!.id}',
+          queryParameters: {
+            'name': createdList!.name,
+            'isOwner': 'true',
+            'canEdit': 'true',
+            'add': 'true'
+          }).toString());
+      if (context.mounted) await provider.loadLists();
+    }
   }
 }
 
@@ -799,43 +780,58 @@ class _ListGridCard extends StatelessWidget {
     final shared = list.scope != ListScope.personal;
     final group = list.scope == ListScope.group;
     return Material(
-      color: context.colors.tabBarBackgroundFocused,
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onOpen,
         child: Container(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.fromLTRB(0, 0, 0, 22),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: context.colors.tabBarBorder),
+            border:
+                Border(bottom: BorderSide(color: context.colors.tabBarBorder)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Center(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: _PosterPreviewStack(
-                      posterUrls: list.previewPosterUrls,
-                      coverImageUrl: list.coverImageUrl,
-                      large: true,
-                    ),
-                  ),
-                ),
-              ),
+              SizedBox(
+                  height: 165,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Row(children: [
+                      if (list.previewPosterUrls.isEmpty)
+                        Expanded(
+                            child: ColoredBox(
+                                color: context.colors.surfaceElevated,
+                                child: const Center(
+                                    child:
+                                        Icon(Icons.movie_outlined, size: 32)))),
+                      for (final url in list.previewPosterUrls.take(3))
+                        SizedBox(
+                            width: ((MediaQuery.sizeOf(context).width - 32) / 3)
+                                .clamp(0.0, 110.0),
+                            child: Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: Image.network(
+                                  url.startsWith('http')
+                                      ? url
+                                      : 'https://image.tmdb.org/t/p/w342$url',
+                                  height: 165,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, __, ___) => const Center(
+                                      child: Icon(Icons.movie_outlined))),
+                            )),
+                    ]),
+                  )),
               const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
                     child: Text(
                       list.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: context.colors.white,
-                        fontSize: 14,
+                        fontSize: 20,
                         fontWeight: FontWeight.w800,
                         height: 1.15,
                       ),
@@ -989,69 +985,6 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-class _PosterPreviewStack extends StatelessWidget {
-  const _PosterPreviewStack({
-    required this.posterUrls,
-    required this.coverImageUrl,
-    this.large = false,
-  });
-
-  final List<String> posterUrls;
-  final String? coverImageUrl;
-  final bool large;
-
-  @override
-  Widget build(BuildContext context) {
-    final urls = posterUrls.isNotEmpty
-        ? posterUrls.take(3).toList(growable: false)
-        : (coverImageUrl != null ? [coverImageUrl!] : const <String>[]);
-    if (urls.isEmpty) {
-      return Container(
-        width: large ? 150 : 88,
-        height: large ? 170 : 118,
-        decoration: BoxDecoration(
-          color: context.colors.surfaceElevated,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(Icons.local_movies_outlined, color: context.colors.medium),
-      );
-    }
-    return SizedBox(
-      width: large ? 164 : 94,
-      height: large ? 174 : 122,
-      child: Stack(
-        children: List.generate(urls.length, (index) {
-          final offset = index * (large ? 22.0 : 6.0);
-          return Positioned(
-            left: offset,
-            top: offset,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                urls[index],
-                width: large ? 112 : 72,
-                height: large ? 168 : 108,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  width: large ? 112 : 72,
-                  height: large ? 168 : 108,
-                  color: context.colors.surfaceElevated,
-                  alignment: Alignment.center,
-                  child: Icon(
-                    Icons.image_not_supported_outlined,
-                    color: context.colors.medium,
-                    size: 16,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-}
-
 IconData _privacyIcon(String visibility) {
   switch (visibility.toUpperCase()) {
     case ListVisibility.public:
@@ -1109,4 +1042,63 @@ String _updatedLabel(String? date) {
   if (diff.inHours < 24) return 'Updated ${diff.inHours}h ago';
   if (diff.inDays < 7) return 'Updated ${diff.inDays}d ago';
   return 'Updated ${parsed.month}/${parsed.day}/${parsed.year}';
+}
+
+/// Keeps the submission action reachable while the editor body scrolls.
+class _ListEditorLayout extends StatelessWidget {
+  const _ListEditorLayout({required this.children});
+  final List<Widget> children;
+  @override
+  Widget build(BuildContext context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+              child: Container(
+                  width: 32,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                      color: context.colors.medium,
+                      borderRadius: BorderRadius.circular(3)))),
+          Flexible(
+              child: SingleChildScrollView(
+                  child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: children.sublist(0, children.length - 1),
+          ))),
+          const SizedBox(height: 12),
+          children.last,
+        ],
+      );
+}
+
+class _ListChoiceGroup extends StatelessWidget {
+  const _ListChoiceGroup(
+      {required this.value,
+      required this.title,
+      required this.items,
+      required this.onChanged});
+  final String value;
+  final String title;
+  final List<DropdownMenuItem<String>> items;
+  final ValueChanged<String?> onChanged;
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 12),
+          Text(title, style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            for (final item in items)
+              ChoiceChip(
+                label: item.child,
+                selected: item.value == value,
+                onSelected: (_) => onChanged(item.value),
+                materialTapTargetSize: MaterialTapTargetSize.padded,
+              ),
+          ]),
+        ],
+      );
 }
