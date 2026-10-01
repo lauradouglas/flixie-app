@@ -1,3 +1,5 @@
+import 'package:flixie_app/features/home/presentation/widgets/home_watchlist_action.dart';
+import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 import 'package:flixie_app/features/home/presentation/widgets/find_tonights_film_section.dart';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
@@ -68,7 +70,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   static _HomeSessionSnapshot? _sessionSnapshot;
   // Keep hero carousel concise so primary CTA and dots remain visible above fold.
   static const int _maxHeroCarouselItems = 12;
-  static const double _heroViewportFraction = 0.42;
+  static const double _heroViewportFraction = 0.84;
 
   List<MovieShort> _featuredMovies = [];
   List<MovieShort> _forYouMovies = [];
@@ -1065,6 +1067,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         actionsIconTheme: IconThemeData(color: context.colors.light),
         title: const FlixieWordmark(),
         actions: [
+          HomeWatchlistAction(onPressed: () => context.push('/watchlist')),
           IconButton(
             icon: Badge(
               isLabelVisible: unreadCount > 0,
@@ -1111,6 +1114,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       },
                       child: const Text('Retry')),
                 ),
+              if (auth.unreadNotificationCount > 0)
+                ListTile(
+                  leading: const Icon(Icons.mark_chat_unread_outlined),
+                  title: const Text('Catch up on your Flixie'),
+                  subtitle:
+                      Text('${auth.unreadNotificationCount} unread updates'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/notifications'),
+                ),
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: GreetingHeader(
@@ -1120,7 +1132,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   profileBadges: user?.profileBadges ?? const [],
                   requestCount: attentionCount,
                   onSearch: () => context.push('/search'),
-                  onWatchlist: () => context.go('/watchlist'),
+                  onWatchlist: () => context.push('/watchlist'),
                   onInvite: () => context.go('/social'),
                   onRequests: () => context.push('/plans'),
                   featureCard: showWatchPlansIntro
@@ -1138,15 +1150,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 selectedState: selectedWatchPlan,
                 suppressEmptyState: showWatchPlansIntro,
               ),
-              _buildBecauseYouRatedSection(context),
-              _buildContinueWatchingSection(context),
-              if (user != null)
-                FindTonightsFilmSection(onPick: () async {
-                  await context.push('/pick-for-us');
-                  if (mounted) await _refreshAll();
-                }),
-              if (user != null)
-                HomeCommunitySection(key: _communityKey, userId: user.id),
               if (_isLoading && heroMovies.isEmpty)
                 _buildPosterRailLoadingState('Trending now'),
               if (_error != null)
@@ -1158,6 +1161,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 const SizedBox(height: 10),
                 _buildCarouselDots(heroMovies),
                 const SizedBox(height: 20),
+                _buildBecauseYouRatedSection(context),
+                _buildContinueWatchingSection(context),
+                if (user != null)
+                  FindTonightsFilmSection(onPick: () async {
+                    await context.push('/pick-for-us');
+                    if (mounted) await _refreshAll();
+                  }),
+                if (user != null)
+                  HomeCommunitySection(key: _communityKey, userId: user.id),
               ],
             ],
           ),
@@ -1234,7 +1246,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // Every page reserves the height required by the largest card in this
     // carousel. This keeps card edges and pagination aligned when a title,
     // date, or social row takes more room than its neighbours.
-    final carouselHeight = sharedPosterHeight + (120 * textScale);
+    final carouselHeight = sharedPosterHeight + (220 * textScale);
     return SizedBox(
       height: carouselHeight,
       child: Stack(
@@ -1254,7 +1266,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     context,
                     movies[index],
                     posterHeight: sharedPosterHeight,
-                    compact: true,
                   ),
                 );
               },
@@ -1265,7 +1276,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  double _heroPosterHeight(MovieShort movie) => 170.0;
+  double _heroPosterHeight(MovieShort movie) => 280.0;
 
   Widget _buildCarouselDots(List<MovieShort> movies) {
     final count = movies.length.clamp(0, _maxHeroCarouselItems);
@@ -1403,7 +1414,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               child: CachedNetworkImage(
                                 imageUrl:
                                     'https://image.tmdb.org/t/p/w780${movie.poster}',
-                                fit: BoxFit.contain,
+                                fit: BoxFit.cover,
                                 alignment: Alignment.center,
                                 errorWidget: (_, __, ___) => _heroFallback(),
                               ),
@@ -1715,26 +1726,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           padding: const EdgeInsets.fromLTRB(16, 0, 12, 0),
           child: Row(
             children: [
-              Container(
-                width: 4,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: FlixieColors.primary,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Just for you',
-                  style: TextStyle(
-                    color: context.colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
+              const Expanded(child: FlixieSectionHeader(title: 'Just for you')),
               IconButton(
                 tooltip: 'Reload recommendations',
                 onPressed:

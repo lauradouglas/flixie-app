@@ -9,7 +9,7 @@ void main() {
     addTearDown(router.dispose);
     await t.pumpWidget(MaterialApp.router(routerConfig: router));
     await t.pumpAndSettle();
-    await t.tap(find.text('Search'));
+    await t.tap(find.text('Discover'));
     await t.pumpAndSettle();
     await t.enterText(find.byType(TextField), 'Alien');
     t.testTextInput.hide();
@@ -17,9 +17,12 @@ void main() {
     await t.pumpAndSettle();
     final offset =
         t.state<ScrollableState>(find.byType(Scrollable).last).position.pixels;
+    await t.tap(find.text('Plans'));
+    await t.pumpAndSettle();
+    expect(find.text('Screen /plans'), findsOneWidget);
     await t.tap(find.text('Social'));
     await t.pumpAndSettle();
-    await t.tap(find.text('Search'));
+    await t.tap(find.text('Discover'));
     await t.pumpAndSettle();
     expect(find.text('Alien'), findsOneWidget);
     expect(

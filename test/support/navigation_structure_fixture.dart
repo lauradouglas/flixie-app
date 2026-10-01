@@ -6,13 +6,7 @@ GoRouter navigationStructureFixture() => GoRouter(routes: [
       StatefulShellRoute.indexedStack(
         builder: (_, __, shell) => MainNavigationShell(navigationShell: shell),
         branches: [
-          for (final path in [
-            '/',
-            '/watchlist',
-            '/search',
-            '/social',
-            '/profile'
-          ])
+          for (final path in ['/', '/search', '/plans', '/social', '/profile'])
             StatefulShellBranch(routes: [
               GoRoute(path: path, builder: (_, __) => _Destination(path: path))
             ]),

@@ -76,11 +76,12 @@ void main() {
       {double scale = 1}) async {
     await tester.pumpWidget(setupApp(fixture, scale: scale));
     await tester.pumpAndSettle();
-    await tap(tester, 'Skip for now');
     await tester.ensureVisible(find.byKey(const ValueKey('taste-movie:348')));
     await tester.tap(find.byKey(const ValueKey('taste-movie:348')));
     await tester.pumpAndSettle();
     await tap(tester, 'Continue');
+    await tap(tester, 'Skip services for now');
+    await tap(tester, 'Find my kind of people');
   }
 
   test(
@@ -136,11 +137,9 @@ void main() {
         false);
     await tap(tester, 'Horror');
     expect(fixture.joins, isEmpty);
-    await tap(tester, 'Skip for now');
-    expect(find.text('Inspired by the titles you chose'), findsOneWidget);
+    await tap(tester, 'I’ll explore on my own');
+    expect(find.text('Home destination'), findsOneWidget);
     expect(fixture.joins, isEmpty);
-    await tap(tester, 'Privacy and spoilers');
-    expect(find.text('Hide episode spoilers'), findsOneWidget);
   });
   testWidgets('explicit join persists and exposes community destination',
       (tester) async {
@@ -148,10 +147,12 @@ void main() {
     await open(tester, fixture);
     await tap(tester, 'Horror');
     await tap(tester, 'Science Fiction');
-    await tap(tester, 'Join 2 & continue');
+    await tap(tester, 'Join 2 & explore');
     expect(fixture.joins, [27, 878]);
-    expect(find.text('Explore your communities'), findsOneWidget);
-    await tap(tester, 'Back to communities');
+    expect(find.text('Communities destination'), findsOneWidget);
+    // Re-entering setup must preserve membership and disable accidental leaving.
+    await tester.pumpWidget(const SizedBox());
+    await open(tester, fixture);
     await tap(tester, 'Browse communities');
     expect(find.text('Already joined'), findsNWidgets(2));
     expect(
@@ -167,12 +168,12 @@ void main() {
     await open(tester, fixture);
     await tap(tester, 'Horror');
     await tap(tester, 'Science Fiction');
-    await tap(tester, 'Join 2 & continue');
+    await tap(tester, 'Join 2 & explore');
     expect(fixture.joined, {27});
     expect(
         find.textContaining('Your successful joins are saved'), findsOneWidget);
     fixture.failJoin = null;
-    await tap(tester, 'Join 1 & continue');
+    await tap(tester, 'Join 1 & explore');
     expect(fixture.joins, [27, 878, 878]);
     expect(fixture.joined, {27, 878});
   });
@@ -184,8 +185,8 @@ void main() {
     fixture.failLoad = false;
     await tap(tester, 'Retry communities');
     expect(find.text('Horror'), findsOneWidget);
-    await tap(tester, 'Skip for now');
-    expect(find.text('Inspired by the titles you chose'), findsOneWidget);
+    await tap(tester, 'I’ll explore on my own');
+    expect(find.text('Home destination'), findsOneWidget);
   });
   testWidgets('skipping while community loading is pending tolerates disposal',
       (tester) async {
@@ -193,11 +194,12 @@ void main() {
       ..pending = Completer<List<GenreCommunity>>();
     await tester.pumpWidget(setupApp(fixture));
     await tester.pumpAndSettle();
-    await tap(tester, 'Skip for now');
-    await tester.tap(find.text('Skip taste picks'));
+    await tap(tester, 'Skip taste picks');
+    await tap(tester, 'Skip services for now');
+    await tester.tap(find.text('Find my kind of people'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.text('Skip for now'));
+    await tester.tap(find.text('I’ll explore on my own'));
     await tester.pump();
     await tester.pumpWidget(const SizedBox());
     fixture.pending!.complete([]);
@@ -228,7 +230,7 @@ void main() {
         });
       }
       await tap(tester, 'Horror');
-      await tap(tester, 'Join 1 & continue');
+      await tap(tester, 'Join 1 & explore');
       expect(fixture.joined, {27});
       expect(tester.takeException(), isNull);
     });

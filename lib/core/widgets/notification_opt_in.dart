@@ -5,8 +5,10 @@ import 'package:flixie_app/core/auth/push_notification_service.dart';
 class NotificationOptIn extends StatefulWidget {
   const NotificationOptIn(
       {super.key,
+      this.message = 'Get watch-plan reminders and updates from your friends.',
       this.check = PushNotificationService.needsPermissionChoice,
       this.enable = PushNotificationService.enableNotifications});
+  final String message;
   final Future<bool> Function() check;
   final Future<bool> Function() enable;
   @override
@@ -31,8 +33,7 @@ class _NotificationOptInState extends State<NotificationOptIn> {
           padding: const EdgeInsets.all(16),
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(_error ??
-                'Get watch-plan reminders and updates from your friends.'),
+            Text(_error ?? widget.message),
             Wrap(spacing: 12, children: [
               TextButton(
                   onPressed: _busy

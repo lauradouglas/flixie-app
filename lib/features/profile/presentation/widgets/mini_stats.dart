@@ -1,8 +1,8 @@
+import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flixie_app/models/watched_movie.dart';
 import 'package:flixie_app/models/watchlist_movie.dart';
-import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/genre_tag.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_chip.dart';
 
@@ -50,35 +50,13 @@ class FriendMiniStats extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     final movies = _movies;
     final topGenres = _topGenres;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // section header
-        Row(
-          children: [
-            Container(
-              width: 4,
-              height: 22,
-              decoration: BoxDecoration(
-                color: FlixieColors.primary,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              'Stats',
-              style: textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: context.colors.textPrimary,
-                letterSpacing: 0,
-              ),
-            ),
-          ],
-        ),
+        const FlixieSectionHeader(title: 'Stats'),
         const SizedBox(height: 12),
 
         // runtime chip

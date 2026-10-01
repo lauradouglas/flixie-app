@@ -5,8 +5,8 @@ import 'package:flixie_app/models/country.dart';
 import 'package:flixie_app/features/authentication/presentation/pages/signup_screen.dart';
 
 void main() {
-  test('signup requires nonblank first and last names', () {
-    for (final label in ['first name', 'last name']) {
+  test('signup requires a nonblank display name', () {
+    for (final label in ['display name']) {
       expect(validateSignupName(null, label), 'Enter your $label');
       expect(validateSignupName('   ', label), 'Enter your $label');
       expect(validateSignupName(' Laura ', label), isNull);

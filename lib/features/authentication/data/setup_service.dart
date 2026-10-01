@@ -1,4 +1,5 @@
 import 'package:flixie_app/features/social/data/genre_community_service.dart';
+import 'package:flixie_app/features/social/data/community_space_service.dart';
 import 'package:flixie_app/core/auth/referral_attribution_store.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,11 +16,13 @@ import 'package:flixie_app/features/home/data/trending_service.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
 
 class SetupTitle {
-  const SetupTitle(this.id, this.name, this.poster, {this.isShow = false});
+  const SetupTitle(this.id, this.name, this.poster,
+      {this.isShow = false, this.reason});
   final int id;
   final String name;
   final String? poster;
   final bool isShow;
+  final String? reason;
   String get key => '${isShow ? 'show' : 'movie'}:$id';
   Map<String, dynamic> toJson() =>
       {'id': id, 'name': name, 'poster': poster, 'isShow': isShow};
@@ -64,6 +67,17 @@ class SetupService {
   const SetupService();
   Future<List<GenreCommunity>> communities() =>
       const GenreCommunityService().list();
+  Future<Map<String, dynamic>?> conversation(int id) async {
+    final page = await const CommunitySpaceService()
+        .get(id, '/discussions', {'sort': 'latest'});
+    // Never reveal a spoiler to make an onboarding preview more interesting.
+    return (page['items'] as List? ?? [])
+        .whereType<Map>()
+        .where((row) => row['spoiler'] == 'none' && row['title'] is String)
+        .map((row) => Map<String, dynamic>.from(row))
+        .firstOrNull;
+  }
+
   Future<void> joinCommunity(int id) =>
       const GenreCommunityService().setJoined(id, true);
 
@@ -156,18 +170,16 @@ class SetupService {
 
   Future<void> saveTaste(
       String id, List<SetupTitle> titles, Set<int> genres) async {
-    // Singleton bulk requests import missing titles, preserve selection order,
-    // and safely skip already-saved favourites when retrying a partial failure.
-    for (final title in titles) {
-      if (title.isShow) {
-        await UserService.addShowsToFavorites(id, [title.id]);
-      } else {
-        await UserService.addMoviesToFavorites(id, [title.id]);
-      }
-    }
+    // Private, per-account device signals. Never publish favourites or ratings
+    // as a side effect of setup. Community genre choices remain local as well.
     await SetupTasteStore.save(id, titles);
-    if (genres.isNotEmpty) {
-      await UserService.addFavoriteGenres(id, genres.toList());
+  }
+
+  Future<void> addProfileFavourite(String id, SetupTitle title) async {
+    if (title.isShow) {
+      await UserService.addShowsToFavorites(id, [title.id]);
+    } else {
+      await UserService.addMoviesToFavorites(id, [title.id]);
     }
   }
 
@@ -226,12 +238,14 @@ class SetupService {
         final show = await ShowService.getShowById(seed.id);
         return show.similarShows
             .take(6)
-            .map((s) => SetupTitle(s.id, s.name, s.posterPath, isShow: true))
+            .map((s) => SetupTitle(s.id, s.name, s.posterPath,
+                isShow: true, reason: 'Because you chose ${seed.name}'))
             .toList();
       }
       return (await MovieService().getMovieRecommendations(seed.id))
           .take(6)
-          .map((m) => SetupTitle(m.id, m.title, m.posterPath))
+          .map((m) => SetupTitle(m.id, m.title, m.posterPath,
+              reason: 'Because you chose ${seed.name}'))
           .toList();
     }));
     final seen = seeds.map((s) => s.key).toSet();

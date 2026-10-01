@@ -1124,7 +1124,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
           _authService.currentUser != null;
 
       if (!canRetryProfile) {
-        final displayName = '${firstName.trim()} ${lastName.trim()}';
+        final displayName = '${firstName.trim()} ${lastName.trim()}'.trim();
         await _authService.signUp(normalizedEmail, password, displayName);
         _pendingSignupEmail = normalizedEmail;
         _pendingSignupProfile = createUserBody;
@@ -1230,7 +1230,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
         await _authService.signUp(
           normalizedEmail,
           password,
-          '${firstName.trim()} ${lastName.trim()}',
+          '${firstName.trim()} ${lastName.trim()}'.trim(),
         );
       }
       _firebaseUser = _authService.currentUser;

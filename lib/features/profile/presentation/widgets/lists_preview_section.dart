@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -7,7 +8,6 @@ import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/media_lists_section.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
-import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 
 class ListsPreviewSection extends StatefulWidget {
   const ListsPreviewSection({
@@ -107,17 +107,7 @@ class _ListsPreviewSectionState extends State<ListsPreviewSection> {
                 ? Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      FlixieSectionHeader(
-                        title: widget.title,
-                        uppercase: false,
-                        accentHeight: 22,
-                        titleStyle: TextStyle(
-                          color: context.colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: .5,
-                        ),
-                      ),
+                      FlixieSectionHeader(title: widget.title),
                       const SizedBox(height: 12),
                       Text(
                         widget.emptyMessage,
@@ -127,6 +117,19 @@ class _ListsPreviewSectionState extends State<ListsPreviewSection> {
                           height: 1.35,
                         ),
                       ),
+                      if (widget.allowManage && !widget.publicOnly) ...[
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                            onPressed: () async {
+                              await context.push('/movie-lists?create=true');
+                              if (mounted) {
+                                setState(() => _listsFuture =
+                                    UserService.getMovieLists(widget.userId));
+                              }
+                            },
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('Create a list')),
+                      ],
                     ],
                   )
                 : MediaListsSection(

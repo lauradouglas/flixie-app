@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flixie_app/core/widgets/notification_opt_in.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -330,6 +331,8 @@ void main() {
             .onPressed,
         isNull);
     await tapSpace(t, 'Join');
+    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(find.byType(AlertDialog), findsNothing);
     expect(membership.writes, 0);
     await tapSpace(t, 'Cancel');
     expect(membership.writes, 0);
@@ -355,6 +358,7 @@ void main() {
             service: fixture,
             joined: true));
     expect(find.text('A thoughtful ending'), findsNothing);
+    expect(find.byType(NotificationOptIn), findsNothing);
     expect(find.text('Attack on Titan'), findsOneWidget);
     expect(fixture.calls.any((c) => c.contains('/replies')), false);
     await tapSpace(t, 'Reveal discussion');
@@ -364,6 +368,7 @@ void main() {
     expect(fixture.payload,
         {'body': 'My reply', 'reveal': true, 'mentionIds': []});
     expect(find.text('My reply'), findsOneWidget);
+    expect(find.byType(NotificationOptIn), findsOneWidget);
   });
   testWidgets('reply failure keeps draft and permits retry', (t) async {
     final fixture = SpaceFixture()..spoiler = false;

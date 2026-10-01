@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 
 class HomeSectionHeader extends StatelessWidget {
@@ -14,17 +13,8 @@ class HomeSectionHeader extends StatelessWidget {
       width: double.infinity,
       child: FlixieSectionHeader(
         title: title,
-        uppercase: false,
-        maxTitleLines: 1,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        titleStyle: TextStyle(
-          color: context.colors.white,
-          fontSize: 18,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0.5,
-        ),
         trailingLabel: onSeeAll != null ? 'See all' : null,
-        trailingColor: FlixieColors.primary,
         onTrailingTap: onSeeAll,
       ),
     );

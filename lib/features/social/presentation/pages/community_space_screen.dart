@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -61,9 +62,9 @@ class _CommunitySpaceScreenState extends State<CommunitySpaceScreen> {
   Future<void> _join() async {
     if (_busy || _community == null) return;
     final joined = _community!['joined'] == true;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showFlixiePromptSheet<bool>(
         context: context,
-        builder: (context) => AlertDialog(
+        builder: (context) => FlixiePromptSheetContent(
                 title: Text(joined
                     ? 'Leave ${_community!['name']}?'
                     : 'Join ${_community!['name']}?'),

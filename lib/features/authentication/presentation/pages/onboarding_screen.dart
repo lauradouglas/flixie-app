@@ -1,3 +1,4 @@
+import 'setup_profile_favourites.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_wordmark.dart';
 import 'dart:async';
@@ -29,7 +30,9 @@ bool canAddOnboardingMovie(Map<int, MovieShort> selected, int movieId,
     selected.containsKey(movieId) || selected.length < maxCount;
 
 class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({super.key, this.service = const SetupService()});
+  const OnboardingScreen(
+      {super.key, this.service = const SetupService(), this.returnTo});
+  final String? returnTo;
   final SetupService service;
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -42,6 +45,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   bool _loadingCommunities = false;
   String? _communityError;
   int _communityRevision = 0;
+  int _picksRevision = 0;
+  final Map<int, Map<String, dynamic>> _conversations = {};
 
   bool _busy = false, _loading = true, _shows = false, _searching = false;
   String? _error, _searchError, _picksError, _referrer;
@@ -70,6 +75,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _userId = context.read<AuthProvider>().dbUser!.id;
     context.read<AnalyticsController?>()?.onboardingStarted();
     _load();
+    _findTitles();
+    _loadGenres();
     widget.service.referrer(_userId).then((name) {
       if (mounted) setState(() => _referrer = name);
     }).catchError((Object _) {});
@@ -101,7 +108,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         _providers = providers;
         _country = countries.where((c) => c.id == user.countryId).firstOrNull;
         _selectedProviders.addAll(saved.map((p) => p.id));
-        _taste.addEntries(taste.map((t) => MapEntry(t.key, t)));
+        _taste.addEntries(taste.take(3).map((t) => MapEntry(t.key, t)));
       });
     } catch (_) {
       if (mounted) {
@@ -114,16 +121,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _move(int step) {
+    ++_searchRevision;
+    _debounce?.cancel();
+    if (step != 2) ++_picksRevision;
     setState(() {
+      _searching = false;
       _step = step;
       _error = null;
     });
     if (_scroll.hasClients) _scroll.jumpTo(0);
-    if (step == 2) _loadCommunities();
-    if (step == 3) {
+    if (step == 3) _loadCommunities();
+    if (step == 2) {
       EpisodeSpoilerPreference.instance.load().catchError((Object _) {});
+      _loadPicks();
     }
-    if (step == 1 && _browse.isEmpty) {
+    if (step == 0 && _browse.isEmpty) {
       _findTitles();
       _loadGenres();
     }
@@ -204,6 +216,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<void> _loadPicks() async {
+    final revision = ++_picksRevision;
     setState(() {
       _searching = true;
       _picksError = null;
@@ -211,7 +224,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     try {
       final picks =
           await widget.service.recommendations(_taste.values.toList());
-      if (!mounted) return;
+      if (!mounted || revision != _picksRevision) return;
       setState(() {
         _picks = picks;
         _offers.clear();
@@ -225,20 +238,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           await Future.wait(picks.skip(i).take(3).map((title) async {
             try {
               final offers = await widget.service.availability(title, region);
-              if (mounted) setState(() => _offers[title.key] = offers);
+              if (mounted && revision == _picksRevision) {
+                setState(() => _offers[title.key] = offers);
+              }
             } catch (_) {
-              if (mounted) setState(() => _offers[title.key] = null);
+              if (mounted && revision == _picksRevision) {
+                setState(() => _offers[title.key] = null);
+              }
             }
           }));
         }
       }
     } catch (_) {
-      if (mounted) {
+      if (mounted && revision == _picksRevision) {
         setState(() => _picksError =
             'Couldn’t load your first picks. Retry or explore Flixie.');
       }
     } finally {
-      if (mounted) setState(() => _searching = false);
+      if (mounted && revision == _picksRevision) {
+        setState(() => _searching = false);
+      }
     }
   }
 
@@ -251,7 +270,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         await analytics?.tasteProfileCompleted(
             signalCount: _taste.length + _genres.length);
         if (qualified) await analytics?.rewardUnlocked();
-        if (mounted) context.go(destination);
+        if (mounted) {
+          context.go(destination == '/' ? widget.returnTo ?? '/' : destination);
+        }
       });
   Future<void> _import() async {
     final auth = context.read<AuthProvider>();
@@ -289,16 +310,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     const titles = [
-      'Less searching.\nMore watching.',
-      'Your taste.\nBetter discoveries.',
-      'Find your people.',
-      'Start your next\nmovie night.'
+      'What stays with you?',
+      'Make it an easy yes.',
+      'Your picks.',
+      'Good films start conversations.'
     ];
     const subtitles = [
-      'Find your next watch—and where to stream it.',
-      'Choose a few favourites to shape your first picks.',
-      'Reviews and ratings from people who enjoy your genres. Join now or skip.',
-      'Save anything that catches your eye for later.'
+      'Pick up to three films or shows you love. We’ll start there.',
+      'Choose where you watch. We’ll put available picks first.',
+      'A few places to start. Save what catches your eye.',
+      'Browse a conversation before deciding to join. This part is optional.'
     ];
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     return Scaffold(
@@ -325,38 +346,75 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             const Expanded(
                               child: Align(
                                 alignment: Alignment.centerLeft,
-                                child: FlixieWordmark(),
+                                child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: FlixieWordmark()),
                               ),
                             ),
-                            Text('${_step + 1} of 4')
+                            if (_step != 2)
+                              Flexible(
+                                  child: Text(
+                                      _step < 2
+                                          ? '${_step + 1} of 2'
+                                          : _step == 2
+                                              ? 'Your picks'
+                                              : 'Optional',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall)),
                           ]),
                           const SizedBox(height: 12),
-                          TweenAnimationBuilder<double>(
-                            tween: Tween(begin: 0.25, end: (_step + 1) / 4),
-                            duration: reduceMotion
-                                ? Duration.zero
-                                : const Duration(milliseconds: 280),
-                            curve: Curves.easeOutCubic,
-                            builder: (context, value, _) => Row(
-                              children: List.generate(
-                                  4,
-                                  (index) => Expanded(
-                                        child: Padding(
-                                          padding: EdgeInsets.only(
-                                              right: index == 3 ? 0 : 5),
-                                          child: LinearProgressIndicator(
-                                            key: ValueKey(
-                                                'setup-progress-$index'),
-                                            minHeight: 3,
-                                            borderRadius:
-                                                BorderRadius.circular(3),
-                                            value: (value * 4 - index)
-                                                .clamp(0.0, 1.0),
+                          if (_step < 2)
+                            TweenAnimationBuilder<double>(
+                              tween: Tween(begin: 0.5, end: (_step + 1) / 2),
+                              duration: reduceMotion
+                                  ? Duration.zero
+                                  : const Duration(milliseconds: 280),
+                              curve: Curves.easeOutCubic,
+                              builder: (context, value, _) => Row(
+                                children: List.generate(
+                                    2,
+                                    (index) => Expanded(
+                                          child: Padding(
+                                            padding: EdgeInsets.only(
+                                                right: index == 1 ? 0 : 5),
+                                            child: LinearProgressIndicator(
+                                              key: ValueKey(
+                                                  'setup-progress-$index'),
+                                              minHeight: 3,
+                                              borderRadius:
+                                                  BorderRadius.circular(3),
+                                              value: (value * 2 - index)
+                                                  .clamp(0.0, 1.0),
+                                            ),
                                           ),
-                                        ),
-                                      )),
+                                        )),
+                              ),
                             ),
-                          ),
+                          if (widget.returnTo != null)
+                            TextButton.icon(
+                              onPressed: _busy
+                                  ? null
+                                  : () => _finish(widget.returnTo!),
+                              icon: const Icon(Icons.arrow_forward),
+                              label:
+                                  const Text('Go straight to your invitation'),
+                            ),
+                          if (_referrer != null)
+                            TextButton(
+                              onPressed: _busy
+                                  ? null
+                                  : () => _run(() async {
+                                        final id = await widget.service
+                                            .friendId(_referrer!);
+                                        if (!mounted) return;
+                                        setState(() => _busy = false);
+                                        await _finish(id == null
+                                            ? '/social?tab=people'
+                                            : '/friends/$id');
+                                      }),
+                              child: Text('Find @$_referrer first'),
+                            ),
                           const SizedBox(height: 20),
                           AnimatedSwitcher(
                             duration: reduceMotion
@@ -391,142 +449,326 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 style: TextStyle(color: context.colors.danger)),
                             const SizedBox(height: 12)
                           ],
-                          if (_step == 0) ..._watching(),
-                          if (_step == 1) ..._tastes(),
-                          if (_step == 2) ..._communities(),
-                          if (_step == 3) ..._results(),
+                          if (_step == 0) ..._tastes(),
+                          if (_step == 1) ..._watching(),
+                          if (_step == 2) ..._results(),
+                          if (_step == 3) ..._communities(),
                         ],
                       )),
                 ))));
   }
 
   void _showPicks() {
-    _move(3);
-    _loadPicks();
+    _move(2);
   }
 
   Widget _setupActions() {
     final label = switch (_step) {
-      0 => _country == null ? 'Choose country' : 'Continue',
-      1 => _taste.isEmpty ? 'Continue without picks' : 'Continue',
-      2 => _selectedCommunities.isEmpty
-          ? 'Continue'
-          : 'Join ${_selectedCommunities.length} & continue',
-      _ => 'Explore Flixie',
+      0 => 'Continue',
+      1 => _country == null ? 'Choose country' : 'Show my first picks',
+      2 => 'Find my kind of people',
+      _ => _selectedCommunities.isEmpty
+          ? 'Explore Flixie'
+          : 'Join ${_selectedCommunities.length} & explore',
     };
     final secondary = switch (_step) {
-      0 => 'Skip for now',
-      1 => 'Skip taste picks',
-      2 => 'Skip for now',
-      _ => 'Back to communities',
+      0 => 'Skip taste picks',
+      1 => 'Skip services for now',
+      _ => 'I’ll explore on my own',
     };
-    return SafeArea(
-      top: false,
-      child: Align(
-        heightFactor: 1,
-        alignment: Alignment.bottomCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 680),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (_step == 1 || (_step == 3 && _added.isNotEmpty)) ...[
-                  Semantics(
-                    liveRegion: true,
-                    child: Text(
-                      _step == 1
-                          ? '${_taste.length} of 5 selected · ${_taste.length == 5 ? 'Remove one to make room' : 'A few is enough'}'
-                          : '${_added.length} saved for later',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                PrimaryButton(
-                  label: label,
-                  isLoading: _busy,
-                  onPressed: _busy ||
-                          (_step == 0 && _loading) ||
-                          (_step == 2 &&
-                              _loadingCommunities &&
-                              _selectedCommunities.isNotEmpty)
-                      ? null
-                      : () {
-                          switch (_step) {
-                            case 0:
-                              if (_country == null) {
-                                if (_countries.isNotEmpty) _pickCountry();
-                              } else {
-                                _run(() async {
-                                  await widget.service.saveWatching(
-                                      _userId, _country!, _selectedProviders);
-                                  if (mounted) _move(1);
-                                });
+    final VoidCallback? advance = _busy ||
+            (_step == 1 && _loading) ||
+            (_step == 3 &&
+                _loadingCommunities &&
+                _selectedCommunities.isNotEmpty)
+        ? null
+        : () {
+            switch (_step) {
+              case 0:
+                _saveTaste();
+              case 1:
+                if (_country == null) {
+                  if (_countries.isNotEmpty) _pickCountry();
+                } else {
+                  _run(() async {
+                    await widget.service
+                        .saveWatching(_userId, _country!, _selectedProviders);
+                    if (mounted) _showPicks();
+                  });
+                }
+              case 2:
+                _move(3);
+              default:
+                _joinCommunities();
+            }
+          };
+    return ColoredBox(
+        key: const ValueKey('setup-footer-surface'),
+        color: _step <= 2 ? context.colors.surface : context.colors.background,
+        child: SafeArea(
+          top: false,
+          child: Align(
+            heightFactor: 1,
+            alignment: Alignment.bottomCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 680),
+              child: Container(
+                decoration: _step <= 2
+                    ? BoxDecoration(
+                        color: context.colors.surface,
+                        border: Border(
+                            top:
+                                BorderSide(color: context.colors.tabBarBorder)))
+                    : null,
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_step == 1) ...[
+                      _providerSummary(),
+                      const SizedBox(height: 10),
+                    ],
+                    if (_step == 0) ...[
+                      _tasteSummary(),
+                      const SizedBox(height: 10),
+                    ],
+                    if (_step == 2) ...[
+                      _savedPicksSummary(),
+                      const SizedBox(height: 10),
+                    ],
+                    if (_step <= 2)
+                      FilledButton(
+                        style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xff8050e8),
+                            textStyle: const TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.w700),
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size.fromHeight(48),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14))),
+                        onPressed: advance,
+                        child: _busy
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2))
+                            : Text(label),
+                      )
+                    else
+                      PrimaryButton(
+                          label: label, isLoading: _busy, onPressed: advance),
+                    TextButton(
+                      onPressed: _busy
+                          ? null
+                          : () {
+                              switch (_step) {
+                                case 0:
+                                  _saveTaste(skip: true);
+                                case 1:
+                                  _showPicks();
+                                default:
+                                  _selectedCommunities.clear();
+                                  _finish('/');
                               }
-                            case 1:
-                              _saveTaste();
-                            case 2:
-                              _joinCommunities();
-                            default:
-                              _finish('/');
-                          }
-                        },
+                            },
+                      style: TextButton.styleFrom(
+                          textStyle: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w500),
+                          minimumSize: const Size(44, 44)),
+                      child: Text(secondary),
+                    ),
+                  ],
                 ),
-                TextButton(
-                  onPressed: _busy
-                      ? null
-                      : () {
-                          switch (_step) {
-                            case 0:
-                              _move(1);
-                            case 1:
-                              _saveTaste(skip: true);
-                            case 2:
-                              _selectedCommunities.clear();
-                              _showPicks();
-                            default:
-                              _move(2);
-                          }
-                        },
-                  child: Text(secondary),
-                ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
-    );
+        ));
+  }
+
+  Widget _savedPicksSummary() => Semantics(
+      liveRegion: true,
+      child: Row(children: [
+        if (MediaQuery.textScalerOf(context).scale(1) < 1.5)
+          for (final title
+              in _picks.where((t) => _added.contains(t.key)).take(3))
+            Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: _tastePoster(title)),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(
+              _added.isEmpty
+                  ? 'Something catch your eye?'
+                  : '${_added.length} saved for later',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(fontSize: 14, fontWeight: FontWeight.w700)),
+          Text(
+              _added.isEmpty
+                  ? 'Save a pick, or keep exploring.'
+                  : 'Waiting for you in Watchlist.',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(fontSize: 12)),
+        ])),
+      ]));
+
+  Widget _tastePoster(SetupTitle title) => ClipRRect(
+        borderRadius: BorderRadius.circular(5),
+        child: SizedBox(
+            width: 28,
+            height: 42,
+            child: title.poster?.isNotEmpty == true
+                ? Image.network(
+                    title.poster!.startsWith('http')
+                        ? title.poster!
+                        : 'https://image.tmdb.org/t/p/w92${title.poster}',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        const Icon(Icons.movie_outlined))
+                : const Icon(Icons.movie_outlined)),
+      );
+
+  Widget _tasteSummary() => Column(mainAxisSize: MainAxisSize.min, children: [
+        Row(children: [
+          if (MediaQuery.textScalerOf(context).scale(1) < 1.5)
+            for (final title in _taste.values)
+              Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: _tastePoster(title)),
+          Expanded(
+              child: Semantics(
+                  liveRegion: true,
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('${_taste.length} of 3 selected',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleSmall
+                                ?.copyWith(
+                                    fontSize: 14, fontWeight: FontWeight.w700)),
+                        Text(
+                            _taste.isEmpty
+                                ? 'Start with something you love.'
+                                : 'A few is enough.',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(fontSize: 12)),
+                      ]))),
+          if (_taste.isNotEmpty)
+            TextButton(
+                onPressed: _busy
+                    ? null
+                    : () => setState(() => _editingTaste = !_editingTaste),
+                style: TextButton.styleFrom(
+                    textStyle: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w500),
+                    minimumSize: const Size(48, 48)),
+                child: Text(_editingTaste ? 'Done' : 'Edit')),
+        ]),
+        if (_editingTaste && _taste.isNotEmpty)
+          SizedBox(
+              height: MediaQuery.sizeOf(context).height * .18,
+              child: SingleChildScrollView(
+                  primary: false,
+                  child: Column(
+                      children: _taste.values
+                          .map((title) => Row(children: [
+                                _tastePoster(title),
+                                const SizedBox(width: 10),
+                                Expanded(child: Text(title.name)),
+                                TextButton(
+                                    key: ValueKey('remove-taste-${title.key}'),
+                                    onPressed: _busy
+                                        ? null
+                                        : () => setState(() {
+                                              _taste.remove(title.key);
+                                              if (_taste.isEmpty) {
+                                                _editingTaste = false;
+                                              }
+                                            }),
+                                    child: Semantics(
+                                        excludeSemantics: true,
+                                        label:
+                                            'Remove ${title.name} from picks',
+                                        child: const Text('Remove'))),
+                              ]))
+                          .toList()))),
+      ]);
+
+  bool _editingTaste = false;
+
+  Widget _providerSummary() {
+    final chosen = _providers
+        .where((p) => _selectedProviders.contains(p.id))
+        .take(3)
+        .toList();
+    return Semantics(
+        liveRegion: true,
+        child: Row(children: [
+          if (chosen.isEmpty) const Icon(Icons.tv_outlined, size: 28),
+          for (final provider in chosen)
+            Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(7),
+                  child: provider.logoPath.isEmpty
+                      ? const Icon(Icons.tv_outlined, size: 28)
+                      : Image.network(provider.logoUrl,
+                          width: 28,
+                          height: 28,
+                          errorBuilder: (_, __, ___) =>
+                              const Icon(Icons.tv_outlined, size: 28)),
+                )),
+          const SizedBox(width: 8),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(
+                    _selectedProviders.isEmpty
+                        ? 'No services selected'
+                        : '${_selectedProviders.length} service${_selectedProviders.length == 1 ? '' : 's'} selected',
+                    style: Theme.of(context).textTheme.titleSmall),
+                Text(
+                    _selectedProviders.isEmpty
+                        ? 'You can add these later'
+                        : 'Your services · change them anytime',
+                    style: Theme.of(context).textTheme.bodySmall),
+              ])),
+        ]));
   }
 
   List<Widget> _watching() => [
         if (_loading)
           const Center(child: CircularProgressIndicator())
         else ...[
-          Text(
-              _country == null
-                  ? 'Choose your country to get started'
-                  : 'Your country',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          OutlinedButton(
-            onPressed: _countries.isEmpty ? null : _pickCountry,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
+          Row(children: [
+            if (MediaQuery.textScalerOf(context).scale(1) < 1.5)
+              const Text('Country'),
+            const SizedBox(width: 12),
+            Expanded(
+                child: OutlinedButton(
+              onPressed: _busy || _countries.isEmpty ? null : _pickCountry,
+              style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 44),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12))),
               child: Row(children: [
-                const Icon(Icons.public, size: 20),
-                const SizedBox(width: 12),
                 Expanded(child: Text(_country?.name ?? 'Select country')),
-                const Icon(Icons.keyboard_arrow_down),
+                const Icon(Icons.keyboard_arrow_down, size: 20),
               ]),
-            ),
-          ),
+            )),
+          ]),
           if (_country == null) ...[
             const SizedBox(height: 8),
             const Text(
@@ -537,22 +779,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           const SizedBox(height: 8),
           if (_country != null) ...[
             const SizedBox(height: 8),
-            Semantics(
-              liveRegion: true,
-              child: Text(
-                  _selectedProviders.isEmpty
-                      ? 'Choose your services'
-                      : 'Your services · ${_selectedProviders.length} selected',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w700)),
-            ),
+            Text('Your services',
+                style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             TextField(
                 controller: _providerSearch,
                 onChanged: (_) => setState(() {}),
                 decoration: const InputDecoration(
+                    isDense: true,
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                     labelText: 'Search streaming services',
                     prefixIcon: Icon(Icons.search))),
             const SizedBox(height: 12),
@@ -571,6 +807,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     borderRadius: BorderRadius.all(Radius.circular(10)),
                   ),
                   child: CheckboxListTile.adaptive(
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.padded,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                     value: _selectedProviders.contains(provider.id),
                     secondary: ClipRRect(
@@ -612,19 +850,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         ],
       ];
   List<Widget> _tastes() => [
-        Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _taste.values
-                .map((t) => FlixiePill.action(
-                    avatar: const Icon(Icons.close, size: 16),
-                    tooltip: 'Remove taste pick',
-                    label: Text(t.name),
-                    onPressed: _busy
-                        ? null
-                        : () => setState(() => _taste.remove(t.key))))
-                .toList()),
-        const SizedBox(height: 16),
         TextField(
             controller: _search,
             decoration: const InputDecoration(
@@ -679,7 +904,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         if (!_searching) _posterGrid(_browse, picking: true),
         const SizedBox(height: 12),
         Text(
-            'Your picks become profile favourites in the order you choose them, and help shape your recommendations.',
+            'These shape your picks on this device. They won’t become public favourites, ratings or watched titles.',
             style: Theme.of(context).textTheme.bodySmall),
         if (_allGenres.isNotEmpty)
           ExpansionTile(
@@ -710,7 +935,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             _taste.clear();
             _genres.clear();
           }
-          _move(2);
+          _move(1);
         }
       });
   Future<void> _loadCommunities() async {
@@ -728,6 +953,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         _selectedCommunities.removeWhere((id) =>
             !choices.any((c) => c.community.id == id && !c.community.joined));
       });
+      await Future.wait(
+          choices.where((c) => c.suggested).take(3).map((c) async {
+        try {
+          final thread = await widget.service.conversation(c.community.id);
+          if (mounted && revision == _communityRevision && thread != null) {
+            setState(() => _conversations[c.community.id] = thread);
+          }
+        } catch (_) {/* Optional preview failure never blocks browsing. */}
+      }));
     } catch (_) {
       if (mounted && revision == _communityRevision) {
         setState(() => _communityError =
@@ -759,7 +993,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               .toList();
         });
       }
-      if (mounted) _showPicks();
+      if (mounted) {
+        setState(() => _busy = false);
+        await _finish('/social?tab=communities');
+      }
     } catch (_) {
       if (mounted) {
         setState(() => _communityError =
@@ -772,25 +1009,48 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Widget _communityRow(SetupCommunitySuggestion suggestion) {
     final community = suggestion.community;
-    return CheckboxListTile(
-      contentPadding: EdgeInsets.zero,
-      controlAffinity: ListTileControlAffinity.leading,
-      value: community.joined || _selectedCommunities.contains(community.id),
-      onChanged: community.joined || _busy
-          ? null
-          : (value) => setState(() {
-                if (value == true) {
-                  _selectedCommunities.add(community.id);
-                } else {
-                  _selectedCommunities.remove(community.id);
-                }
-              }),
-      title: Text(community.name,
-          style: const TextStyle(fontWeight: FontWeight.w700)),
-      subtitle: Text(community.joined
-          ? 'Already joined'
-          : suggestion.reason ?? 'Reviews and ratings from community members'),
-    );
+    final thread = _conversations[community.id];
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      CheckboxListTile(
+        contentPadding: EdgeInsets.zero,
+        controlAffinity: ListTileControlAffinity.leading,
+        value: community.joined || _selectedCommunities.contains(community.id),
+        onChanged: community.joined || _busy
+            ? null
+            : (value) => setState(() {
+                  if (value == true) {
+                    _selectedCommunities.add(community.id);
+                  } else {
+                    _selectedCommunities.remove(community.id);
+                  }
+                }),
+        title: Text(community.name,
+            style: const TextStyle(fontWeight: FontWeight.w700)),
+        subtitle: Text(community.joined
+            ? 'Already joined'
+            : suggestion.reason ??
+                'Reviews and ratings from community members'),
+      ),
+      if (thread != null) ...[
+        Text('Spoiler-free conversation',
+            style: TextStyle(color: context.colors.secondary, fontSize: 12)),
+        Text(thread['title'] as String,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        TextButton(
+          onPressed: _busy
+              ? null
+              : () => _finish(
+                  '/genre-communities/${community.id}/discussions/${Uri.encodeComponent(thread['id'].toString())}'),
+          child: const Text('Read the conversation'),
+        ),
+      ],
+      TextButton(
+        onPressed:
+            _busy ? null : () => _finish('/genre-communities/${community.id}'),
+        child: Text('Browse ${community.name} before joining'),
+      ),
+      const Divider(),
+    ]);
   }
 
   List<Widget> _communities() => [
@@ -862,42 +1122,38 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         if (!_searching && _picks.isEmpty && _picksError == null)
           const Text(
               'No picks available yet. Explore Flixie or try choosing a few more titles.'),
-        for (final title in _picks) _pickRow(title),
+        if (!_searching)
+          for (final title in _rankedPicks) _pickRow(title),
         const SizedBox(height: 24),
+        if (_taste.isEmpty)
+          TextButton(
+              onPressed: _busy ? null : () => _finish('/profile'),
+              child:
+                  const Text('Make your profile more you · choose favourites')),
+        if (_taste.isNotEmpty)
+          SetupProfileFavourites(
+            titles: _taste.values.toList(),
+            save: (title) => widget.service.addProfileFavourite(_userId, title),
+            onSaved: () => context.read<AuthProvider>().markActivityChanged(),
+            onBusyChanged: (busy) {
+              if (mounted) setState(() => _busy = busy);
+            },
+          ),
         ExpansionTile(
           tilePadding: EdgeInsets.zero,
           title: const Text('Privacy and spoilers'),
           subtitle: const Text('Keep or adjust your current preferences'),
           children: _preferences(),
         ),
-        if (_communityChoices.any((c) => c.community.joined))
-          TextButton.icon(
-              onPressed:
-                  _busy ? null : () => _finish('/social?tab=communities'),
-              icon: const Icon(Icons.groups_outlined),
-              label: const Text('Explore your communities')),
-        TextButton.icon(
-            onPressed: _busy
-                ? null
-                : () async {
-                    if (_referrer == null) {
-                      await _finish('/social');
-                      return;
-                    }
-                    String? id;
-                    try {
-                      id = await widget.service.friendId(_referrer!);
-                    } catch (_) {}
-                    if (mounted) {
-                      await _finish(id == null ? '/social' : '/friends/$id');
-                    }
-                  },
-            icon: const Icon(Icons.people_outline),
-            label:
-                Text(_referrer == null ? 'Find friends' : 'Find @$_referrer')),
-        TextButton(
-            onPressed: _busy ? null : () => _finish('/getting-started'),
-            child: const Text('Take an optional tour')),
+        if (_added.isNotEmpty)
+          Semantics(
+              liveRegion: true,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Text(
+                    'Yours to come back to. Find your saved picks in Watchlist.',
+                    style: TextStyle(color: context.colors.secondary)),
+              )),
       ];
   Widget _posterGrid(List<SetupTitle> titles, {required bool picking}) =>
       LayoutBuilder(builder: (context, constraints) {
@@ -921,14 +1177,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                   ? () => setState(() {
                                         if (_taste.containsKey(t.key)) {
                                           _taste.remove(t.key);
-                                        } else if (_taste.length < 5) {
+                                        } else if (_taste.length < 3) {
                                           _taste[t.key] = t;
                                         } else {
                                           ScaffoldMessenger.of(context)
                                               .showSnackBar(
                                             const SnackBar(
                                                 content: Text(
-                                                    'Five selected. Remove one to make room for another.')),
+                                                    'Three selected. Remove one to make room for another.')),
                                           );
                                         }
                                       })
@@ -1029,10 +1285,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                               ]))))),
                           const SizedBox(height: 8),
                           Text(t.name,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w600)),
-                          Text(t.isShow ? 'Show' : 'Movie',
-                              style: Theme.of(context).textTheme.bodySmall),
+                              style: TextStyle(
+                                  fontSize: picking ? 13 : 16,
+                                  fontWeight: FontWeight.w600)),
+                          if (!picking)
+                            Text(t.isShow ? 'Show' : 'Movie',
+                                style: Theme.of(context).textTheme.bodySmall),
                           if (!picking) ...[
                             const SizedBox(height: 6),
                             Text(_availabilityLabel(t),
@@ -1044,7 +1302,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                     ? null
                                     : () => _add(t),
                                 child: Text(_added.contains(t.key)
-                                    ? 'Added'
+                                    ? 'Saved'
                                     : _adding.contains(t.key)
                                         ? 'Adding…'
                                         : 'Add to watchlist')),
@@ -1052,6 +1310,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         ])))
                 .toList());
       });
+  List<SetupTitle> get _rankedPicks {
+    bool included(SetupTitle t) => (_offers[t.key] ?? [])
+        .any((p) => p.isIncludedOffer && _selectedProviders.contains(p.id));
+    return [..._picks.where(included), ..._picks.where((t) => !included(t))]
+        .take(3)
+        .toList();
+  }
+
   Widget _pickRow(SetupTitle title) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
@@ -1084,29 +1350,51 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 Text(title.name,
                     style: Theme.of(context)
                         .textTheme
-                        .titleSmall
-                        ?.copyWith(fontWeight: FontWeight.w700)),
+                        .titleMedium
+                        ?.copyWith(fontSize: 18, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 4),
                 Text(title.isShow ? 'Show' : 'Movie',
                     style: Theme.of(context).textTheme.bodySmall),
                 const SizedBox(height: 4),
+                if (title.reason != null)
+                  Text(title.reason!,
+                      style: TextStyle(
+                          color: context.colors.secondary, fontSize: 13)),
                 Text(_availabilityLabel(title),
                     style: Theme.of(context).textTheme.bodySmall),
                 const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed:
-                      _added.contains(title.key) || _adding.contains(title.key)
-                          ? null
-                          : () => _add(title),
-                  icon: Icon(
-                      _added.contains(title.key) ? Icons.check : Icons.add,
-                      size: 18),
-                  label: Text(_added.contains(title.key)
-                      ? 'Added'
-                      : _adding.contains(title.key)
-                          ? 'Adding…'
-                          : 'Add to watchlist'),
-                ),
+                Wrap(spacing: 6, runSpacing: 4, children: [
+                  TextButton(
+                    style: TextButton.styleFrom(
+                        textStyle: const TextStyle(fontSize: 13),
+                        minimumSize: const Size(44, 44)),
+                    onPressed: _busy
+                        ? null
+                        : () => _finish(
+                            '/${title.isShow ? 'shows' : 'movies'}/${title.id}'),
+                    child:
+                        Text(title.isShow ? 'Show details' : 'Movie details'),
+                  ),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                        textStyle: const TextStyle(fontSize: 13),
+                        minimumSize: const Size(44, 44),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10))),
+                    onPressed: _added.contains(title.key) ||
+                            _adding.contains(title.key)
+                        ? null
+                        : () => _add(title),
+                    icon: Icon(
+                        _added.contains(title.key) ? Icons.check : Icons.add,
+                        size: 18),
+                    label: Text(_added.contains(title.key)
+                        ? 'Saved'
+                        : _adding.contains(title.key)
+                            ? 'Adding…'
+                            : 'Add to watchlist'),
+                  ),
+                ]),
               ],
             )),
           ],

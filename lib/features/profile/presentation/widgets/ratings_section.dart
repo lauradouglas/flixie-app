@@ -41,16 +41,7 @@ class RatingsSection extends StatelessWidget {
       children: [
         FlixieSectionHeader(
           title: 'My ratings',
-          uppercase: false,
-          accentHeight: 22,
-          titleStyle: TextStyle(
-            color: context.colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            letterSpacing: .5,
-          ),
           trailingLabel: ratings.length > 6 ? 'See all' : null,
-          trailingColor: FlixieColors.primary,
           onTrailingTap:
               ratings.length > 6 ? () => _showAllRatingsSheet(context) : null,
         ),

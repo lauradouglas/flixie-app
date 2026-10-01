@@ -10,7 +10,6 @@ class SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return FlixieSectionHeader(
       title: title,
-      accentHeight: 18,
     );
   }
 }

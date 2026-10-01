@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/favourite_ranking_sheet.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/media_detail_action.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
@@ -1267,15 +1268,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     ]);
   }
 
-  Widget _buildSectionHeader(BuildContext context, String title) {
-    return Text(
-      title,
-      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            color: context.colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-    );
-  }
+  Widget _buildSectionHeader(BuildContext context, String title) =>
+      FlixieSectionHeader(title: title);
 
   BoxDecoration _movieCardDecoration() {
     return BoxDecoration(

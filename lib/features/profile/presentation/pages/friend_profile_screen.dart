@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 import '../widgets/expandable_profile_bio.dart';
 import '../widgets/creator_interview.dart';
 import 'package:flixie_app/features/social/data/community_service.dart';
@@ -2035,34 +2036,11 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                   // Reviews section header
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 4,
-                          height: 22,
-                          decoration: BoxDecoration(
-                            color: FlixieColors.primary,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          'RECENT REVIEWS',
-                          style: textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: context.colors.textPrimary,
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-                        if (!_reviewsLoading && _reviews.isNotEmpty) ...[
-                          const Spacer(),
-                          Text(
-                            '${_reviews.length} total',
-                            style: textTheme.bodySmall
-                                ?.copyWith(color: context.colors.medium),
-                          ),
-                        ],
-                      ],
+                    child: FlixieSectionHeader(
+                      title: 'Recent reviews',
+                      trailingLabel: !_reviewsLoading && _reviews.isNotEmpty
+                          ? '${_reviews.length} total'
+                          : null,
                     ),
                   ),
 

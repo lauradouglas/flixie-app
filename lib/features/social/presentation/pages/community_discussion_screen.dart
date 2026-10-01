@@ -1,3 +1,5 @@
+import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
+import 'package:flixie_app/core/widgets/notification_opt_in.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -43,7 +45,7 @@ class _CommunityDiscussionScreenState extends State<CommunityDiscussionScreen> {
   final _focusKey = GlobalKey();
   final Map<String, String> _mentions = {};
   Map<String, dynamic>? _replyTo, _focusedReply;
-  bool _member = false, _joining = false;
+  bool _member = false, _joining = false, _postedReply = false;
   final _replyKeys = <String, GlobalKey>{};
   String? _focusError, _highlightedReplyId;
   Timer? _highlightTimer;
@@ -215,7 +217,10 @@ class _CommunityDiscussionScreenState extends State<CommunityDiscussionScreen> {
       if (!mounted) return;
       _body.clear();
       _mentions.clear();
-      setState(() => _replyTo = null);
+      setState(() {
+        _replyTo = null;
+        _postedReply = true;
+      });
       FocusScope.of(context).unfocus();
       await _loadReplies();
       if (mounted) {
@@ -344,9 +349,9 @@ class _CommunityDiscussionScreenState extends State<CommunityDiscussionScreen> {
   }
 
   Future<void> _join() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showFlixiePromptSheet<bool>(
         context: context,
-        builder: (ctx) => AlertDialog(
+        builder: (ctx) => FlixiePromptSheetContent(
                 title: const Text('Join this community?'),
                 content: const Text(
                     'Your public reviews can appear here. Private reviews stay private. Joining won’t follow anyone for you.'),
@@ -456,6 +461,10 @@ class _CommunityDiscussionScreenState extends State<CommunityDiscussionScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                if (_postedReply)
+                  const NotificationOptIn(
+                      message:
+                          'Keep the conversation going. Enable notifications for replies and other Flixie updates. You can manage them in Settings.'),
                 if (_replyTo != null)
                   Row(children: [
                     Icon(Icons.reply,

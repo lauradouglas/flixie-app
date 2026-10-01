@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'support/api_fixture.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,6 +23,8 @@ import 'package:flixie_app/features/authentication/presentation/pages/onboarding
 import 'support/watchlist_auth.dart';
 
 class SetupFixture extends SetupService {
+  @override
+  Future<Map<String, dynamic>?> conversation(int id) async => null;
   @override
   Future<List<GenreCommunity>> communities() async => [];
 
@@ -105,22 +108,41 @@ class ApiShowsSetupFixture extends SetupFixture {
       shows ? const SetupService().popular(true) : super.popular(false);
 }
 
+class SetupAuth extends TestAuth {
+  @override
+  Future<void> refreshDbUser() async {}
+  @override
+  Future<bool> completeOnboarding() async => false;
+}
+
 Widget setupApp(SetupFixture service,
         {double scale = 1, bool reduceMotion = false}) =>
     MultiProvider(
         providers: [
-          ChangeNotifierProvider<AuthProvider>(create: (_) => TestAuth()),
+          ChangeNotifierProvider<AuthProvider>(create: (_) => SetupAuth()),
           ChangeNotifierProvider<MovieRatingPrivacy>(
               create: (_) => MovieRatingPrivacy(loadRatings: (_) async => {})
                 ..syncUser('viewer'))
         ],
-        child: MaterialApp(
+        child: MaterialApp.router(
             theme: AppTheme.lightTheme,
-            home: MediaQuery(
-                data: MediaQueryData(
-                    textScaler: TextScaler.linear(scale),
-                    disableAnimations: reduceMotion),
-                child: OnboardingScreen(service: service))));
+            routerConfig: GoRouter(initialLocation: '/onboarding', routes: [
+              GoRoute(
+                  path: '/',
+                  builder: (_, __) =>
+                      const Scaffold(body: Text('Home destination'))),
+              GoRoute(
+                  path: '/social',
+                  builder: (_, __) =>
+                      const Scaffold(body: Text('Communities destination'))),
+              GoRoute(
+                  path: '/onboarding',
+                  builder: (context, _) => MediaQuery(
+                      data: MediaQuery.of(context).copyWith(
+                          textScaler: TextScaler.linear(scale),
+                          disableAnimations: reduceMotion),
+                      child: OnboardingScreen(service: service))),
+            ])));
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -192,7 +214,7 @@ void main() {
   });
 
   test(
-      'setup saves movie and show favourites in selection order; skip writes none',
+      'private taste preserves selection order; explicit favourites use existing APIs',
       () async {
     final requests = <http.Request>[];
     useApiFixture(MockClient((request) async {
@@ -215,6 +237,12 @@ void main() {
       const SetupTitle(12, 'First show', null, isShow: true),
       const SetupTitle(4, 'Second movie', null),
     ], {});
+    expect(requests, isEmpty);
+    expect((await service.loadTaste('viewer')).map((t) => t.key),
+        ['movie:12', 'show:12', 'movie:4']);
+    for (final title in await service.loadTaste('viewer')) {
+      await service.addProfileFavourite('viewer', title);
+    }
     expect(requests.map((r) => r.url.path), [
       '/users/viewer/movies/favorites',
       '/users/viewer/shows/favorites',
@@ -244,11 +272,12 @@ void main() {
         saveWorks ? '[{"movieId":12,"removed":false}]' : '[]', 200)));
     const service = SetupService();
     const picks = [SetupTitle(12, 'Movie', null)];
-    await expectLater(service.saveTaste('viewer', picks, {}), throwsStateError);
+    await expectLater(
+        service.addProfileFavourite('viewer', picks.single), throwsStateError);
     expect(await service.loadTaste('viewer'), isEmpty);
     saveWorks = true;
-    await service.saveTaste('viewer', picks, {});
-    expect((await service.loadTaste('viewer')).single.id, 12);
+    await service.addProfileFavourite('viewer', picks.single);
+    expect(await service.loadTaste('viewer'), isEmpty);
   });
 
   testWidgets(
@@ -257,7 +286,6 @@ void main() {
     final service = SetupFixture();
     await tester.pumpWidget(setupApp(service));
     await tester.pumpAndSettle();
-    await tap(tester, 'Skip for now');
     expect(find.byKey(const ValueKey('taste-movie:1')), findsOneWidget);
     service.showLoad = Completer<List<SetupTitle>>();
     await tester.ensureVisible(find.text('Shows'));
@@ -311,7 +339,6 @@ void main() {
     final service = ApiShowsSetupFixture();
     await tester.pumpWidget(setupApp(service));
     await tester.pumpAndSettle();
-    await tap(tester, 'Skip for now');
     await tap(tester, 'Shows');
     expect(paths, contains(endsWith('/trending/show/week')));
     expect(paths, contains(endsWith('/shows/top_rated')));
@@ -333,16 +360,17 @@ void main() {
       (tester) async {
     await tester.pumpWidget(setupApp(SetupFixture()));
     await tester.pumpAndSettle();
-    expect(find.text('Choose your country to get started'), findsOneWidget);
+    await tap(tester, 'Skip taste picks');
+    expect(find.text('Select country'), findsOneWidget);
     expect(find.text('Continue'), findsNothing);
     expect(find.text('Choose country').hitTestable(), findsOneWidget);
     expect(find.text('Search streaming services'), findsNothing);
     await tester.tap(find.text('Choose country'));
     await tester.pumpAndSettle();
     await tap(tester, 'United Kingdom');
-    expect(find.text('Continue').hitTestable(), findsOneWidget);
+    expect(find.text('Show my first picks').hitTestable(), findsOneWidget);
     expect(find.text('Search streaming services'), findsOneWidget);
-    expect(find.text('Choose your country to get started'), findsNothing);
+    expect(find.text('Select country'), findsNothing);
   });
 
   testWidgets('all services can be scrolled to and selected without expanding',
@@ -358,24 +386,27 @@ void main() {
               }));
     await tester.pumpWidget(setupApp(service));
     await tester.pumpAndSettle();
+    await tap(tester, 'Skip taste picks');
     await tap(tester, 'Choose country');
     await tap(tester, 'United Kingdom');
     expect(find.text('Show all services'), findsNothing);
     expect(tester.getTopLeft(find.text('Netflix')).dy,
         lessThan(tester.getTopLeft(find.text('Service 0')).dy));
-    final continuePosition = tester.getTopLeft(find.text('Continue'));
-    expect(find.text('Continue').hitTestable(), findsOneWidget);
-    expect(find.text('Skip for now').hitTestable(), findsOneWidget);
+    final continuePosition =
+        tester.getTopLeft(find.text('Show my first picks'));
+    expect(find.text('Show my first picks').hitTestable(), findsOneWidget);
+    expect(find.text('Skip services for now').hitTestable(), findsOneWidget);
     await tester.scrollUntilVisible(find.text('Service 14'), 300,
         scrollable: find.byType(Scrollable).first);
     await tap(tester, 'Service 14');
-    expect(tester.getTopLeft(find.text('Continue')), continuePosition);
-    expect(find.text('Continue').hitTestable(), findsOneWidget);
-    expect(find.text('Skip for now').hitTestable(), findsOneWidget);
-    await tester.tap(find.text('Continue'));
+    expect(
+        tester.getTopLeft(find.text('Show my first picks')), continuePosition);
+    expect(find.text('Show my first picks').hitTestable(), findsOneWidget);
+    expect(find.text('Skip services for now').hitTestable(), findsOneWidget);
+    await tester.tap(find.text('Show my first picks'));
     await tester.pumpAndSettle();
     expect(service.selected, {114});
-    expect(find.text('Your taste.\nBetter discoveries.'), findsOneWidget);
+    expect(find.text('Your picks.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -385,19 +416,25 @@ void main() {
     final service = SetupFixture();
     await tester.pumpWidget(setupApp(service));
     await tester.pumpAndSettle();
+    await tap(tester, 'Skip taste picks');
     await tap(tester, 'Choose country');
     await tap(tester, 'United Kingdom');
     await tap(tester, 'Netflix');
-    expect(find.text('Your services · 1 selected'), findsOneWidget);
+    expect(find.text('1 service selected').hitTestable(), findsOneWidget);
+    await tester.enterText(find.byType(TextField).last, 'not a service');
+    await tester.pumpAndSettle();
+    expect(find.text('1 service selected').hitTestable(), findsOneWidget);
+    await tester.enterText(find.byType(TextField).last, '');
+    await tester.pumpAndSettle();
     service.failSave = true;
-    await tap(tester, 'Continue');
+    await tap(tester, 'Show my first picks');
     expect(find.textContaining('Couldn’t save this step'), findsOneWidget);
-    expect(find.text('Less searching.\nMore watching.'), findsOneWidget);
+    expect(find.text('Make it an easy yes.'), findsOneWidget);
     service.failSave = false;
-    await tap(tester, 'Continue');
+    await tap(tester, 'Show my first picks');
     expect(service.savedCountry?.id, 1);
     expect(service.selected, {8});
-    expect(find.text('Your taste.\nBetter discoveries.'), findsOneWidget);
+    expect(find.text('Your picks.'), findsOneWidget);
   });
   testWidgets(
       'movie and show with same id stay separate; suggestions add a show',
@@ -405,7 +442,6 @@ void main() {
     final service = SetupFixture();
     await tester.pumpWidget(setupApp(service));
     await tester.pumpAndSettle();
-    await tap(tester, 'Skip for now');
     await tester.ensureVisible(find.byKey(const ValueKey('taste-movie:1')));
     await tester.tap(find.byKey(const ValueKey('taste-movie:1')));
     await tester.pumpAndSettle();
@@ -422,34 +458,80 @@ void main() {
     await tester.pumpAndSettle();
     await tap(tester, 'Continue');
     expect(service.taste.map((t) => t.key), ['movie:1', 'show:1']);
-    await tap(tester, 'Continue');
+    await tap(tester, 'Skip services for now');
     await tap(tester, 'Add to watchlist');
     expect(service.added.single.isShow, isTrue);
-    expect(find.text('Added'), findsOneWidget);
-    expect(find.text('Take an optional tour'), findsOneWidget);
+    expect(find.text('Saved'), findsOneWidget);
+    expect(find.text('Find my kind of people'), findsOneWidget);
   });
   testWidgets(
-      'taste limit, deselection and pinned community actions preserve choices',
+      'taste footer edits remove choices and Continue saves remaining picks',
+      (tester) async {
+    final service = SetupFixture()
+      ..browseTitles = [
+        const SetupTitle(1, 'Alien', null),
+        const SetupTitle(2, 'The Odyssey', null)
+      ];
+    await tester.pumpWidget(setupApp(service));
+    await tester.pumpAndSettle();
+    for (final id in [1, 2]) {
+      final tile = find.byKey(ValueKey('taste-movie:$id'));
+      await tester.ensureVisible(tile);
+      await tester.tap(tile);
+      await tester.pumpAndSettle();
+    }
+    expect(find.text('2 of 3 selected').hitTestable(), findsOneWidget);
+    await tap(tester, 'Edit');
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('remove-taste-movie:1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('remove-taste-movie:1')));
+    await tester.pumpAndSettle();
+    expect(find.text('1 of 3 selected').hitTestable(), findsOneWidget);
+    await tap(tester, 'Done');
+    await tap(tester, 'Continue');
+    expect(service.taste.single.id, 2);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'footer surface reaches screen edge while actions respect bottom inset',
+      (tester) async {
+    tester.view.padding = const FakeViewPadding(bottom: 34);
+    tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+    addTearDown(tester.view.resetPadding);
+    addTearDown(tester.view.resetViewPadding);
+    await tester.pumpWidget(setupApp(SetupFixture()));
+    await tester.pumpAndSettle();
+    final screenHeight =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    final footer = find.byKey(const ValueKey('setup-footer-surface'));
+    expect(tester.getRect(footer).bottom, screenHeight);
+    expect(tester.getRect(find.text('Skip taste picks')).bottom,
+        lessThan(screenHeight - 34));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('three-title taste limit and deselection preserve choices',
       (tester) async {
     final service = SetupFixture()
       ..browseTitles = List.generate(
           6, (index) => SetupTitle(index + 1, 'Pick $index', null));
     await tester.pumpWidget(setupApp(service));
     await tester.pumpAndSettle();
-    await tap(tester, 'Skip for now');
-    for (var id = 1; id <= 5; id++) {
+    for (var id = 1; id <= 3; id++) {
       final tile = find.byKey(ValueKey('taste-movie:$id'));
       await tester.ensureVisible(tile);
       await tester.tap(tile);
       await tester.pumpAndSettle();
     }
     expect(
-        find.textContaining('5 of 5 selected').hitTestable(), findsOneWidget);
+        find.textContaining('3 of 3 selected').hitTestable(), findsOneWidget);
     final sixth = find.byKey(const ValueKey('taste-movie:6'));
     await tester.ensureVisible(sixth);
     await tester.tap(sixth);
     await tester.pumpAndSettle();
-    expect(find.text('Five selected. Remove one to make room for another.'),
+    expect(find.text('Three selected. Remove one to make room for another.'),
         findsOneWidget);
     final first = find.byKey(const ValueKey('taste-movie:1'));
     await tester.ensureVisible(first);
@@ -459,9 +541,9 @@ void main() {
     await tester.tap(sixth);
     await tester.pumpAndSettle();
     await tap(tester, 'Continue');
-    expect(service.taste.map((title) => title.id), [2, 3, 4, 5, 6]);
-    expect(find.text('Continue').hitTestable(), findsOneWidget);
-    expect(find.text('Skip for now').hitTestable(), findsOneWidget);
+    expect(service.taste.map((title) => title.id), [2, 3, 6]);
+    expect(find.text('Choose country').hitTestable(), findsOneWidget);
+    expect(find.text('Skip services for now').hitTestable(), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -472,7 +554,9 @@ void main() {
       await tester
           .pumpWidget(setupApp(SetupFixture(), reduceMotion: reduceMotion));
       await tester.pumpAndSettle();
-      expect(find.text('Find your next watch—and where to stream it.'),
+      expect(
+          find.text(
+              'Pick up to three films or shows you love. We’ll start there.'),
           findsOneWidget);
       expect(
           tester
@@ -480,7 +564,7 @@ void main() {
                   find.byKey(const ValueKey('setup-progress-0')))
               .value,
           1);
-      await tester.tap(find.text('Skip for now'));
+      await tester.tap(find.text('Skip taste picks'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
       final progress = tester
@@ -494,8 +578,8 @@ void main() {
         expect(progress, lessThan(1));
       }
       await tester.pumpAndSettle();
-      expect(find.text('Your taste.\nBetter discoveries.'), findsOneWidget);
-      expect(find.text('Less searching.\nMore watching.'), findsNothing);
+      expect(find.text('Make it an easy yes.'), findsOneWidget);
+      expect(find.text('What stays with you?'), findsNothing);
       expect(tester.takeException(), isNull);
     }
   });
@@ -505,10 +589,9 @@ void main() {
     final service = SetupFixture();
     await tester.pumpWidget(setupApp(service));
     await tester.pumpAndSettle();
-    await tap(tester, 'Skip for now');
     await tap(tester, 'Skip taste picks');
     expect(service.taste, isEmpty);
-    await tap(tester, 'Skip for now');
+    await tap(tester, 'Skip services for now');
     expect(find.text('Popular picks to get you started'), findsOneWidget);
   });
   testWidgets('setup reflows across screen sizes and large text',
@@ -526,22 +609,21 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       await tester.pumpWidget(setupApp(SetupFixture(), scale: 2));
       await tester.pumpAndSettle();
-      await tap(tester, 'Choose country');
-      await tap(tester, 'United Kingdom');
-      await tap(tester, 'Netflix');
-      expect(find.text('Continue').hitTestable(), findsOneWidget);
-      expect(tester.takeException(), isNull);
-      await tap(tester, 'Continue');
       final tile = find.byKey(const ValueKey('taste-movie:1'));
       await tester.ensureVisible(tile);
       await tester.tap(tile);
       await tester.pumpAndSettle();
       expect(
-          find.textContaining('1 of 5 selected').hitTestable(), findsOneWidget);
+          find.textContaining('1 of 3 selected').hitTestable(), findsOneWidget);
       expect(tester.takeException(), isNull);
-      await tap(tester, 'Skip taste picks');
+      await tap(tester, 'Continue');
+      await tap(tester, 'Choose country');
+      await tap(tester, 'United Kingdom');
+      await tap(tester, 'Netflix');
+      expect(find.text('Show my first picks').hitTestable(), findsOneWidget);
       expect(tester.takeException(), isNull);
-      await tap(tester, 'Skip for now');
+      await tap(tester, 'Show my first picks');
+      expect(find.text('Your picks.'), findsOneWidget);
       expect(tester.takeException(), isNull);
     }
   });

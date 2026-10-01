@@ -19,7 +19,8 @@ import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 
 class MovieListsScreen extends StatelessWidget {
-  const MovieListsScreen({super.key});
+  const MovieListsScreen({super.key, this.createOnOpen = false});
+  final bool createOnOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -33,13 +34,14 @@ class MovieListsScreen extends StatelessWidget {
       create: (_) => MovieListsProvider(
         userId: userId,
       )..loadLists(),
-      child: const _MovieListsView(),
+      child: _MovieListsView(createOnOpen: createOnOpen),
     );
   }
 }
 
 class _MovieListsView extends StatefulWidget {
-  const _MovieListsView();
+  const _MovieListsView({this.createOnOpen = false});
+  final bool createOnOpen;
 
   @override
   State<_MovieListsView> createState() => _MovieListsViewState();
@@ -50,6 +52,16 @@ enum _ListFilter { all, private, shared }
 enum _ListSort { updated, name }
 
 class _MovieListsViewState extends State<_MovieListsView> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.createOnOpen) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openListEditor(context);
+      });
+    }
+  }
+
   _ListFilter _filter = _ListFilter.all;
   _ListSort _sort = _ListSort.updated;
   bool _showSearch = false;

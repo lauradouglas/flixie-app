@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'dart:math' as math;
@@ -464,18 +465,7 @@ class _SectionTitle extends StatelessWidget {
   const _SectionTitle(this.title);
   final String title;
   @override
-  Widget build(BuildContext context) => Row(children: [
-        Container(
-            width: 4,
-            height: 26,
-            decoration: BoxDecoration(
-                color: FlixieColors.primary,
-                borderRadius: BorderRadius.circular(4))),
-        const SizedBox(width: 10),
-        Text(title,
-            style: const TextStyle(
-                fontSize: 19, fontWeight: FontWeight.w700, letterSpacing: 1.2))
-      ]);
+  Widget build(BuildContext context) => FlixieSectionHeader(title: title);
 }
 
 class _Poster extends StatelessWidget {

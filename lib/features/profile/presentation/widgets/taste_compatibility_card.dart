@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -61,31 +62,9 @@ class TasteCompatibilityCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Section header
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            children: [
-              Container(
-                width: 4,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: FlixieColors.primary,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                'TASTE COMPATIBILITY',
-                style: textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: context.colors.textPrimary,
-                  letterSpacing: 1.5,
-                ),
-              ),
-            ],
-          ),
-        ),
+        const FlixieSectionHeader(
+            title: 'Taste compatibility',
+            padding: EdgeInsets.symmetric(vertical: 8)),
         // Badge card
         Container(
           width: double.infinity,

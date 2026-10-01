@@ -46,9 +46,11 @@ class FavouritePosterRail extends StatelessWidget {
     this.limit,
     this.circular = false,
     this.onRank,
+    this.onSeeAll,
   });
 
   final VoidCallback? onRank;
+  final VoidCallback? onSeeAll;
   final String title;
   final List<FavouriteDisplayItem> items;
   final int? limit;
@@ -184,7 +186,7 @@ class FavouritePosterRail extends StatelessWidget {
                   color: context.colors.primaryText, size: 22),
             ),
           TextButton(
-            onPressed: () => showAll(context),
+            onPressed: onSeeAll ?? () => showAll(context),
             child: Text('See all',
                 style: TextStyle(color: context.colors.light, fontSize: 13)),
           ),

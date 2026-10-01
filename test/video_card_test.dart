@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/video_card.dart';
 import 'package:flixie_app/models/movie_video.dart';
@@ -13,21 +14,32 @@ void main() {
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
         final video = MovieVideo.fromJson({
-          'name': 'Official extended trailer with a long title that should remain '
-              'fully readable when accessibility text sizes are enabled',
+          'name':
+              'Official extended trailer with a long title that should remain '
+                  'fully readable when accessibility text sizes are enabled',
           'key': 'fixture',
         });
         await tester.pumpWidget(MaterialApp(
+          theme: AppTheme.darkTheme,
           home: Scaffold(
             body: MediaQuery(
-              data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+              data: MediaQueryData(
+                  textScaler: TextScaler.linear(scale),
+                  padding: const EdgeInsets.only(top: 24, bottom: 4)),
               child: Builder(builder: (context) {
                 return SingleChildScrollView(
                   child: SizedBox(
                     height: VideoCard.carouselHeight(context, [video]),
                     child: ListView(
+                      padding: EdgeInsets.zero,
                       scrollDirection: Axis.horizontal,
-                      children: [VideoCard(video: video)],
+                      children: [
+                        DefaultTextStyle(
+                          style: const TextStyle(
+                              fontSize: 16, height: 2, letterSpacing: 1),
+                          child: VideoCard(video: video),
+                        )
+                      ],
                     ),
                   ),
                 );

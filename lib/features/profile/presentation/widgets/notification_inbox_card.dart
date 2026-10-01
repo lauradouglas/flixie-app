@@ -8,6 +8,11 @@ import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_
 import 'package:flixie_app/features/watch_plans/presentation/utils/watch_plan_display_state.dart';
 import 'package:flixie_app/features/watch_plans/presentation/widgets/shared/watch_plan_components.dart';
 
+/// Read updates leave the inbox; unresolved invitations remain actionable.
+bool notificationBelongsInInbox(FlixieNotification notification) =>
+    notification.closed != true &&
+    (!notification.isRead || notificationNeedsResponse(notification));
+
 bool notificationNeedsResponse(FlixieNotification n) {
   if (n.closed == true) return false;
   if (n.isWatchPlanNotification) {

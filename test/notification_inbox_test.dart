@@ -5,6 +5,31 @@ import 'package:flixie_app/features/profile/presentation/widgets/notification_in
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 
 void main() {
+  test('marking updates read clears them from the inbox across reloads', () {
+    const update = FlixieNotification(
+        id: 'accepted',
+        userId: 'me',
+        type: FlixieNotification.friendRequest,
+        action: 'ACCEPTED',
+        message: '');
+    expect(notificationBelongsInInbox(update), isTrue);
+    final saved = update.copyWith(read: true);
+    expect(notificationBelongsInInbox(saved), isFalse);
+    expect(notificationBelongsInInbox(saved.copyWith(read: false)), isTrue);
+  });
+  test('mark all read retains pending invitations until they are resolved', () {
+    const pending = FlixieNotification(
+        id: 'invite',
+        userId: 'me',
+        type: FlixieNotification.friendRequest,
+        action: 'RECEIVED',
+        message: '');
+    final read = pending.copyWith(read: true);
+    expect(notificationBelongsInInbox(read), isTrue);
+    expect(
+        notificationBelongsInInbox(read.copyWith(action: 'ACCEPTED')), isFalse);
+    expect(notificationBelongsInInbox(read.copyWith(closed: true)), isFalse);
+  });
   test('legacy sent notification is actionable only for the pending recipient',
       () {
     FlixieNotification request(String viewer, String status) =>

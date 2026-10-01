@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 import 'package:flixie_app/features/collections/movie_collection_card.dart';
 import 'package:flixie_app/features/movies/data/movie_watch_plan_choice.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/movie_friends_summary_badges.dart';
@@ -4101,17 +4102,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     );
   }
 
-  Widget _buildSectionHeader(BuildContext context, String title) {
-    return Text(
-      title,
-      style: TextStyle(
-        color: context.colors.white,
-        fontSize: 18,
-        fontWeight: FontWeight.w700,
-        height: 1.15,
-      ),
-    );
-  }
+  Widget _buildSectionHeader(BuildContext context, String title) =>
+      FlixieSectionHeader(title: title);
 
   String _friendTabLabel(FriendActivityTab tab) {
     return _kFriendActivityTabs
@@ -4282,6 +4274,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         SizedBox(
           height: VideoCard.carouselHeight(context, videos),
           child: ListView.separated(
+            padding: EdgeInsets.zero,
             scrollDirection: Axis.horizontal,
             itemCount: videos.length,
             separatorBuilder: (_, __) => const SizedBox(width: 12),

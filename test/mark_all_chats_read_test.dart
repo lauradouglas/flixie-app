@@ -40,12 +40,16 @@ void main() {
         child: MaterialApp(
             theme: AppTheme.lightTheme,
             home: const Scaffold(body: MarkAllChatsReadButton()))));
+    await tester.tap(find.byTooltip('Message options'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Mark all as read'));
     await tester.pumpAndSettle();
     expect(calls, ['direct', 'group']);
     expect(controller.total, 1);
     expect(find.textContaining('Some chats could not'), findsOneWidget);
     failGroup = false;
+    await tester.tap(find.byTooltip('Message options'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Mark all as read'));
     await tester.pumpAndSettle();
     expect(calls, ['direct', 'group', 'group']);
@@ -53,7 +57,7 @@ void main() {
     expect(find.text('Mark all as read'), findsNothing);
     counts['direct']!.add(1);
     await tester.pumpAndSettle();
-    expect(find.text('Mark all as read'), findsOneWidget);
+    expect(find.byTooltip('Message options'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.runAsync(() async {
       controller.dispose();

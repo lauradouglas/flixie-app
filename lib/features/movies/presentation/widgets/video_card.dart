@@ -1,3 +1,4 @@
+import 'package:flixie_app/app/theme/flixie_typography.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -12,12 +13,16 @@ class VideoCard extends StatelessWidget {
 
   final MovieVideo video;
 
-  static TextStyle _titleStyle(BuildContext context) =>
-      DefaultTextStyle.of(context).style.merge(TextStyle(
+  // Measurement happens above the card's inherited text context. Use a complete
+  // style so Scaffold/Material defaults cannot change the rendered line height.
+  static TextStyle _titleStyle(BuildContext context) => TextStyle(
+        inherit: false,
+        fontFamily: FlixieTypography.fontFamily,
         color: context.colors.light,
         fontSize: 12.5,
+        height: 1.4,
         fontWeight: FontWeight.w600,
-      ));
+      );
 
   static double carouselHeight(BuildContext context, List<MovieVideo> videos) {
     var titleHeight = 0.0;

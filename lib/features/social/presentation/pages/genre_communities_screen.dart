@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -62,9 +63,9 @@ class _GenreCommunitiesViewState extends State<GenreCommunitiesView> {
   }
 
   Future<void> _confirm(GenreCommunity community) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showFlixiePromptSheet<bool>(
         context: context,
-        builder: (context) => AlertDialog(
+        builder: (context) => FlixiePromptSheetContent(
               title: Text(
                   '${community.joined ? 'Leave' : 'Join'} ${community.name}?'),
               content: Text(community.joined

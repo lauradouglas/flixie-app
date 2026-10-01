@@ -388,6 +388,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
   /// One source of truth for both cards and section headings. This protects
   /// the headings from a stale refresh during a dismiss animation.
   List<FlixieNotification> get _visibleNotifications => _notifications
+      .where(notificationBelongsInInbox)
       .where((notification) =>
           notification.id == null || !_dismissingIds.contains(notification.id))
       .toList(growable: false);

@@ -62,27 +62,19 @@ class MediaListsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return Column(
+      return const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           FlixieSectionHeader(
             title: 'Lists',
-            uppercase: false,
-            accentHeight: 22,
-            titleStyle: TextStyle(
-              color: context.colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-            ),
             trailingLabel: 'See all',
-            trailingColor: FlixieColors.primary,
           ),
-          const SizedBox(height: 8),
-          const SkeletonBox(width: 128, height: 13),
-          const SizedBox(height: 12),
-          const SkeletonBox(height: 86, borderRadius: 14),
-          const SizedBox(height: 10),
-          const SkeletonBox(height: 86, borderRadius: 14),
+          SizedBox(height: 8),
+          SkeletonBox(width: 128, height: 13),
+          SizedBox(height: 12),
+          SkeletonBox(height: 86, borderRadius: 14),
+          SizedBox(height: 10),
+          SkeletonBox(height: 86, borderRadius: 14),
         ],
       );
     }
@@ -98,16 +90,7 @@ class MediaListsSection extends StatelessWidget {
       children: [
         FlixieSectionHeader(
           title: title,
-          uppercase: false,
-          accentHeight: 22,
-          titleStyle: TextStyle(
-            color: context.colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            letterSpacing: .5,
-          ),
           trailingLabel: onSeeAll == null ? null : 'See all',
-          trailingColor: FlixieColors.primary,
           onTrailingTap: onSeeAll,
         ),
         Row(

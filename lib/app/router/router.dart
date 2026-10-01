@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/auth/setup_destination.dart';
 import 'package:flixie_app/features/social/presentation/widgets/conversations_hub.dart';
 import 'package:flixie_app/features/social/presentation/pages/community_discussion_screen.dart';
 import 'package:flixie_app/features/social/data/community_space_service.dart';
@@ -166,6 +167,7 @@ GoRouter buildRouter(
   ReferralAttributionStore referralStore,
 ) {
   final recordedInviteCodes = <String>{};
+  String? pendingSetupDestination;
   return GoRouter(
     navigatorKey: rootNavigatorKey,
     observers: [_FlixieAnalyticsObserver(analytics)],
@@ -174,6 +176,10 @@ GoRouter buildRouter(
     redirect: (context, state) async {
       final status = authProvider.status;
       final hasCompletedSetup = authProvider.dbUser?.completedSetup ?? false;
+      if (!hasCompletedSetup) {
+        pendingSetupDestination =
+            setupDestination(state.uri.toString()) ?? pendingSetupDestination;
+      }
       final isAuthRoute = state.matchedLocation.startsWith('/auth');
       final isSplash = state.matchedLocation == '/splash';
       final isOnboarding = state.matchedLocation == '/onboarding';
@@ -227,7 +233,14 @@ GoRouter buildRouter(
               : '/terms-required';
         }
         if (state.matchedLocation == '/terms-required') {
-          return hasCompletedSetup ? '/' : '/onboarding';
+          return hasCompletedSetup
+              ? '/'
+              : Uri(
+                      path: '/onboarding',
+                      queryParameters: pendingSetupDestination == null
+                          ? null
+                          : {'next': pendingSetupDestination!})
+                  .toString();
         }
         // Referral codes apply only to new account creation. Never carry one
         // into an existing authenticated account or a later sign-up.
@@ -235,13 +248,21 @@ GoRouter buildRouter(
         // New users must complete onboarding before entering the app shell.
         if (!hasCompletedSetup) {
           if (isOnboarding) return null;
-          return '/onboarding';
+          return Uri(
+                  path: '/onboarding',
+                  queryParameters: pendingSetupDestination == null
+                      ? null
+                      : {'next': pendingSetupDestination!})
+              .toString();
         }
 
         // Completed users should land in the app shell, not auth/splash/onboarding.
         if (isAuthRoute || isSplash || isOnboarding) {
-          return '/';
+          final destination = pendingSetupDestination ?? '/';
+          pendingSetupDestination = null;
+          return destination;
         }
+        pendingSetupDestination = null;
       }
 
       return null;
@@ -279,18 +300,21 @@ GoRouter buildRouter(
             _FlixieAnalyticsObserver(analytics)
           ], routes: [
             GoRoute(
-              path: '/watchlist',
+              path: '/search',
               pageBuilder: (context, state) =>
-                  _calmPage(state, const WatchlistScreen()),
+                  _calmPage(state, const SearchScreen()),
             ),
           ]),
           StatefulShellBranch(observers: [
             _FlixieAnalyticsObserver(analytics)
           ], routes: [
             GoRoute(
-              path: '/search',
-              pageBuilder: (context, state) =>
-                  _calmPage(state, const SearchScreen()),
+              path: '/plans',
+              pageBuilder: (context, state) => _calmPage(
+                  state,
+                  WatchRequestsScreen(
+                      initialRequestId:
+                          state.uri.queryParameters['requestId'])),
             ),
           ]),
           StatefulShellBranch(observers: [
@@ -331,11 +355,9 @@ GoRouter buildRouter(
           pageBuilder: (context, state) =>
               _pushPage(state, const _MessagesPage())),
       GoRoute(
-          path: '/plans',
-          pageBuilder: (context, state) => _pushPage(
-              state,
-              WatchRequestsScreen(
-                  initialRequestId: state.uri.queryParameters['requestId']))),
+          path: '/watchlist',
+          pageBuilder: (context, state) =>
+              _pushPage(state, const WatchlistScreen())),
       GoRoute(
         path: '/pick-for-us',
         pageBuilder: (context, state) => _pushPage(
@@ -543,8 +565,10 @@ GoRouter buildRouter(
       ),
       GoRoute(
         path: '/movie-lists',
-        pageBuilder: (context, state) =>
-            _calmPage(state, const MovieListsScreen()),
+        pageBuilder: (context, state) => _calmPage(
+            state,
+            MovieListsScreen(
+                createOnOpen: state.uri.queryParameters['create'] == 'true')),
       ),
       GoRoute(
         path: '/movie-lists/:id',
@@ -642,8 +666,11 @@ GoRouter buildRouter(
       // Onboarding route is kept for explicit navigation only.
       GoRoute(
         path: '/onboarding',
-        pageBuilder: (context, state) =>
-            _calmPage(state, const OnboardingScreen()),
+        pageBuilder: (context, state) => _calmPage(
+            state,
+            OnboardingScreen(
+                returnTo:
+                    setupDestination(state.uri.queryParameters['next'] ?? ''))),
       ),
 
       GoRoute(
@@ -733,14 +760,14 @@ class _FlixieNavBar extends StatelessWidget {
   static const _destinations = [
     _NavDest(icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Home'),
     _NavDest(
-      icon: Icons.bookmark_border_outlined,
-      activeIcon: Icons.bookmark,
-      label: 'Watchlist',
+      icon: Icons.explore_outlined,
+      activeIcon: Icons.explore,
+      label: 'Discover',
     ),
     _NavDest(
-      icon: Icons.search_outlined,
-      activeIcon: Icons.search_rounded,
-      label: 'Search',
+      icon: Icons.event_outlined,
+      activeIcon: Icons.event,
+      label: 'Plans',
     ),
     _NavDest(
       icon: Icons.people_outline,

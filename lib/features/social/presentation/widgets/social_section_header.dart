@@ -18,7 +18,6 @@ class SocialSectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return FlixieSectionHeader(
       title: title,
-      uppercase: false,
       badge: badge,
       trailingLabel: rightLabel,
     );

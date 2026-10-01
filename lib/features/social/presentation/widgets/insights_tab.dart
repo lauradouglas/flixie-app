@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -276,46 +277,8 @@ class InsightSectionHeader extends StatelessWidget {
   final String? meta;
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 4,
-          height: 22,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(2),
-            color: FlixieColors.primary,
-            boxShadow: [
-              BoxShadow(
-                color: FlixieColors.primary.withValues(alpha: 0.35),
-                blurRadius: 10,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 10),
-        Icon(icon, color: FlixieColors.primary, size: 18),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: FlixieColors.primary,
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.4,
-            ),
-          ),
-        ),
-        if ((meta ?? '').isNotEmpty) ...[
-          const SizedBox(width: 8),
-          FlixiePill.label(label: Text(meta!)),
-        ],
-      ],
-    );
-  }
+  Widget build(BuildContext context) =>
+      FlixieSectionHeader(title: title, trailingLabel: meta);
 }
 
 class InsightHighlightCard extends StatelessWidget {

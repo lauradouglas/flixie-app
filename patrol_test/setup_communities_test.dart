@@ -91,20 +91,19 @@ void main() {
         ],
         child: MaterialApp.router(
             theme: AppTheme.darkTheme, routerConfig: router)));
-    await $('Skip for now').tap();
     await $(find.byKey(const ValueKey('taste-movie:348'))).tap();
     await $('Continue').tap();
+    await $('Skip services for now').tap();
+    await $('Find my kind of people').tap();
     await $('Horror').waitUntilVisible();
     expect(joins, 0);
     await $('Horror').tap();
     expect(joins, 0);
-    await $('Join 1 & continue').tap();
-    await $('Explore your communities').scrollTo();
-    await $('Explore your communities').tap();
-    await $('Joined · Explore reviews').waitUntilVisible();
+    await $('Join 1 & explore').tap();
+    await $('✓ Joined').waitUntilVisible();
     expect(joins, 1);
     await $.platform.mobile.pressHome();
     await $.platform.mobile.openApp();
-    await $('Joined · Explore reviews').waitUntilVisible();
+    await $('✓ Joined').waitUntilVisible();
   });
 }

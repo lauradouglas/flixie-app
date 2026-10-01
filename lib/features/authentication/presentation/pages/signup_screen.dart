@@ -19,7 +19,7 @@ import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/widgets/flixie_wordmark.dart';
 import 'package:flixie_app/features/authentication/presentation/pages/auth_ui.dart';
 import 'package:flixie_app/features/profile/data/avatar_service.dart';
-import 'package:flixie_app/features/profile/presentation/widgets/avatar_picker.dart';
+import 'signup_avatar_step.dart';
 import 'package:flixie_app/models/profile_avatar.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 
@@ -50,8 +50,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _termsAccepted = false;
 
-  final _firstNameController = TextEditingController();
-  final _lastNameController = TextEditingController();
+  final _displayNameController = TextEditingController();
   final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -93,8 +92,7 @@ class _SignupScreenState extends State<SignupScreen> {
   void dispose() {
     _usernameDebounce?.cancel();
     _referralDebounce?.cancel();
-    _firstNameController.dispose();
-    _lastNameController.dispose();
+    _displayNameController.dispose();
     _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -270,8 +268,8 @@ class _SignupScreenState extends State<SignupScreen> {
       termsAccepted: _termsAccepted,
       email: _emailController.text.trim(),
       password: _passwordController.text,
-      firstName: _firstNameController.text.trim(),
-      lastName: _lastNameController.text.trim(),
+      firstName: _displayNameController.text.trim(),
+      lastName: '',
       username: _usernameController.text.trim(),
       referralCode: _referralCodeController.text,
     );
@@ -391,6 +389,22 @@ class _SignupScreenState extends State<SignupScreen> {
     final textTheme = Theme.of(context).textTheme;
     final isLoading = context.select<AuthProvider, bool>((p) => p.isLoading);
 
+    if (_choosingAvatar) {
+      return SignupAvatarStep(
+        avatars: _avatars,
+        selectedId: _selectedAvatarId,
+        loading: _loadingAvatars,
+        saving: isLoading,
+        error: _avatarError,
+        profileBadges:
+            context.watch<AuthProvider>().dbUser?.profileBadges ?? const [],
+        onRetry: _loadAvatars,
+        onSelected: (avatar) => setState(() => _selectedAvatarId = avatar.id),
+        onContinue: _completeAvatarSignup,
+        onBack: () => context.pop(),
+      );
+    }
+
     return AuthScaffold(
       topLabel: 'Create your account',
       title: Text.rich(
@@ -417,239 +431,205 @@ class _SignupScreenState extends State<SignupScreen> {
         ),
         textAlign: TextAlign.center,
       ),
-      subtitle: 'Secure your account with the basics.',
+      subtitle: 'Your next favourite. Your kind of people.',
       onBack: () => context.pop(),
       cardPadding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
-      cardChild: _choosingAvatar
-          ? Column(
-              children: [
-                Text('Choose your profile avatar', style: textTheme.titleLarge),
-                const SizedBox(height: 16),
-                AvatarPicker(
-                  avatars: _avatars,
-                  selectedId: _selectedAvatarId,
-                  loading: _loadingAvatars,
-                  error: _avatarError,
-                  onRetry: _loadAvatars,
-                  onSelected: (avatar) =>
-                      setState(() => _selectedAvatarId = avatar.id),
-                ),
-                const SizedBox(height: 18),
-                PrimaryButton(
-                  label: 'Continue',
-                  isLoading: isLoading,
-                  onPressed: isLoading || _selectedAvatarId == null
-                      ? null
-                      : _completeAvatarSignup,
+      cardChild: AutofillGroup(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AppTextField(
+                controller: _displayNameController,
+                label: 'Display name',
+                validator: (value) => validateSignupName(value, 'display name'),
+                prefixIcon: Icons.person_outline_rounded,
+                keyboardType: TextInputType.name,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.nickname],
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'What should we call you? Your display name is public. '
+                'Use a first name, nickname or full name.',
+              ),
+              const SizedBox(height: 14),
+              AppTextField(
+                controller: _usernameController,
+                label: 'Username',
+                prefixIcon: Icons.alternate_email_rounded,
+                textInputAction: TextInputAction.next,
+                onChanged: _onUsernameChanged,
+                suffixIcon: _buildUsernameSuffix(),
+                validator: (value) {
+                  final raw = value?.trim() ?? '';
+                  if (raw.isEmpty) return 'Please enter a username.';
+                  if (raw.length < 3) {
+                    return 'Username must be at least 3 characters.';
+                  }
+                  if (_usernameAvailable == false) {
+                    return 'This username is already taken.';
+                  }
+                  return null;
+                },
+              ),
+              if (_usernameCheckError != null) ...[
+                const SizedBox(height: 6),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    _usernameCheckError!,
+                    style: TextStyle(
+                      color: context.colors.danger,
+                      fontSize: 12,
+                    ),
+                  ),
                 ),
               ],
-            )
-          : AutofillGroup(
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    AppTextField(
-                      controller: _firstNameController,
-                      label: 'First name',
-                      validator: (value) =>
-                          validateSignupName(value, 'first name'),
-                      prefixIcon: Icons.person_outline_rounded,
-                      keyboardType: TextInputType.name,
-                      textCapitalization: TextCapitalization.words,
-                      textInputAction: TextInputAction.next,
-                      autofillHints: const [AutofillHints.givenName],
-                    ),
-                    const SizedBox(height: 14),
-                    AppTextField(
-                      controller: _lastNameController,
-                      label: 'Last name',
-                      validator: (value) =>
-                          validateSignupName(value, 'last name'),
-                      prefixIcon: Icons.person_outline_rounded,
-                      keyboardType: TextInputType.name,
-                      textCapitalization: TextCapitalization.words,
-                      textInputAction: TextInputAction.next,
-                      autofillHints: const [AutofillHints.familyName],
-                    ),
-                    const SizedBox(height: 14),
-                    AppTextField(
-                      controller: _usernameController,
-                      label: 'Username',
-                      prefixIcon: Icons.alternate_email_rounded,
-                      textInputAction: TextInputAction.next,
-                      onChanged: _onUsernameChanged,
-                      suffixIcon: _buildUsernameSuffix(),
-                      validator: (value) {
-                        final raw = value?.trim() ?? '';
-                        if (raw.isEmpty) return 'Please enter a username.';
-                        if (raw.length < 3) {
-                          return 'Username must be at least 3 characters.';
-                        }
-                        if (_usernameAvailable == false) {
-                          return 'This username is already taken.';
-                        }
-                        return null;
-                      },
-                    ),
-                    if (_usernameCheckError != null) ...[
-                      const SizedBox(height: 6),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          _usernameCheckError!,
-                          style: TextStyle(
-                            color: context.colors.danger,
-                            fontSize: 12,
-                          ),
+              const SizedBox(height: 14),
+              AppTextField(
+                controller: _emailController,
+                label: 'Email Address',
+                prefixIcon: Icons.mail_outline_rounded,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [
+                  AutofillHints.username,
+                  AutofillHints.email,
+                ],
+                onChanged: (_) => setState(() {}),
+                suffixIcon: _buildEmailSuffix(),
+                validator: (value) {
+                  final raw = value?.trim() ?? '';
+                  if (raw.isEmpty) return 'Please enter your email.';
+                  if (!isValidEmailFormat(raw)) {
+                    return 'Please enter a valid email.';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 14),
+              AppTextField(
+                controller: _referralCodeController,
+                label: 'Who referred you? (optional)',
+                prefixIcon: Icons.people_alt_outlined,
+                textCapitalization: TextCapitalization.characters,
+                textInputAction: TextInputAction.next,
+                onChanged: _onReferralCodeChanged,
+                suffixIcon: _checkingReferral
+                    ? const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
                         ),
-                      ),
-                    ],
-                    const SizedBox(height: 14),
-                    AppTextField(
-                      controller: _emailController,
-                      label: 'Email Address',
-                      prefixIcon: Icons.mail_outline_rounded,
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      autofillHints: const [
-                        AutofillHints.username,
-                        AutofillHints.email,
-                      ],
-                      onChanged: (_) => setState(() {}),
-                      suffixIcon: _buildEmailSuffix(),
-                      validator: (value) {
-                        final raw = value?.trim() ?? '';
-                        if (raw.isEmpty) return 'Please enter your email.';
-                        if (!isValidEmailFormat(raw)) {
-                          return 'Please enter a valid email.';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 14),
-                    AppTextField(
-                      controller: _referralCodeController,
-                      label: 'Who referred you? (optional)',
-                      prefixIcon: Icons.people_alt_outlined,
-                      textCapitalization: TextCapitalization.characters,
-                      textInputAction: TextInputAction.next,
-                      onChanged: _onReferralCodeChanged,
-                      suffixIcon: _checkingReferral
-                          ? const Padding(
-                              padding: EdgeInsets.all(12),
-                              child: SizedBox(
-                                width: 18,
-                                height: 18,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              ),
-                            )
-                          : _referralCodeValid == true
-                              ? Icon(
-                                  Icons.check_circle,
-                                  color: context.colors.success,
-                                )
-                              : _referralCodeValid == false
-                                  ? Icon(
-                                      Icons.cancel,
-                                      color: context.colors.danger,
-                                    )
-                                  : null,
-                      validator: (value) {
-                        final code = value?.trim() ?? '';
-                        if (code.isNotEmpty &&
-                            (code.length < 4 || code.length > 32)) {
-                          return 'Enter the referral code from your friend.';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      _referrerUsername != null
-                          ? '@$_referrerUsername referred you'
-                          : _referralError ??
-                              'Enter the code from your invite. When you '
-                                  'complete your profile, you’ll both unlock '
-                                  'your Movie Match.',
-                      style: TextStyle(
-                        color: _referrerUsername != null
-                            ? context.colors.success
-                            : _referralError != null
-                                ? context.colors.danger
-                                : context.colors.medium,
-                        fontSize: 12,
-                        height: 1.35,
-                        fontWeight: _referrerUsername != null
-                            ? FontWeight.w700
-                            : FontWeight.normal,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    PasswordField(
-                      controller: _passwordController,
-                      label: 'Password',
-                      textInputAction: TextInputAction.next,
-                      autofillHints: const [AutofillHints.newPassword],
-                      onChanged: (_) => setState(() {}),
-                      validator: validateFirebasePassword,
-                    ),
-                    const SizedBox(height: 10),
-                    PasswordStrengthBar(password: _passwordController.text),
-                    const SizedBox(height: 14),
-                    PasswordField(
-                      controller: _confirmPasswordController,
-                      label: 'Confirm Password',
-                      textInputAction: TextInputAction.done,
-                      autofillHints: const [AutofillHints.newPassword],
-                      onFieldSubmitted: (_) => _submit(),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please confirm your password.';
-                        }
-                        if (value != _passwordController.text) {
-                          return 'Passwords do not match.';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 22),
-                    TermsAgreementField(
-                        onChanged: (value) => _termsAccepted = value),
-                    const SizedBox(height: 16),
-                    PrimaryButton(
-                      label: 'Continue',
-                      isLoading: isLoading,
-                      onPressed: isLoading ? null : _submit,
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Already have an account?',
-                          style: textTheme.bodyMedium
-                              ?.copyWith(color: context.colors.light),
-                        ),
-                        TextButton(
-                          onPressed: () => context.pop(),
-                          style: TextButton.styleFrom(
-                            foregroundColor: context.colors.primaryTint,
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                          ),
-                          child: const Text(
-                            'Sign In',
-                            style: TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                      )
+                    : _referralCodeValid == true
+                        ? Icon(
+                            Icons.check_circle,
+                            color: context.colors.success,
+                          )
+                        : _referralCodeValid == false
+                            ? Icon(
+                                Icons.cancel,
+                                color: context.colors.danger,
+                              )
+                            : null,
+                validator: (value) {
+                  final code = value?.trim() ?? '';
+                  if (code.isNotEmpty &&
+                      (code.length < 4 || code.length > 32)) {
+                    return 'Enter the referral code from your friend.';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 6),
+              Text(
+                _referrerUsername != null
+                    ? '@$_referrerUsername referred you'
+                    : _referralError ??
+                        'Enter the code from your invite. When you '
+                            'complete your profile, you’ll both unlock '
+                            'your Movie Match.',
+                style: TextStyle(
+                  color: _referrerUsername != null
+                      ? context.colors.success
+                      : _referralError != null
+                          ? context.colors.danger
+                          : context.colors.medium,
+                  fontSize: 12,
+                  height: 1.35,
+                  fontWeight: _referrerUsername != null
+                      ? FontWeight.w700
+                      : FontWeight.normal,
                 ),
               ),
-            ),
+              const SizedBox(height: 14),
+              PasswordField(
+                controller: _passwordController,
+                label: 'Password',
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.newPassword],
+                onChanged: (_) => setState(() {}),
+                validator: validateFirebasePassword,
+              ),
+              const SizedBox(height: 10),
+              PasswordStrengthBar(password: _passwordController.text),
+              const SizedBox(height: 14),
+              PasswordField(
+                controller: _confirmPasswordController,
+                label: 'Confirm Password',
+                textInputAction: TextInputAction.done,
+                autofillHints: const [AutofillHints.newPassword],
+                onFieldSubmitted: (_) => _submit(),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please confirm your password.';
+                  }
+                  if (value != _passwordController.text) {
+                    return 'Passwords do not match.';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 22),
+              TermsAgreementField(onChanged: (value) => _termsAccepted = value),
+              const SizedBox(height: 16),
+              PrimaryButton(
+                label: 'Continue',
+                isLoading: isLoading,
+                onPressed: isLoading ? null : _submit,
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Already have an account?',
+                    style: textTheme.bodyMedium
+                        ?.copyWith(color: context.colors.light),
+                  ),
+                  TextButton(
+                    onPressed: () => context.pop(),
+                    style: TextButton.styleFrom(
+                      foregroundColor: context.colors.primaryTint,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    child: const Text(
+                      'Sign In',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -1,3 +1,4 @@
+import 'package:flixie_app/app/theme/flixie_typography.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flixie_app/features/watch_plans/presentation/widgets/shared/watch_plan_components.dart';
@@ -1856,11 +1857,7 @@ class _PlanState {
   final IconData icon;
 }
 
-const _sectionTitle = TextStyle(
-  color: FlixieColors.textPrimary,
-  fontSize: 22,
-  fontWeight: FontWeight.w900,
-);
+const _sectionTitle = FlixieTypography.sectionTitle;
 
 const _body = TextStyle(
   color: FlixieColors.light,

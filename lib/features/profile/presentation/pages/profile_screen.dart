@@ -1,10 +1,11 @@
+import 'package:flixie_app/features/profile/presentation/widgets/profile_scroll_view.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/monthly_watch_summary.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/favourite_poster_rail.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_library_totals.dart';
 import 'package:flixie_app/features/profile/presentation/pages/milestones_screen.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/favourite_ranking_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/features/profile/presentation/controllers/review_reactions_controller.dart';
-import 'package:flixie_app/features/movies/presentation/widgets/review_card.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -66,7 +67,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   FriendsData? _friendsData;
   bool _friendsLoading = true;
 
-  final _ratingsKey = GlobalKey();
   List<MovieRating> _ratings = [];
   bool _ratingsLoading = true;
   int _ratingsGeneration = 0;
@@ -521,9 +521,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 await context.read<AuthProvider>().refreshUserData();
                 await _loadAll();
               },
-              child: CustomScrollView(
-                key: PageStorageKey('profile-${_selectedTab.name}'),
-                physics: const AlwaysScrollableScrollPhysics(),
+              child: ProfileScrollView(
                 slivers: [
                   SliverToBoxAdapter(
                       child: ProfileHeader(
@@ -556,62 +554,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   icon: const Icon(Icons.people_outline,
                                       size: 19),
                                   label: const Text('Friends & following'))))),
-                  if (_wrapped?.insights != null)
-                    SliverToBoxAdapter(
-                        child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _SocialSectionHeader(
-                                title: 'This month',
-                                onSeeAll: () => setState(
-                                    () => _selectedTab = _ProfileTab.stats),
-                                actionLabel: 'View stats'),
-                            Text(
-                                '${_wrapped!.insights!['monthMovies']} movie watches · ${_wrapped!.insights!['monthEpisodes']} episodes',
-                                style: TextStyle(color: context.colors.light)),
-                            if (_wrapped!.insights!['milestone'] != null)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 14),
-                                child: Row(children: [
-                                  Icon(Icons.star_outline_rounded,
-                                      color: context.colors.warning),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                      child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                        Text('Latest milestone',
-                                            style: TextStyle(
-                                                color: context.colors.medium,
-                                                fontSize: 12)),
-                                        Text(
-                                            '${_wrapped!.insights!['milestone']['count']} unique films watched',
-                                            style: TextStyle(
-                                                color: context.colors.white,
-                                                fontWeight: FontWeight.w600)),
-                                      ])),
-                                ]),
-                              ),
-                          ]),
-                    )),
-                  if (userId != null)
-                    SliverToBoxAdapter(
-                        child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: TextButton.icon(
-                            icon: const Icon(Icons.workspace_premium_outlined),
-                            label: const Text('View all milestones'),
-                            onPressed: () => Navigator.of(context).push(
-                                MaterialPageRoute(
-                                    builder: (_) =>
-                                        MilestonesScreen(userId: userId))),
-                          )),
-                    )),
                   SliverPersistentHeader(
                       pinned: true,
                       delegate: _ProfileTabsDelegate(
@@ -674,6 +616,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Widget _libraryRow(
+          {required IconData icon,
+          required String label,
+          required VoidCallback onPressed}) =>
+      Column(children: [
+        ListTile(
+            contentPadding: EdgeInsets.zero,
+            minTileHeight: 52,
+            leading: Icon(icon, size: 20, color: context.colors.secondary),
+            title: Text(label,
+                style:
+                    const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+            trailing: const Icon(Icons.chevron_right, size: 18),
+            onTap: onPressed),
+        Divider(height: 1, color: context.colors.tabBarBorder),
+      ]);
+
   Widget _buildLibraryTab({
     required BuildContext context,
     required String? userId,
@@ -684,34 +643,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Wrap(spacing: 14, runSpacing: 4, children: [
-          TextButton.icon(
-              onPressed: () => context.push('/watch-history'),
-              icon: const Icon(Icons.history, size: 18),
-              label: const Text('Watch history')),
-          TextButton.icon(
-              onPressed: () => context.push('/my-reviews'),
-              icon: const Icon(Icons.rate_review_outlined, size: 18),
-              label: const Text('Reviews')),
-          TextButton.icon(
-              onPressed: () {
-                final target = _ratingsKey.currentContext;
-                if (target != null) {
-                  Scrollable.ensureVisible(target,
-                      alignment: .1,
-                      duration: MediaQuery.disableAnimationsOf(context)
-                          ? Duration.zero
-                          : const Duration(milliseconds: 250));
-                }
-              },
-              icon: const Icon(Icons.star_outline, size: 18),
-              label: const Text('Ratings')),
-          TextButton.icon(
-              onPressed: () => context.push('/movie-lists'),
-              icon: const Icon(Icons.list_alt, size: 18),
-              label: const Text('Lists')),
-        ]),
-        const SizedBox(height: 12),
+        ProfileFavouritesLibrary(
+          movies: favoriteMovies,
+          people: favoritePeople,
+          shows: favoriteShows,
+        ),
+        const SizedBox(height: 20),
+        if (_profileExtrasLoading) ...[
+          const _ProfileExtrasLoadingIndicator(),
+          const SizedBox(height: 20),
+        ],
+        _libraryRow(
+            icon: Icons.bookmark_outline,
+            label: 'Watchlist',
+            onPressed: () => context.push('/watchlist')),
+        const SizedBox(height: 20),
+        if (userId != null) ...[
+          ListsPreviewSection(
+            userId: userId,
+            title: 'Your lists',
+            emptyMessage:
+                'Keep a little collection of your own. Rainy-day films? A director you love?',
+            allowManage: true,
+            embedded: true,
+          ),
+          const SizedBox(height: 20),
+        ],
+        if (_activityLoading)
+          const LinearProgressIndicator()
+        else
+          _recentlyWatched(),
+        const SizedBox(height: 20),
         if (_continueWatching.isNotEmpty) ...[
           _ProfileContinueWatching(
             shows: _continueWatching,
@@ -719,50 +681,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 20),
         ],
-        if (favoriteMovies.isNotEmpty ||
-            favoritePeople.isNotEmpty ||
-            favoriteShows.isNotEmpty) ...[
-          _FavouritesLibrary(
-            movies: favoriteMovies,
-            people: favoritePeople,
-            shows: favoriteShows,
+        _libraryRow(
+          icon: Icons.rate_review_outlined,
+          label: 'Reviews',
+          onPressed: () => context.push('/my-reviews'),
+        ),
+        _libraryRow(
+          icon: Icons.star_outline,
+          label: 'Ratings',
+          onPressed: () => showModalBottomSheet<void>(
+            context: context,
+            useRootNavigator: true,
+            useSafeArea: true,
+            isScrollControlled: true,
+            builder: (context) => SizedBox(
+              height: MediaQuery.sizeOf(context).height * .75,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: _ratingsLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : RatingsSection(ratings: _ratings),
+              ),
+            ),
           ),
-        ] else
-          _ProfileEmptyAction(
-            icon: Icons.favorite_outline_rounded,
-            title: 'No favourite movies yet',
-            body: 'Favourite a few movies so your profile feels like you.',
-            label: 'Find movies',
-            onPressed: () => context.push('/search'),
-          ),
+        ),
         const SizedBox(height: 20),
-        if (_profileExtrasLoading) ...[
-          const _ProfileExtrasLoadingIndicator(),
-          const SizedBox(height: 20),
-        ],
-        if (userId != null) ...[
-          ListsPreviewSection(
-            userId: userId,
-            title: 'Your lists',
-            emptyMessage: "You haven't created any lists yet.",
-            allowManage: true,
-            embedded: true,
-          ),
-          const SizedBox(height: 20),
-        ],
-        if (_reviews.isNotEmpty) ...[
-          _RecentReviewsSummary(reviews: _reviews),
-          const SizedBox(height: 16),
-        ],
-        if (_ratingsLoading)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Center(child: CircularProgressIndicator()),
-          )
-        else ...[
-          RatingsSection(key: _ratingsKey, ratings: _ratings),
-          const SizedBox(height: 16),
-        ],
         _WatchProvidersSummary(
           providers: _watchProviders,
           onManage: _openWatchProviders,
@@ -770,6 +713,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
         const SizedBox(height: 16),
       ],
     );
+  }
+
+  Widget _recentlyWatched() {
+    final watches = _activity
+        .where((item) =>
+            !item.removed &&
+            (item.type == ActivityListType.movieWatched ||
+                item.type == ActivityListType.showWatched ||
+                item.watchLogged))
+        .toList()
+      ..sort((a, b) => (DateTime.tryParse(b.watchedAt ?? b.timestamp) ??
+              DateTime(1970))
+          .compareTo(
+              DateTime.tryParse(a.watchedAt ?? a.timestamp) ?? DateTime(1970)));
+    final seen = <String>{};
+    final items = <FavouriteDisplayItem>[];
+    for (final item in watches) {
+      final route = item.showId != null
+          ? '/shows/${item.showId}'
+          : item.movieId != null
+              ? '/movies/${item.movieId}'
+              : null;
+      if (route == null || !seen.add(route)) continue;
+      items.add(FavouriteDisplayItem(
+          title: item.mediaTitle ?? 'View title',
+          imagePath: item.mediaPosterPath,
+          route: route));
+      if (items.length == 10) break;
+    }
+    if (items.isEmpty) {
+      return _ProfileEmptyAction(
+        icon: Icons.movie_outlined,
+        title: 'Find your next watch',
+        body:
+            'Explore films and shows, or log something you’ve already watched.',
+        label: 'Explore films & shows',
+        onPressed: () => context.push('/search'),
+      );
+    }
+    return FavouritePosterRail(
+        title: 'Recently watched',
+        items: items,
+        onSeeAll: () => context.push('/watch-history'));
   }
 
   Widget _buildActivityTab(
@@ -899,18 +885,88 @@ class _ProfileScreenState extends State<ProfileScreen> {
     List<dynamic> favoriteGenres,
     models.User? user,
   ) {
-    return _ProfileStatsContent(
-      wrapped: _wrapped,
-      failed: _statsFailed,
-      onRetry: _loadProfileExtras,
-      ratings: _ratings,
-      reviewCount: _reviewCount,
-      favoriteGenres: favoriteGenres,
-      directorPeople: _directorPeople,
-      onWrapped: () => context.push('/wrapped/${user?.id ?? ''}'),
-      onFindMovies: () => context.push('/search'),
-      onSeeRatings: () => context.push('/stats'),
-    );
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      CustomScrollView(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          slivers: [
+            if (_wrapped?.insights != null)
+              SliverToBoxAdapter(
+                  child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _SocialSectionHeader(
+                          title: 'This month',
+                          onSeeAll: () =>
+                              setState(() => _selectedTab = _ProfileTab.stats),
+                          actionLabel: 'View stats'),
+                      MonthlyWatchSummary(
+                        movies: (_wrapped!.insights!['monthMovies'] as num?)
+                                ?.toInt() ??
+                            0,
+                        episodes: (_wrapped!.insights!['monthEpisodes'] as num?)
+                                ?.toInt() ??
+                            0,
+                        onDiscover: () => context.push('/search'),
+                        onLog: () => context.push('/search'),
+                      ),
+                      if (_wrapped!.insights!['milestone'] != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 14),
+                          child: Row(children: [
+                            Icon(Icons.star_outline_rounded,
+                                color: context.colors.warning),
+                            const SizedBox(width: 10),
+                            Expanded(
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                  Text('Latest milestone',
+                                      style: TextStyle(
+                                          color: context.colors.medium,
+                                          fontSize: 12)),
+                                  Text(
+                                      '${_wrapped!.insights!['milestone']['count']} unique films watched',
+                                      style: TextStyle(
+                                          color: context.colors.white,
+                                          fontWeight: FontWeight.w600)),
+                                ])),
+                          ]),
+                        ),
+                    ]),
+              )),
+            if (user?.id != null)
+              SliverToBoxAdapter(
+                  child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      icon: const Icon(Icons.workspace_premium_outlined),
+                      label: const Text('View all milestones'),
+                      onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                              builder: (_) =>
+                                  MilestonesScreen(userId: user!.id))),
+                    )),
+              )),
+          ]),
+      _ProfileStatsContent(
+        wrapped: _wrapped,
+        failed: _statsFailed,
+        onRetry: _loadProfileExtras,
+        ratings: _ratings,
+        reviewCount: _reviewCount,
+        favoriteGenres: favoriteGenres,
+        directorPeople: _directorPeople,
+        onWrapped: () => context.push('/wrapped/${user?.id ?? ''}'),
+        onFindMovies: () => context.push('/search'),
+        onSeeRatings: () => context.push('/stats'),
+      ),
+    ]);
   }
 
   String? _memberSinceLabel(String? value) {
@@ -934,8 +990,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-class _FavouritesLibrary extends StatelessWidget {
-  const _FavouritesLibrary({
+class ProfileFavouritesLibrary extends StatelessWidget {
+  const ProfileFavouritesLibrary({
+    super.key,
     required this.movies,
     required this.shows,
     required this.people,
@@ -944,6 +1001,17 @@ class _FavouritesLibrary extends StatelessWidget {
   final List<dynamic> movies;
   final List<dynamic> people;
   final List<dynamic> shows;
+
+  Widget _empty(BuildContext context, String title, String action) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          FlixieSectionHeader(title: title),
+          TextButton.icon(
+              onPressed: () => context.push('/search'),
+              icon: const Icon(Icons.add, size: 18),
+              label: Text(action)),
+        ],
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -985,14 +1053,14 @@ class _FavouritesLibrary extends StatelessWidget {
       children: [
         if (movieItems.isNotEmpty)
           FavouritePosterRail(
-            title: 'Favourite movies',
+            title: 'Favourite films',
             items: movieItems,
             limit: maxFavouriteMovies,
             onRank: () => showFavouriteRankingSheet(context, shows: false),
           ),
-        if (movieItems.isNotEmpty &&
-            (peopleItems.isNotEmpty || showItems.isNotEmpty))
-          const SizedBox(height: 18),
+        if (movieItems.isEmpty)
+          _empty(context, 'Favourite films', 'Add favourite films'),
+        const SizedBox(height: 18),
         if (showItems.isNotEmpty)
           FavouritePosterRail(
             title: 'Favourite shows',
@@ -1000,160 +1068,18 @@ class _FavouritesLibrary extends StatelessWidget {
             limit: maxFavouriteShows,
             onRank: () => showFavouriteRankingSheet(context, shows: true),
           ),
-        if (showItems.isNotEmpty && peopleItems.isNotEmpty)
-          const SizedBox(height: 18),
+        if (showItems.isEmpty)
+          _empty(context, 'Favourite shows', 'Add favourite shows'),
+        const SizedBox(height: 18),
         if (peopleItems.isNotEmpty)
           FavouritePosterRail(
             title: 'Favourite people',
             items: peopleItems,
             circular: true,
           ),
+        if (peopleItems.isEmpty)
+          _empty(context, 'Favourite people', 'Add favourite people'),
       ],
-    );
-  }
-}
-
-class _RecentReviewsSummary extends StatelessWidget {
-  const _RecentReviewsSummary({required this.reviews});
-
-  final List<Review> reviews;
-
-  @override
-  Widget build(BuildContext context) {
-    final recent = reviews.take(3);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        FlixieSectionHeader(
-          title: 'Recent reviews',
-          uppercase: false,
-          accentHeight: 0,
-          titleStyle: TextStyle(
-            color: context.colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            letterSpacing: .5,
-          ),
-          trailingLabel: 'See all',
-          trailingColor: FlixieColors.primary,
-          onTrailingTap: () => context.push('/my-reviews'),
-        ),
-        ...recent.map((review) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _ProfileReviewCard(review: review),
-            )),
-      ],
-    );
-  }
-}
-
-class _ProfileReviewCard extends StatelessWidget {
-  const _ProfileReviewCard({required this.review});
-
-  final Review review;
-
-  @override
-  Widget build(BuildContext context) {
-    final date = DateTime.tryParse(review.createdAt);
-    final mediaRoute = review.showId != null
-        ? showDetailPath(review.showId!)
-        : review.movieId != null
-            ? movieDetailPath(review.movieId!)
-            : null;
-    return Material(
-      color: context.colors.surface,
-      borderRadius: BorderRadius.circular(14),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => showReviewDetailSheet(context,
-            review: review,
-            currentUserId: context.read<AuthProvider>().dbUser?.id),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            if (review.moviePosterPath != null) ...[
-              ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                      'https://image.tmdb.org/t/p/w342${review.moviePosterPath}',
-                      width: 60,
-                      height: 90,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          const SizedBox(width: 60, height: 90))),
-              const SizedBox(width: 12),
-            ],
-            Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                  TextButton(
-                      onPressed: mediaRoute == null
-                          ? null
-                          : () => context.push(mediaRoute),
-                      style: TextButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          alignment: Alignment.centerLeft),
-                      child: Text(review.movieTitle ??
-                          (review.showId != null
-                              ? 'Show review'
-                              : 'Movie review'))),
-                  Text(review.title,
-                      style: TextStyle(
-                          color: context.colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700)),
-                  if (date != null)
-                    Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                            '${date.day} ${const [
-                              'Jan',
-                              'Feb',
-                              'Mar',
-                              'Apr',
-                              'May',
-                              'Jun',
-                              'Jul',
-                              'Aug',
-                              'Sep',
-                              'Oct',
-                              'Nov',
-                              'Dec'
-                            ][date.month - 1]} ${date.year}',
-                            style: TextStyle(
-                                color: context.colors.medium, fontSize: 12))),
-                  const SizedBox(height: 6),
-                  Text(review.body,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          color: context.colors.light,
-                          fontSize: 13,
-                          height: 1.4)),
-                  Wrap(
-                      spacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Text('★ ${review.rating}/10',
-                            style: TextStyle(color: context.colors.warning)),
-                        if (review.recommended)
-                          Icon(Icons.thumb_up_alt_outlined,
-                              color: context.colors.success, size: 16),
-                        TextButton(
-                            onPressed: () => showReviewDetailSheet(context,
-                                review: review,
-                                currentUserId:
-                                    context.read<AuthProvider>().dbUser?.id),
-                            child: const Text('Read review ›')),
-                        TextButton(
-                            onPressed: () => context.push('/my-reviews'),
-                            child: const Text('Manage')),
-                      ]),
-                ])),
-          ]),
-        ),
-      ),
     );
   }
 }
@@ -1661,16 +1587,8 @@ class _ProfileContinueWatching extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        FlixieSectionHeader(
+        const FlixieSectionHeader(
           title: 'Continue watching',
-          uppercase: false,
-          accentHeight: 0,
-          titleStyle: TextStyle(
-            color: context.colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            letterSpacing: .5,
-          ),
         ),
         const SizedBox(height: 10),
         ContinueWatchingCarousel(

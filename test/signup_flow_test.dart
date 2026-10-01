@@ -20,6 +20,7 @@ class _FakeFirebaseUser extends Fake implements User {}
 class _SignupAuthService extends Fake implements AuthService {
   final _controller = StreamController<User?>.broadcast();
   int signupCalls = 0;
+  String? submittedDisplayName;
   int refreshCalls = 0;
   Object? signupError;
   bool hasUser = false;
@@ -34,6 +35,7 @@ class _SignupAuthService extends Fake implements AuthService {
   Future<String> signUp(
       String email, String password, String displayName) async {
     signupCalls++;
+    submittedDisplayName = displayName;
     if (signupError case final error?) throw error;
     hasUser = true;
     ApiClient.setToken('fresh-signup-token');
@@ -259,6 +261,33 @@ void main() {
       UserService.usernameAvailabilityPath('Movie User/99'),
       '/users/Movie%20User%2F99/exists',
     );
+  });
+
+  test('display-name-only signup creates a profile and proceeds to avatar',
+      () async {
+    Map<String, dynamic>? body;
+    final provider = AuthProvider(authService, MovieService(),
+        prefetchAfterAuth: false, profileCreator: (value) async {
+      body = Map<String, dynamic>.from(value);
+      return model.User.fromJson({
+        ..._createdUser().toJson(),
+        'firstName': 'Film Fan',
+        'lastName': ''
+      });
+    });
+    expect(
+        await provider.beginAvatarSignUp(
+            termsAccepted: true,
+            email: 'viewer@example.com',
+            password: 'Password1!',
+            firstName: ' Film Fan ',
+            lastName: '',
+            username: 'film_fan'),
+        isTrue);
+    expect(body?['firstName'], 'Film Fan');
+    expect(body?['lastName'], '');
+    expect(authService.submittedDisplayName, 'Film Fan');
+    expect(provider.dbUser?.firstName, 'Film Fan');
   });
 
   test('signup forwards a normalized referral code', () async {

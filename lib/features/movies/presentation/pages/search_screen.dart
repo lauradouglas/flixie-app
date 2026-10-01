@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 import 'package:flixie_app/features/collections/collection_screen.dart';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
@@ -578,7 +579,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 }
 
-// ─── Section header with left accent bar ───────────────────────────────────
+// Shared section heading
 
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({required this.title});
@@ -586,29 +587,7 @@ class _SectionHeader extends StatelessWidget {
   final String title;
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 3,
-          height: 18,
-          decoration: BoxDecoration(
-            color: FlixieColors.primary,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: TextStyle(
-            color: context.colors.light,
-            fontWeight: FontWeight.w700,
-            fontSize: 16,
-          ),
-        ),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => FlixieSectionHeader(title: title);
 }
 
 // ─── Browse-by category data ─────────────────────────────────────────────────

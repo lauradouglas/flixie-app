@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/safety/safety_service.dart';
 import 'package:flixie_app/features/social/data/chat_unread_controller.dart';
@@ -159,25 +160,15 @@ class _ConversationsHubState extends State<ConversationsHub> {
               const SizedBox(height: 22),
               Row(
                 children: [
-                  Text(
-                    'Messages',
-                    style: TextStyle(
-                      color: context.colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '${conversations.length} ${conversations.length == 1 ? 'chat' : 'chats'}',
-                    style: const TextStyle(
-                      color: FlixieColors.primary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                  Expanded(
+                      child: FlixieSectionHeader(
+                    title: 'Messages',
+                    trailingLabel:
+                        '${conversations.length} ${conversations.length == 1 ? 'chat' : 'chats'}',
+                  )),
+                  const MarkAllChatsReadButton(),
                 ],
               ),
-              const MarkAllChatsReadButton(),
               const SizedBox(height: 10),
               if (conversations.isEmpty)
                 _ConversationEmpty(
@@ -520,30 +511,36 @@ class MarkAllChatsReadButton extends StatelessWidget {
         (controller.total == 0 && !controller.markingAllRead)) {
       return const SizedBox.shrink();
     }
-    return Align(
-      alignment: Alignment.centerRight,
-      child: TextButton.icon(
-        style: TextButton.styleFrom(
-          padding: const EdgeInsetsDirectional.only(start: 8),
-        ),
-        onPressed: controller.markingAllRead
-            ? null
-            : () async {
-                final failures = await controller.markAllRead();
-                if (!context.mounted || failures == 0) return;
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                  content: Text(
-                      'Some chats could not be marked as read. Please try again.'),
-                ));
-              },
-        icon: controller.markingAllRead
-            ? const SizedBox.square(
-                dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
-            : const Icon(Icons.done_all_rounded, size: 20),
-        label: Text(controller.markingAllRead
-            ? 'Marking as read…'
-            : 'Mark all as read'),
-      ),
+    if (controller.markingAllRead) {
+      return const SizedBox(
+          width: 48,
+          height: 48,
+          child: Center(
+              child: SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2))));
+    }
+    return PopupMenuButton<String>(
+      tooltip: 'Message options',
+      icon: Icon(Icons.more_horiz, color: context.colors.light),
+      constraints: const BoxConstraints(minWidth: 200, maxWidth: 300),
+      itemBuilder: (context) => const [
+        PopupMenuItem(
+            value: 'read',
+            child: Row(children: [
+              Icon(Icons.done_all_rounded, size: 20),
+              SizedBox(width: 12),
+              Flexible(child: Text('Mark all as read')),
+            ])),
+      ],
+      onSelected: (_) async {
+        final failures = await controller.markAllRead();
+        if (!context.mounted || failures == 0) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content:
+              Text('Some chats could not be marked as read. Please try again.'),
+        ));
+      },
     );
   }
 }
